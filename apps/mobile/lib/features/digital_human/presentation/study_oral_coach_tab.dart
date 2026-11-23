@@ -1731,16 +1731,20 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_recordingActive || _busy) {
       return;
     }
+    // Full-duplex keeps the LiveKit mic open; hold-to-talk must not tear it down.
+    if (_duplexLive) {
+      await _liveKit.setMicrophoneEnabled(true);
+      if (mounted) {
+        setState(() => _status = '全双工聆听中 · 直接说即可打断外教');
+      }
+      return;
+    }
     if (_podcastPlaying) await _pauseArticlePodcast(forQuestion: true);
     if (_coachSpeaking) {
       await _interruptCoachSpeech();
     }
-    if (_liveKit.room != null || _duplexLive) {
-      // Prefer hold-to-talk over a silent duplex room with no agent.
-      setState(() {
-        _duplexLive = false;
-        _status = '正在听你说…';
-      });
+    if (_liveKit.room != null) {
+      // Stale room without a ready agent — clear before HTTP hold-to-talk.
       await _liveKit.disconnect();
       if (!mounted) return;
     }
@@ -2986,6 +2990,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_busy || _recordingActive) {
       return;
     }
+    // Duplex: mic is already published to LiveKit; pressing must not switch
+    // back to HTTP hold-to-talk (that previously disconnected the room).
+    if (_duplexLive) {
+      await _liveKit.setMicrophoneEnabled(true);
+      if (mounted) {
+        setState(() => _status = '全双工聆听中 · 直接说即可打断外教');
+      }
+      return;
+    }
     if (_podcastPlaying) await _pauseArticlePodcast(forQuestion: true);
     if (_coachSpeaking) {
       await _interruptCoachSpeech();
@@ -3007,6 +3020,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   Future<void> _onHoldEnd() async {
     _holdPressed = false;
+    if (_duplexLive) {
+      // Keep LiveKit mic open for barge-in; do not stop a local recorder.
+      return;
+    }
     if (!_recordingActive) {
       return;
     }
@@ -3325,15 +3342,23 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   Widget build(BuildContext context) {
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
     final DigitalHumanPersona persona = settings.selectedDigitalHuman;
-    final String orbHint = _recordingActive
-        ? (_pendingResay != null ? '正在跟读地道英文…' : '正在听你说…')
-        : (_busy
-              ? '外教思考中…'
-              : (_pendingResay != null
-                    ? '按住再说一次'
-                    : (_status.trim().isNotEmpty
-                          ? _status
-                          : (_started ? '你可以开始说' : '点麦克风开始对话'))));
+    final String orbHint = _duplexLive
+        ? (_duplexAgentSpeaking
+              ? '外教在说 · 插话即可打断'
+              : (_duplexLearnerSpeaking
+                    ? '正在听你说（全双工）'
+                    : (_duplexThinking
+                          ? '外教思考中…'
+                          : '全双工开麦中 · 直接说，无需按住')))
+        : (_recordingActive
+              ? (_pendingResay != null ? '正在跟读地道英文…' : '正在听你说…')
+              : (_busy
+                    ? '外教思考中…'
+                    : (_pendingResay != null
+                          ? '按住再说一次'
+                          : (_status.trim().isNotEmpty
+                                ? _status
+                                : (_started ? '你可以开始说' : '点麦克风开始对话')))));
     final bool avatarSpeaking = _coachSpeaking || _duplexAgentSpeaking;
     final bool avatarListening = _recordingActive || _duplexLearnerSpeaking;
     final String stageLabel = avatarSpeaking
@@ -3776,6 +3801,53 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                       ],
                     ),
                   ),
+                ),
+              ),
+            )
+          else if (_duplexLive)
+            // Open-mic indicator — tap only re-asserts LiveKit mic (no hold).
+            Material(
+              color: Colors.transparent,
+              child: InkWell(
+                key: const ValueKey<String>('study-oral-coach-mic-duplex'),
+                customBorder: const CircleBorder(),
+                onTap: _busy
+                    ? null
+                    : () => unawaited(_liveKit.setMicrophoneEnabled(true)),
+                child: AnimatedBuilder(
+                  animation: _orbPulse,
+                  builder: (BuildContext context, Widget? child) {
+                    final double t = _duplexLearnerSpeaking
+                        ? 0.55 + _orbPulse.value * 0.45
+                        : 0.4 + _orbPulse.value * 0.2;
+                    return Container(
+                      width: 54,
+                      height: 54,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        gradient: RadialGradient(
+                          colors: <Color>[
+                            Color.lerp(
+                                  const Color(0xFF58CC02),
+                                  const Color(0xFFE8DEFF),
+                                  t,
+                                ) ??
+                                const Color(0xFF58CC02),
+                            const Color(0xFF2F9E44),
+                            const Color(0xFF1B4332),
+                          ],
+                          stops: const <double>[0, 0.55, 1],
+                        ),
+                      ),
+                      child: Icon(
+                        _duplexLearnerSpeaking
+                            ? Icons.graphic_eq_rounded
+                            : Icons.mic_rounded,
+                        color: Colors.white.withValues(alpha: 0.95),
+                        size: 28,
+                      ),
+                    );
+                  },
                 ),
               ),
             )

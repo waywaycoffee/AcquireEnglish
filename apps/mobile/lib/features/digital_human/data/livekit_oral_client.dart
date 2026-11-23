@@ -153,6 +153,10 @@ class LiveKitOralClient {
     try {
       await room.connect(url, creds.token).timeout(const Duration(seconds: 15));
       if (_room != room) throw StateError('语音连接已取消');
+      // Prefer loudspeaker so coach TTS is audible during duplex (esp. Android).
+      try {
+        await Hardware.instance.setSpeakerphoneOn(true);
+      } catch (_) {}
       if (enableMicrophone) {
         final publication = await room.localParticipant?.setMicrophoneEnabled(
           true,
@@ -160,6 +164,7 @@ class LiveKitOralClient {
         if (publication == null) throw StateError('麦克风未发布');
       }
       if (context != null) await publishContext(context);
+      onStatus?.call('实时麦已打开，可直接说');
       return room;
     } catch (_) {
       if (_room == room) await disconnect();
