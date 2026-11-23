@@ -16,7 +16,7 @@ import urllib.parse
 import urllib.request
 import uuid
 from pathlib import Path
-from typing import Any
+from typing import Any, Callable
 
 from app.config import settings
 
@@ -560,10 +560,19 @@ def collect_infra_snapshot() -> dict[str, Any]:
 
     services: dict[str, str] = {
         "acquireenglish-api": _service_status("acquireenglish-api"),
+        "acquireenglish-oral-coach": _service_status("acquireenglish-oral-coach"),
+        "acquireenglish-openlist": _service_status("acquireenglish-openlist"),
         "nginx": _service_status("nginx"),
+        "coturn": _service_status("coturn"),
     }
     pg = "unknown"
-    for unit in ("postgresql", "postgresql@16-main", "postgresql@15-main", "postgresql@14-main"):
+    for unit in (
+        "postgresql",
+        "postgresql@18-main",
+        "postgresql@16-main",
+        "postgresql@15-main",
+        "postgresql@14-main",
+    ):
         st = _service_status(unit)
         if st == "active":
             pg = st
@@ -575,6 +584,8 @@ def collect_infra_snapshot() -> dict[str, Any]:
     if redis == "unknown":
         redis = _service_status("redis")
     services["redis"] = redis
+
+    endpoint_health = _probe_backend_endpoints()
 
     app_dirs = []
     for label, path in (
@@ -627,9 +638,167 @@ def collect_infra_snapshot() -> dict[str, Any]:
         "mounts": mounts,
         "block_devices": _block_devices(),
         "services": services,
+        "endpoint_health": endpoint_health,
         "app_dirs": app_dirs,
         "aliyun": cloud,
-        "alerts": _build_alerts(cpu_pct, mem_pct, root_mount, services, cloud),
+        "alerts": _build_alerts(
+            cpu_pct, mem_pct, root_mount, services, cloud, endpoint_health
+        ),
+    }
+
+
+def _http_json(
+    url: str,
+    *,
+    timeout: float = 5.0,
+    expect: Callable[[dict[str, Any]], str | None] | None = None,
+) -> dict[str, Any]:
+    started = time.perf_counter()
+    try:
+        req = urllib.request.Request(
+            url,
+            headers={"User-Agent": "AcquireEnglish-InfraMonitor/1.0", "Accept": "application/json"},
+        )
+        with urllib.request.urlopen(req, timeout=timeout) as resp:
+            status = int(getattr(resp, "status", 200) or 200)
+            raw = resp.read(65536).decode("utf-8", errors="replace")
+            latency_ms = int((time.perf_counter() - started) * 1000)
+            body: dict[str, Any] = {}
+            try:
+                parsed = json.loads(raw)
+                if isinstance(parsed, dict):
+                    body = parsed
+            except json.JSONDecodeError:
+                body = {}
+            detail = f"HTTP {status}"
+            state = "healthy"
+            if status >= 400:
+                state = "unhealthy"
+                detail = f"HTTP {status}"
+            elif expect is not None:
+                err = expect(body)
+                if err:
+                    state = "unhealthy"
+                    detail = err
+            if state == "healthy" and latency_ms >= 2500:
+                state = "degraded"
+                detail = f"HTTP {status} · 偏慢 {latency_ms}ms"
+            return {
+                "ok": state == "healthy",
+                "state": state,
+                "http_status": status,
+                "latency_ms": latency_ms,
+                "detail": detail,
+                "url": url,
+            }
+    except Exception as exc:  # noqa: BLE001
+        return {
+            "ok": False,
+            "state": "unhealthy",
+            "http_status": 0,
+            "latency_ms": int((time.perf_counter() - started) * 1000),
+            "detail": str(exc)[:160],
+            "url": url,
+        }
+
+
+def _probe_backend_endpoints() -> dict[str, Any]:
+    """HTTP-level health for API / coach / GPU-box dependencies."""
+    def status_ok(body: dict[str, Any]) -> str | None:
+        if str(body.get("status") or "").lower() in ("ok", "healthy", "up"):
+            return None
+        return f"status={body.get('status')!r}"
+
+    def coach_ready(body: dict[str, Any]) -> str | None:
+        if body.get("ready") is True:
+            return None
+        return f"ready={body.get('ready')!r}"
+
+    gpu_ip = (
+        os.environ.get("GPU_BOX_TAILSCALE_IP", "").strip()
+        or "100.115.252.55"
+    )
+    probes = [
+        ("api_local", "API 本机", "http://127.0.0.1:5200/api/health", status_ok, True),
+        ("oral_coach_local", "口语管线本机", "http://127.0.0.1:8770/api/health", coach_ready, True),
+        (
+            "livetalking_gpu",
+            "LiveTalking GPU",
+            f"http://{gpu_ip}:8010/",
+            None,
+            False,
+        ),
+        (
+            "ollama_gpu",
+            "本地 Qwen GPU",
+            f"http://{gpu_ip}:11434/health",
+            status_ok,
+            False,
+        ),
+    ]
+    services: list[dict[str, Any]] = []
+    for sid, name, url, expect, critical in probes:
+        # livetalking often returns HTML/302 — treat any 2xx/3xx without expect as up
+        if expect is None:
+            started = time.perf_counter()
+            try:
+                req = urllib.request.Request(
+                    url,
+                    headers={"User-Agent": "AcquireEnglish-InfraMonitor/1.0"},
+                )
+                with urllib.request.urlopen(req, timeout=5.0) as resp:
+                    status = int(getattr(resp, "status", 200) or 200)
+                    latency_ms = int((time.perf_counter() - started) * 1000)
+                    state = "healthy" if status < 400 else "unhealthy"
+                    if state == "healthy" and latency_ms >= 2500:
+                        state = "degraded"
+                    outcome = {
+                        "ok": state == "healthy",
+                        "state": state,
+                        "http_status": status,
+                        "latency_ms": latency_ms,
+                        "detail": f"HTTP {status}",
+                        "url": url,
+                    }
+            except Exception as exc:  # noqa: BLE001
+                outcome = {
+                    "ok": False,
+                    "state": "unhealthy",
+                    "http_status": 0,
+                    "latency_ms": int((time.perf_counter() - started) * 1000),
+                    "detail": str(exc)[:160],
+                    "url": url,
+                }
+        else:
+            outcome = _http_json(url, expect=expect)
+        services.append(
+            {
+                "id": sid,
+                "name": name,
+                "critical": critical,
+                **outcome,
+            }
+        )
+
+    unhealthy = [s for s in services if s["state"] == "unhealthy"]
+    degraded = [s for s in services if s["state"] == "degraded"]
+    critical_bad = [s for s in unhealthy if s.get("critical")]
+    overall = "healthy"
+    if unhealthy:
+        overall = "unhealthy" if critical_bad else "degraded"
+    elif degraded:
+        overall = "degraded"
+    return {
+        "overall": overall,
+        "ok": overall == "healthy",
+        "services": services,
+        "counts": {
+            "total": len(services),
+            "healthy": sum(1 for s in services if s["state"] == "healthy"),
+            "degraded": len(degraded),
+            "unhealthy": len(unhealthy),
+            "critical_unhealthy": len(critical_bad),
+        },
     }
 
 
@@ -639,6 +808,7 @@ def _build_alerts(
     root_mount: dict[str, Any] | None,
     services: dict[str, str],
     cloud: dict[str, Any],
+    endpoint_health: dict[str, Any] | None = None,
 ) -> list[dict[str, str]]:
     alerts: list[dict[str, str]] = []
     if cpu_pct is not None and cpu_pct >= 85:
@@ -655,6 +825,22 @@ def _build_alerts(
     for name, st in services.items():
         if st not in ("active", "unknown"):
             alerts.append({"level": "critical", "message": f"服务 {name} 状态异常：{st}"})
+    for row in (endpoint_health or {}).get("services") or []:
+        state = str(row.get("state") or "")
+        if state == "unhealthy":
+            alerts.append(
+                {
+                    "level": "critical" if row.get("critical") else "warn",
+                    "message": f"后端探测 {row.get('name')} 不健康：{row.get('detail')}",
+                }
+            )
+        elif state == "degraded":
+            alerts.append(
+                {
+                    "level": "warn",
+                    "message": f"后端探测 {row.get('name')} 偏慢：{row.get('detail')}",
+                }
+            )
     if cloud.get("configured") and not cloud.get("ok") and cloud.get("error"):
         alerts.append(
             {

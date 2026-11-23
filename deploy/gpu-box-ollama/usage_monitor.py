@@ -206,12 +206,29 @@ def install_monitor(app):
 
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
-            if self.path != '/stats':
+            path = self.path.split('?', 1)[0]
+            if path == '/stats':
+                body = json.dumps(store.snapshot()).encode()
+            elif path in ('/backend-health', '/health/services'):
+                try:
+                    from backend_health import collect_backend_health
+                except ImportError:
+                    # Allow importing when cwd differs from this folder.
+                    import importlib.util
+                    spec = importlib.util.spec_from_file_location(
+                        'backend_health',
+                        Path(__file__).with_name('backend_health.py'),
+                    )
+                    mod = importlib.util.module_from_spec(spec)
+                    assert spec.loader is not None
+                    spec.loader.exec_module(mod)
+                    collect_backend_health = mod.collect_backend_health
+                body = json.dumps(collect_backend_health()).encode()
+            else:
                 self.send_error(404)
                 return
-            body = json.dumps(store.snapshot()).encode()
             self.send_response(200)
-            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Type', 'application/json; charset=utf-8')
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             self.wfile.write(body)

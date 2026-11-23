@@ -782,6 +782,28 @@
             </tbody>
           </table></div>
         </div>
+        <div class="dash-card">
+          <h3>后端 HTTP 探测 ${escapeHtml(
+            ((data.endpoint_health || {}).overall || "—")
+          )}</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>探测</th><th>状态</th><th>延迟</th><th>说明</th></tr></thead>
+            <tbody>
+              ${((data.endpoint_health || {}).services || [])
+                .map((row) => {
+                  const st = row.state || (row.ok ? "healthy" : "unhealthy");
+                  const chip =
+                    st === "healthy" ? "ok" : st === "degraded" ? "warn" : "bad";
+                  return `<tr><td>${escapeHtml(row.name || row.id || "")}</td>
+                    <td><span class="chip ${chip}">${escapeHtml(st)}</span></td>
+                    <td>${num(row.latency_ms)} ms</td>
+                    <td>${escapeHtml(row.detail || "")}</td></tr>`;
+                })
+                .join("") ||
+                `<tr><td colspan="4" class="muted">暂无探测数据</td></tr>`}
+            </tbody>
+          </table></div>
+        </div>
         <div class="dash-card full">
           <h3>挂载点 / 本机磁盘用量</h3>
           <div class="table-wrap"><table>
