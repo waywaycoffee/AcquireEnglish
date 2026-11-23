@@ -23,6 +23,36 @@ import 'subtitle_completion_status_hub.dart';
 
 enum SubtitleResetSide { chinese, english, both }
 
+/// Confirm before wiping / regenerating subtitles that already exist.
+Future<bool> confirmRerecognizeExistingSubtitles(
+  BuildContext context, {
+  required SubtitleResetSide side,
+}) async {
+  final String label = switch (side) {
+    SubtitleResetSide.chinese => '中文字幕',
+    SubtitleResetSide.english => '英文字幕',
+    SubtitleResetSide.both => '中英字幕',
+  };
+  final bool? confirmed = await showDialog<bool>(
+    context: context,
+    builder: (BuildContext dialogContext) => AlertDialog(
+      title: Text('重新生成$label？'),
+      content: Text('本集已有$label。继续会覆盖现有内容，并重新排队生成。'),
+      actions: <Widget>[
+        TextButton(
+          onPressed: () => Navigator.of(dialogContext).pop(false),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () => Navigator.of(dialogContext).pop(true),
+          child: const Text('继续生成'),
+        ),
+      ],
+    ),
+  );
+  return confirmed == true;
+}
+
 /// Player / library「重新识别」chooser: English ASR vs Chinese EN→ZH vs both.
 Future<SubtitleResetSide?> showSubtitleRerecognizeDialog(
   BuildContext context,

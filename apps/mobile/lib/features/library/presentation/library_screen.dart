@@ -1680,6 +1680,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     if (!mounted) {
       return;
     }
+    final bool alreadyHas = switch (side) {
+      SubtitleResetSide.english => episode.hasEnglishSubtitles,
+      SubtitleResetSide.chinese => episode.hasChineseSubtitles,
+      SubtitleResetSide.both =>
+        episode.hasEnglishSubtitles || episode.hasChineseSubtitles,
+    };
+    if (alreadyHas) {
+      final bool proceed = await confirmRerecognizeExistingSubtitles(
+        context,
+        side: side,
+      );
+      if (!proceed || !mounted) {
+        return;
+      }
+    }
     final bool hasManual = await episodeHasManualSubtitleEdits(
       episodeId: episode.id,
     );

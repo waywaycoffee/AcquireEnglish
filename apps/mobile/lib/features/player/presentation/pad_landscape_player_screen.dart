@@ -3464,6 +3464,27 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       return;
     }
 
+    final bool hasEnglish = state.lines.any(
+      (PlayerSubtitleLine line) => looksEnglish(line.english),
+    );
+    final bool hasChinese = state.lines.any(
+      (PlayerSubtitleLine line) => looksChinese(line.chinese),
+    );
+    final bool alreadyHas = switch (side) {
+      SubtitleResetSide.english => hasEnglish,
+      SubtitleResetSide.chinese => hasChinese,
+      SubtitleResetSide.both => hasEnglish || hasChinese,
+    };
+    if (alreadyHas) {
+      final bool proceed = await confirmRerecognizeExistingSubtitles(
+        context,
+        side: side,
+      );
+      if (!proceed || !mounted) {
+        return;
+      }
+    }
+
     final bool hasManual = await episodeHasManualSubtitleEdits(
       episodeId: widget.episodeId,
       englishLocks: _manualEnglishByStartMs,
