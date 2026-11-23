@@ -1,5 +1,7 @@
 // ignore_for_file: always_put_control_body_on_new_line
 
+import 'dart:async';
+
 import 'package:easy_localization/easy_localization.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -44,24 +46,13 @@ Future<void> bootstrap({List<String> args = const <String>[]}) async {
   await EasyLocalization.ensureInitialized();
   initializeVideoPlayerBackend();
   await initHive();
+  // Keep cold-start short so the 8-page 启动页 can paint instead of a black window.
   await registerDailyFeedBackground();
-  await initializeVideoCoverExtractor();
   await setPreferredOrientations();
   await SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
-    await FlutterDisplayMode.setHighRefreshRate();
-    // Port must exist before any FGS callbacks from subtitle completion.
-    await SubtitleCompletionRuntime.instance.init();
-    // Ask notification / overlay early — FGS + 悬浮球 need them on Android 13+.
     try {
-      await SubtitleCompletionRuntime.instance.requestPermissions();
-    } catch (_) {}
-    // Seed WebRTC with voice-communication attributes before any room joins
-    // so oral-coach full-duplex AEC / open-mic barge-in works on Android.
-    try {
-      await LiveKitClient.initialize(
-        initialAudioSessionOptions: const AudioSessionOptions.communication(),
-      );
+      await FlutterDisplayMode.setHighRefreshRate();
     } catch (_) {}
   }
 
@@ -95,6 +86,35 @@ Future<void> bootstrap({List<String> args = const <String>[]}) async {
     if (stack is stack_trace.Chain) return stack.toTrace().vmTrace;
     return stack;
   };
+
+  // Heavy Android boot work after first frame — 启动页 can show sooner.
+  WidgetsBinding.instance.addPostFrameCallback((_) {
+    unawaited(_finishAndroidBoot());
+  });
+}
+
+Future<void> _finishAndroidBoot() async {
+  if (kIsWeb || defaultTargetPlatform != TargetPlatform.android) {
+    return;
+  }
+  try {
+    await initializeVideoCoverExtractor();
+  } catch (_) {}
+  // Port must exist before any FGS callbacks from subtitle completion.
+  try {
+    await SubtitleCompletionRuntime.instance.init();
+  } catch (_) {}
+  // Ask notification / overlay — FGS + 悬浮球 need them on Android 13+.
+  try {
+    await SubtitleCompletionRuntime.instance.requestPermissions();
+  } catch (_) {}
+  // Seed WebRTC with voice-communication attributes before any room joins
+  // so oral-coach full-duplex AEC / open-mic barge-in works on Android.
+  try {
+    await LiveKitClient.initialize(
+      initialAudioSessionOptions: const AudioSessionOptions.communication(),
+    );
+  } catch (_) {}
 }
 
 Future<void> _configureDesktopWindow() async {

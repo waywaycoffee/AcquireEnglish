@@ -1,6 +1,7 @@
 import 'package:hive_ce/hive.dart';
 
-const String kAuthSourceGuideCompleteKey = 'auth_source_guide_complete_v3';
+/// Bumped when the 8-page cinematic guide became the cold-start 启动页.
+const String kAuthSourceGuideCompleteKey = 'auth_source_guide_complete_v4';
 
 bool readAuthSourceGuideCompletedSync() {
   if (!Hive.isBoxOpen('prefs')) return false;

@@ -148,31 +148,34 @@ bool _isAuthOrLegalPath(String location) {
 GoRouter goRouter(Ref ref) {
   final bool signedIn = ref.watch(authSessionProvider).isLoggedIn;
   return GoRouter(
-  initialLocation: !signedIn
-      ? SGRoute.login.route
-      : (!readOnboardingCompletedSync()
-          ? '/onboarding'
-          : (readAuthSourceGuideCompletedSync()
-              ? SGRoute.home.route
-              : '/onboarding/auth-guide')),
+  // Cold start: 8-page cinematic guide is the 启动页 until completed once.
+  initialLocation: !readAuthSourceGuideCompletedSync()
+      ? '/onboarding/auth-guide'
+      : (!signedIn
+          ? SGRoute.login.route
+          : (!readOnboardingCompletedSync()
+              ? '/onboarding'
+              : SGRoute.home.route)),
   redirect: (BuildContext context, GoRouterState state) {
     final bool done = readOnboardingCompletedSync();
     final bool authGuideDone = readAuthSourceGuideCompletedSync();
     final String loc = state.matchedLocation;
-    if (!signedIn && !_isAuthOrLegalPath(loc)) {
-      return SGRoute.login.route;
-    }
     final bool onOnboarding = loc == '/onboarding';
     final bool onAuthGuide = loc == '/onboarding/auth-guide';
-    if (!done && !onOnboarding && !_isAuthOrLegalPath(loc)) {
-      return '/onboarding';
-    }
-    if (done &&
-        !authGuideDone &&
-        !onAuthGuide &&
-        !onOnboarding &&
-        !_isAuthOrLegalPath(loc)) {
+    // 启动页 first — before login / profile onboarding.
+    if (!authGuideDone && !onAuthGuide && !_isAuthOrLegalPath(loc)) {
       return '/onboarding/auth-guide';
+    }
+    if (!signedIn && !onAuthGuide && !_isAuthOrLegalPath(loc)) {
+      return SGRoute.login.route;
+    }
+    if (signedIn &&
+        authGuideDone &&
+        !done &&
+        !onOnboarding &&
+        !onAuthGuide &&
+        !_isAuthOrLegalPath(loc)) {
+      return '/onboarding';
     }
     return null;
   },

@@ -5,7 +5,6 @@ import 'package:go_router/go_router.dart';
 import '../../community/presentation/adventure_ui.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../domain/onboarding_profile.dart';
-import 'auth_guide_keys.dart';
 import 'focus_recommendation.dart';
 import 'onboarding_provider.dart';
 
@@ -174,22 +173,13 @@ class _FirstOpenOnboardingScreenState
                     onStart: (String route) {
                       final String target =
                           ref.read(focusRecommendationProvider)?.route ?? route;
-                      // Do not push a module route over auth-guide — that
-                      // skipped the post-register source guide in practice.
-                      if (!readAuthSourceGuideCompletedSync()) {
-                        context.go('/onboarding/auth-guide');
-                        return;
-                      }
+                      // 8-page 启动页 already ran before this profile flow.
                       context.go('/home');
                       context.push(target);
                     },
                     onHome: () => context.go('/home'),
                     recommendation: ref.watch(focusRecommendationProvider),
                     onMap: () {
-                      if (!readAuthSourceGuideCompletedSync()) {
-                        context.go('/onboarding/auth-guide');
-                        return;
-                      }
                       context.go('/discover');
                       context.push('/explore');
                     },

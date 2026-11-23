@@ -7,8 +7,10 @@ import 'package:go_router/go_router.dart';
 
 import '../../../constants/assets.dart';
 import '../../../router/app_router.dart';
+import '../../authentication/presentation/auth_session.dart';
 import 'auth_guide_keys.dart';
 import 'auth_sources_settings_screen.dart';
+import 'onboarding_provider.dart';
 
 const Color _bg = Color(0xFF07090D);
 const Color _green = Color(0xFF22C55E);
@@ -70,6 +72,16 @@ class _AuthSourceGuideScreenState extends ConsumerState<AuthSourceGuideScreen>
   Future<void> _finish({bool openSettings = false}) async {
     await markAuthSourceGuideCompleted();
     if (!mounted) return;
+    final bool signedIn = ref.read(authSessionProvider).isLoggedIn;
+    final bool profileDone = readOnboardingCompletedSync();
+    if (!signedIn) {
+      context.go(SGRoute.login.route);
+      return;
+    }
+    if (!profileDone) {
+      context.go('/onboarding');
+      return;
+    }
     if (openSettings) {
       context.go(SGRoute.home.route);
       context.push(AuthSourcesSettingsScreen.route);
