@@ -21,6 +21,10 @@ class Settings(BaseSettings):
     bilibili_cookie: str = ""
     # Optional global DashScope / 百炼 API key for web AI subtitles / scene VL.
     dashscope_api_key: str = ""
+    # Optional dedicated OpenAI-compatible podcast backend. Set all three together.
+    podcast_api_base: str = ""
+    podcast_api_key: str = ""
+    podcast_api_model: str = ""
     asr_model: str = "qwen3-asr-flash-filetrans"
     # Qwen-VL model for photo scene word refine (compatible-mode).
     # Note: older `qwen-vl-plus` is gone on DashScope; use qwen3-vl-plus.
