@@ -259,10 +259,17 @@ async def entrypoint(ctx) -> None:
             if ready:
                 spawn(send('coach.ready', {'ready': True}))
 
+    # Keep barge-in aggressive: short VAD threshold, do not discard learner
+    # audio while the coach is mid-utterance (needed for true full-duplex).
     session_kwargs: dict = {
         'vad': silero.VAD.load(),
         'llm': llm,
         'tts': tts,
+        'allow_interruptions': True,
+        'min_interruption_duration': min_duration,
+        'false_interruption_timeout': false_timeout,
+        'discard_audio_if_uninterruptible': False,
+        'aec_warmup_duration': float(os.getenv('AEC_WARMUP_DURATION', '0')),
         'turn_handling': TurnHandlingOptions(
             interruption={
                 'enabled': True,
@@ -270,6 +277,7 @@ async def entrypoint(ctx) -> None:
                 'min_duration': min_duration,
                 'false_interruption_timeout': false_timeout,
                 'resume_false_interruption': True,
+                'discard_audio_if_uninterruptible': False,
             },
         ),
     }

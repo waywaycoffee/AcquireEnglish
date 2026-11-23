@@ -6,6 +6,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_displaymode/flutter_displaymode.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:livekit_client/livekit_client.dart';
 import 'package:stack_trace/stack_trace.dart' as stack_trace;
 import 'package:window_manager/window_manager.dart';
 
@@ -54,6 +55,13 @@ Future<void> bootstrap({List<String> args = const <String>[]}) async {
     // Ask notification / overlay early — FGS + 悬浮球 need them on Android 13+.
     try {
       await SubtitleCompletionRuntime.instance.requestPermissions();
+    } catch (_) {}
+    // Seed WebRTC with voice-communication attributes before any room joins
+    // so oral-coach full-duplex AEC / open-mic barge-in works on Android.
+    try {
+      await LiveKitClient.initialize(
+        initialAudioSessionOptions: const AudioSessionOptions.communication(),
+      );
     } catch (_) {}
   }
 
