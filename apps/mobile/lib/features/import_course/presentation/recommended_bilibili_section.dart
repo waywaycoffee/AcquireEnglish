@@ -90,6 +90,7 @@ class _CreatorCard extends ConsumerStatefulWidget {
 
 class _CreatorCardState extends ConsumerState<_CreatorCard> {
   bool _busy = false;
+  bool _openingEpisode = false;
 
   bool _isFollowed(List<FollowedCreatorDto> followed) {
     final String mid = widget.item.creatorId.trim();
@@ -112,12 +113,19 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
   }
 
   Future<void> _openOneEpisode(String watchUrl) async {
-    await openBilibiliLearningOrImport(
-      context,
-      ref,
-      watchUrl: watchUrl,
-      startImportImmediately: true,
-    );
+    if (_openingEpisode) return;
+    _openingEpisode = true;
+    try {
+      await openBilibiliLearningOrImport(
+        context,
+        ref,
+        watchUrl: watchUrl,
+        startImportImmediately: true,
+        waitForPlayerClose: true,
+      );
+    } finally {
+      _openingEpisode = false;
+    }
   }
 
   Future<void> _downloadFullCollection(String watchUrl) async {

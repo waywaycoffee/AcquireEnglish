@@ -2082,42 +2082,50 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     _maybeBackfillBilibiliEpisodeCovers(course);
   }
 
+  bool _openingEpisode = false;
+
   Future<void> _openEpisodeForLearning(
     LibraryCourseData course,
     LibraryEpisodeItem item,
   ) async {
-    setState(() {
-      selectedEpisodeId = item.id;
-    });
-    if (!await _ensureVideoEpisodeAllowed(course, item)) return;
-    if (!mounted) return;
-    final bool remoteStream = isRemoteStreamVideoAsset(item.videoAsset) ||
-        isRemoteStreamVideoAsset(item.sourceUrl);
-    final bool netdiskStream = isNetdiskCourse(course) && remoteStream;
-    final bool onlineCourse = course.id.startsWith('bilibili-') ||
-        course.id.startsWith('youtube-');
-    if (onlineCourse && !isUsableLocalVideoPath(item.videoAsset)) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('正在在线播放，下载到本地后播放更流畅')),
+    if (_openingEpisode) return;
+    _openingEpisode = true;
+    try {
+      setState(() {
+        selectedEpisodeId = item.id;
+      });
+      if (!await _ensureVideoEpisodeAllowed(course, item)) return;
+      if (!mounted) return;
+      final bool remoteStream = isRemoteStreamVideoAsset(item.videoAsset) ||
+          isRemoteStreamVideoAsset(item.sourceUrl);
+      final bool netdiskStream = isNetdiskCourse(course) && remoteStream;
+      final bool onlineCourse = course.id.startsWith('bilibili-') ||
+          course.id.startsWith('youtube-');
+      if (onlineCourse && !isUsableLocalVideoPath(item.videoAsset)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('正在在线播放，下载到本地后播放更流畅')),
+        );
+      } else if (netdiskStream) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('正在通过网盘直链在线播放')),
+        );
+      }
+      await context.pushNamed<void>(
+        SGRoute.player.name,
+        pathParameters: <String, String>{'episodeId': item.id},
+        queryParameters: <String, String>{
+          'courseId': course.id,
+          if (course.id.startsWith('youtube-') &&
+              !item.hasEnglishSubtitles &&
+              !item.hasChineseSubtitles)
+            'preview': '1',
+          'autoplay': '1',
+          if (prefersNetdiskLandscapePlayback(course)) 'fullscreen': '1',
+        },
       );
-    } else if (netdiskStream) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('正在通过网盘直链在线播放')),
-      );
+    } finally {
+      _openingEpisode = false;
     }
-    context.pushNamed(
-      SGRoute.player.name,
-      pathParameters: <String, String>{'episodeId': item.id},
-      queryParameters: <String, String>{
-        'courseId': course.id,
-        if (course.id.startsWith('youtube-') &&
-            !item.hasEnglishSubtitles &&
-            !item.hasChineseSubtitles)
-          'preview': '1',
-        'autoplay': '1',
-        if (prefersNetdiskLandscapePlayback(course)) 'fullscreen': '1',
-      },
-    );
   }
 
   Future<bool> _ensureVideoEpisodeAllowed(

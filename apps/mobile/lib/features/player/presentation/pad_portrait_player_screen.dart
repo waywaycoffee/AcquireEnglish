@@ -1055,7 +1055,9 @@ class PadPortraitPlayerScreenState
       _hasOfficialEnglish = officialEnglish;
       _referenceSubtitleLines = resolvedLines;
       _isBootstrapping = false;
-      if (!usingAsrSentences && _linesMissingEnglish(resolvedLines)) {
+      if (!usingAsrSentences && !hasReliableEn &&
+          !(resource.course?.id.startsWith('bilibili-') ?? false) &&
+          !(resource.course?.id.startsWith('youtube-') ?? false)) {
         _bilingualPhase = BilingualPipelinePhase.asrProofreading;
         _bilingualPipelineLabel = '正在用语音补全英文字幕…';
         _bilingualShowAiComplete = false;
@@ -1148,7 +1150,9 @@ class PadPortraitPlayerScreenState
       );
     }
     await videoInitFuture;
-    if (mounted) {
+    if (mounted &&
+        _videoReady &&
+        state.isPlaying != _videoPlayer?.state.playing) {
       _applyPlaybackMode();
     }
   }
@@ -1586,6 +1590,7 @@ class PadPortraitPlayerScreenState
             createPlayerMediaUri(media.uri),
             httpHeaders: media.headers ?? const <String, String>{},
           ),
+          play: false,
         );
       }, timeout: Duration(seconds: isBilibili ? 30 : 8));
       if (!mounted || !identical(_videoPlayer, player)) return;
@@ -1617,6 +1622,7 @@ class PadPortraitPlayerScreenState
       _videoPosition = player.state.position;
       if (!mounted || !identical(_videoPlayer, player)) return;
       _attachVideoListeners(player);
+      PlayerSystemMediaControls.updatePlaybackState(isPlaying: shouldPlay);
       final List<SubtitleTrack> embeddedTracks = embeddedSubtitleTracks(
         player.state.tracks.subtitle,
       );
@@ -1645,7 +1651,6 @@ class PadPortraitPlayerScreenState
         unawaited(_loadCachedAiSubtitles(validateReferenceSignature: false));
       }
       if (!mounted) return;
-      _applyPlaybackMode();
       // Do not start live OCR/ZH→EN fill on open — import queue owns completion.
       unawaited(_ensureImportTimeSubtitleCompletion());
     } catch (error) {
@@ -3893,8 +3898,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     required Set<String> keyVocabularyWords,
     SubtitleChunkHighlighter? chunkHighlighter,
   }) {
-    final bool englishGenBusy =
-        _generatingAiSubtitles || _isEnglishSubtitleGenerationBusy();
+    final bool englishGenBusy = _isEnglishSubtitleGenerationBusy();
     final ({String text, double? value, String preview})? englishGenUi =
         englishGenBusy ? _englishGenerationProgressUi() : null;
     switch (_studyTab) {
@@ -4008,7 +4012,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             onAiExplain: (_) {},
             onPronounce: _stopVideo,
             showAiGenerateSubtitles: true,
-            generatingAiSubtitles: true,
+            generatingAiSubtitles: englishGenBusy,
             aiSubtitleProgressValue:
                 englishGenUi?.value ??
                 _aiSubtitleProgressValue ??
@@ -4023,7 +4027,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 _aiSubtitlePreviewText ??
                 '云端 5060 Ti 识别中，完成后会出现可跟读字幕',
             aiSubtitleErrorText: _aiSubtitleErrorText,
-            onGenerateAiSubtitles: null,
+            onGenerateAiSubtitles: englishGenBusy ? null : _handleGenerateAiSubtitles,
             bilingualPipelineLabel: _bilingualPipelineLabel,
             bilingualPipelineProgressValue: _bilingualPipelineProgress,
             showAiCompleteButton: _bilingualShowAiComplete,
@@ -5967,6 +5971,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
   }
 
   Future<void> _handleOpenFullscreen(List<LibraryEpisodeItem> episodes) async {
+    if (_isFullscreenOpen) return;
     final Widget? fullscreenVideoSurface = _buildVideoSurface();
     final bool highlightWords = ref
         .read(learningSettingsProvider)

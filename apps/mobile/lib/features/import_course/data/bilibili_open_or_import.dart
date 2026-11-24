@@ -116,6 +116,7 @@ Future<String?> openBilibiliLearningOrImport(
   required String watchUrl,
   bool startImportImmediately = false,
   bool pushPlayer = true,
+  bool waitForPlayerClose = false,
 }) async {
   final String url = watchUrl.trim();
   if (url.isEmpty) {
@@ -143,10 +144,11 @@ Future<String?> openBilibiliLearningOrImport(
       return hit.episode.id;
     }
     if (pushPlayer) {
-      context.pushNamed(
+      final player = context.pushNamed<void>(
         SGRoute.player.name,
         pathParameters: <String, String>{'episodeId': hit.episode.id},
       );
+      if (waitForPlayerClose) await player;
     }
     return hit.episode.id;
   }
@@ -163,10 +165,11 @@ Future<String?> openBilibiliLearningOrImport(
       episodeId.isNotEmpty &&
       pushPlayer &&
       context.mounted) {
-    context.pushNamed(
+    final player = context.pushNamed<void>(
       SGRoute.player.name,
       pathParameters: <String, String>{'episodeId': episodeId},
     );
+    if (waitForPlayerClose) await player;
   }
   return episodeId;
 }
