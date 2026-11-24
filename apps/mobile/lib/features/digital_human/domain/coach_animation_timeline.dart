@@ -29,44 +29,33 @@ class CoachAnimationTimeline {
       previousEnd = cue.endMs;
     }
   }
-  // Fallback for audio without phoneme timestamps. Weight pronounced
-  // letter groups and pauses, then fit them to the actual audio duration.
+  /// Coarse closed/open only. Atlas cells are not position-locked; using all
+  /// five visemes makes every coach look like it is shaking.
   factory CoachAnimationTimeline.estimate(String text, Duration duration) {
-    final List<({CoachViseme shape, int weight})> shapes = [];
-    final RegExp groups = RegExp(
-      r'[aeiouy]+|[bmp]|[fv]|[.!?,;:，。！？、]|[a-z]|[^\s]',
-      unicode: true,
-    );
-    for (final Match match in groups.allMatches(text.toLowerCase())) {
-      final String group = match[0]!;
-      final (CoachViseme shape, int weight) = switch (group[0]) {
-        'b' || 'm' || 'p' => (CoachViseme.closed, 2),
-        'f' || 'v' => (CoachViseme.teeth, 2),
-        'o' || 'u' => (CoachViseme.rounded, 4),
-        'e' || 'i' || 'y' => (CoachViseme.wide, 4),
-        'a' => (CoachViseme.open, 4),
-        '.' || '!' || '?' || '。' || '！' || '？' => (CoachViseme.closed, 8),
-        ',' || ';' || ':' || '，' || '、' => (CoachViseme.closed, 5),
-        _ => (CoachViseme.open, 1),
-      };
-      shapes.add((shape: shape, weight: weight));
-    }
-    final int totalWeight = shapes.fold(
-      0,
-      (int sum, item) => sum + item.weight,
-    );
-    final List<CoachMouthCue> cues = [];
-    int elapsedWeight = 0;
+    final int totalMs = duration.inMilliseconds.clamp(400, 20000);
+    // Longer beats for longer lines — fewer atlas cuts = less shake.
+    final int beatMs = text.trim().length > 80 ? 260 : 300;
+    final List<CoachMouthCue> cues = <CoachMouthCue>[];
     int startMs = 0;
-    for (final item in shapes) {
-      elapsedWeight += item.weight;
-      final int endMs = duration.inMilliseconds * elapsedWeight ~/ totalWeight;
+    bool open = true;
+    while (startMs < totalMs) {
+      final int endMs = (startMs + beatMs).clamp(0, totalMs);
       if (endMs > startMs) {
         cues.add(
-          CoachMouthCue(startMs: startMs, endMs: endMs, shape: item.shape),
+          CoachMouthCue(
+            startMs: startMs,
+            endMs: endMs,
+            shape: open ? CoachViseme.open : CoachViseme.closed,
+          ),
         );
-        startMs = endMs;
       }
+      startMs = endMs;
+      open = !open;
+    }
+    if (cues.isEmpty) {
+      cues.add(
+        CoachMouthCue(startMs: 0, endMs: totalMs, shape: CoachViseme.open),
+      );
     }
     return CoachAnimationTimeline(cues);
   }

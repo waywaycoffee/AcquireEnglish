@@ -543,9 +543,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _mouthTimeline = CoachAnimationTimeline.estimate(speak, dur);
     _mouthClockStart = DateTime.now();
     _mouthTicker?.cancel();
-    // Slow mouth cuts — Mia atlas cells are not locked, fast swaps look like shake.
-    DateTime lastFlip = DateTime.fromMillisecondsSinceEpoch(0);
-    _mouthTicker = Timer.periodic(const Duration(milliseconds: 140), (_) {
+    _mouthTicker = Timer.periodic(const Duration(milliseconds: 120), (_) {
       if (!mounted || _mouthTimeline == null || _mouthClockStart == null) {
         return;
       }
@@ -553,13 +551,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         DateTime.now().difference(_mouthClockStart!),
         playing: true,
       );
-      if (next == _coachMouth) return;
-      final DateTime now = DateTime.now();
-      if (now.difference(lastFlip) < const Duration(milliseconds: 160)) {
-        return;
+      // Only closed/open — other cells jump too much on these atlases.
+      final CoachViseme stable = next == CoachViseme.closed
+          ? CoachViseme.closed
+          : CoachViseme.open;
+      if (stable != _coachMouth) {
+        setState(() => _coachMouth = stable);
       }
-      lastFlip = now;
-      setState(() => _coachMouth = next);
     });
   }
 
@@ -1493,8 +1491,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       if (mounted && gen == _speakGen) {
         setState(() => _coachSpeaking = false);
-        // After speech, flash the encouraging pose from the gesture atlas.
-        _encourageLearner();
       }
     }
   }
@@ -3575,13 +3571,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           : (_started ? '按住麦克风说话' : '按住麦克风开始对话'))));
     final bool avatarSpeaking = _coachSpeaking || _duplexAgentSpeaking;
     final bool avatarThinking = _busy || (_duplexLive && _duplexThinking);
-    // Hold-to-talk OR idle waiting → listening pose (atlas cell 6).
-    final bool avatarListening = _recordingActive ||
-        _duplexLearnerSpeaking ||
-        (_started &&
-            !avatarSpeaking &&
-            !avatarThinking &&
-            !_coachEncouraging);
+    // Only real listening — idle waiting stays on closed mouth (no pose thrash).
+    final bool avatarListening =
+        _recordingActive || _duplexLearnerSpeaking;
     final bool useCartoonLips =
         settings.cartoonDigitalHuman && persona.hasCartoonAtlas;
     final String stageLabel = _coachEncouraging
@@ -3591,7 +3583,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               : (avatarThinking
                     ? '外教思考中…'
                     : (avatarListening
-                          ? (_recordingActive ? '外教在听…' : '外教在等你…')
+                          ? '外教在听…'
                           : (useCartoonLips
                                 ? '${persona.displayName} · 数字人'
                                 : persona.displayName))));
