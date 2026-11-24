@@ -14,9 +14,21 @@ def _now() -> str:
     return datetime.now(timezone.utc).isoformat()
 
 
-async def create_job(*, user_id: int, provider: str, folder: str) -> str:
+async def create_job(*, user_id: int, provider: str, folder: str) -> tuple[str, bool]:
+    """Create a job, or reuse an in-flight one for the same user+folder.
+
+    Returns ``(job_id, created)``. Caller must only spawn a worker when
+    ``created`` is True, to avoid duplicate writers.
+    """
     job_id = uuid.uuid4().hex
     async with _lock:
+        for job in _jobs.values():
+            if (
+                int(job.get("user_id") or 0) == user_id
+                and str(job.get("folder") or "") == folder
+                and str(job.get("status") or "") in {"queued", "running"}
+            ):
+                return str(job["id"]), False
         _jobs[job_id] = {
             "id": job_id,
             "user_id": user_id,
@@ -34,7 +46,7 @@ async def create_job(*, user_id: int, provider: str, folder: str) -> str:
             "created_at": _now(),
             "updated_at": _now(),
         }
-    return job_id
+    return job_id, True
 
 
 async def update_job(job_id: str, **fields: Any) -> None:

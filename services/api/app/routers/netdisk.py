@@ -12,6 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
@@ -159,6 +160,9 @@ async def _upsert_video_link(
     series_key: str | None = None,
     series_title: str | None = None,
     episode_index: int | None = None,
+    load_sidecars: bool = True,
+    verify_remote: bool = True,
+    sidecar_dir_cache: dict[str, list[str]] | None = None,
 ) -> tuple[UserLinkCourse | None, NetdiskImportItemOut]:
     if not is_video_name(path.rsplit("/", 1)[-1]):
         return None, NetdiskImportItemOut(
@@ -169,58 +173,81 @@ async def _upsert_video_link(
             ok=False,
             error="仅支持视频文件",
         )
+    title = path.rsplit("/", 1)[-1]
     client = OpenListClient()
-    try:
-        meta = await client.fs_get(path)
-    except OpenListError as exc:
-        return None, NetdiskImportItemOut(
-            path=path,
-            course_id="",
-            title="",
-            watch_url="",
-            ok=False,
-            error=str(exc),
-        )
+    if verify_remote:
+        try:
+            meta = await client.fs_get(path)
+            title = str(meta.get("name") or title)
+        except OpenListError as exc:
+            return None, NetdiskImportItemOut(
+                path=path,
+                course_id="",
+                title="",
+                watch_url="",
+                ok=False,
+                error=str(exc),
+            )
 
-    title = str(meta.get("name") or path.rsplit("/", 1)[-1])
     external_id = _external_id(provider, path)
     source = f"{provider}_netdisk"
-    existing = await db.execute(
-        select(UserLinkCourse).where(
-            UserLinkCourse.user_id == user.id,
-            UserLinkCourse.source == source,
-            UserLinkCourse.external_id == external_id,
+
+    async def _fetch_existing() -> UserLinkCourse | None:
+        result = await db.execute(
+            select(UserLinkCourse).where(
+                UserLinkCourse.user_id == user.id,
+                UserLinkCourse.source == source,
+                UserLinkCourse.external_id == external_id,
+            )
         )
-    )
-    link = existing.scalar_one_or_none()
+        return result.scalar_one_or_none()
+
+    link = await _fetch_existing()
     if link is None:
-        link = UserLinkCourse(
-            user_id=user.id,
-            source=source,
-            external_id=external_id,
-            title=title[:512],
-            author=provider,
-            watch_url=path[:1024],
-            duration_sec=60,
-        )
-        db.add(link)
-    else:
-        link.title = title[:512]
-        link.watch_url = path[:1024]
+        # SAVEPOINT: concurrent/partial re-import may race the unique index.
+        try:
+            async with db.begin_nested():
+                link = UserLinkCourse(
+                    user_id=user.id,
+                    source=source,
+                    external_id=external_id,
+                    title=title[:512],
+                    author=provider,
+                    watch_url=path[:1024],
+                    duration_sec=60,
+                )
+                db.add(link)
+                await db.flush()
+        except IntegrityError:
+            link = await _fetch_existing()
+            if link is None:
+                return None, NetdiskImportItemOut(
+                    path=path,
+                    course_id="",
+                    title=title,
+                    watch_url="",
+                    ok=False,
+                    error="写入冲突且无法读回已有记录",
+                )
+    link.title = title[:512]
+    link.watch_url = path[:1024]
 
     if series_key:
         link.series_key = series_key
         link.series_title = (series_title or link.series_title or title)[:512]
         link.episode_index = episode_index
 
-    try:
-        sidecars = await load_sidecars_for_video(client, path)
-    except Exception:  # noqa: BLE001
-        sidecars = {}
-    if sidecars.get("en"):
-        link.subtitle_en_srt = sidecars["en"]
-    if sidecars.get("zh"):
-        link.subtitle_zh_srt = sidecars["zh"]
+    if load_sidecars:
+        try:
+            sidecars = await load_sidecars_for_video(
+                client, path, dir_cache=sidecar_dir_cache
+            )
+        except Exception:  # noqa: BLE001
+            sidecars = {}
+        if sidecars.get("en"):
+            link.subtitle_en_srt = sidecars["en"]
+        if sidecars.get("zh"):
+            link.subtitle_zh_srt = sidecars["zh"]
 
     await db.flush()
     course_id = (
@@ -740,7 +767,7 @@ async def _run_series_import_job(
         )
         return
 
-    ordered = sort_video_paths(video_paths)
+    ordered = list(dict.fromkeys(sort_video_paths(video_paths)))
     total = len(ordered)
     series_key = series_key_for(user_id, provider, folder)
     title = folder_title(folder, title_override)
@@ -749,12 +776,13 @@ async def _run_series_import_job(
         phase="importing",
         total=total,
         done=0,
-        message=f"找到 {total} 个视频，开始写入…",
+        message=f"找到 {total} 个视频，开始写入（含外挂 .srt）…",
     )
 
     items: list[dict[str, Any]] = []
     ok_n = 0
     failed_n = 0
+    sidecar_dir_cache: dict[str, list[str]] = {}
     try:
         async with SessionLocal() as db:
             user = await db.get(User, user_id)
@@ -769,6 +797,20 @@ async def _run_series_import_job(
                 return
             links: list[UserLinkCourse] = []
             for i, path in enumerate(ordered, start=1):
+                name = path.rsplit("/", 1)[-1]
+                # Publish progress before the slow per-file work so the App can poll.
+                await jobs.update_job(
+                    job_id,
+                    phase="importing",
+                    done=i - 1,
+                    total=total,
+                    ok=ok_n,
+                    failed=failed_n,
+                    current=name,
+                    message=f"写入中 {i}/{total} · {name}",
+                )
+                # Yield so concurrent GET /import-jobs can run between files.
+                await asyncio.sleep(0)
                 link, item = await _upsert_video_link(
                     db=db,
                     user=user,
@@ -777,6 +819,10 @@ async def _run_series_import_job(
                     series_key=series_key,
                     series_title=title,
                     episode_index=i,
+                    # Reuse folder listing; attach sibling .srt (no ASR).
+                    load_sidecars=True,
+                    verify_remote=False,
+                    sidecar_dir_cache=sidecar_dir_cache,
                 )
                 items.append(item.model_dump())
                 if link is not None and item.ok:
@@ -784,13 +830,26 @@ async def _run_series_import_job(
                     ok_n += 1
                 else:
                     failed_n += 1
+                sub_bit = ""
+                if item.ok:
+                    flags = []
+                    if item.has_en:
+                        flags.append("英字")
+                    if item.has_zh:
+                        flags.append("中字")
+                    if flags:
+                        sub_bit = " · " + "+".join(flags)
                 await jobs.update_job(
                     job_id,
                     done=i,
                     ok=ok_n,
                     failed=failed_n,
-                    message=f"导入中 {i}/{total} · 成功 {ok_n}",
+                    current=name,
+                    message=f"已写入 {i}/{total} · 成功 {ok_n}{sub_bit}",
                 )
+                if i % 5 == 0:
+                    await db.commit()
+                    await asyncio.sleep(0)
             await db.commit()
             if not links:
                 await jobs.update_job(
@@ -846,25 +905,29 @@ async def import_netdisk_series(
         provider=payload.provider,
         folder_path=payload.folder_path,
     )
-    job_id = await jobs.create_job(
+    job_id, created = await jobs.create_job(
         user_id=user.id,
         provider=payload.provider,
         folder=folder,
     )
-    asyncio.create_task(
-        _run_series_import_job(
-            job_id=job_id,
-            user_id=user.id,
-            provider=payload.provider,
-            folder=folder,
-            title_override=payload.title,
+    if created:
+        asyncio.create_task(
+            _run_series_import_job(
+                job_id=job_id,
+                user_id=user.id,
+                provider=payload.provider,
+                folder=folder,
+                title_override=payload.title,
+            )
         )
-    )
+    existing = await jobs.get_job(job_id)
     return {
         "job_id": job_id,
-        "status": "queued",
-        "message": "已开始导入，请轮询进度",
+        "status": (existing or {}).get("status") or ("queued" if created else "running"),
+        "message": (existing or {}).get("message")
+        or ("已开始导入，请轮询进度" if created else "已有导入任务进行中"),
         "poll_path": f"/api/netdisk/import-jobs/{job_id}",
+        "resumed": not created,
     }
 
 

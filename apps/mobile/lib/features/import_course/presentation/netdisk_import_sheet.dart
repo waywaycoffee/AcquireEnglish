@@ -54,6 +54,8 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   String? _healthError;
   String? _error;
   String? _progressHint;
+  int _progressDone = 0;
+  int _progressTotal = 0;
   String? _listHint;
   String _mountPath = '';
   String? _baiduAccountLabel;
@@ -428,6 +430,8 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
       _busy = true;
       _error = null;
       _progressHint = '正在启动导入…';
+      _progressDone = 0;
+      _progressTotal = 0;
     });
     try {
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
@@ -440,17 +444,26 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
         throw Exception('服务器未返回导入任务 ID');
       }
       Map<String, dynamic> job = started;
-      for (int i = 0; i < 1800; i++) {
+      for (int i = 0; i < 3600; i++) {
         job = await api.netdiskImportJob(jobId);
         final String status = '${job['status'] ?? ''}';
         final String message = '${job['message'] ?? ''}';
+        final String current = '${job['current'] ?? ''}';
         final int done = int.tryParse('${job['done'] ?? 0}') ?? 0;
         final int total = int.tryParse('${job['total'] ?? 0}') ?? 0;
         if (!mounted) return;
         setState(() {
-          _progressHint = message.isNotEmpty
-              ? message
-              : (total > 0 ? '导入中 $done/$total' : '处理中…');
+          _progressDone = done;
+          _progressTotal = total;
+          if (total > 0) {
+            final String fileBit =
+                current.isNotEmpty ? '\n$current' : '';
+            _progressHint = message.isNotEmpty
+                ? '$message$fileBit'
+                : '导入中 $done/$total$fileBit';
+          } else {
+            _progressHint = message.isNotEmpty ? message : '处理中…';
+          }
         });
         if (status == 'done') {
           final Object? resultRaw = job['result'];
@@ -467,7 +480,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
         if (status == 'error') {
           throw Exception('${job['error'] ?? job['message'] ?? '导入失败'}');
         }
-        await Future<void>.delayed(const Duration(seconds: 1));
+        await Future<void>.delayed(const Duration(milliseconds: 400));
       }
       throw Exception('导入超时，请稍后在课程库查看是否已写入');
     } catch (error) {
@@ -475,6 +488,8 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
       setState(() {
         _busy = false;
         _progressHint = null;
+        _progressDone = 0;
+        _progressTotal = 0;
         _error = '$error'.replaceFirst('Exception: ', '');
       });
     }
@@ -851,22 +866,50 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                       ),
                       child: Text(
                         _busy
-                            ? (_progressHint ?? '导入中…')
+                            ? (_progressTotal > 0
+                                ? '导入中 $_progressDone/$_progressTotal'
+                                : '导入中…')
                             : _videoPathsInDir.isNotEmpty
                                 ? '导入本文件夹为课程（${_videoPathsInDir.length} 集）'
                                 : '导入本文件夹为课程（含 Season 子目录）',
                       ),
                     ),
-                    if (_busy && _progressHint != null) ...<Widget>[
-                      const SizedBox(height: 8),
-                      Text(
-                        _progressHint!,
-                        textAlign: TextAlign.center,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: AppDesignTokens.textSecondary,
+                    if (_busy) ...<Widget>[
+                      const SizedBox(height: 10),
+                      if (_progressTotal > 0)
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            value: (_progressDone / _progressTotal)
+                                .clamp(0.0, 1.0),
+                            minHeight: 8,
+                            backgroundColor: AppDesignTokens.borderGray,
+                            color: AppDesignTokens.primaryBlueDark,
+                          ),
+                        )
+                      else
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(4),
+                          child: LinearProgressIndicator(
+                            minHeight: 8,
+                            backgroundColor: AppDesignTokens.borderGray,
+                            color: AppDesignTokens.primaryBlueDark,
+                          ),
                         ),
-                      ),
+                      if (_progressHint != null) ...<Widget>[
+                        const SizedBox(height: 8),
+                        Text(
+                          _progressHint!,
+                          textAlign: TextAlign.center,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: AppDesignTokens.textSecondary,
+                          ),
+                        ),
+                      ],
                     ],
                     const SizedBox(height: 8),
                     OutlinedButton(

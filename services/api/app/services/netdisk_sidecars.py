@@ -195,23 +195,35 @@ async def fetch_openlist_text(client: OpenListClient, path: str) -> str | None:
 async def load_sidecars_for_video(
     client: OpenListClient,
     video_path: str,
+    *,
+    dir_cache: dict[str, list[str]] | None = None,
 ) -> dict[Lang, str]:
-    """List the parent folder, match sidecars, return {en|zh: srt body}."""
+    """List the parent folder, match sidecars, return {en|zh: srt body}.
+
+    ``dir_cache`` caches subtitle filenames per parent folder so bulk series
+    import does not re-list the same Season directory for every episode.
+    """
     parent = str(PurePosixPath(video_path).parent)
     video_name = PurePosixPath(video_path).name
-    try:
-        data = await client.fs_list(parent)
-    except OpenListError:
-        return {}
-    content = data.get("content") if isinstance(data, dict) else None
-    names: list[str] = []
-    if isinstance(content, list):
-        for item in content:
-            if not isinstance(item, dict) or item.get("is_dir"):
-                continue
-            name = str(item.get("name") or "")
-            if is_subtitle_name(name):
-                names.append(name)
+    names: list[str] | None = None
+    if dir_cache is not None and parent in dir_cache:
+        names = dir_cache[parent]
+    else:
+        try:
+            data = await client.fs_list(parent)
+        except OpenListError:
+            return {}
+        content = data.get("content") if isinstance(data, dict) else None
+        names = []
+        if isinstance(content, list):
+            for item in content:
+                if not isinstance(item, dict) or item.get("is_dir"):
+                    continue
+                name = str(item.get("name") or "")
+                if is_subtitle_name(name):
+                    names.append(name)
+        if dir_cache is not None:
+            dir_cache[parent] = names
     if not names:
         return {}
 
