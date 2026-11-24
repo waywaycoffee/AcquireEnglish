@@ -2220,6 +2220,20 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  /// Official Baidu Open Platform OAuth (QR / login). Returns authorize_url.
+  Future<Map<String, dynamic>> startBaiduNetdiskOauth() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.netdiskBaiduOauthStart,
+      options: Options(
+        receiveTimeout: const Duration(seconds: 20),
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
   Future<void> unbindNetdisk(String provider) async {
     await _dio.delete<dynamic>('api/netdisk/bind/$provider');
   }

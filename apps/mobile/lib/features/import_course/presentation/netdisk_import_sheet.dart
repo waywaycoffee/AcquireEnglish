@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../authentication/presentation/auth_session.dart';
 import '../../library/presentation/library_catalog_provider.dart';
@@ -46,12 +47,15 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   bool _loading = true;
   bool _busy = false;
   bool _openlistReady = false;
+  bool _baiduOauthReady = false;
   bool _bound = false;
   bool _healthy = true;
+  bool _showAdvancedCookie = false;
   String? _healthError;
   String? _error;
   String? _listHint;
   String _mountPath = '';
+  Timer? _oauthPoll;
 
   static const List<(String, String)> _providers = <(String, String)>[
     ('baidu', '百度'),
@@ -74,6 +78,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
 
   @override
   void dispose() {
+    _oauthPoll?.cancel();
     _credential.dispose();
     super.dispose();
   }
@@ -100,9 +105,11 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
       case 'pan115':
         return '在浏览器登录 115，复制 Cookie 粘贴到下方。';
       default:
-        return '粘贴百度网盘 Cookie（含 BDUSS/STOKEN）或 refresh_token。';
+        return '粘贴百度网盘 Cookie（含 BDUSS/STOKEN）或 refresh_token（高级）。';
     }
   }
+
+  bool get _useBaiduOauth => _provider == 'baidu' && _baiduOauthReady;
 
   Future<void> _reloadStatus() async {
     if (!ref.read(authSessionProvider).isLoggedIn) {
@@ -120,6 +127,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
       final Map<String, dynamic> status =
           await ref.read(acquireApiClientProvider).netdiskStatus();
       final bool ready = status['openlist_configured'] == true;
+      final bool baiduOauth = status['baidu_oauth_configured'] == true;
       final List<dynamic> providers =
           (status['providers'] as List<dynamic>?) ?? const <dynamic>[];
       bool bound = false;
@@ -139,6 +147,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
       if (!mounted) return;
       setState(() {
         _openlistReady = ready;
+        _baiduOauthReady = baiduOauth;
         _bound = bound;
         _mountPath = mount;
         _healthy = healthy;
@@ -146,6 +155,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
         _loading = false;
       });
       if (bound && healthy) {
+        _oauthPoll?.cancel();
         await _loadDir();
       }
     } catch (error) {
@@ -179,6 +189,48 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
       setState(() => _error = '$error'.replaceFirst('Exception: ', ''));
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _startBaiduOauth() async {
+    setState(() {
+      _busy = true;
+      _error = null;
+    });
+    try {
+      final Map<String, dynamic> started =
+          await ref.read(acquireApiClientProvider).startBaiduNetdiskOauth();
+      final String url = '${started['authorize_url'] ?? ''}'.trim();
+      if (url.isEmpty) {
+        throw Exception('未返回授权地址');
+      }
+      final Uri uri = Uri.parse(url);
+      final bool opened = await launchUrl(
+        uri,
+        mode: LaunchMode.externalApplication,
+      );
+      if (!opened) {
+        throw Exception('无法打开百度授权页，请检查浏览器');
+      }
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = '请在浏览器中用百度 App 扫码或登录授权，完成后会自动刷新';
+      });
+      _oauthPoll?.cancel();
+      _oauthPoll = Timer.periodic(const Duration(seconds: 3), (_) {
+        unawaited(_reloadStatus());
+      });
+      // Stop polling after 3 minutes.
+      Timer(const Duration(minutes: 3), () {
+        _oauthPoll?.cancel();
+      });
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _busy = false;
+        _error = '$error'.replaceFirst('Exception: ', '');
+      });
     }
   }
 
@@ -448,55 +500,88 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                       style: TextStyle(color: AppDesignTokens.textSecondary),
                     ),
                   if (_openlistReady && !_bound) ...<Widget>[
-                    Text(
-                      _credentialHint(),
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: AppDesignTokens.textSecondary,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    TextField(
-                      controller: _credential,
-                      maxLines: 4,
-                      style: TextStyle(color: AppDesignTokens.textPrimary),
-                      cursorColor: AppDesignTokens.primaryBlueDark,
-                      decoration: InputDecoration(
-                        filled: true,
-                        fillColor: AppDesignTokens.softWhite,
-                        hintText: 'Cookie / token',
-                        hintStyle: TextStyle(
+                    if (_useBaiduOauth) ...<Widget>[
+                      Text(
+                        '用百度账号扫码或登录授权，即可导入你自己网盘里的视频（不支持分享链接）。',
+                        style: TextStyle(
+                          fontSize: 13,
                           color: AppDesignTokens.textSecondary,
                         ),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: AppDesignTokens.borderGray,
-                          ),
+                      ),
+                      const SizedBox(height: 12),
+                      FilledButton.icon(
+                        onPressed: _busy ? null : _startBaiduOauth,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppDesignTokens.primaryBlueDark,
+                          foregroundColor: AppDesignTokens.onAccent,
+                          minimumSize: const Size.fromHeight(48),
                         ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: BorderSide(
-                            color: AppDesignTokens.borderGray,
-                          ),
+                        icon: const Icon(Icons.qr_code_2_rounded),
+                        label: Text(_busy ? '打开授权中…' : '百度扫码 / 账号授权'),
+                      ),
+                      const SizedBox(height: 8),
+                      TextButton(
+                        onPressed: _busy
+                            ? null
+                            : () => setState(
+                                  () => _showAdvancedCookie = !_showAdvancedCookie,
+                                ),
+                        child: Text(
+                          _showAdvancedCookie ? '收起高级方式' : '高级：粘贴 Cookie',
                         ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(12),
-                          borderSide: const BorderSide(
-                            color: AppDesignTokens.primaryBlueDark,
+                      ),
+                    ],
+                    if (!_useBaiduOauth || _showAdvancedCookie) ...<Widget>[
+                      Text(
+                        _credentialHint(),
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: AppDesignTokens.textSecondary,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      TextField(
+                        controller: _credential,
+                        maxLines: 4,
+                        style: TextStyle(color: AppDesignTokens.textPrimary),
+                        cursorColor: AppDesignTokens.primaryBlueDark,
+                        decoration: InputDecoration(
+                          filled: true,
+                          fillColor: AppDesignTokens.softWhite,
+                          hintText: 'Cookie / token',
+                          hintStyle: TextStyle(
+                            color: AppDesignTokens.textSecondary,
+                          ),
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppDesignTokens.borderGray,
+                            ),
+                          ),
+                          enabledBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: BorderSide(
+                              color: AppDesignTokens.borderGray,
+                            ),
+                          ),
+                          focusedBorder: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            borderSide: const BorderSide(
+                              color: AppDesignTokens.primaryBlueDark,
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 10),
-                    FilledButton(
-                      onPressed: _busy ? null : _bind,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: AppDesignTokens.primaryBlueDark,
-                        foregroundColor: AppDesignTokens.onAccent,
+                      const SizedBox(height: 10),
+                      FilledButton(
+                        onPressed: _busy ? null : _bind,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: AppDesignTokens.primaryBlueDark,
+                          foregroundColor: AppDesignTokens.onAccent,
+                        ),
+                        child: Text(_busy ? '绑定中…' : '绑定并打开网盘'),
                       ),
-                      child: Text(_busy ? '绑定中…' : '绑定并打开网盘'),
-                    ),
+                    ],
                   ],
                   if (_openlistReady && _bound && !_healthy) ...<Widget>[
                     Container(

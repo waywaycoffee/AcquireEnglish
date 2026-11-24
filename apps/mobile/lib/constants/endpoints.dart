@@ -148,6 +148,7 @@ class Endpoints {
   static const String importsAsset = 'api/imports/asset';
   static const String netdiskStatus = 'api/netdisk/status';
   static const String netdiskBind = 'api/netdisk/bind';
+  static const String netdiskBaiduOauthStart = 'api/netdisk/baidu/oauth/start';
   static const String netdiskList = 'api/netdisk/list';
   static const String netdiskImport = 'api/netdisk/import';
   static const String netdiskImportSeries = 'api/netdisk/import-series';

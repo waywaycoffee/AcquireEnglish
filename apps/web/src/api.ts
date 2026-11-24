@@ -119,6 +119,7 @@ export const api = {
   netdiskStatus: (token: string) =>
     request<{
       openlist_configured: boolean;
+      baidu_oauth_configured?: boolean;
       providers: Array<{
         provider: string;
         bound: boolean;
@@ -128,6 +129,12 @@ export const api = {
         label?: string;
       }>;
     }>("/api/netdisk/status", {}, token),
+  netdiskBaiduOauthStart: (token: string) =>
+    request<{ authorize_url: string; state: string; hint?: string }>(
+      "/api/netdisk/baidu/oauth/start",
+      {},
+      token,
+    ),
   netdiskBind: (token: string, provider: string, credential: string) =>
     request("/api/netdisk/bind", {
       method: "POST",

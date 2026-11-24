@@ -4,7 +4,7 @@ import { api } from "../api";
 import { useAuth } from "../auth";
 
 const PROVIDERS: { id: string; label: string; hint: string }[] = [
-  { id: "baidu", label: "百度网盘", hint: "粘贴 Cookie（BDUSS/STOKEN）或 refresh_token" },
+  { id: "baidu", label: "百度网盘", hint: "优先扫码/账号授权；高级可粘贴 Cookie" },
   { id: "quark", label: "夸克", hint: "登录 pan.quark.cn 后复制 Cookie" },
   { id: "aliyun", label: "阿里云盘", hint: "粘贴 Open refresh_token" },
   { id: "pan115", label: "115", hint: "登录 115 后复制 Cookie" },
@@ -24,6 +24,7 @@ export default function NetdiskPage() {
   const [provider, setProvider] = useState("baidu");
   const [credential, setCredential] = useState("");
   const [openlistReady, setOpenlistReady] = useState(false);
+  const [baiduOauthReady, setBaiduOauthReady] = useState(false);
   const [bound, setBound] = useState(false);
   const [healthy, setHealthy] = useState(true);
   const [healthError, setHealthError] = useState<string | null>(null);
@@ -41,6 +42,7 @@ export default function NetdiskPage() {
     if (!token) return;
     const status = await api.netdiskStatus(token);
     setOpenlistReady(!!status.openlist_configured);
+    setBaiduOauthReady(!!status.baidu_oauth_configured);
     const row = status.providers.find((p) => p.provider === provider);
     setBound(!!row?.bound);
     setMountPath(row?.mount_path ?? "");
@@ -96,6 +98,30 @@ export default function NetdiskPage() {
       if (row?.bound) await loadDir([]);
     } catch (err) {
       setError(err instanceof Error ? err.message : "绑定失败");
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function onBaiduOauth() {
+    if (!token) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const started = await api.netdiskBaiduOauthStart(token);
+      window.open(started.authorize_url, "_blank", "noopener,noreferrer");
+      setError("请在新打开的页面扫码或登录授权，完成后刷新本页");
+      const timer = window.setInterval(() => {
+        void refreshStatus().then((row) => {
+          if (row?.bound) {
+            window.clearInterval(timer);
+            void loadDir([]);
+          }
+        });
+      }, 3000);
+      window.setTimeout(() => window.clearInterval(timer), 180_000);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "无法启动百度授权");
     } finally {
       setBusy(false);
     }
@@ -166,15 +192,26 @@ export default function NetdiskPage() {
         ) : !bound ? (
           <>
             <p className="muted">{providerMeta.hint}</p>
+            {provider === "baidu" && baiduOauthReady ? (
+              <button
+                className="btn"
+                type="button"
+                disabled={busy}
+                onClick={() => void onBaiduOauth()}
+                style={{ marginBottom: 12 }}
+              >
+                {busy ? "打开授权中…" : "百度扫码 / 账号授权"}
+              </button>
+            ) : null}
             <textarea
               value={credential}
               onChange={(e) => setCredential(e.target.value)}
               rows={4}
               style={{ width: "100%", marginBottom: 8 }}
-              placeholder="Cookie / token"
+              placeholder="Cookie / token（高级）"
             />
             <button className="btn" type="button" disabled={busy} onClick={() => void onBind()}>
-              {busy ? "绑定中…" : "绑定并打开网盘"}
+              {busy ? "绑定中…" : "用 Cookie / token 绑定"}
             </button>
           </>
         ) : !healthy ? (

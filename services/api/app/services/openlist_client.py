@@ -119,7 +119,7 @@ def addition_for(provider: str, credential: str) -> str:
             },
             ensure_ascii=False,
         )
-    # Baidu: accept cookie (BDUSS/STOKEN) or a bare refresh_token.
+    # Baidu: accept cookie (BDUSS/STOKEN) or a bare refresh_token (OAuth).
     if "BDUSS" in cred.upper() or "STOKEN" in cred.upper() or ";" in cred:
         return json.dumps(
             {
@@ -128,13 +128,17 @@ def addition_for(provider: str, credential: str) -> str:
             },
             ensure_ascii=False,
         )
-    return json.dumps(
-        {
-            "refresh_token": cred,
-            "download_api": "official",
-        },
-        ensure_ascii=False,
-    )
+    addition: dict[str, Any] = {
+        "refresh_token": cred,
+        "download_api": "official",
+    }
+    # Official Open Platform app — required when not using OpenList online API.
+    app_key = (settings.baidu_netdisk_app_key or "").strip()
+    app_secret = (settings.baidu_netdisk_app_secret or "").strip()
+    if app_key and app_secret:
+        addition["client_id"] = app_key
+        addition["client_secret"] = app_secret
+    return json.dumps(addition, ensure_ascii=False)
 
 
 class OpenListClient:

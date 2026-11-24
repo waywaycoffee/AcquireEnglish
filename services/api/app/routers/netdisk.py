@@ -7,8 +7,8 @@ import re
 from pathlib import PurePosixPath
 from typing import Any, Literal
 
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.responses import RedirectResponse
+from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi.responses import HTMLResponse, RedirectResponse
 from pydantic import BaseModel, Field
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -18,6 +18,7 @@ from app.database import get_db
 from app.deps import get_current_user
 from app.models import User, UserLinkCourse, UserNetdiskBinding
 from app.schemas import CourseOut
+from app.services import baidu_netdisk_oauth as baidu_oauth
 from app.services.netdisk_crypto import encrypt_credential
 from app.services.netdisk_books import scan_book_folder
 from app.services.netdisk_episode_sort import sort_video_paths
@@ -57,6 +58,7 @@ class NetdiskBindIn(BaseModel):
 
 class NetdiskStatusOut(BaseModel):
     openlist_configured: bool
+    baidu_oauth_configured: bool = False
     providers: list[dict[str, Any]]
 
 
@@ -270,7 +272,139 @@ async def netdisk_status(
         )
     return NetdiskStatusOut(
         openlist_configured=settings.openlist_configured,
+        baidu_oauth_configured=settings.baidu_netdisk_oauth_configured,
         providers=providers,
+    )
+
+
+async def _upsert_binding(
+    *,
+    db: AsyncSession,
+    user_id: int,
+    provider: Provider,
+    credential: str,
+) -> UserNetdiskBinding:
+    mount = _mount_for(user_id, provider)
+    client = OpenListClient()
+    result = await db.execute(
+        select(UserNetdiskBinding).where(
+            UserNetdiskBinding.user_id == user_id,
+            UserNetdiskBinding.provider == provider,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None:
+        storage_id = await client.create_storage(
+            mount_path=mount,
+            provider=provider,
+            credential=credential,
+        )
+        row = UserNetdiskBinding(
+            user_id=user_id,
+            provider=provider,
+            credential_enc=encrypt_credential(credential),
+            openlist_mount_path=mount,
+            openlist_storage_id=storage_id,
+        )
+        db.add(row)
+    else:
+        storage_id = row.openlist_storage_id
+        if storage_id is None:
+            storage_id = await client.create_storage(
+                mount_path=mount,
+                provider=provider,
+                credential=credential,
+            )
+        else:
+            await client.update_storage(
+                storage_id=storage_id,
+                mount_path=mount,
+                provider=provider,
+                credential=credential,
+            )
+        row.credential_enc = encrypt_credential(credential)
+        row.openlist_mount_path = mount
+        row.openlist_storage_id = storage_id
+    await db.commit()
+    await db.refresh(row)
+    return row
+
+
+def _oauth_result_html(*, ok: bool, message: str) -> HTMLResponse:
+    color = "#16a34a" if ok else "#dc2626"
+    title = "授权成功" if ok else "授权失败"
+    body = f"""<!DOCTYPE html>
+<html lang="zh-CN"><head><meta charset="utf-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1"/>
+<title>{title} · 爱快英语</title>
+<style>
+body{{font-family:system-ui,-apple-system,sans-serif;background:#0f172a;color:#e2e8f0;
+display:flex;min-height:100vh;align-items:center;justify-content:center;margin:0;padding:24px}}
+.card{{max-width:420px;background:#1e293b;border-radius:16px;padding:28px;text-align:center}}
+h1{{color:{color};font-size:22px;margin:0 0 12px}}
+p{{line-height:1.6;margin:0;color:#cbd5e1}}
+</style></head><body><div class="card"><h1>{title}</h1><p>{message}</p></div></body></html>"""
+    return HTMLResponse(body, status_code=200 if ok else 400)
+
+
+@router.get("/baidu/oauth/start")
+async def baidu_oauth_start(
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Return Baidu authorize URL (QR-capable) for the logged-in Acquire user."""
+    _require_openlist()
+    if not settings.baidu_netdisk_oauth_configured:
+        raise HTTPException(
+            503,
+            "服务端尚未配置百度网盘开放平台 APP KEY，请联系管理员",
+        )
+    state = baidu_oauth.mint_oauth_state(user.id)
+    try:
+        url = baidu_oauth.build_authorize_url(state=state)
+    except RuntimeError as exc:
+        raise HTTPException(503, str(exc)) from exc
+    return {
+        "authorize_url": url,
+        "state": state,
+        "expires_in": 15 * 60,
+        "hint": "请在打开的页面用百度 App 扫码或登录授权，完成后返回本 App",
+    }
+
+
+@router.get("/baidu/oauth/callback")
+async def baidu_oauth_callback(
+    code: str | None = Query(None),
+    state: str | None = Query(None),
+    error: str | None = Query(None),
+    error_description: str | None = Query(None),
+    db: AsyncSession = Depends(get_db),
+) -> HTMLResponse:
+    """Baidu redirects here after QR / password authorize."""
+    if error:
+        detail = (error_description or error or "用户取消或授权失败").strip()
+        return _oauth_result_html(ok=False, message=detail)
+    if not code or not state:
+        return _oauth_result_html(ok=False, message="缺少 code 或 state")
+    user_id = baidu_oauth.parse_oauth_state(state)
+    if user_id is None:
+        return _oauth_result_html(ok=False, message="授权已过期，请返回 App 重新发起")
+    if not settings.openlist_configured:
+        return _oauth_result_html(ok=False, message="OpenList 未启用，无法完成绑定")
+    try:
+        tokens = await baidu_oauth.exchange_code_for_tokens(code)
+        await _upsert_binding(
+            db=db,
+            user_id=user_id,
+            provider="baidu",
+            credential=tokens["refresh_token"],
+        )
+    except OpenListError as exc:
+        return _oauth_result_html(ok=False, message=f"挂载网盘失败：{exc}")
+    except Exception as exc:  # noqa: BLE001
+        return _oauth_result_html(ok=False, message=str(exc)[:240])
+    return _oauth_result_html(
+        ok=True,
+        message="百度网盘已绑定。请返回爱快英语 App，下拉刷新后即可浏览自己的文件。",
     )
 
 
@@ -287,49 +421,13 @@ async def bind_netdisk(
     if len(credential) < 8:
         raise HTTPException(400, "凭证过短")
 
-    mount = _mount_for(user.id, provider)
-    client = OpenListClient()
-    result = await db.execute(
-        select(UserNetdiskBinding).where(
-            UserNetdiskBinding.user_id == user.id,
-            UserNetdiskBinding.provider == provider,
-        )
-    )
-    row = result.scalar_one_or_none()
     try:
-        if row is None:
-            storage_id = await client.create_storage(
-                mount_path=mount,
-                provider=provider,
-                credential=credential,
-            )
-            row = UserNetdiskBinding(
-                user_id=user.id,
-                provider=provider,
-                credential_enc=encrypt_credential(credential),
-                openlist_mount_path=mount,
-                openlist_storage_id=storage_id,
-            )
-            db.add(row)
-        else:
-            storage_id = row.openlist_storage_id
-            if storage_id is None:
-                storage_id = await client.create_storage(
-                    mount_path=mount,
-                    provider=provider,
-                    credential=credential,
-                )
-            else:
-                await client.update_storage(
-                    storage_id=storage_id,
-                    mount_path=mount,
-                    provider=provider,
-                    credential=credential,
-                )
-            row.credential_enc = encrypt_credential(credential)
-            row.openlist_mount_path = mount
-            row.openlist_storage_id = storage_id
-        await db.commit()
+        row = await _upsert_binding(
+            db=db,
+            user_id=user.id,
+            provider=provider,
+            credential=credential,
+        )
     except OpenListError as exc:
         await db.rollback()
         raise HTTPException(502, f"OpenList 绑定失败：{exc}") from exc
@@ -337,7 +435,7 @@ async def bind_netdisk(
     return {
         "ok": True,
         "provider": provider,
-        "mount_path": mount,
+        "mount_path": row.openlist_mount_path,
         "storage_id": row.openlist_storage_id,
     }
 

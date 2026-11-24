@@ -89,6 +89,13 @@ class Settings(BaseSettings):
     openlist_admin_password: str = ""
     # Public base for OpenList links if different from openlist_base_url (nginx reverse proxy).
     openlist_public_base: str = ""
+    # Baidu Netdisk Open Platform (official OAuth / QR). Empty = cookie-only bind.
+    baidu_netdisk_app_key: str = ""
+    baidu_netdisk_app_secret: str = ""
+    # Must match the callback registered in Baidu developer console.
+    baidu_netdisk_redirect_uri: str = (
+        "https://acquireenglish.curlhairai.com/api/netdisk/baidu/oauth/callback"
+    )
     # Optional token for approving community reclassify requests (header X-Community-Admin-Token).
     community_admin_token: str = ""
     # Ops console (/admin + /api/admin/*): username + password + X-Admin-Token.
@@ -182,6 +189,13 @@ class Settings(BaseSettings):
     def openlist_configured(self) -> bool:
         return bool(
             self.openlist_base_url.strip() and self.openlist_admin_password.strip()
+        )
+
+    @property
+    def baidu_netdisk_oauth_configured(self) -> bool:
+        return bool(
+            self.baidu_netdisk_app_key.strip()
+            and self.baidu_netdisk_app_secret.strip()
         )
 
 
