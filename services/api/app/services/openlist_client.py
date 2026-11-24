@@ -120,17 +120,29 @@ def addition_for(provider: str, credential: str) -> str:
             ensure_ascii=False,
         )
     # Baidu: accept cookie (BDUSS/STOKEN) or a bare refresh_token (OAuth).
+    # Empty order_by/order_direction makes OpenList call xpan/file with bad
+    # params and Baidu returns errno:2 ("参数错误") on every list.
+    baidu_common: dict[str, Any] = {
+        "root_folder_path": "/",
+        "order_by": "name",
+        "order_direction": "asc",
+        "download_api": "official",
+        "custom_crack_ua": "netdisk",
+        "upload_thread": "3",
+    }
     if "BDUSS" in cred.upper() or "STOKEN" in cred.upper() or ";" in cred:
         return json.dumps(
             {
+                **baidu_common,
                 "cookie": cred,
-                "download_api": "official",
             },
             ensure_ascii=False,
         )
     addition: dict[str, Any] = {
+        **baidu_common,
         "refresh_token": cred,
-        "download_api": "official",
+        # Own AppKey tokens must not go through OpenList online renew API.
+        "use_online_api": False,
     }
     # Official Open Platform app — required when not using OpenList online API.
     app_key = (settings.baidu_netdisk_app_key or "").strip()
