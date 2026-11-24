@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../router/app_router.dart';
 import '../../authentication/presentation/account_hub_sheet.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../drama/data/drama_cover_cache.dart';
 import '../../growth/presentation/growth_provider.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/data/bilibili_open_or_import.dart';
@@ -40,6 +41,13 @@ class PadHomeScreen extends ConsumerStatefulWidget {
 
 class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
   bool _isOpeningEpisode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    primeDramaCoverCacheSyncFromPersisted();
+    unawaited(primeDramaCoverCacheFromDisk());
+  }
 
   @override
   Widget build(BuildContext context) {

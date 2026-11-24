@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../drama/data/drama_cover_cache.dart';
+import '../../../drama/domain/drama_catalog.dart';
 import '../../../import_course/data/bilibili_cover_refresh.dart';
 import '../../../import_course/data/bilibili_import_service.dart';
 import '../../../import_course/domain/bilibili_import.dart';
@@ -11,7 +13,7 @@ import '../library_catalog_provider.dart';
 import '../library_mock_data.dart';
 import 'library_course_poster.dart';
 
-/// Course poster that backfills missing Bilibili covers (same path as 继续学习).
+/// Course poster that backfills missing Bilibili / curated-drama covers.
 class EnsuringCoursePoster extends ConsumerStatefulWidget {
   const EnsuringCoursePoster({
     required this.course,
@@ -43,7 +45,31 @@ class _EnsuringCoursePosterState extends ConsumerState<EnsuringCoursePoster> {
     return widget.course.episodes.isEmpty ? null : widget.course.episodes.first;
   }
 
-  String get _catalogCover => displayCoverForCourse(
+  String _resolvedCover({
+    required LibraryCourseData course,
+    LibraryEpisodeItem? episode,
+  }) {
+    final String catalog = displayCoverForCourse(
+      course: course,
+      episode: episode,
+    );
+    if (isDisplayableCover(catalog)) {
+      return catalog;
+    }
+    final DramaCatalogEntry? drama = catalogEntryForCourse(course);
+    if (drama != null) {
+      final String? local = cachedDramaCoverPathSync(drama.id);
+      if (local != null && isDisplayableCover(local)) {
+        return local;
+      }
+    }
+    if (_fetchedCover != null && isDisplayableCover(_fetchedCover!)) {
+      return _fetchedCover!;
+    }
+    return catalog;
+  }
+
+  String get _catalogCover => _resolvedCover(
         course: widget.course,
         episode: _episode,
       );
@@ -66,17 +92,58 @@ class _EnsuringCoursePosterState extends ConsumerState<EnsuringCoursePoster> {
   }
 
   Future<void> _ensureCover() async {
+    final LibraryCourseData course = widget.course;
     final String existing = _catalogCover;
     if (isDisplayableCover(existing)) {
       if (mounted) {
         setState(() => _fetchedCover = existing);
       }
       if (!existing.startsWith('http')) {
+        // Persist drama local path onto the course so next cold start is instant.
+        if (!isDisplayableCover(course.coverImage)) {
+          final DramaCatalogEntry? dramaHit = catalogEntryForCourse(course);
+          if (dramaHit != null) {
+            try {
+              await ref.read(libraryCatalogProvider.notifier).updateCourseCover(
+                    courseId: course.id,
+                    coverImage: existing,
+                  );
+            } catch (_) {}
+          }
+        }
         return;
       }
     }
 
-    final LibraryCourseData course = widget.course;
+    final DramaCatalogEntry? drama = catalogEntryForCourse(course);
+    if (drama != null) {
+      final String key = 'drama|${course.id}|${drama.id}';
+      if (_fetchKey == key &&
+          _fetchedCover != null &&
+          isDisplayableCover(_fetchedCover!) &&
+          !_fetchedCover!.startsWith('http')) {
+        return;
+      }
+      _fetchKey = key;
+      try {
+        final String? path = await ensureDramaCoverCached(drama);
+        if (!mounted || path == null || path.isEmpty) {
+          return;
+        }
+        if (!isDisplayableCover(path)) {
+          return;
+        }
+        setState(() => _fetchedCover = path);
+        try {
+          await ref.read(libraryCatalogProvider.notifier).updateCourseCover(
+                courseId: course.id,
+                coverImage: path,
+              );
+        } catch (_) {}
+      } catch (_) {}
+      return;
+    }
+
     if (!_isBilibiliCourse(course)) {
       return;
     }
@@ -122,19 +189,15 @@ class _EnsuringCoursePosterState extends ConsumerState<EnsuringCoursePoster> {
             .where((LibraryCourseData c) => c.id == widget.course.id)
             .firstOrNull ??
         widget.course;
-    final String catalog = displayCoverForCourse(
+    final LibraryEpisodeItem? liveEpisode = _episode == null
+        ? null
+        : live.episodes
+            .where((LibraryEpisodeItem e) => e.id == _episode!.id)
+            .firstOrNull;
+    final String path = _resolvedCover(
       course: live,
-      episode: _episode == null
-          ? null
-          : live.episodes
-                .where((LibraryEpisodeItem e) => e.id == _episode!.id)
-                .firstOrNull,
+      episode: liveEpisode,
     );
-    final String path = isDisplayableCover(catalog)
-        ? catalog
-        : (_fetchedCover != null && isDisplayableCover(_fetchedCover!)
-            ? _fetchedCover!
-            : catalog);
     return LibraryCoursePoster(
       title: live.title,
       path: path,

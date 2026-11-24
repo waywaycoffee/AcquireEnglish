@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../daily_path/presentation/today_path_card.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
+import '../../drama/data/drama_cover_cache.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../library/presentation/library_catalog_provider.dart';
@@ -50,6 +51,9 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
   @override
   void initState() {
     super.initState();
+    // So「最近看过」can paint Friends etc. from Documents/drama_covers immediately.
+    primeDramaCoverCacheSyncFromPersisted();
+    unawaited(primeDramaCoverCacheFromDisk());
     if (widget.focusVocab) {
       WidgetsBinding.instance.addPostFrameCallback((_) => _scrollToVocab());
     }
