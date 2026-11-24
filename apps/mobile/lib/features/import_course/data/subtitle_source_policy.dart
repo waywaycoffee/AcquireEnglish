@@ -53,7 +53,7 @@ class SubtitleSourceDecision {
 /// Shared subtitle-source policy for import, player open, and completion queue.
 abstract final class SubtitleSourcePolicy {
   static final RegExp hardsubHintPattern = RegExp(
-    r'中英字幕|双语字幕|硬字幕|双语|英语学习',
+    r'中英字幕|双语字幕|硬字幕|双语|英语学习|字幕版|内嵌字幕|硬字幕版',
   );
 
   static bool isHardsubHint({
@@ -63,12 +63,45 @@ abstract final class SubtitleSourcePolicy {
     String? pagePart,
     String? title,
     String? description,
+    String? videoAsset,
   }) {
     final String blob =
         '${episode?.title ?? ''} ${course?.title ?? ''} '
         '${course?.description ?? ''} ${description ?? ''} '
-        '${title ?? ''} ${sourceUrl ?? ''} ${pagePart ?? ''}';
+        '${title ?? ''} ${sourceUrl ?? ''} ${pagePart ?? ''} '
+        '${videoAsset ?? ''} ${episode?.videoAsset ?? ''} '
+        '${episode?.sourceUrl ?? ''}';
     return hardsubHintPattern.hasMatch(blob);
+  }
+
+  /// Netdisk MKV with no soft/embedded tracks is usually burned-in 硬字幕.
+  static bool looksLikeNetdiskHardsub({
+    LibraryEpisodeItem? episode,
+    LibraryCourseData? course,
+    String? videoAsset,
+    String? sourceUrl,
+    required bool hasSoftsubFiles,
+    required bool hasEmbeddedSoftTracks,
+  }) {
+    if (hasSoftsubFiles || hasEmbeddedSoftTracks) {
+      return false;
+    }
+    if (isHardsubHint(
+      episode: episode,
+      course: course,
+      sourceUrl: sourceUrl,
+      videoAsset: videoAsset,
+    )) {
+      return true;
+    }
+    final String path =
+        '${videoAsset ?? ''} ${episode?.videoAsset ?? ''} '
+        '${episode?.sourceUrl ?? ''} ${sourceUrl ?? ''} '
+        '${episode?.title ?? ''}';
+    final String lower = path.toLowerCase();
+    return lower.contains('.mkv') ||
+        lower.contains('netdisk') ||
+        lower.contains('/api/netdisk/play/');
   }
 
   /// Episode-level decision before cue bodies are trusted.
@@ -79,6 +112,7 @@ abstract final class SubtitleSourcePolicy {
     String? pagePart,
     String? title,
     String? description,
+    String? videoAsset,
   }) {
     // Hardsub / 双语课 still prefer official softsubs when B站 provides them.
     // Only fall back to speech ASR for missing sides — never wipe official CC
@@ -90,6 +124,7 @@ abstract final class SubtitleSourcePolicy {
       pagePart: pagePart,
       title: title,
       description: description,
+      videoAsset: videoAsset,
     )) {
       return const SubtitleSourceDecision(
         ignoreAllOfficialSoftsubs: false,

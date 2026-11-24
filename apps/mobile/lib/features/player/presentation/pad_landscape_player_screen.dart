@@ -37,6 +37,7 @@ import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../daily_path/presentation/oral_core_series_provider.dart';
@@ -613,6 +614,7 @@ class PadLandscapePlayerScreenState
           episode: resource.episode,
           course: resource.course,
           sourceUrl: resource.episode?.sourceUrl,
+          videoAsset: resource.videoAsset ?? _videoAsset,
         );
     // Prefer official softsubs whenever present. Speech ASR only fills gaps.
     final bool preferSpeech = sourcePolicy.ignoreAllOfficialSoftsubs;
@@ -620,6 +622,8 @@ class PadLandscapePlayerScreenState
       episode: resource.episode,
       course: resource.course,
       sourceUrl: resource.episode?.sourceUrl,
+      videoAsset: resource.videoAsset ?? _videoAsset,
+      title: resource.episode?.title,
     );
     if (isUsableSubtitlePath(enSub)) {
       try {
@@ -1740,6 +1744,8 @@ class PadLandscapePlayerScreenState
       episode: resource.episode,
       course: resource.course,
       sourceUrl: resource.episode?.sourceUrl,
+      videoAsset: videoPath ?? resource.videoAsset,
+      title: resource.episode?.title,
     );
     if (hardsubHint) {
       final ({List<PlayerSubtitleLine> lines, bool strippedChinese}) repaired =
@@ -2034,6 +2040,38 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final MissingSubtitleSide missing = detectMissingSubtitleSide(lines);
     return missing == MissingSubtitleSide.english ||
         missing == MissingSubtitleSide.both;
+  }
+
+  /// Burned-in / 字幕版 MKV with no soft files — empty UI should not say「没有字幕」.
+  bool _emptySubtitleHardsubHint({
+    LibraryEpisodeItem? episode,
+    LibraryCourseData? course,
+  }) {
+    if (state.hasLines || _embeddedSubtitleTracks.isNotEmpty) {
+      return false;
+    }
+    final bool hasSoft =
+        isUsableSubtitlePath(episode?.enSubtitleAsset) ||
+        isUsableSubtitlePath(episode?.cnSubtitleAsset);
+    if (hasSoft) {
+      return false;
+    }
+    final String? videoAsset = _videoAsset ?? episode?.videoAsset;
+    return SubtitleSourcePolicy.looksLikeNetdiskHardsub(
+          episode: episode,
+          course: course,
+          videoAsset: videoAsset,
+          sourceUrl: episode?.sourceUrl,
+          hasSoftsubFiles: false,
+          hasEmbeddedSoftTracks: false,
+        ) ||
+        SubtitleSourcePolicy.isHardsubHint(
+          episode: episode,
+          course: course,
+          sourceUrl: episode?.sourceUrl,
+          videoAsset: videoAsset,
+          title: episode?.title,
+        );
   }
 
   bool _isEnglishSubtitleGenerationBusy() {
@@ -3066,6 +3104,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         ?.value;
     final bool canGenerateAiSubtitles =
         (_videoAsset?.isNotEmpty ?? false) && !_usingAiSubtitles;
+    final bool emptySubtitleHardsubHint = _emptySubtitleHardsubHint(
+      episode: episode,
+      course: course,
+    );
     final LearningDashboardStats dashboard = ref.watch(
       learningDashboardProvider,
     );
@@ -3365,6 +3407,12 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                       onResegment: _resegmentSubtitleLines,
                                       onEditLineNote: _editLineNote,
                                       lineNotesByStartMs: _lineNotesByStartMs,
+                                      showAiGenerateSubtitles:
+                                          canGenerateAiSubtitles,
+                                      emptySubtitleHardsubHint:
+                                          emptySubtitleHardsubHint,
+                                      embeddedSoftTrackCount:
+                                          _embeddedSubtitleTracks.length,
                                       bilingualPipelineLabel:
                                           _bilingualPipelineLabel,
                                       bilingualPipelineProgressValue:
@@ -3410,6 +3458,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                       onAiExplain: (_) {},
                                       onPronounce: _stopVideo,
                                       showAiGenerateSubtitles: true,
+                                      emptySubtitleHardsubHint:
+                                          emptySubtitleHardsubHint,
+                                      embeddedSoftTrackCount:
+                                          _embeddedSubtitleTracks.length,
                                       generatingAiSubtitles:
                                           _generatingAiSubtitles ||
                                           _isEnglishSubtitleGenerationBusy(),
@@ -3459,14 +3511,19 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                           ? _handleCancelBilingualPipeline
                                           : null,
                                     )
-                                  : const Center(
+                                  : Center(
                                       child: Text(
-                                        '当前剧集没有可用字幕或视频',
+                                        emptySubtitleHardsubHint
+                                            ? '画面内已有字幕（硬字幕）\n点「语音识别」生成可跟读词级字幕'
+                                            : (_embeddedSubtitleTracks
+                                                    .isNotEmpty
+                                                ? '检测到内嵌字幕轨\n点「语音识别」生成可学习字幕'
+                                                : '当前剧集没有可用字幕或视频'),
                                         textAlign: TextAlign.center,
                                         style: TextStyle(
                                           fontSize: 16,
                                           fontWeight: FontWeight.w700,
-                                          color: Color(0xFF5F6368),
+                                          color: AppDesignTokens.textSecondary,
                                         ),
                                       ),
                                     ),

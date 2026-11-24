@@ -64,6 +64,8 @@ class PlayerSubtitleList extends StatefulWidget {
     this.onAssessLine,
     this.pronunciationUnavailableReasonForLine,
     this.showAiGenerateSubtitles = false,
+    this.emptySubtitleHardsubHint = false,
+    this.embeddedSoftTrackCount = 0,
     this.generatingAiSubtitles = false,
     this.aiSubtitleProgressValue,
     this.aiSubtitleProgressText,
@@ -142,6 +144,12 @@ class PlayerSubtitleList extends StatefulWidget {
   final ValueChanged<int>? onAssessLine;
   final String? Function(int index)? pronunciationUnavailableReasonForLine;
   final bool showAiGenerateSubtitles;
+
+  /// Burned-in 硬字幕 (no extractable soft track) — clearer empty-state copy.
+  final bool emptySubtitleHardsubHint;
+
+  /// media_kit reported embedded soft tracks that are not yet in [lines].
+  final int embeddedSoftTrackCount;
   final bool generatingAiSubtitles;
   final double? aiSubtitleProgressValue;
   final String? aiSubtitleProgressText;
@@ -1077,10 +1085,18 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
 
     final int totalLineCount = widget.lines.length;
     if (totalLineCount == 0 && widget.showAiGenerateSubtitles) {
+      final bool hardsub = widget.emptySubtitleHardsubHint;
+      final bool hasEmbedded = widget.embeddedSoftTrackCount > 0;
       return _SubtitlePlaceholder(
         icon: Icons.mic_none_rounded,
-        title: '当前视频没有字幕',
-        body: '点击下方按钮，用语音识别自动生成可跟读的词级同步字幕。',
+        title: hardsub
+            ? '画面内已有字幕（硬字幕）'
+            : (hasEmbedded ? '检测到内嵌字幕轨' : '当前视频没有可跟读字幕'),
+        body: hardsub
+            ? '硬字幕烧在画面里，不能直接点词跟读。点下方用语音识别生成可学习的词级字幕。'
+            : (hasEmbedded
+                ? '内嵌软字幕还需提取后才能点词。可点下方语音识别生成学习字幕。'
+                : '点击下方按钮，用语音识别自动生成可跟读的词级同步字幕。'),
         showAiGenerateSubtitles: widget.showAiGenerateSubtitles,
         generatingAiSubtitles: emptyGenerating,
         progressValue: emptyProgressValue,

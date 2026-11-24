@@ -53,6 +53,8 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.studyDarkStyle = false,
     this.blindListening = false,
     this.showAiGenerateSubtitles = false,
+    this.emptySubtitleHardsubHint = false,
+    this.embeddedSoftTrackCount = 0,
     this.generatingAiSubtitles = false,
     this.aiSubtitleProgressValue,
     this.aiSubtitleProgressText,
@@ -120,6 +122,8 @@ class PlayerTranscriptPanel extends StatefulWidget {
   final bool studyDarkStyle;
   final bool blindListening;
   final bool showAiGenerateSubtitles;
+  final bool emptySubtitleHardsubHint;
+  final int embeddedSoftTrackCount;
   final bool generatingAiSubtitles;
   final double? aiSubtitleProgressValue;
   final String? aiSubtitleProgressText;
@@ -213,6 +217,8 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       studyDarkStyle: widget.studyDarkStyle,
       blindListening: widget.blindListening,
       showAiGenerateSubtitles: widget.showAiGenerateSubtitles,
+      emptySubtitleHardsubHint: widget.emptySubtitleHardsubHint,
+      embeddedSoftTrackCount: widget.embeddedSoftTrackCount,
       generatingAiSubtitles: widget.generatingAiSubtitles,
       aiSubtitleProgressValue: widget.aiSubtitleProgressValue,
       aiSubtitleProgressText: widget.aiSubtitleProgressText,

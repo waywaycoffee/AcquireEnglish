@@ -45,6 +45,7 @@ import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
+import '../../import_course/data/subtitle_source_policy.dart';
 import '../../subtitle_completion/cloud_subtitle_job_tracker.dart';
 import '../../subtitle_completion/reset_episode_subtitles.dart';
 import '../../subtitle_completion/subtitle_completion_enqueue.dart';
@@ -333,9 +334,32 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
     if (!mounted) return;
     if (lines.isEmpty) {
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(const SnackBar(content: Text('当前剧集没有可查看的全文字幕')));
+      final bool hardsub = SubtitleSourcePolicy.looksLikeNetdiskHardsub(
+            episode: episode,
+            course: course,
+            videoAsset: resource.videoAsset ?? episode.videoAsset,
+            sourceUrl: episode.sourceUrl,
+            hasSoftsubFiles:
+                isUsableSubtitlePath(episode.enSubtitleAsset) ||
+                isUsableSubtitlePath(episode.cnSubtitleAsset),
+            hasEmbeddedSoftTracks: false,
+          ) ||
+          SubtitleSourcePolicy.isHardsubHint(
+            episode: episode,
+            course: course,
+            sourceUrl: episode.sourceUrl,
+            videoAsset: resource.videoAsset ?? episode.videoAsset,
+            title: episode.title,
+          );
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            hardsub
+                ? '画面内为硬字幕，暂无全文字幕。请先在播放器里用语音识别生成'
+                : '当前剧集没有可查看的全文字幕',
+          ),
+        ),
+      );
       return;
     }
 

@@ -855,6 +855,7 @@ class PadPortraitPlayerScreenState
           episode: resource.episode,
           course: resource.course,
           sourceUrl: resource.episode?.sourceUrl,
+          videoAsset: resource.videoAsset ?? _videoAsset,
         );
     // Prefer official softsubs whenever present. Speech ASR only fills gaps.
     final bool preferSpeech = sourcePolicy.ignoreAllOfficialSoftsubs;
@@ -862,6 +863,8 @@ class PadPortraitPlayerScreenState
       episode: resource.episode,
       course: resource.course,
       sourceUrl: resource.episode?.sourceUrl,
+      videoAsset: resource.videoAsset ?? _videoAsset,
+      title: resource.episode?.title,
     );
     if (isUsableSubtitlePath(enSub)) {
       try {
@@ -2179,6 +2182,8 @@ class PadPortraitPlayerScreenState
       episode: resource.episode,
       course: resource.course,
       sourceUrl: resource.episode?.sourceUrl,
+      videoAsset: videoPath ?? resource.videoAsset,
+      title: resource.episode?.title,
     );
     if (hardsubHint) {
       final ({List<PlayerSubtitleLine> lines, bool strippedChinese}) repaired =
@@ -2300,6 +2305,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           episode: resource.episode,
           course: resource.course,
           sourceUrl: resource.episode?.sourceUrl,
+          videoAsset: videoPath,
         );
     final SubtitleCompletionNeed need = await detectSubtitleCompletionNeed(
       episodeId: widget.episodeId,
@@ -2560,6 +2566,38 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final MissingSubtitleSide missing = detectMissingSubtitleSide(lines);
     return missing == MissingSubtitleSide.english ||
         missing == MissingSubtitleSide.both;
+  }
+
+  /// Burned-in / 字幕版 MKV with no soft files — empty UI should not say「没有字幕」.
+  bool _emptySubtitleHardsubHint({
+    LibraryEpisodeItem? episode,
+    LibraryCourseData? course,
+  }) {
+    if (state.hasLines || _embeddedSubtitleTracks.isNotEmpty) {
+      return false;
+    }
+    final bool hasSoft =
+        isUsableSubtitlePath(episode?.enSubtitleAsset) ||
+        isUsableSubtitlePath(episode?.cnSubtitleAsset);
+    if (hasSoft) {
+      return false;
+    }
+    final String? videoAsset = _videoAsset ?? episode?.videoAsset;
+    return SubtitleSourcePolicy.looksLikeNetdiskHardsub(
+          episode: episode,
+          course: course,
+          videoAsset: videoAsset,
+          sourceUrl: episode?.sourceUrl,
+          hasSoftsubFiles: false,
+          hasEmbeddedSoftTracks: false,
+        ) ||
+        SubtitleSourcePolicy.isHardsubHint(
+          episode: episode,
+          course: course,
+          sourceUrl: episode?.sourceUrl,
+          videoAsset: videoAsset,
+          title: episode?.title,
+        );
   }
 
   bool _isEnglishSubtitleGenerationBusy() {
@@ -3614,6 +3652,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         ?.value;
     final bool canGenerateAiSubtitles =
         (_videoAsset?.isNotEmpty ?? false) && !_usingAiSubtitles;
+    final bool emptySubtitleHardsubHint = _emptySubtitleHardsubHint(
+      episode: episode,
+      course: course,
+    );
     final bool landscapeFirst = widget.autoOpenFullscreen ||
         prefersNetdiskLandscapePlayback(course);
     // Wait until video is ready (or failed) so landscape does not open on a
@@ -3822,7 +3864,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                               : null,
                         assessmentUnavailableReason: state.hasLines
                             ? null
-                            : '当前没有可跟读的字幕',
+                            : (emptySubtitleHardsubHint
+                                  ? '画面内为硬字幕，请先用语音识别生成可跟读字幕'
+                                  : '当前没有可跟读的字幕'),
                         onCollectWord: (String word) =>
                             _handleCollectWord(word, courseContext),
                         onCollectWordAtTime: (String word, String time) =>
@@ -3880,6 +3924,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                             courseContext: courseContext,
                             settings: settings,
                             canGenerateAiSubtitles: canGenerateAiSubtitles,
+                            emptySubtitleHardsubHint: emptySubtitleHardsubHint,
                             visibleAssessment: visibleAssessment,
                             activeLine: activeLine,
                             savedVocabularyWords: savedVocabularyWords,
@@ -4080,6 +4125,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     required PlayerCourseLookupResult courseContext,
     required LearningSettingsState settings,
     required bool canGenerateAiSubtitles,
+    bool emptySubtitleHardsubHint = false,
     required PronunciationTargetSelection visibleAssessment,
     required PlayerSubtitleLine activeLine,
     required Set<String> savedVocabularyWords,
@@ -4154,6 +4200,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 _blindListening ||
                 SubtitleDisplayMode.isBlind(state.subtitleMode),
             showAiGenerateSubtitles: canGenerateAiSubtitles,
+            emptySubtitleHardsubHint: emptySubtitleHardsubHint,
+            embeddedSoftTrackCount: _embeddedSubtitleTracks.length,
             generatingAiSubtitles: englishGenBusy,
             aiSubtitleProgressValue:
                 englishGenUi?.value ?? _aiSubtitleProgressValue,
@@ -4203,6 +4251,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             onAiExplain: (_) {},
             onPronounce: _stopVideo,
             showAiGenerateSubtitles: true,
+            emptySubtitleHardsubHint: emptySubtitleHardsubHint,
+            embeddedSoftTrackCount: _embeddedSubtitleTracks.length,
             generatingAiSubtitles: englishGenBusy,
             aiSubtitleProgressValue:
                 englishGenUi?.value ??
@@ -4239,7 +4289,11 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           children: <Widget>[
             const SizedBox(height: 24),
             Text(
-              '当前剧集没有可用字幕或视频\n导入本地视频后可用语音识别生成字幕',
+              emptySubtitleHardsubHint
+                  ? '画面内已有字幕（硬字幕）\n点「语音识别」生成可跟读的词级字幕'
+                  : (_embeddedSubtitleTracks.isNotEmpty
+                        ? '检测到内嵌字幕轨\n点「语音识别」生成可学习字幕，或稍后再试提取'
+                        : '当前剧集没有可用字幕或视频\n导入本地视频后可用语音识别生成字幕'),
               textAlign: TextAlign.center,
               style: TextStyle(
                 fontSize: 15,
@@ -5280,6 +5334,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       episode: resource.episode,
       course: resource.course,
       sourceUrl: resource.episode?.sourceUrl,
+      videoAsset: resource.videoAsset ?? _videoAsset,
+      title: resource.episode?.title,
     )) {
       await _forceHardsubSpeechRegenerate(resource);
       return;
