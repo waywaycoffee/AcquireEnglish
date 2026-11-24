@@ -5,8 +5,15 @@ from __future__ import annotations
 from fastapi import APIRouter, File, Form, HTTPException, Query, UploadFile
 
 from app.services import content_media as cm
+from app.services import drama_covers as drama_covers_svc
 
 router = APIRouter(prefix="/content/media", tags=["content-media"])
+
+
+@router.get("/drama-covers")
+async def drama_covers_status() -> dict:
+    """List curated US-drama posters cached under misc/drama-covers on ECS."""
+    return drama_covers_svc.status_summary()
 
 
 @router.get("/manifest")

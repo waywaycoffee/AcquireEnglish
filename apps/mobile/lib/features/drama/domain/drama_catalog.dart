@@ -22,14 +22,14 @@ class DramaCatalogEntry {
   final String blurb;
   /// Lowercased fragments matched against imported course title/description.
   final List<String> matchAliases;
-  /// Poster hosted on ECS `/media/misc/drama-covers/…` (not in the APK).
+  /// Relative ECS path `/media/misc/drama-covers/…` (not bundled in the APK).
+  /// Resolved against the API base URL; device caches under Documents/drama_covers.
   final String? coverUrl;
   final String level;
   final int accent;
 }
 
-const String _kDramaCoverBase =
-    'https://acquireenglish.curlhairai.com/media/misc/drama-covers';
+const String _kDramaCoverBase = '/media/misc/drama-covers';
 
 const List<DramaCatalogEntry> kDramaCatalog = <DramaCatalogEntry>[
   DramaCatalogEntry(

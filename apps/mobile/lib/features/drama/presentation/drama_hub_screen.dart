@@ -12,9 +12,11 @@ import '../../player/domain/episode_clip_due.dart';
 import '../../player/domain/episode_study_progress.dart';
 import '../../player/presentation/episode_study_progress_provider.dart';
 import '../../player/presentation/widgets/episode_stage_dots.dart';
+import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../data/drama_cover_cache.dart';
 import '../domain/drama_catalog.dart';
 import '../domain/drama_course.dart';
 
@@ -43,6 +45,26 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
   _DramaFilter _filter = _DramaFilter.all;
   String? _selectedCourseId;
   bool _syncedDue = false;
+  bool _coversPrefetched = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _warmDramaCovers();
+    });
+  }
+
+  Future<void> _warmDramaCovers() async {
+    if (_coversPrefetched) {
+      return;
+    }
+    _coversPrefetched = true;
+    await prefetchAllDramaCovers();
+    if (mounted) {
+      setState(() {});
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -417,7 +439,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
   }
 }
 
-class _CatalogPosterCard extends StatelessWidget {
+class _CatalogPosterCard extends StatefulWidget {
   const _CatalogPosterCard({
     required this.entry,
     required this.owned,
@@ -433,13 +455,52 @@ class _CatalogPosterCard extends StatelessWidget {
   final VoidCallback onTap;
 
   @override
+  State<_CatalogPosterCard> createState() => _CatalogPosterCardState();
+}
+
+class _CatalogPosterCardState extends State<_CatalogPosterCard> {
+  late String? _coverPath = cachedDramaCoverPathSync(widget.entry.id);
+
+  @override
+  void initState() {
+    super.initState();
+    _resolveCover();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CatalogPosterCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.entry.id != widget.entry.id) {
+      _coverPath = cachedDramaCoverPathSync(widget.entry.id);
+      _resolveCover();
+    } else {
+      final String? hit = cachedDramaCoverPathSync(widget.entry.id);
+      if (hit != null && hit != _coverPath) {
+        setState(() => _coverPath = hit);
+      }
+    }
+  }
+
+  Future<void> _resolveCover() async {
+    final String? path = await ensureDramaCoverCached(widget.entry);
+    if (!mounted || path == null || path == _coverPath) {
+      return;
+    }
+    setState(() => _coverPath = path);
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final DramaCatalogEntry entry = widget.entry;
+    final bool owned = widget.owned;
+    final bool selected = widget.selected;
+    final int episodeCount = widget.episodeCount;
     final Color accent = Color(entry.accent);
-    final String? cover = entry.coverUrl?.trim();
+    final String? cover = _coverPath;
     return Material(
       color: Colors.transparent,
       child: InkWell(
-        onTap: onTap,
+        onTap: widget.onTap,
         borderRadius: BorderRadius.circular(14),
         child: Ink(
           width: 118,
@@ -458,30 +519,22 @@ class _CatalogPosterCard extends StatelessWidget {
               fit: StackFit.expand,
               children: <Widget>[
                 if (cover != null && cover.isNotEmpty)
-                  Image.network(
-                    cover,
+                  CoverImage(
+                    path: cover,
                     fit: BoxFit.cover,
                     errorBuilder: (_, __, ___) => ColoredBox(color: accent),
-                    loadingBuilder: (
-                      BuildContext context,
-                      Widget child,
-                      ImageChunkEvent? progress,
-                    ) {
-                      if (progress == null) return child;
-                      return ColoredBox(
-                        color: accent,
-                        child: const Center(
-                          child: SizedBox(
-                            width: 22,
-                            height: 22,
-                            child: CircularProgressIndicator(strokeWidth: 2),
-                          ),
-                        ),
-                      );
-                    },
                   )
                 else
-                  ColoredBox(color: accent),
+                  ColoredBox(
+                    color: accent,
+                    child: const Center(
+                      child: SizedBox(
+                        width: 22,
+                        height: 22,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ),
+                  ),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
