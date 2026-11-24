@@ -258,12 +258,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   /// Show atlas frame 8 (thumbs-up / smile) — last night's gesture sheet.
   void _encourageLearner() {
-    if (!mounted || !_started) return;
-    _coachGestureTimer?.cancel();
-    setState(() => _coachEncouraging = true);
-    _coachGestureTimer = Timer(const Duration(milliseconds: 1800), () {
-      if (mounted) setState(() => _coachEncouraging = false);
-    });
+    // Disabled: encourage cell is not aligned with idle — looks like a sideways jump.
   }
 
   bool _podcastPlaying = false;
@@ -533,32 +528,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     super.dispose();
   }
 
-  /// Drive cartoon atlas lips from estimated phoneme cues (数字人唇形).
+  /// Hold a single open-mouth atlas cell while speaking (no frame thrash).
   void _beginDigitalMouth(String text, {Duration? estimated}) {
     final String speak = text.trim();
     if (speak.isEmpty) return;
-    final Duration dur =
-        estimated ??
-        Duration(milliseconds: (speak.length * 55).clamp(800, 12000));
-    _mouthTimeline = CoachAnimationTimeline.estimate(speak, dur);
-    _mouthClockStart = DateTime.now();
     _mouthTicker?.cancel();
-    _mouthTicker = Timer.periodic(const Duration(milliseconds: 120), (_) {
-      if (!mounted || _mouthTimeline == null || _mouthClockStart == null) {
-        return;
-      }
-      final CoachViseme next = _mouthTimeline!.mouthAt(
-        DateTime.now().difference(_mouthClockStart!),
-        playing: true,
-      );
-      // Only closed/open — other cells jump too much on these atlases.
-      final CoachViseme stable = next == CoachViseme.closed
-          ? CoachViseme.closed
-          : CoachViseme.open;
-      if (stable != _coachMouth) {
-        setState(() => _coachMouth = stable);
-      }
-    });
+    _mouthTicker = null;
+    _mouthTimeline = null;
+    _mouthClockStart = null;
+    if (_coachMouth != CoachViseme.open) {
+      setState(() => _coachMouth = CoachViseme.open);
+    }
   }
 
   void _endDigitalMouth() {

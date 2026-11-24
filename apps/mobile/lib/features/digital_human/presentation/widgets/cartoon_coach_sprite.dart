@@ -3,8 +3,9 @@ import '../../domain/coach_animation_timeline.dart';
 
 /// Three-by-three raster atlas. Fixed actions never invoke a video model.
 ///
-/// Frames switch by shifting a single cached [Image.asset] (no AnimatedSwitcher),
-/// so mouth / gesture cuts do not flash white between cells.
+/// Cells are shown by integer pixel translation (not [Alignment]), and speaking
+/// holds a single open-mouth cell — alternating cells reads as left-right shake
+/// because these atlases are not position-locked.
 class CartoonCoachSprite extends StatelessWidget {
   const CartoonCoachSprite({
     super.key,
@@ -29,40 +30,47 @@ class CartoonCoachSprite extends StatelessWidget {
   final Duration transitionDuration;
 
   int get frame {
-    if (motion == CoachMotion.speaking) return mouth.index;
-    if (motion == CoachMotion.thinking) return 7;
-    if (motion == CoachMotion.encouraging) return 8;
-    if (motion == CoachMotion.listening) return 6;
-    // Narrow idle blink window — avoids thrashing 0↔5 near pulse peaks.
-    return (phase > 0.97 && phase < 0.995) ? 5 : 0;
+    // Speaking: hold open cell only. Cycling closed↔open shakes every persona.
+    if (motion == CoachMotion.speaking) return CoachViseme.open.index;
+    // Gesture cells (6–8) are also misaligned vs idle — skip until atlases
+    // are re-authored with locked head position.
+    return 0;
   }
 
   @override
-  Widget build(BuildContext context) => LayoutBuilder(
-    builder: (BuildContext context, BoxConstraints constraints) {
-      final double side = constraints.biggest.shortestSide;
-      final int index = frame;
-      return SizedBox(
-        width: side,
-        height: side,
-        child: ClipRect(
-          child: OverflowBox(
-            alignment: Alignment((index % 3) - 1.0, (index ~/ 3) - 1.0),
-            minWidth: side * 3,
-            maxWidth: side * 3,
-            minHeight: side * 3,
-            maxHeight: side * 3,
-            child: Image.asset(
-              asset,
-              width: side * 3,
-              height: side * 3,
-              fit: BoxFit.fill,
-              gaplessPlayback: true,
-              filterQuality: FilterQuality.medium,
+  Widget build(BuildContext context) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final double side = constraints.biggest.shortestSide;
+        final int index = frame;
+        final int col = index % 3;
+        final int row = index ~/ 3;
+        return SizedBox(
+          width: side,
+          height: side,
+          child: ClipRect(
+            child: Stack(
+              children: <Widget>[
+                Positioned(
+                  left: -side * col,
+                  top: -side * row,
+                  width: side * 3,
+                  height: side * 3,
+                  child: Image.asset(
+                    asset,
+                    width: side * 3,
+                    height: side * 3,
+                    fit: BoxFit.fill,
+                    gaplessPlayback: true,
+                    filterQuality: FilterQuality.low,
+                    alignment: Alignment.topLeft,
+                  ),
+                ),
+              ],
             ),
           ),
-        ),
-      );
-    },
-  );
+        );
+      },
+    );
+  }
 }
