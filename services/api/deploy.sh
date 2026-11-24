@@ -33,6 +33,10 @@ if [[ -f "$ROOT/data/recommended_bilibili.json" ]]; then
   echo "==> Sync curated Bilibili recommendations"
   rsync -az "$ROOT/data/recommended_bilibili.json" "$HOST:$PATH_REMOTE/data/recommended_bilibili.json"
 fi
+if [[ -f "$ROOT/data/youtube_education_catalog.json" ]]; then
+  echo "==> Sync YouTube education catalog"
+  rsync -az "$ROOT/data/youtube_education_catalog.json" "$HOST:$PATH_REMOTE/data/youtube_education_catalog.json"
+fi
 if [[ -f "$ROOT/data/free_trial_seeds.json" ]]; then
   echo "==> Sync permanent free-trial seed catalog"
   rsync -az "$ROOT/data/free_trial_seeds.json" "$HOST:$PATH_REMOTE/data/free_trial_seeds.json"

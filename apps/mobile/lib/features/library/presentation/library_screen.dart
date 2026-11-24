@@ -21,6 +21,7 @@ import '../../drama/presentation/drama_hub_screen.dart';
 import '../../membership/domain/free_trial_seeds.dart';
 import '../../membership/domain/module_access.dart';
 import '../../community/presentation/english_browse_screen.dart';
+import '../../community/presentation/youtube_browse_screen.dart';
 import '../../import_course/presentation/course_import_entry.dart';
 import '../../import_course/presentation/recommended_bilibili_section.dart';
 import '../../import_course/presentation/widgets/import_course_flow.dart';
@@ -472,7 +473,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 LibraryShelfTab.bilibili => 'B 站 / 本地短片 · 搜索或导入练耳朵',
                 LibraryShelfTab.englishBrowse => '今日全站同一份精选 · 按难度每日生成',
                 LibraryShelfTab.drama => '网盘季集 + SRT · 四阶段精学',
-                LibraryShelfTab.youtube => '需自备梯子 · 粘贴链接导入学习',
+                LibraryShelfTab.youtube => '英语教育精选 · 按难度 · 需自备梯子',
                 LibraryShelfTab.dubbing => '看过的视频切成 1–3 分钟 · 人声分离配音',
               },
         leading: showImport
@@ -1397,6 +1398,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         )
                       : shelfTab == LibraryShelfTab.englishBrowse
                       ? const EnglishBrowseScreen(embedded: true)
+                      : shelfTab == LibraryShelfTab.youtube
+                      ? const YoutubeBrowseScreen(embedded: true)
                       : shelfTab == LibraryShelfTab.dubbing
                       ? const DubClipHub()
                       : LayoutBuilder(

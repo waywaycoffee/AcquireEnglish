@@ -1504,6 +1504,64 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
+  /// Shared daily YouTube English-education shelf (curated + VPN contributions).
+  Future<List<AcquireDailyFeedItemDto>> youtubeBrowseFeed({
+    String? level,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.youtubeBrowseFeed,
+      queryParameters: <String, dynamic>{
+        if (level != null && level.trim().isNotEmpty) 'level': level.trim(),
+      },
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(AcquireDailyFeedItemDto.fromJson)
+        .where(
+          (AcquireDailyFeedItemDto item) =>
+              item.bvid.isNotEmpty && item.watchUrl.isNotEmpty,
+        )
+        .toList(growable: false);
+  }
+
+  Future<List<String>> youtubeBrowseQueries({required String level}) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.youtubeBrowseMeta,
+      queryParameters: <String, dynamic>{'level': level.trim()},
+    );
+    final Map<String, dynamic> data =
+        Map<String, dynamic>.from(response.data as Map);
+    final List<dynamic> queries =
+        data['queries'] as List<dynamic>? ?? const <dynamic>[];
+    return queries
+        .map((dynamic e) => e.toString().trim())
+        .where((String s) => s.isNotEmpty)
+        .toList(growable: false);
+  }
+
+  Future<List<AcquireDailyFeedItemDto>> contributeYoutubeBrowse({
+    required String level,
+    required List<AcquireDailyFeedItemDto> items,
+    bool replace = false,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.youtubeBrowseContribute,
+      data: <String, dynamic>{
+        'level': level.trim(),
+        'replace': replace,
+        'items': items.map((AcquireDailyFeedItemDto e) => e.toJson()).toList(),
+      },
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(AcquireDailyFeedItemDto.fromJson)
+        .where(
+          (AcquireDailyFeedItemDto item) =>
+              item.bvid.isNotEmpty && item.watchUrl.isNotEmpty,
+        )
+        .toList(growable: false);
+  }
+
   Future<List<FollowedCreatorDto>> listFollowedCreators() async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.creatorsFollowed,

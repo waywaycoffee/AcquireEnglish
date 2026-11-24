@@ -1,0 +1,300 @@
+{
+  "version": 1,
+  "max_items": 36,
+  "allow_authors": [
+    "BBC Learning English",
+    "VOA Learning English",
+    "English with Lucy",
+    "Speak English With Vanessa",
+    "mmmEnglish",
+    "Rachel's English",
+    "EngVid",
+    "Oxford Online English",
+    "Cambridge English",
+    "British Council | LearnEnglish",
+    "EnglishClass101.com",
+    "Learn English with TV Series",
+    "English Speaking Success",
+    "Shaw English Online",
+    "Espresso English",
+    "Easy English",
+    "TED-Ed",
+    "English with Jennifer",
+    "Anglo-Link",
+    "Papa Teach Me",
+    "To Fluency",
+    "Interactive English",
+    "English Like A Native",
+    "Accent's Way English with Hadar",
+    "Learn English Open Doors",
+    "Business English Pod",
+    "EnglishAnyone",
+    "Speak English With Tiffani",
+    "Learn English with Jessica",
+    "English Fluency Journey"
+  ],
+  "block_title_keywords": [
+    "breaking news",
+    "world news",
+    "live news",
+    "election",
+    "political",
+    "politics",
+    "trump",
+    "biden",
+    "war in",
+    "military",
+    "protest",
+    "ukraine",
+    "russia ukraine",
+    "gaza",
+    "israel hamas",
+    "cnn",
+    "fox news",
+    "msnbc",
+    "bbc news",
+    "cctv",
+    "时政",
+    "新闻",
+    "政治",
+    "两会",
+    "军事",
+    "战争"
+  ],
+  "levels": {
+    "A1": {
+      "queries": [
+        "beginner english conversation slow speaking practice -news -politics",
+        "A1 english listening practice daily dialogue -news",
+        "basic english vocabulary for beginners lesson -news"
+      ],
+      "seeds": [
+        {
+          "video_id": "sIvU0hEXy0E",
+          "title": "Basic English Conversation Practice",
+          "author": "Speak English With Vanessa"
+        },
+        {
+          "video_id": "OUVnpsPLbJI",
+          "title": "English Conversation for Beginners",
+          "author": "mmmEnglish"
+        },
+        {
+          "video_id": "JwPj_YAbD84",
+          "title": "Learn English with Easy Conversations",
+          "author": "Easy English"
+        },
+        {
+          "video_id": "8jPQjjsBbWQ",
+          "title": "Slow English Listening Practice",
+          "author": "English with Lucy"
+        },
+        {
+          "video_id": "0VegYhB3q3Y",
+          "title": "A1 English Listening",
+          "author": "Oxford Online English"
+        },
+        {
+          "video_id": "eI5t-iLYa0I",
+          "title": "Beginner English Speaking Practice",
+          "author": "Shaw English Online"
+        }
+      ]
+    },
+    "A2": {
+      "queries": [
+        "elementary english conversation A2 listening -news -politics",
+        "daily english conversation practice elementary -news",
+        "A2 english grammar speaking practice -politics"
+      ],
+      "seeds": [
+        {
+          "video_id": "UxrdPBnYheU",
+          "title": "Daily English Conversations",
+          "author": "Speak English With Vanessa"
+        },
+        {
+          "video_id": "jVhlJNJopOQ",
+          "title": "English Listening Practice Elementary",
+          "author": "mmmEnglish"
+        },
+        {
+          "video_id": "Z4mNqX5g1ZQ",
+          "title": "A2 English Conversation",
+          "author": "BBC Learning English"
+        },
+        {
+          "video_id": "4esRiBQWgbQ",
+          "title": "Elementary English Dialogue",
+          "author": "Oxford Online English"
+        },
+        {
+          "video_id": "P1xIVhRfXRY",
+          "title": "Learn English Conversation Practice",
+          "author": "EnglishClass101.com"
+        },
+        {
+          "video_id": "WYiL1H5xqVI",
+          "title": "Everyday English Speaking",
+          "author": "English Speaking Success"
+        }
+      ]
+    },
+    "B1": {
+      "queries": [
+        "intermediate english conversation B1 listening -news -politics",
+        "B1 english story listening practice -news",
+        "intermediate english phrasal verbs explained -politics"
+      ],
+      "seeds": [
+        {
+          "video_id": "GRcettv944I",
+          "title": "How miscommunication happens (and how to avoid it)",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "8S0FDjFBj8o",
+          "title": "How to practice effectively",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "YEpk0eGq2v0",
+          "title": "Intermediate English Conversation",
+          "author": "mmmEnglish"
+        },
+        {
+          "video_id": "R9OHn5ZF4Uo",
+          "title": "How to learn any language in six months",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "3lvuAXQ4w1k",
+          "title": "B1 English Listening Practice",
+          "author": "BBC Learning English"
+        },
+        {
+          "video_id": "OQqcYfH2W0o",
+          "title": "Intermediate Speaking Practice",
+          "author": "Speak English With Vanessa"
+        }
+      ]
+    },
+    "B2": {
+      "queries": [
+        "upper intermediate english discussion B2 -news -politics",
+        "B2 english listening practice academic -news",
+        "upper intermediate vocabulary explained english -politics"
+      ],
+      "seeds": [
+        {
+          "video_id": "5MgBikgcWnY",
+          "title": "The first 20 hours — how to learn anything",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "HAnw168huqA",
+          "title": "Inside the mind of a master procrastinator",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "arj7oStGLkU",
+          "title": "How to speak so that people want to listen",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "iG9CE55wbtY",
+          "title": "B2 English Listening",
+          "author": "Oxford Online English"
+        },
+        {
+          "video_id": "kLyu7TqQeB0",
+          "title": "Upper Intermediate Conversation",
+          "author": "mmmEnglish"
+        },
+        {
+          "video_id": "ZXsQAXx_ao0",
+          "title": "Advanced Phrasal Verbs",
+          "author": "English with Lucy"
+        }
+      ]
+    },
+    "C1": {
+      "queries": [
+        "advanced english listening C1 lecture -news -politics",
+        "C1 academic english vocabulary explained -news",
+        "advanced english pronunciation connected speech -politics"
+      ],
+      "seeds": [
+        {
+          "video_id": "iRvF5xK0P0Y",
+          "title": "Advanced English Listening Practice",
+          "author": "Oxford Online English"
+        },
+        {
+          "video_id": "lnJQ9q6o9cM",
+          "title": "C1 Advanced Vocabulary",
+          "author": "English with Lucy"
+        },
+        {
+          "video_id": "Ks-_Mh1QhMc",
+          "title": "Your body language may shape who you are",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "iCvmsMzlF7o",
+          "title": "The power of vulnerability",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "ZXsQAXx_ao0",
+          "title": "Advanced English Expressions",
+          "author": "mmmEnglish"
+        },
+        {
+          "video_id": "QjX8vQw2d3E",
+          "title": "Advanced Listening Comprehension",
+          "author": "BBC Learning English"
+        }
+      ]
+    },
+    "C2": {
+      "queries": [
+        "proficiency english C2 listening native -news -politics",
+        "C2 english idioms advanced nuance -news",
+        "near native english pronunciation mastery -politics"
+      ],
+      "seeds": [
+        {
+          "video_id": "8S0FDjFBj8o",
+          "title": "How to practice effectively for mastery",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "arj7oStGLkU",
+          "title": "How to speak so that people want to listen",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "HAnw168huqA",
+          "title": "Inside the mind of a master procrastinator",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "iCvmsMzlF7o",
+          "title": "The power of vulnerability",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "Ks-_Mh1QhMc",
+          "title": "Your body language may shape who you are",
+          "author": "TED-Ed"
+        },
+        {
+          "video_id": "5MgBikgcWnY",
+          "title": "The first 20 hours — how to learn anything",
+          "author": "TED-Ed"
+        }
+      ]
+    }
+  }
+}

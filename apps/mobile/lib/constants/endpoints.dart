@@ -42,6 +42,10 @@ class Endpoints {
   static const String preferences = 'api/preferences';
   static const String dailyFeed = 'api/feed/daily';
   static const String englishBrowseFeed = 'api/feed/english-browse';
+  static const String youtubeBrowseFeed = 'api/feed/youtube-browse';
+  static const String youtubeBrowseMeta = 'api/feed/youtube-browse/meta';
+  static const String youtubeBrowseContribute =
+      'api/feed/youtube-browse/contribute';
   static const String bilibiliSearch = 'api/feed/bilibili-search';
   static const String creatorsFollowed = 'api/creators/followed';
   static const String creatorsFollow = 'api/creators/follow';

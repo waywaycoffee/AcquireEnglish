@@ -214,7 +214,21 @@ class DailyFeedItemOut(BaseModel):
     description: str | None = None
     tags: list[str] = []
     source: str = "bilibili"
-    reason: str = "interest"  # interest | followed
+    reason: str = "interest"  # interest | followed | english_browse | youtube_browse
+
+
+class YoutubeBrowseContributeIn(BaseModel):
+    """VPN-client discoveries for today's shared YouTube education shelf."""
+
+    level: str = Field(default="A2", max_length=16)
+    items: list[DailyFeedItemOut] = Field(default_factory=list, max_length=40)
+    replace: bool = False
+
+
+class YoutubeBrowseMetaOut(BaseModel):
+    level: str
+    queries: list[str] = Field(default_factory=list)
+    day: str
 
 
 class RecommendedBilibiliVideoOut(BaseModel):

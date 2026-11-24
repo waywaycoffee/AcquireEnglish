@@ -26,12 +26,21 @@ from app.database import get_db
 from app.deps import get_current_user, get_current_user_optional
 from app.followed_creators import parse_followed_creators
 from app.models import User, UserLinkCourse, UserPreference
-from app.schemas import DailyFeedItemOut
+from app.schemas import (
+    DailyFeedItemOut,
+    YoutubeBrowseContributeIn,
+    YoutubeBrowseMetaOut,
+)
 from app.services.english_browse_daily import (
     ENGLISH_BROWSE_KEYWORDS,
     ENGLISH_BROWSE_MAX,
     ENGLISH_BROWSE_WAIT_SEC,
     get_shared_daily_browse,
+)
+from app.services.youtube_browse_daily import (
+    contribute_daily_youtube_browse,
+    get_shared_daily_youtube_browse,
+    level_queries as youtube_level_queries,
 )
 
 router = APIRouter(prefix="/feed", tags=["feed"])
@@ -413,3 +422,56 @@ async def bilibili_keyword_search(
         if len(out) >= limit:
             break
     return out
+
+
+@router.get("/youtube-browse", response_model=list[DailyFeedItemOut])
+async def youtube_browse_feed(
+    level: str | None = Query(
+        default=None,
+        max_length=16,
+        description="CEFR level (A1–C2); defaults to profile level",
+    ),
+    user: User | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+) -> list[DailyFeedItemOut]:
+    """Shared daily English-education YouTube shelf (no news/politics / Chinese creators).
+
+    Built from a curated catalog on the server (ECS cannot reach YouTube). Clients
+    with a VPN may enrich today's list via ``POST /feed/youtube-browse/contribute``.
+    """
+    resolved_level = (level or "").strip().upper() or "A2"
+    if user is not None and not (level or "").strip():
+        pref_result = await db.execute(
+            select(UserPreference).where(UserPreference.user_id == user.id)
+        )
+        pref = pref_result.scalar_one_or_none()
+        resolved_level = (pref.level if pref else None) or "A2"
+    return get_shared_daily_youtube_browse(resolved_level)
+
+
+@router.get("/youtube-browse/meta", response_model=YoutubeBrowseMetaOut)
+async def youtube_browse_meta(
+    level: str = Query(default="A2", max_length=16),
+) -> YoutubeBrowseMetaOut:
+    """Search query seeds for VPN-side YouTube discovery on the phone."""
+    level_u = (level or "A2").strip().upper() or "A2"
+    return YoutubeBrowseMetaOut(
+        level=level_u,
+        queries=youtube_level_queries(level_u),
+        day=date.today().isoformat(),
+    )
+
+
+@router.post("/youtube-browse/contribute", response_model=list[DailyFeedItemOut])
+async def youtube_browse_contribute(
+    body: YoutubeBrowseContributeIn,
+    user: User = Depends(get_current_user),
+) -> list[DailyFeedItemOut]:
+    """Merge filtered VPN search hits into today's shared shelf for all users."""
+    _ = user  # auth required to limit spam
+    payload = [item.model_dump() for item in body.items]
+    return contribute_daily_youtube_browse(
+        body.level,
+        payload,
+        replace=bool(body.replace),
+    )
