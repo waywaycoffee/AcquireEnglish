@@ -11,7 +11,8 @@ if str(_SHARED) not in sys.path:
     sys.path.insert(0, str(_SHARED))
 
 from aikua_english_prompts import (  # noqa: E402
+    filter_stream_chunk,
     video_script_system_prompt,
 )
 
-__all__ = ['video_script_system_prompt']
+__all__ = ['filter_stream_chunk', 'video_script_system_prompt']

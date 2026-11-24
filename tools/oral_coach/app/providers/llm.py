@@ -557,7 +557,8 @@ class OpenAiLlm:
                         + ' Reply as compact JSON. The "text" field must be English'
                         ' unless the learner asked for Chinese.'
                         ' Include diagnosis when learner used Chinese or non-idiomatic English.'
-                        ' You may append a short expression tag like (微笑)/(思考)/(平静).'
+                        ' You may append a short expression tag like 【表情：微笑】/'
+                        '【表情：思考】/【表情：平静】 (never markdown).'
                     ),
                 },
                 {'role': 'user', 'content': json.dumps(user, ensure_ascii=False)},

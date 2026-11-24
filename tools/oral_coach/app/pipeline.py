@@ -3,6 +3,7 @@ from __future__ import annotations
 import uuid
 from dataclasses import asdict, dataclass, field
 
+from .aikua_prompts import filter_stream_chunk
 from .config import Settings
 from .providers import (
     build_asr,
@@ -284,22 +285,29 @@ class OralCoachPipeline:
         if (reply_language or '').strip():
             session.reply_language = reply_language.strip().lower()
 
+        # Fullduplex stream filter: emotion → avatar channel; clean text → TTS.
+        filtered = filter_stream_chunk(reply.text, mode='fullduplex', for_tts=True)
+        spoken = filtered.tts_text or reply.text
+
         tts_url = None
         avatar: dict = {}
         if not text_only:
             tts_url = await self.synthesize_speech(
-                reply.text,
+                spoken,
                 digital_human_id=session.digital_human_id or digital_human_id,
                 tts_voice=session.tts_voice or tts_voice,
                 language=session.reply_language or reply_language or 'en',
             )
-            avatar = asdict(await self.avatar.cue(reply.text))
+            avatar = asdict(await self.avatar.cue(spoken))
+            avatar['emotion'] = filtered.emotion
+            if filtered.emotions:
+                avatar['emotions'] = list(filtered.emotions)
 
         return TurnResult(
             session_id=session.id,
             transcript=transcript,
             pronunciation=pron_dict,
-            coach_text=reply.text,
+            coach_text=spoken,
             corrections=reply.corrections,
             difficulty=session.difficulty,
             tts_url=tts_url,
