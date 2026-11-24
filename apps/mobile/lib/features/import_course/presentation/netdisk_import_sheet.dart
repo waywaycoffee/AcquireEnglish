@@ -55,6 +55,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   String? _error;
   String? _listHint;
   String _mountPath = '';
+  String? _baiduAccountLabel;
   Timer? _oauthPoll;
 
   static const List<(String, String)> _providers = <(String, String)>[
@@ -134,6 +135,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
       bool healthy = true;
       String? healthError;
       String mount = '';
+      String? accountLabel;
       for (final dynamic row in providers) {
         if (row is! Map) continue;
         if ('${row['provider']}' == _provider) {
@@ -142,6 +144,16 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
           healthy = row['healthy'] != false;
           final Object? err = row['error'];
           healthError = err == null ? null : '$err';
+          final Object? accountRaw = row['account'];
+          if (accountRaw is Map) {
+            final String name =
+                '${accountRaw['baidu_name'] ?? accountRaw['netdisk_name'] ?? ''}'
+                    .trim();
+            final bool isVip = accountRaw['is_vip'] == true;
+            if (name.isNotEmpty) {
+              accountLabel = isVip ? '$name · 会员' : '$name · 非会员';
+            }
+          }
         }
       }
       if (!mounted) return;
@@ -152,6 +164,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
         _mountPath = mount;
         _healthy = healthy;
         _healthError = healthError;
+        _baiduAccountLabel = accountLabel;
         _loading = false;
       });
       if (bound && healthy) {
@@ -616,6 +629,21 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                     ),
                   ],
                   if (_openlistReady && _bound && _healthy) ...<Widget>[
+                    if (_provider == 'baidu' &&
+                        (_baiduAccountLabel?.isNotEmpty ?? false))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: Text(
+                          '当前百度账号：$_baiduAccountLabel\n'
+                          '若不是有会员、有资源的那个，请解绑后重新授权，'
+                          '登录页务必选对百度护照（198 开头那套里核对昵称/会员）。',
+                          style: TextStyle(
+                            fontSize: 12,
+                            height: 1.35,
+                            color: AppDesignTokens.textSecondary,
+                          ),
+                        ),
+                      ),
                     Row(
                       children: <Widget>[
                         IconButton(

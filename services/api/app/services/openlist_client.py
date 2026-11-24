@@ -339,6 +339,45 @@ class OpenListClient:
         await self.delete_storage(int(found["id"]))
         return True
 
+    async def baidu_account_info(self, mount_path: str) -> dict[str, Any] | None:
+        """Resolve bound Baidu passport nickname / VIP via OpenList token."""
+        found = await self.find_storage_by_mount(mount_path)
+        if not found:
+            return None
+        raw_add = found.get("addition") or ""
+        try:
+            addition = json.loads(raw_add) if isinstance(raw_add, str) else (raw_add or {})
+        except Exception:  # noqa: BLE001
+            return None
+        if not isinstance(addition, dict):
+            return None
+        token = str(
+            addition.get("AccessToken")
+            or addition.get("access_token")
+            or ""
+        ).strip()
+        if not token:
+            return None
+        try:
+            async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+                resp = await client.get(
+                    "https://pan.baidu.com/rest/2.0/xpan/nas",
+                    params={"method": "uinfo", "access_token": token},
+                )
+                data = resp.json()
+        except Exception:  # noqa: BLE001
+            return None
+        if not isinstance(data, dict) or int(data.get("errno") or 0) != 0:
+            return None
+        vip = int(data.get("vip_type") or 0)
+        return {
+            "baidu_name": str(data.get("baidu_name") or "").strip(),
+            "netdisk_name": str(data.get("netdisk_name") or "").strip(),
+            "uk": data.get("uk"),
+            "vip_type": vip,
+            "is_vip": vip > 0,
+        }
+
     async def fs_list(self, path: str, *, page: int = 1, per_page: int = 100) -> dict[str, Any]:
         data = await self._request(
             "POST",

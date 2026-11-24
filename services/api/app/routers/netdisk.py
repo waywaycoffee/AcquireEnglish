@@ -253,12 +253,18 @@ async def netdisk_status(
     for row in rows:
         healthy = True
         error: str | None = None
+        account: dict[str, Any] | None = None
         if client is not None:
             try:
                 await client.fs_list(row.openlist_mount_path, page=1, per_page=1)
             except OpenListError as exc:
                 healthy = False
                 error = str(exc)
+            if row.provider == "baidu":
+                try:
+                    account = await client.baidu_account_info(row.openlist_mount_path)
+                except Exception:  # noqa: BLE001
+                    account = None
         providers.append(
             {
                 "provider": row.provider,
@@ -268,6 +274,7 @@ async def netdisk_status(
                 "healthy": healthy,
                 "error": error,
                 "label": _PROVIDER_LABEL.get(row.provider, row.provider),
+                "account": account,
             }
         )
     return NetdiskStatusOut(
@@ -378,22 +385,32 @@ async def baidu_oauth_callback(
         return _oauth_result_html(ok=False, message="授权已过期，请返回 App 重新发起")
     if not settings.openlist_configured:
         return _oauth_result_html(ok=False, message="OpenList 未启用，无法完成绑定")
+    account_hint = ""
     try:
         tokens = await baidu_oauth.exchange_code_for_tokens(code)
-        await _upsert_binding(
+        row = await _upsert_binding(
             db=db,
             user_id=user_id,
             provider="baidu",
             credential=tokens["refresh_token"],
         )
+        try:
+            info = await OpenListClient().baidu_account_info(row.openlist_mount_path)
+            if info:
+                name = str(info.get("baidu_name") or info.get("netdisk_name") or "").strip()
+                vip = "会员" if info.get("is_vip") else "非会员"
+                if name:
+                    account_hint = f"当前绑定百度账号：{name}（{vip}）。若不对请回 App 解绑后换号重授。"
+        except Exception:  # noqa: BLE001
+            account_hint = ""
     except OpenListError as exc:
         return _oauth_result_html(ok=False, message=f"挂载网盘失败：{exc}")
     except Exception as exc:  # noqa: BLE001
         return _oauth_result_html(ok=False, message=str(exc)[:240])
-    return _oauth_result_html(
-        ok=True,
-        message="百度网盘已绑定。请返回爱快英语 App，下拉刷新后即可浏览自己的文件。",
-    )
+    msg = "百度网盘已绑定。请返回爱快英语 App 刷新后浏览文件。"
+    if account_hint:
+        msg = f"{msg}\n{account_hint}"
+    return _oauth_result_html(ok=True, message=msg)
 
 
 @router.post("/bind")
