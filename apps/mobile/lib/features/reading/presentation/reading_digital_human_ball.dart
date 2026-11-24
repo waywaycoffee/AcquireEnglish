@@ -225,6 +225,9 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
   PronunciationMicrophone? _microphone;
   StreamSubscription<Uint8List>? _recordingSubscription;
   Timer? _recordingLimitTimer;
+  Timer? _sceneQuestionTimer;
+  bool _sceneConversation = false;
+  bool _sceneQuestionAsked = false;
   OralCoachSession? _session;
   int _recordingBytesWritten = 0;
   bool _recordingActive = false;
@@ -247,6 +250,7 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
   @override
   void dispose() {
     _recordingLimitTimer?.cancel();
+    _sceneQuestionTimer?.cancel();
     unawaited(_recordingSubscription?.cancel());
     unawaited(_microphone?.dispose() ?? Future<void>.value());
     _text.dispose();
@@ -510,8 +514,33 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
     );
   }
 
-  Future<void> _sendTyped() async {
-    final String question = _text.text.trim();
+  void _toggleSceneConversation(bool enabled) {
+    _sceneQuestionTimer?.cancel();
+    setState(() => _sceneConversation = enabled);
+    if (!enabled || _sceneQuestionAsked) return;
+    _sceneQuestionTimer = Timer.periodic(const Duration(seconds: 20), (Timer timer) {
+      if (!mounted || !_sceneConversation) {
+        timer.cancel();
+        return;
+      }
+      if (_busy || _recordingActive || _text.text.trim().isNotEmpty ||
+          WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed ||
+          ModalRoute.of(context)?.isCurrent != true ||
+          !ref.read(learningSettingsProvider).usesOralCoachPipeline) {
+        return;
+      }
+      timer.cancel();
+      _sceneQuestionAsked = true;
+      unawaited(_sendTyped(sceneQuestion: true));
+    });
+  }
+
+  Future<void> _sendTyped({bool sceneQuestion = false}) async {
+    final String question = sceneQuestion
+        ? 'Act as a friendly English conversation coach. Based on the current reading passage, '
+              'ask one short English question that connects its topic to my everyday life. '
+              'Ask only the question and wait for my answer.'
+        : _text.text.trim();
     if (question.isEmpty || _busy) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
     if (!settings.usesOralCoachPipeline) {
@@ -553,6 +582,7 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
         session: session,
         draftId: draft.draftId,
         confirmed: question,
+        showUserMessage: !sceneQuestion,
       );
     } catch (error) {
       if (mounted) {
@@ -577,10 +607,11 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
     required OralCoachSession session,
     required String draftId,
     required String confirmed,
+    bool showUserMessage = true,
   }) async {
     final DigitalHumanPersona persona = settings.selectedDigitalHuman;
     setState(() {
-      _bubbles.add(_ChatBubble(role: 'user', text: confirmed));
+      if (showUserMessage) _bubbles.add(_ChatBubble(role: 'user', text: confirmed));
       _busy = true;
       _status = '外教思考中…';
     });
@@ -592,7 +623,7 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
       confirmedText: confirmed,
       digitalHumanId: persona.id,
       ttsVoice: readingCoachVoiceForPersona(persona),
-      replyLanguage: 'zh',
+      replyLanguage: showUserMessage ? 'zh' : 'en',
       textOnly: true,
     );
     if (!mounted) return;
@@ -702,6 +733,19 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
                     ],
                   ),
                 ],
+              ),
+            ),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: FilterChip(
+                  label: const Text('场景对话 · 教练可主动提问'),
+                  selected: _sceneConversation,
+                  onSelected: _busy || _recordingActive
+                      ? null
+                      : _toggleSceneConversation,
+                ),
               ),
             ),
             if ((_error ?? '').isNotEmpty)
