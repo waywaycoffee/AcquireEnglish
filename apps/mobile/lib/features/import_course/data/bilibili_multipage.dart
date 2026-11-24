@@ -38,16 +38,25 @@ Future<String> repairBilibiliSourceCase({
   }
   final bool looksForcedUpper = bilibiliBvidLooksForceUppercased(bvid);
   final String aid = (ids?['aid'] ?? '').trim();
-  if (!looksForcedUpper && aid.isEmpty) {
+  if (!looksForcedUpper) {
     return raw;
   }
 
   if (aid.isNotEmpty) {
     try {
-      final BilibiliImportResult meta = await service.fetch('av$aid');
-      final String fixed = meta.watchUrl.trim();
-      if (fixed.isNotEmpty) {
-        return fixed;
+      final int? page = BilibiliImport.extractPage(raw);
+      final BilibiliImportResult meta = await service.fetch(
+        BilibiliImport.watchUrl(aid: aid, page: page),
+        includeSubtitles: false,
+      );
+      final ids = BilibiliImport.extractIds(meta.watchUrl);
+      final String? canonicalBvid = ids?['bvid'];
+      if (canonicalBvid != null && canonicalBvid.isNotEmpty) {
+        return BilibiliImport.watchUrl(
+          bvid: canonicalBvid,
+          aid: aid,
+          page: page,
+        );
       }
     } catch (_) {}
   }

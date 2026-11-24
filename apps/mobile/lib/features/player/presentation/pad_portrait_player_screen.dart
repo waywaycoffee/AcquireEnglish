@@ -1897,9 +1897,6 @@ class PadPortraitPlayerScreenState
       courses: ref.read(libraryCatalogProvider),
       episodeId: widget.episodeId,
     );
-    if (isUsableLocalVideoPath(resource.episode?.videoAsset)) {
-      return resource.episode!.videoAsset!.trim();
-    }
     if (isUsableLocalVideoPath(resource.videoAsset)) {
       return resource.videoAsset!.trim();
     }

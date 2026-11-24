@@ -1343,6 +1343,9 @@ class BilibiliImportService {
       fallbackCid: (data['cid'] as num?)?.toInt() ?? 0,
       fallbackDurationSec: (data['duration'] as num?)?.toInt() ?? 60,
     );
+    if (selected.page != requestedPage) {
+      throw StateError('B 站未返回第 $requestedPage 集的视频信息');
+    }
     final int cid = selected.cid;
     if (cid <= 0) {
       throw StateError('视频缺少 cid，无法取流');

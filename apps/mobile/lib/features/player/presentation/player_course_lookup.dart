@@ -1,4 +1,6 @@
 import '../../import_course/data/bilibili_episode_prepare.dart';
+import '../../import_course/data/bilibili_multipage.dart';
+import '../../import_course/domain/bilibili_import.dart';
 import '../../library/presentation/library_mock_data.dart';
 
 class PlayerCourseLookupResult {
@@ -42,7 +44,7 @@ PlayerCourseLookupResult resolvePlayerCourseForEpisode({
         return PlayerCourseLookupResult(
           course: course,
           episode: episode,
-          videoAsset: episode.videoAsset,
+          videoAsset: _resolveEpisodeVideo(course, episode),
           // Never fall back to missing/stale track paths — that made prepare
           // skip official fetch and the player wipe both sides as "ASR".
           englishSubtitleAsset:
@@ -62,6 +64,37 @@ PlayerCourseLookupResult resolvePlayerCourseForEpisode({
     }
   }
   return const PlayerCourseLookupResult();
+}
+
+String? _resolveEpisodeVideo(
+  LibraryCourseData course,
+  LibraryEpisodeItem episode,
+) {
+  final String? asset = episode.videoAsset;
+  if (course.episodes.length < 2 ||
+      !(course.id.startsWith('bilibili-') || course.category == 'bilibili')) {
+    return asset;
+  }
+  final String? watchUrl = bilibiliSourceForEpisode(
+    course: course,
+    episode: episode,
+    videoAsset: asset,
+  );
+  if (watchUrl == null || asset == null || asset.trim().isEmpty) {
+    return watchUrl ?? asset;
+  }
+  final String? expected = bilibiliEpisodeCacheKey(sourceUrl: watchUrl);
+  final String? actual = BilibiliImport.isWatchPageUrl(asset)
+      ? bilibiliEpisodeCacheKey(sourceUrl: asset)
+      : bilibiliIdKeyFromPath(asset);
+  if (expected != null && actual != null) {
+    return bilibiliMediaKeysAligned(expected, actual) ? asset : watchUrl;
+  }
+  // Old imports may have copied an unscoped MP4 or direct URL onto each row.
+  final bool reusedByAnotherEpisode = course.episodes.any(
+    (other) => other.id != episode.id && other.videoAsset?.trim() == asset.trim(),
+  );
+  return reusedByAnotherEpisode ? watchUrl : asset;
 }
 
 String? _usableSubtitlePath(String? path) =>

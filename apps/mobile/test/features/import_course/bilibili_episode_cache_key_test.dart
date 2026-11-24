@@ -1,8 +1,50 @@
 import 'package:common_learn_english/features/import_course/data/bilibili_multipage.dart';
+import 'package:common_learn_english/features/import_course/data/bilibili_import_service.dart';
+import 'package:dio/dio.dart';
 import 'package:common_learn_english/features/library/presentation/library_mock_data.dart';
 import 'package:flutter_test/flutter_test.dart';
 
+class _CaseRepairService extends BilibiliImportService {
+  _CaseRepairService() : super(dio: Dio());
+
+  String? requestedUrl;
+
+  @override
+  Future<BilibiliImportResult> fetch(
+    String rawInput, {
+    bool includeSubtitles = true,
+  }) async {
+    requestedUrl = rawInput;
+    return const BilibiliImportResult(
+      idKey: 'BV1CS4y1v7sQ',
+      title: '合集',
+      watchUrl: 'https://www.bilibili.com/video/BV1CS4y1v7sQ',
+      durationMinutes: 12,
+    );
+  }
+}
+
 void main() {
+  test('repair via aid keeps the requested page', () async {
+    final service = _CaseRepairService();
+    expect(
+      await repairBilibiliSourceCase(
+        service: service,
+        source: 'https://www.bilibili.com/video/BV1CS4Y1V7SQ?p=14&aid=123',
+      ),
+      'https://www.bilibili.com/video/BV1CS4y1v7sQ?p=14&aid=123',
+    );
+    expect(service.requestedUrl, 'https://www.bilibili.com/video/av123?p=14');
+    service.requestedUrl = null;
+    const canonical =
+        'https://www.bilibili.com/video/BV1CS4y1v7sQ?p=14&aid=123';
+    expect(
+      await repairBilibiliSourceCase(service: service, source: canonical),
+      canonical,
+    );
+    expect(service.requestedUrl, isNull);
+  });
+
   group('bilibiliEpisodeCacheKey', () {
     test('multipage page 2 uses BV-p02 fingerprint', () {
       expect(

@@ -4,6 +4,56 @@ import 'package:common_learn_english/features/player/presentation/player_course_
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('a later Bilibili page cannot play the first page cache', () {
+    const String first = '/bilibili_media/BV1CS4y1v7sQ-p01.mp4';
+    const String page14 = 'https://www.bilibili.com/video/BV1CS4y1v7sQ?p=14';
+    LibraryEpisodeItem episode(String number, String asset, String source) =>
+        LibraryEpisodeItem(
+          id: 'bili-$number',
+          numberStr: number,
+          title: number,
+          durationMinutes: 12,
+          hasChineseSubtitles: true,
+          hasEnglishSubtitles: true,
+          completed: false,
+          progressPercent: 0,
+          coverImage: '',
+          videoAsset: asset,
+          sourceUrl: source,
+        );
+    final course = LibraryCourseData(
+      id: 'bilibili-BV1CS4y1v7sQ',
+      title: '合集',
+      description: '',
+      sourceLabel: 'Bilibili',
+      coverImage: '',
+      level: '',
+      category: 'bilibili',
+      progressPercent: 0,
+      totalWords: 0,
+      completedEpisodes: 0,
+      totalEpisodes: 3,
+      lastStudiedStr: '',
+      rating: 0,
+      episodes: [
+        episode('01', first, 'https://www.bilibili.com/video/BV1CS4y1v7sQ'),
+        episode('14', first, page14),
+        episode(
+          '15',
+          '/bilibili_media/BV1CS4y1v7sQ-p15.mp4',
+          'https://www.bilibili.com/video/BV1CS4y1v7sQ?p=15',
+        ),
+      ],
+    );
+    String? video(String id) => resolvePlayerCourseForEpisode(
+      courses: [course],
+      episodeId: id,
+    ).videoAsset;
+    expect(video('bili-01'), first);
+    expect(video('bili-14'), page14);
+    expect(video('bili-15'), '/bilibili_media/BV1CS4y1v7sQ-p15.mp4');
+  });
+
   test('resolves subtitle paths from subtitle tracks', () {
     final Directory root = Directory.systemTemp.createTempSync('track-lookup-');
     addTearDown(() => root.deleteSync(recursive: true));
