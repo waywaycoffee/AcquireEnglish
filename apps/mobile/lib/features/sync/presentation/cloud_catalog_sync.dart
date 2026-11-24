@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../import_course/data/netdisk_local_download.dart';
 import '../../library/data/course_pack_mapper.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
@@ -52,6 +53,14 @@ Future<void> syncCloudCatalogAndFeed(
   // Reading / wordbook / settings / progress / FSRS / modules.
   try {
     await runDeviceSyncBootstrap(ref, pushLocal: pushLocal);
+  } catch (_) {}
+  // Free phone storage: drop netdisk_media files unused for 10+ days.
+  try {
+    final NetdiskMediaPurgeResult purged = await purgeStaleNetdiskMedia();
+    if (purged.deletedFiles.isNotEmpty) {
+      await (ref.read(libraryCatalogProvider.notifier) as LibraryCatalogNotifier)
+          .revertPurgedNetdiskLocalVideos(purged.deletedFiles);
+    }
   } catch (_) {}
 }
 

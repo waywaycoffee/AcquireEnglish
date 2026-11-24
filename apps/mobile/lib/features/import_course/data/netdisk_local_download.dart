@@ -1,8 +1,10 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 
 import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:hive_ce/hive.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../constants/endpoints.dart';
@@ -12,6 +14,10 @@ import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../sync/data/acquire_api_client.dart';
 import 'bilibili_episode_prepare.dart';
+
+/// Local drama cache TTL — unused files under Documents/netdisk_media are removed.
+const Duration kNetdiskMediaUnusedTtl = Duration(days: 10);
+const String _netdiskMediaAccessKey = 'netdisk_media_last_access_v1';
 
 /// Baidu CDN often rejects anonymous media_kit fetches; always send these.
 const Map<String, String> kNetdiskStreamHeaders = <String, String>{
@@ -28,15 +34,77 @@ bool isNetdiskPlayUrl(String? path) {
       value.contains('netdisk/play/');
 }
 
-Future<File?> findCachedNetdiskMedia(int importId) async {
+Future<Directory> netdiskMediaDirectory() async {
   final Directory docs = await getApplicationDocumentsDirectory();
-  final Directory dir = Directory('${docs.path}/netdisk_media');
+  return Directory('${docs.path}/netdisk_media');
+}
+
+String _accessKeyForFile(File file) {
+  final String name = file.uri.pathSegments.isEmpty
+      ? file.path
+      : file.uri.pathSegments.last;
+  final int dot = name.lastIndexOf('.');
+  return dot > 0 ? name.substring(0, dot) : name;
+}
+
+Map<String, int> _readAccessMap() {
+  if (!Hive.isBoxOpen('prefs')) {
+    return <String, int>{};
+  }
+  final String raw =
+      Hive.box<String>('prefs').get(_netdiskMediaAccessKey) ?? '';
+  if (raw.trim().isEmpty) {
+    return <String, int>{};
+  }
+  try {
+    final Object? decoded = jsonDecode(raw);
+    if (decoded is! Map) {
+      return <String, int>{};
+    }
+    final Map<String, int> out = <String, int>{};
+    decoded.forEach((Object? key, Object? value) {
+      final int? ms = value is int
+          ? value
+          : (value is num ? value.toInt() : int.tryParse('$value'));
+      if (key != null && ms != null && ms > 0) {
+        out['$key'] = ms;
+      }
+    });
+    return out;
+  } catch (_) {
+    return <String, int>{};
+  }
+}
+
+Future<void> _writeAccessMap(Map<String, int> map) async {
+  if (!Hive.isBoxOpen('prefs')) {
+    return;
+  }
+  await Hive.box<String>('prefs').put(
+    _netdiskMediaAccessKey,
+    jsonEncode(map),
+  );
+}
+
+/// Mark a local netdisk video as recently used (playback / download / hit).
+Future<void> touchNetdiskMediaAccess(File file) async {
+  if (!file.existsSync()) {
+    return;
+  }
+  final Map<String, int> map = _readAccessMap();
+  map[_accessKeyForFile(file)] = DateTime.now().millisecondsSinceEpoch;
+  await _writeAccessMap(map);
+}
+
+Future<File?> findCachedNetdiskMedia(int importId) async {
+  final Directory dir = await netdiskMediaDirectory();
   if (!dir.existsSync()) {
     return null;
   }
   for (final String ext in <String>['.mkv', '.mp4', '.bin', '.ts', '.webm']) {
     final File f = File('${dir.path}/$importId$ext');
     if (f.existsSync() && f.lengthSync() > 64 * 1024) {
+      unawaited(touchNetdiskMediaAccess(f));
       return f;
     }
   }
@@ -49,10 +117,80 @@ Future<File?> findCachedNetdiskMedia(int importId) async {
         ? ''
         : e.uri.pathSegments.last;
     if (name.startsWith('$importId') && e.lengthSync() > 64 * 1024) {
+      unawaited(touchNetdiskMediaAccess(e));
       return e;
     }
   }
   return null;
+}
+
+class NetdiskMediaPurgeResult {
+  const NetdiskMediaPurgeResult({
+    required this.deletedFiles,
+    required this.freedBytes,
+  });
+
+  final List<String> deletedFiles;
+  final int freedBytes;
+}
+
+/// Delete `Documents/netdisk_media` files not touched for [maxAge] (default 10d).
+///
+/// Returns deleted absolute paths so the library can point episodes back to the
+/// netdisk play URL instead of a missing local file.
+Future<NetdiskMediaPurgeResult> purgeStaleNetdiskMedia({
+  Duration maxAge = kNetdiskMediaUnusedTtl,
+}) async {
+  final Directory dir = await netdiskMediaDirectory();
+  if (!dir.existsSync()) {
+    return const NetdiskMediaPurgeResult(deletedFiles: <String>[], freedBytes: 0);
+  }
+  final Map<String, int> access = _readAccessMap();
+  final int cutoff =
+      DateTime.now().subtract(maxAge).millisecondsSinceEpoch;
+  final List<String> deleted = <String>[];
+  int freed = 0;
+  final Set<String> keepKeys = <String>{};
+
+  await for (final FileSystemEntity e in dir.list()) {
+    if (e is! File) {
+      continue;
+    }
+    final String path = e.path;
+    if (path.endsWith('.part')) {
+      try {
+        final int len = e.lengthSync();
+        await e.delete();
+        deleted.add(path);
+        freed += len;
+      } catch (_) {}
+      continue;
+    }
+    final String key = _accessKeyForFile(e);
+    int lastMs = access[key] ?? 0;
+    if (lastMs <= 0) {
+      try {
+        lastMs = e.lastModifiedSync().millisecondsSinceEpoch;
+      } catch (_) {
+        lastMs = 0;
+      }
+    }
+    if (lastMs > cutoff) {
+      keepKeys.add(key);
+      access[key] = lastMs;
+      continue;
+    }
+    try {
+      final int len = e.lengthSync();
+      await e.delete();
+      deleted.add(path);
+      freed += len;
+    } catch (_) {}
+  }
+
+  access.removeWhere((String k, int _) => !keepKeys.contains(k));
+  await _writeAccessMap(access);
+  return NetdiskMediaPurgeResult(deletedFiles: deleted, freedBytes: freed);
 }
 
 String absoluteNetdiskPlayUrl(String playUrl) {
@@ -183,11 +321,11 @@ Future<File> cacheNetdiskEpisodeLocally({
   final File? existing =
       importId == null ? null : await findCachedNetdiskMedia(importId);
   if (existing != null) {
+    await touchNetdiskMediaAccess(existing);
     onProgress?.call(1);
     return existing;
   }
-  final Directory docs = await getApplicationDocumentsDirectory();
-  final Directory dir = Directory('${docs.path}/netdisk_media');
+  final Directory dir = await netdiskMediaDirectory();
   await dir.create(recursive: true);
   final File out = File('${dir.path}/$idKey.mkv');
   final File temp = File('${out.path}.part');
@@ -230,6 +368,7 @@ Future<File> cacheNetdiskEpisodeLocally({
     await out.delete();
   }
   await temp.rename(out.path);
+  await touchNetdiskMediaAccess(out);
   onProgress?.call(1);
   return out;
 }

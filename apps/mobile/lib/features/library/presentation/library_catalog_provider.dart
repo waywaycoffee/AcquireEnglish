@@ -557,6 +557,44 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     }
   }
 
+  /// After TTL purge of Documents/netdisk_media, point episodes back to remote
+  /// play URLs so the next open re-downloads instead of a broken local path.
+  Future<int> revertPurgedNetdiskLocalVideos(Iterable<String> deletedPaths) async {
+    final Set<String> deleted = deletedPaths
+        .map((String p) => p.trim())
+        .where((String p) => p.isNotEmpty)
+        .toSet();
+    if (deleted.isEmpty) {
+      return 0;
+    }
+    bool changed = false;
+    int count = 0;
+    state = state.map((LibraryCourseData course) {
+      final List<LibraryEpisodeItem> episodes = course.episodes.map((
+        LibraryEpisodeItem episode,
+      ) {
+        final String asset = (episode.videoAsset ?? '').trim();
+        if (asset.isEmpty || !deleted.contains(asset)) {
+          return episode;
+        }
+        final String? remote = (episode.sourceUrl ?? '').trim().isNotEmpty
+            ? episode.sourceUrl!.trim()
+            : null;
+        changed = true;
+        count += 1;
+        return episode.copyWith(
+          videoAsset: remote,
+          videoMissing: remote == null || remote.isEmpty,
+        );
+      }).toList(growable: false);
+      return course.copyWith(episodes: episodes);
+    }).toList(growable: false);
+    if (changed) {
+      await _persistImportedCourses();
+    }
+    return count;
+  }
+
   /// Persist one Bilibili episode's local video / subs / cover after download.
   Future<void> updateEpisodeLocalMedia({
     required String courseId,
