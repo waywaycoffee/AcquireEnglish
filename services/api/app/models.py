@@ -1543,6 +1543,8 @@ class ProductFeedback(Base):
     body: Mapped[str] = mapped_column(Text, default="")
     contact: Mapped[str] = mapped_column(String(120), default="")
     app_version: Mapped[str] = mapped_column(String(64), default="")
+    # Optional screenshot URL (ECS /media/… after upload).
+    screenshot_url: Mapped[str] = mapped_column(String(512), default="")
     # open | read | done
     status: Mapped[str] = mapped_column(String(16), default="open", index=True)
     admin_note: Mapped[str] = mapped_column(Text, default="")

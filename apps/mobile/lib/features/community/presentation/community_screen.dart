@@ -15,6 +15,7 @@ import 'community_me_tab.dart';
 import 'community_provider.dart';
 import 'community_social_screen.dart';
 import 'exam_assets_tab.dart';
+import 'feature_feedback_tab.dart';
 import 'study_desk_screen.dart';
 
 class CommunityScreen extends ConsumerStatefulWidget {
@@ -74,12 +75,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
         emptyMeta: '仿写、跟读、造句成果都会出现在这里',
         emptyHint: '练习区承接输出与反馈；真题资料请看「考试」。',
       ),
-      const CommunityFeedTab(
-        kinds: <String>{'question'},
-        emptyTitle: '还没有英语问答',
-        emptyMeta: '可贴台词时间戳或词条提问',
-        emptyHint: '问答聚焦发音、词汇、语法、考试题型辨析。',
-      ),
+      const FeatureFeedbackTab(),
       const CommunityMeTab(),
     ];
 
@@ -129,7 +125,7 @@ class _CommunityScreenState extends ConsumerState<CommunityScreen> {
                     (0, '考试'),
                     (1, '素材'),
                     (2, '练习'),
-                    (3, '问答'),
+                    (3, '反馈'),
                     (4, '我的'),
                   ])
                     Expanded(

@@ -23,6 +23,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_api_usage_module_column(conn)
     await _ensure_rank_state_columns(conn)
     await _ensure_upload_task_notify_column(conn)
+    await _ensure_product_feedback_columns(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -367,5 +368,18 @@ async def _ensure_upload_task_notify_column(conn: AsyncConnection) -> None:
         await conn.execute(
             text(
                 "ALTER TABLE upload_task ADD COLUMN notify_pending INTEGER DEFAULT 0"
+            )
+        )
+
+
+async def _ensure_product_feedback_columns(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "product_feedback")
+    if existing is None:
+        return
+    if "screenshot_url" not in existing:
+        await conn.execute(
+            text(
+                "ALTER TABLE product_feedback "
+                "ADD COLUMN screenshot_url VARCHAR(512) DEFAULT ''"
             )
         )

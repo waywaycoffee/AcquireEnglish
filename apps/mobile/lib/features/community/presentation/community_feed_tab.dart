@@ -230,12 +230,6 @@ class CommunityFeedTab extends ConsumerWidget {
                             const Color(0xFF5B8DEF),
                           ),
                           (
-                            'question',
-                            '学习问答',
-                            '卡住的地方喊人一起想',
-                            const Color(0xFFE67E22),
-                          ),
-                          (
                             'team_invite',
                             '组队邀请',
                             '找搭子一起练',

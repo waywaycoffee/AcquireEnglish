@@ -1814,6 +1814,7 @@ class AcquireApiClient {
     String category = 'general',
     String contact = '',
     String appVersion = '',
+    String screenshotUrl = '',
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.productFeedback,
@@ -1823,9 +1824,33 @@ class AcquireApiClient {
         'category': category,
         if (contact.trim().isNotEmpty) 'contact': contact.trim(),
         if (appVersion.trim().isNotEmpty) 'app_version': appVersion.trim(),
+        if (screenshotUrl.trim().isNotEmpty)
+          'screenshot_url': screenshotUrl.trim(),
       },
     );
     return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  /// Current user's feature-problem feedback tickets (with resolution status).
+  Future<List<Map<String, dynamic>>> listMyProductFeedback({
+    int limit = 30,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.productFeedbackMine,
+      queryParameters: <String, dynamic>{'limit': limit.clamp(1, 50)},
+      options: Options(
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    final Object? raw = response.data;
+    final Object? items = raw is Map ? raw['items'] : null;
+    if (items is! List) return const <Map<String, dynamic>>[];
+    return items
+        .whereType<Map>()
+        .map((Map row) => Map<String, dynamic>.from(row))
+        .toList(growable: false);
   }
 
   Future<Map<String, dynamic>> commerceTrialStatus() async {

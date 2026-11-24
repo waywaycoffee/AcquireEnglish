@@ -38,6 +38,7 @@ class FeedbackCreateBody(BaseModel):
     category: FeedbackCategory = "general"
     contact: str = Field(default="", max_length=120)
     app_version: str = Field(default="", max_length=64)
+    screenshot_url: str = Field(default="", max_length=512)
 
 
 class FeedbackStatusBody(BaseModel):
@@ -59,6 +60,7 @@ def _serialize(row: ProductFeedback, user: User | None = None) -> dict[str, Any]
         "body": row.body or "",
         "contact": row.contact or "",
         "app_version": row.app_version or "",
+        "screenshot_url": row.screenshot_url or "",
         "status": row.status,
         "admin_note": row.admin_note or "",
         "created_at": row.created_at.isoformat() if row.created_at else None,
@@ -77,10 +79,11 @@ async def submit_feedback(
 ) -> dict[str, Any]:
     text = (body.body or "").strip()
     if len(text) < 2:
-        raise HTTPException(status_code=400, detail="请填写反馈内容")
+        raise HTTPException(status_code=400, detail="请填写问题情况描述")
     title = (body.title or "").strip()
     if not title:
-        title = "软件优化建议"
+        title = "功能问题反馈"
+    screenshot = (body.screenshot_url or "").strip()[:512]
 
     day_key = _utcnow().date().isoformat()
     # Soft rate limit: count today's rows for this user.
@@ -111,6 +114,7 @@ async def submit_feedback(
         body=text[:8000],
         contact=(body.contact or "").strip()[:120],
         app_version=(body.app_version or "").strip()[:64],
+        screenshot_url=screenshot,
         status="open",
     )
     db.add(row)
@@ -148,8 +152,11 @@ async def my_feedback(
                 "category": r.category,
                 "title": r.title,
                 "body": r.body,
+                "screenshot_url": r.screenshot_url or "",
                 "status": r.status,
+                "admin_note": r.admin_note or "",
                 "created_at": r.created_at.isoformat() if r.created_at else None,
+                "updated_at": r.updated_at.isoformat() if r.updated_at else None,
             }
             for r in rows
         ]

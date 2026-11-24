@@ -119,12 +119,12 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
                 ],
               const SizedBox(height: 18),
               const Text(
-                '素材包',
+                'B站学习资源',
                 style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18),
               ),
               const SizedBox(height: 4),
               Text(
-                '社区不存视频本体，只存链接 / 字幕元信息 / 词表说明；可 fork 到自己的库',
+                '只发布 B 站学习链接与词表说明，不上传视频本体；他人可 fork 到自己的库',
                 style: TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w600,
@@ -137,7 +137,7 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
                   alignment: Alignment.centerLeft,
                   child: FilledButton.tonal(
                     onPressed: () => unawaited(_createPack(context)),
-                    child: const Text('发布素材包'),
+                    child: const Text('发布B站学习资源'),
                   ),
                 ),
               const SizedBox(height: 10),
@@ -148,8 +148,8 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
                 )
               else if (_packs.isEmpty)
                 QuestFeedCard(
-                  title: '还没有公开素材包',
-                  meta: '发布含 CEFR / 题材 / 词表的包，或先分享 B 站链接',
+                  title: '还没有 B站学习资源',
+                  meta: '粘贴 B 站链接，可选 CEFR / 题材 / 词表后发布',
                   badge: '等你来发',
                   accent: AppDesignTokens.brandGreen,
                   onPlay: loggedIn
@@ -161,9 +161,9 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
                   QuestFeedCard(
                     title: (pack['title'] as String?)?.trim().isNotEmpty == true
                         ? pack['title'] as String
-                        : '未命名素材包',
+                        : '未命名 B站资源',
                     meta: <String>[
-                      'i+1 推荐',
+                      'B站',
                       if ((pack['cefr'] as String?)?.isNotEmpty == true)
                         pack['cefr'] as String,
                       if ((pack['topic'] as String?)?.isNotEmpty == true)
@@ -353,35 +353,50 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
     final bool? ok = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
-        title: const Text('发布素材包'),
+        backgroundColor: AppDesignTokens.appWhite,
+        title: Text(
+          '发布B站学习资源',
+          style: TextStyle(color: AppDesignTokens.textPrimary),
+        ),
         content: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const Text(
-                '不上传视频文件；只保存来源链接、学习元信息与可选词表。',
-                style: TextStyle(fontSize: 12),
+              Text(
+                '不上传视频文件；请粘贴 B 站链接，并可附 CEFR / 题材 / 词表。',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppDesignTokens.textSecondary,
+                ),
               ),
               TextField(
                 controller: title,
+                style: TextStyle(color: AppDesignTokens.textPrimary),
                 decoration: const InputDecoration(labelText: '标题'),
               ),
               TextField(
                 controller: url,
-                decoration: const InputDecoration(labelText: 'B 站链接（可选）'),
+                style: TextStyle(color: AppDesignTokens.textPrimary),
+                decoration: const InputDecoration(
+                  labelText: 'B 站链接（必填）',
+                  hintText: 'https://www.bilibili.com/video/…',
+                ),
               ),
               TextField(
                 controller: cefr,
+                style: TextStyle(color: AppDesignTokens.textPrimary),
                 decoration: const InputDecoration(labelText: 'CEFR'),
               ),
               TextField(
                 controller: topic,
+                style: TextStyle(color: AppDesignTokens.textPrimary),
                 decoration: const InputDecoration(labelText: '题材'),
               ),
               TextField(
                 controller: vocab,
                 minLines: 3,
                 maxLines: 6,
+                style: TextStyle(color: AppDesignTokens.textPrimary),
                 decoration: const InputDecoration(
                   labelText: '词表（可选，一行一词）',
                   hintText: 'apple:苹果\norder|点单',
@@ -409,13 +424,21 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
       );
       return;
     }
+    final String biliUrl = url.text.trim();
+    if (biliUrl.isEmpty ||
+        !(biliUrl.contains('bilibili.com') || biliUrl.contains('b23.tv'))) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请填写有效的 B 站链接')),
+      );
+      return;
+    }
     final List<Map<String, dynamic>> vocabRows =
         _parseVocabLines(vocab.text);
     try {
       await ref.read(acquireApiClientProvider).createCommunityPack(
         <String, dynamic>{
           'title': title.text.trim(),
-          if (url.text.trim().isNotEmpty) 'source_url': url.text.trim(),
+          'source_url': biliUrl,
           if (cefr.text.trim().isNotEmpty) 'cefr': cefr.text.trim(),
           if (topic.text.trim().isNotEmpty) 'topic': topic.text.trim(),
           'has_subtitles': false,
@@ -428,7 +451,7 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
       await _loadExtras();
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('素材包已发布')),
+        const SnackBar(content: Text('B站学习资源已发布')),
       );
     } catch (e) {
       if (!mounted) return;
@@ -455,14 +478,14 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
             crossAxisAlignment: CrossAxisAlignment.stretch,
             children: <Widget>[
               Text(
-                (pack['title'] as String?) ?? '素材包',
+                (pack['title'] as String?) ?? 'B站学习资源',
                 style: Theme.of(ctx).textTheme.titleMedium,
               ),
               const SizedBox(height: 6),
               Text(
                 (pack['description'] as String?)?.trim().isNotEmpty == true
                     ? pack['description'] as String
-                    : '社区不存视频本体；导入播放器时请自备合法片源。',
+                    : '仅保存 B 站链接与学习元信息；导入播放器时请自备合法片源。',
               ),
               const SizedBox(height: 12),
               if (sourceUrl != null && sourceUrl.isNotEmpty)
@@ -543,7 +566,7 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
                     if (!mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('该素材包还没有词表；发布时可粘贴词表'),
+                        content: Text('该资源还没有词表；发布时可粘贴词表'),
                       ),
                     );
                     return;
@@ -553,7 +576,8 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
                         .read(dailyReviewProvider.notifier)
                         .importPackVocab(
                           vocab,
-                          packTitle: (pack['title'] as String?) ?? '社区素材包',
+                          packTitle:
+                              (pack['title'] as String?) ?? 'B站学习资源',
                         );
                     if (ctx.mounted) Navigator.pop(ctx);
                     if (!mounted) return;
