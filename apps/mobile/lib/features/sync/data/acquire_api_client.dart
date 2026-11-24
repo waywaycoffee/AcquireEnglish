@@ -365,7 +365,7 @@ class SharedSubtitleGpuJob {
       state == 'failed' || (error.trim().isNotEmpty && state == 'failed');
 }
 
-/// One beat of an article dialogue-guide podcast.
+/// One beat of a continuous 口播 narration script.
 class PodcastGuideSegment {
   const PodcastGuideSegment({
     required this.text,
@@ -374,7 +374,7 @@ class PodcastGuideSegment {
 
   final String text;
 
-  /// After TTS finishes, pause and wait for the learner to speak.
+  /// Reserved; continuous 口播 ignores learner-turn pauses.
   final bool awaitUser;
 }
 
@@ -3880,7 +3880,7 @@ class AcquireApiClient {
     );
   }
 
-  /// Dialogue-guide podcast: coach beats + optional learner turns.
+  /// Continuous 口播 narration (single or dual host). No learner-turn pauses.
   Future<List<PodcastGuideSegment>> generatePodcastScript(
     String excerpt, {
     required bool singleHost,
@@ -3899,17 +3899,9 @@ class AcquireApiClient {
         if (row is Map) {
           final String text = '${row['text'] ?? ''}'.trim();
           if (text.isEmpty) continue;
-          out.add(
-            PodcastGuideSegment(
-              text: text,
-              awaitUser: row['await_user'] == true,
-            ),
-          );
+          out.add(PodcastGuideSegment(text: text));
         } else if (row is String && row.trim().isNotEmpty) {
-          final String text = row.trim();
-          out.add(
-            PodcastGuideSegment(text: text, awaitUser: text.endsWith('?')),
-          );
+          out.add(PodcastGuideSegment(text: row.trim()));
         }
       }
       return out;
@@ -3921,12 +3913,7 @@ class AcquireApiClient {
         .map((String line) => line.trim())
         .where((String line) => line.isNotEmpty)
         .take(10)
-        .map(
-          (String line) => PodcastGuideSegment(
-            text: line,
-            awaitUser: line.endsWith('?'),
-          ),
-        )
+        .map((String line) => PodcastGuideSegment(text: line))
         .toList(growable: false);
   }
 

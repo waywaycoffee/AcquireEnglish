@@ -1199,35 +1199,74 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       await _pauseArticlePodcast();
       return;
     }
-    // Self-play + guide: always single-host dialogue guide — no mode picker.
-    if (!_podcastSingleHost) {
+    if (_podcastIndex < _podcastLines.length) {
+      await _playArticlePodcast();
+      return;
+    }
+    final bool? single = await showModalBottomSheet<bool>(
+      context: context,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              leading: const Icon(Icons.record_voice_over_outlined),
+              title: const Text('单人口播'),
+              subtitle: const Text('一位主持从头讲到尾，适合跟听'),
+              onTap: () => Navigator.pop(sheetContext, true),
+            ),
+            ListTile(
+              leading: const Icon(Icons.people_outline),
+              title: const Text('双人口播'),
+              subtitle: const Text('两位主持轮流讲解同一段材料'),
+              onTap: () => Navigator.pop(sheetContext, false),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || single == null) return;
+    if (_podcastSingleHost != single) {
       _podcastLines = const <PodcastGuideSegment>[];
       _podcastOffset = Duration.zero;
       _podcastIndex = 0;
       _podcastDisplayedThrough = -1;
-      _podcastSingleHost = true;
+      _podcastSingleHost = single;
     }
     await _playArticlePodcast();
   }
 
   Future<void> _playArticlePodcast() async {
     if (_podcastPlaying || _busy || _recordingActive) return;
-    final generation = ++_podcastGeneration;
+    if (!_started) {
+      setState(() {
+        _started = true;
+        _roundStartBubble = _bubbles.length;
+        _lastRoundTurns = 0;
+        _lastRoundExpressions = const <String>[];
+        _questUtterances = 0;
+        _roundPronScores.clear();
+        _error = null;
+      });
+      _armSessionClock();
+      unawaited(_consumeCoachQuotaIfNeeded());
+    }
+    final int generation = ++_podcastGeneration;
     setState(() {
       _podcastPlaying = true;
       _podcastPausedForQuestion = false;
       _duplexLive = false;
-      _status = _podcastLines.isEmpty ? '正在准备引导对话…' : '引导对话进行中…';
+      _status = _podcastLines.isEmpty ? '正在生成口播稿…' : '口播播放中…';
     });
     _idlePromptTimer?.cancel();
     await _liveKit.disconnect();
     await _interruptCoachSpeech();
     if (!mounted || generation != _podcastGeneration) return;
 
-    final settings = ref.read(learningSettingsProvider);
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
     try {
       if (_podcastLines.isEmpty) {
-        final excerpt = widget.articleExcerpt.trim();
+        final String excerpt = widget.articleExcerpt.trim();
         List<PodcastGuideSegment> generated = const <PodcastGuideSegment>[];
         try {
           generated = await ref.read(acquireApiClientProvider).generatePodcastScript(
@@ -1240,37 +1279,38 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             ? generated
             : <PodcastGuideSegment>[
                 for (final String passage
-                    in tutorSourceLines(excerpt).take(3)) ...<PodcastGuideSegment>[
-                  PodcastGuideSegment(
-                    text: 'Here is a short line from the article: $passage',
-                  ),
-                  const PodcastGuideSegment(
-                    text: 'Can you say that idea in your own words?',
-                    awaitUser: true,
-                  ),
-                ],
+                    in tutorSourceLines(excerpt).take(5))
+                  PodcastGuideSegment(text: passage),
               ];
+        // Show full script immediately so learners can follow along.
+        setState(() {});
       }
       if (_podcastIndex == _podcastLines.length) {
         _podcastIndex = 0;
         _podcastDisplayedThrough = -1;
       }
-      setState(() => _status = '引导对话中 · 听到提问后请开口');
-      while (mounted && generation == _podcastGeneration &&
+      setState(() => _status = '口播播放中 · 可对照右侧/下方稿件');
+      while (mounted &&
+          generation == _podcastGeneration &&
           _podcastIndex < _podcastLines.length) {
         final PodcastGuideSegment segment = _podcastLines[_podcastIndex];
         final String text = segment.text;
-        final host = _podcastIndex.isEven;
-        final persona = settings.selectedDigitalHuman;
+        final bool host = _podcastIndex.isEven;
+        final DigitalHumanPersona persona = settings.selectedDigitalHuman;
         if (_podcastIndex > _podcastDisplayedThrough) {
           setState(() {
-            _bubbles.add(_ChatBubble(
-              role: 'coach',
-              text: '${_podcastSingleHost ? persona.displayName : (host ? '主持人' : '嘉宾')} · $text',
-            ));
+            _bubbles.add(
+              _ChatBubble(
+                role: 'coach',
+                text:
+                    '${_podcastSingleHost ? persona.displayName : (host ? '主持人' : '嘉宾')} · $text',
+              ),
+            );
             _podcastDisplayedThrough = _podcastIndex;
           });
           _scrollChatToEnd();
+        } else {
+          setState(() {});
         }
         final result = await _pipelineClient.synthesizeSpeechWithProvider(
           rawBaseUrl: settings.oralCoachPipelineUrl,
@@ -1282,33 +1322,25 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         );
         if (!mounted || generation != _podcastGeneration) return;
         if (result == null) throw StateError('播客音频暂不可用');
-        final played = await _playRemoteTts(
+        final bool played = await _playRemoteTts(
           result.url,
           gen: ++_speakGen,
           startAt: _podcastOffset,
         );
         if (!mounted || generation != _podcastGeneration) return;
         if (!played) throw StateError('播客音频暂不可用');
-        final bool waitForUser = segment.awaitUser;
+        // Continuous 口播: never pause for learner turns.
         setState(() {
           _podcastIndex++;
           _podcastOffset = Duration.zero;
-          if (waitForUser) {
-            _podcastPlaying = false;
-            _podcastPausedForQuestion = true;
-            _status = '轮到你了 · 按住麦克风回答，说完自动继续';
-          }
         });
-        if (waitForUser) {
-          return;
-        }
       }
       if (mounted && generation == _podcastGeneration) {
-        setState(() => _status = '本段引导对话已完成');
+        setState(() => _status = '口播已播完');
       }
     } catch (_) {
       if (mounted && generation == _podcastGeneration) {
-        setState(() => _status = '播客音频暂不可用，可从当前段重试');
+        setState(() => _status = '口播音频暂不可用，可从当前段重试');
       }
     } finally {
       if (mounted &&
@@ -1326,14 +1358,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     setState(() {
       _podcastPlaying = false;
       _podcastPausedForQuestion = forQuestion;
-      _status = '已暂停引导对话';
+      _status = '已暂停口播';
     });
     await _interruptCoachSpeech();
   }
 
   void _resumeArticlePodcast() {
-    if (!mounted || !_podcastPausedForQuestion || _holdPressed || _recordingActive || _busy) return;
-    _podcastPausedForQuestion = false;
+    if (!mounted || _holdPressed || _recordingActive || _busy) return;
+    if (_podcastPausedForQuestion) {
+      _podcastPausedForQuestion = false;
+    }
     unawaited(_playArticlePodcast());
   }
 
@@ -1537,8 +1571,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_busy || _historyLoading || _started) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
     _preferChineseReply = false;
-    // With article/video material: auto-start guided 口播 (no user mode pick).
-    if (widget.articleExcerpt.trim().isNotEmpty) {
+    if (_isGuidedTutorLesson && !_podcastPausedForQuestion && !_podcastPlaying) {
       setState(() {
         _started = true;
         _roundStartBubble = _bubbles.length;
@@ -1547,8 +1580,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _questUtterances = 0;
         _roundPronScores.clear();
         _error = null;
-        _podcastSingleHost = true;
-        _status = '正在准备引导对话…';
+        _tutorStep = TutorLessonStep.intro;
+        _tutorShadowIndex = 0;
+        _tutorDialogueTurns = 0;
+        _tutorStepScores.clear();
+        _tutorCorrections.clear();
+        _tutorFocusLine = '';
+        _tutorCoachQuestion = '';
+        _tutorOverallScore = null;
+        _tutorFsrsWritten = false;
+        _status = '六步外教课 · 开场';
       });
       _armSessionClock();
       _idlePromptCount = 0;
@@ -1557,12 +1598,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       if (_usesVoicePipeline(settings)) {
         unawaited(_ensurePipelineSession(settings).catchError((Object _) {}));
       }
-      if (_duplexLive || _liveKit.room != null) {
-        unawaited(_stopDuplexMeter(flush: true));
-        unawaited(_liveKit.disconnect());
-        _duplexLive = false;
-      }
-      unawaited(_playArticlePodcast());
+      unawaited(_runTutorStep());
       return;
     }
     final String? opening = _podcastPausedForQuestion || _podcastPlaying
@@ -3664,12 +3700,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     avatar: Icon(_podcastPlaying ? Icons.pause : Icons.headphones),
                     label: Text(
                       _podcastPlaying
-                          ? '暂停引导'
-                          : (_podcastPausedForQuestion ||
-                                  _podcastIndex > 0 ||
-                                  _podcastLines.isNotEmpty
-                              ? '继续引导'
-                              : '引导对话'),
+                          ? '暂停口播'
+                          : (_podcastIndex > 0 &&
+                                  _podcastIndex < _podcastLines.length
+                              ? '继续口播'
+                              : (widget.episodeId != null ? '视频口播' : '文章口播')),
                     ),
                     onPressed: () => unawaited(_openArticlePodcast()),
                   ),
@@ -3772,7 +3807,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        Expanded(child: _buildTutorLessonPanel()),
+        Expanded(
+          child: _podcastLines.isNotEmpty
+              ? _buildPodcastScriptPane(persona)
+              : _buildTutorLessonPanel(),
+        ),
         if (pending != null && pending.isUseful)
           Padding(
             padding: const EdgeInsets.fromLTRB(12, 0, 12, 10),
@@ -4016,9 +4055,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     return Column(
       children: <Widget>[
         Expanded(
-          flex: 3,
+          flex: _podcastLines.isNotEmpty ? 2 : 3,
           child: stage,
         ),
+        if (_podcastLines.isNotEmpty)
+          Expanded(
+            flex: 3,
+            child: _buildPodcastScriptPane(persona),
+          ),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           child: Row(
@@ -4477,6 +4521,115 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           blurRadius: 6,
         ),
       ],
+    );
+  }
+
+  Widget _buildPodcastScriptPane(DigitalHumanPersona persona) {
+    final int speakingIndex = _podcastPlaying
+        ? _podcastIndex.clamp(0, _podcastLines.isEmpty ? 0 : _podcastLines.length - 1)
+        : (_podcastIndex > 0
+            ? (_podcastIndex - 1).clamp(0, _podcastLines.length - 1)
+            : 0);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.05),
+        border: Border(
+          right: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+          bottom: BorderSide(color: Colors.white.withValues(alpha: 0.08)),
+        ),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 14, 16, 8),
+            child: Row(
+              children: <Widget>[
+                Icon(
+                  Icons.headphones,
+                  size: 18,
+                  color: Colors.white.withValues(alpha: 0.85),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _podcastSingleHost ? '口播稿 · 单人' : '口播稿 · 双人',
+                  style: _tutorCartoonStyle(
+                    size: 15,
+                    color: Colors.white.withValues(alpha: 0.9),
+                    weight: FontWeight.w700,
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '${_podcastLines.isEmpty ? 0 : speakingIndex + 1}/${_podcastLines.length}',
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.55),
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Expanded(
+            child: ListView.builder(
+              padding: const EdgeInsets.fromLTRB(12, 0, 12, 14),
+              itemCount: _podcastLines.length,
+              itemBuilder: (BuildContext context, int index) {
+                final PodcastGuideSegment segment = _podcastLines[index];
+                final bool active = index == speakingIndex;
+                final bool host = index.isEven;
+                final String speaker = _podcastSingleHost
+                    ? persona.displayName
+                    : (host ? '主持人' : '嘉宾');
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
+                  decoration: BoxDecoration(
+                    color: active
+                        ? const Color(0xFF6D28D9).withValues(alpha: 0.35)
+                        : Colors.white.withValues(alpha: 0.04),
+                    borderRadius: BorderRadius.circular(14),
+                    border: Border.all(
+                      color: active
+                          ? const Color(0xFFA78BFA)
+                          : Colors.white.withValues(alpha: 0.08),
+                    ),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        '$speaker · ${index + 1}',
+                        style: TextStyle(
+                          color: active
+                              ? const Color(0xFFE9D5FF)
+                              : Colors.white54,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w800,
+                        ),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        segment.text,
+                        style: TextStyle(
+                          color: Colors.white.withValues(
+                            alpha: active ? 0.96 : 0.78,
+                          ),
+                          fontSize: active ? 16 : 14,
+                          height: 1.4,
+                          fontWeight:
+                              active ? FontWeight.w700 : FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                );
+              },
+            ),
+          ),
+        ],
+      ),
     );
   }
 
