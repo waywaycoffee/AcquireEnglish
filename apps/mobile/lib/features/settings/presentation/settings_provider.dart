@@ -437,11 +437,19 @@ class LearningSettingsState {
       usesOralCoachPipeline ||
       oralCoachBackend == '本地 TTS';
 
-  /// Real-time wav2lip WebRTC on the GPU box.
+  /// Real-time wav2lip WebRTC on the GPU box (simplex hold-to-talk unchanged).
   ///
-  /// Disabled for now: connecting LiveTalking during digital-human chat jumps
-  /// into an unrelated lip-sync loading experience. Keep local avatar + TTS.
-  bool get usesRealtimeLipSync => false;
+  /// On when the selected persona maps to a LiveTalking `--avatar_id` and the
+  /// coach backend is not local-TTS-only. Connect fails soft → portrait + TTS.
+  bool get usesRealtimeLipSync {
+    if (oralCoachBackend == '本地 TTS') {
+      return false;
+    }
+    if (resolvedOralCoachServerUrl.trim().isEmpty) {
+      return false;
+    }
+    return selectedDigitalHuman.liveTalkingAvatarId.trim().isNotEmpty;
+  }
 
   bool get isBilibiliLoggedIn => hasBilibiliCookie;
 

@@ -309,7 +309,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   int _speakGen = 0;
   final FlutterTts _cartoonTts = FlutterTts();
 
-  /// Local 数字人 cartoon mouth (atlas visemes). Never LiveTalking 真人 WebRTC.
+  /// Local cartoon mouth cues (fallback when LiveTalking video is unavailable).
   CoachViseme _coachMouth = CoachViseme.closed;
   CoachAnimationTimeline? _mouthTimeline;
   DateTime? _mouthClockStart;
@@ -778,8 +778,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       settings.oralCoachBackend != '本地 TTS' &&
       settings.oralCoachPipelineUrl.trim().isNotEmpty;
 
-  /// LiveTalking lip-sync is intentionally off — stay on local avatar + TTS.
-  bool _wantsLiveTalking(LearningSettingsState settings) => false;
+  /// LiveTalking wav2lip when the persona has an avatar id (simplex unchanged).
+  bool _wantsLiveTalking(LearningSettingsState settings) =>
+      settings.usesRealtimeLipSync;
 
   Future<void> _ensurePipelineSession(LearningSettingsState settings) async {
     if (_session != null) return;
@@ -838,6 +839,21 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           _status = '数字人已建连 · 等待画面';
         }
       });
+      // ICE may deliver video after /offer returns — refresh status once.
+      if (!_liveTalking.hasRemoteVideo) {
+        unawaited(
+          Future<void>.delayed(const Duration(seconds: 2), () {
+            if (!mounted ||
+                startedAt != _sessionStartedAt ||
+                !_liveTalking.isConnected) {
+              return;
+            }
+            if (_liveTalking.hasRemoteVideo) {
+              setState(() => _status = '数字人已连接');
+            }
+          }),
+        );
+      }
     } catch (error) {
       if (!mounted || startedAt != _sessionStartedAt) {
         return;
@@ -1404,6 +1420,30 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (mounted) setState(() => _coachSpeaking = true);
     _beginDigitalMouth(speak);
     try {
+      // Prefer LiveTalking: GPU TTS + wav2lip in one WebRTC stream.
+      if (_wantsLiveTalking(settings)) {
+        await _ensureLiveTalking(settings);
+        if (gen != _speakGen) return;
+        if (_liveTalking.isConnected) {
+          try {
+            if (mounted) {
+              setState(() => _voicePlaybackLabel = '数字人唇形 · LiveTalking');
+            }
+            await _liveTalking.speak(speak, type: 'echo', interrupt: true);
+            // Approximate lip-sync duration so mic unlocks after talk.
+            final int waitMs = (speak.length * 55).clamp(1200, 12000);
+            final int slices = (waitMs / 200).ceil();
+            for (int i = 0; i < slices; i++) {
+              if (gen != _speakGen || !mounted) return;
+              await Future<void>.delayed(const Duration(milliseconds: 200));
+            }
+            return;
+          } catch (_) {
+            // Fall through to pipeline / device TTS.
+          }
+        }
+      }
+
       final bool usesCloudVoice = _usesCloudVoice(settings.selectedDigitalHuman);
       String? remote = ttsUrl;
       String provider = '';
@@ -1431,26 +1471,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           _ => '在线音色',
         });
         if (await _playRemoteTts(remote, gen: gen)) return;
-      }
-      if (gen != _speakGen) return;
-      if (_wantsLiveTalking(settings)) {
-        await _ensureLiveTalking(settings);
-        if (gen != _speakGen) return;
-        if (_liveTalking.isConnected) {
-          try {
-            await _liveTalking.speak(speak, type: 'echo', interrupt: true);
-            // Approximate lip-sync duration so mic unlocks after talk.
-            final int waitMs = (speak.length * 55).clamp(1200, 12000);
-            final int slices = (waitMs / 200).ceil();
-            for (int i = 0; i < slices; i++) {
-              if (gen != _speakGen || !mounted) return;
-              await Future<void>.delayed(const Duration(milliseconds: 200));
-            }
-            return;
-          } catch (_) {
-            // Fall through to TTS.
-          }
-        }
       }
       if (!mounted || !_started || gen != _speakGen) return;
       setState(() => _voicePlaybackLabel = '备用音色 · 本机');
@@ -3548,8 +3568,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final String stageLabel = avatarSpeaking
         ? '外教在说…'
         : (avatarListening ? '外教在听…' : persona.displayName);
-    // Portrait-only digital human (no cartoon atlas / sprite lips).
-    final Widget? liveVideo = null;
+    // LiveTalking WebRTC when connected; otherwise still portrait.
+    final Widget? liveVideo =
+        (_wantsLiveTalking(settings) &&
+            _liveConnected &&
+            _liveRenderer != null)
+        ? RTCVideoView(
+            _liveRenderer!,
+            objectFit: RTCVideoViewObjectFit.RTCVideoViewObjectFitCover,
+            mirror: false,
+          )
+        : null;
 
     final Widget avatarStage = Stack(
       fit: StackFit.expand,
