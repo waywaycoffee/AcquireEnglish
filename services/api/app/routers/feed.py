@@ -27,6 +27,12 @@ from app.deps import get_current_user, get_current_user_optional
 from app.followed_creators import parse_followed_creators
 from app.models import User, UserLinkCourse, UserPreference
 from app.schemas import DailyFeedItemOut
+from app.services.english_browse_daily import (
+    ENGLISH_BROWSE_KEYWORDS,
+    ENGLISH_BROWSE_MAX,
+    ENGLISH_BROWSE_WAIT_SEC,
+    get_shared_daily_browse,
+)
 
 router = APIRouter(prefix="/feed", tags=["feed"])
 
@@ -41,19 +47,6 @@ MAX_FOLLOWED_CREATORS = 6
 MAX_TOTAL_ITEMS = 50
 # Soft deadline for English-audio sampling — never blocks returning the feed.
 AUDIO_SAMPLE_WAIT_SEC = 4.0
-# Community 「全英可逛」: prefer verified English audio, longer sample budget.
-ENGLISH_BROWSE_WAIT_SEC = 8.0
-ENGLISH_BROWSE_MAX = 36
-ENGLISH_BROWSE_KEYWORDS = (
-    ("vlog", "english vlog native speaker"),
-    ("podcast", "english podcast conversation"),
-    ("ted", "TED english talk"),
-    ("bbc", "BBC english"),
-    ("voa", "VOA learning english"),
-    ("drama", "english drama scene dialogue"),
-    ("news", "english news report"),
-    ("daily", "daily english conversation native"),
-)
 
 
 def _parse_tags(raw: str | None) -> list[str]:
@@ -248,20 +241,28 @@ async def english_browse_feed(
     q: str | None = Query(
         default=None,
         max_length=80,
-        description="Optional extra keyword; mixed with English-native seeds",
+        description="Optional keyword search; bypasses the shared daily list",
     ),
     level: str | None = Query(
         default=None,
         max_length=16,
         description="Optional CEFR / level hint (A1–C2); overrides profile level",
     ),
+    force: bool = Query(
+        default=False,
+        description="Admin/debug: rebuild today's shared list (ignored when q is set)",
+    ),
     user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ) -> list[DailyFeedItemOut]:
-    """English-audio-first Bilibili browse for the video module 「全英可逛」."""
+    """English-audio-first Bilibili browse for the video module 「全英可逛」.
+
+    Default feed (no ``q``) is a **shared daily list** per CEFR level: built once
+    per calendar day on the server and returned identically to every user.
+    Keyword search still runs live.
+    """
     resolved_level = (level or "").strip().upper() or "A2"
     cookie: str | None = None
-    already_imported: set[str] = set()
     if user is not None:
         pref_result = await db.execute(
             select(UserPreference).where(UserPreference.user_id == user.id)
@@ -270,6 +271,20 @@ async def english_browse_feed(
         if not (level or "").strip():
             resolved_level = (pref.level if pref else None) or "A2"
         cookie = (pref.bilibili_cookie if pref else None) or None
+
+    extra = (q or "").strip()
+    if not extra:
+        # Shared daily cache — same list for all users (no per-user shuffle /
+        # import filtering). Cookie only used when rebuilding on cache miss.
+        return await get_shared_daily_browse(
+            resolved_level,
+            cookie=cookie,
+            force_rebuild=force,
+        )
+
+    # Live keyword search (not the shared daily shelf).
+    already_imported: set[str] = set()
+    if user is not None:
         imported_result = await db.execute(
             select(UserLinkCourse.external_id).where(
                 UserLinkCourse.user_id == user.id,
@@ -283,12 +298,10 @@ async def english_browse_feed(
     level_hint = LEVEL_HINTS.get(
         (resolved_level or "A2").upper(), "英语学习"
     )
-    pairs: list[tuple[str, str]] = list(ENGLISH_BROWSE_KEYWORDS)
-    extra = (q or "").strip()
-    if extra:
-        pairs = [("query", f"{extra} english native")] + pairs
-    # Keep fan-out bounded.
-    pairs = pairs[:8]
+    pairs: list[tuple[str, str]] = [
+        ("query", f"{extra} english native"),
+        *list(ENGLISH_BROWSE_KEYWORDS),
+    ][:8]
 
     seen: set[str] = set()
     candidates: list[DailyFeedItemOut] = []
@@ -317,9 +330,7 @@ async def english_browse_feed(
             candidates.append(_hit_to_item(hit, reason="english_browse"))
 
     day_key = date.today().isoformat()
-    uid = user.id if user is not None else 0
-    candidates.sort(key=lambda item: _stable_rank(item.bvid, day_key, uid))
-    # Cap before audio sample to keep latency reasonable.
+    candidates.sort(key=lambda item: _stable_rank(item.bvid, day_key, 0))
     probe = candidates[: min(len(candidates), ENGLISH_BROWSE_MAX + 12)]
 
     languages = await sample_audio_languages(
@@ -340,7 +351,6 @@ async def english_browse_feed(
             item.tags = list(item.tags) + [UNVERIFIED_TAG]
             pending.append(item)
 
-    # Hard preference: verified English first; pending only as filler.
     preferred = english + pending
     return preferred[:ENGLISH_BROWSE_MAX]
 

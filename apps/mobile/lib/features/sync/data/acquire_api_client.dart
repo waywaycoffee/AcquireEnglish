@@ -1492,12 +1492,7 @@ class AcquireApiClient {
         if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
         if (level != null && level.trim().isNotEmpty) 'level': level.trim(),
       },
-      options: Options(
-        // Optional auth — guests can browse; cookie used when signed in.
-        extra: const <String, Object>{
-          'dio_cache_interceptor_force_refresh': true,
-        },
-      ),
+      // Shared daily list on the server — allow Dio HTTP cache for same-day hits.
     );
     return (response.data as List<dynamic>)
         .cast<Map<String, dynamic>>()
