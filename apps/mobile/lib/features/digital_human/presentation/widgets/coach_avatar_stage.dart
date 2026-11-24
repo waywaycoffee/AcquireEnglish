@@ -66,8 +66,8 @@ class CoachAvatarStage extends StatelessWidget {
     }
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
     final String? sprite = spriteAsset;
-    // Cartoon atlas cells are not pixel-registered — bob/tilt reads as
-    // left-right shake when combined with mouth cuts. Keep the sprite still.
+    // Cartoon: no left/right bob. Soft same-cell scale so it does not feel frozen
+    // between mouth beats; mouth/gesture frames come from the atlas.
     if (sprite != null) {
       final CoachMotion motion = encouraging
           ? CoachMotion.encouraging
@@ -95,15 +95,32 @@ class CoachAvatarStage extends StatelessWidget {
             ),
           ),
           Center(
-            child: SizedBox.square(
-              dimension: 196,
-              child: CartoonCoachSprite(
-                asset: sprite,
-                mouth: mouth ?? CoachViseme.closed,
-                phase: 0,
-                transitionDuration: Duration.zero,
-                motion: motion,
-              ),
+            child: AnimatedBuilder(
+              animation: reduceMotion
+                  ? const AlwaysStoppedAnimation<double>(0)
+                  : pulse,
+              builder: (BuildContext context, Widget? child) {
+                final double t = reduceMotion ? 0 : pulse.value;
+                final double scale = speaking
+                    ? 1.0 + math.sin(t * math.pi * 2) * 0.012
+                    : listening
+                    ? 1.0 + math.sin(t * math.pi * 2) * 0.006
+                    : 1.0 + math.sin(t * math.pi) * 0.004;
+                return Transform.scale(
+                  scale: scale,
+                  child: SizedBox.square(
+                    dimension: 196,
+                    child: CartoonCoachSprite(
+                      asset: sprite,
+                      mouth: mouth ??
+                          (speaking ? CoachViseme.open : CoachViseme.closed),
+                      phase: t,
+                      transitionDuration: Duration.zero,
+                      motion: motion,
+                    ),
+                  ),
+                );
+              },
             ),
           ),
           Positioned(

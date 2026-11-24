@@ -258,7 +258,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   /// Show atlas frame 8 (thumbs-up / smile) — last night's gesture sheet.
   void _encourageLearner() {
-    // Disabled: encourage cell is not aligned with idle — looks like a sideways jump.
+    if (!mounted || !_started) return;
+    _coachGestureTimer?.cancel();
+    setState(() => _coachEncouraging = true);
+    _coachGestureTimer = Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) setState(() => _coachEncouraging = false);
+    });
   }
 
   bool _podcastPlaying = false;
@@ -528,17 +533,32 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     super.dispose();
   }
 
-  /// Hold a single open-mouth atlas cell while speaking (no frame thrash).
+  /// Drive closed/open mouth beats while speaking (~4 fps — smooth, not shaky).
   void _beginDigitalMouth(String text, {Duration? estimated}) {
     final String speak = text.trim();
     if (speak.isEmpty) return;
+    final Duration dur =
+        estimated ??
+        Duration(milliseconds: (speak.length * 55).clamp(800, 12000));
+    _mouthTimeline = CoachAnimationTimeline.estimate(speak, dur);
+    _mouthClockStart = DateTime.now();
     _mouthTicker?.cancel();
-    _mouthTicker = null;
-    _mouthTimeline = null;
-    _mouthClockStart = null;
-    if (_coachMouth != CoachViseme.open) {
-      setState(() => _coachMouth = CoachViseme.open);
-    }
+    setState(() => _coachMouth = CoachViseme.open);
+    _mouthTicker = Timer.periodic(const Duration(milliseconds: 220), (_) {
+      if (!mounted || _mouthTimeline == null || _mouthClockStart == null) {
+        return;
+      }
+      final CoachViseme next = _mouthTimeline!.mouthAt(
+        DateTime.now().difference(_mouthClockStart!),
+        playing: true,
+      );
+      final CoachViseme stable = next == CoachViseme.closed
+          ? CoachViseme.closed
+          : CoachViseme.open;
+      if (stable != _coachMouth) {
+        setState(() => _coachMouth = stable);
+      }
+    });
   }
 
   void _endDigitalMouth() {
@@ -1471,6 +1491,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       if (mounted && gen == _speakGen) {
         setState(() => _coachSpeaking = false);
+        _encourageLearner();
       }
     }
   }

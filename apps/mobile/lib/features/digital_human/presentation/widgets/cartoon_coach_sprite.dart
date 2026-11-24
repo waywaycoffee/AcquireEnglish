@@ -2,10 +2,6 @@ import 'package:flutter/material.dart';
 import '../../domain/coach_animation_timeline.dart';
 
 /// Three-by-three raster atlas. Fixed actions never invoke a video model.
-///
-/// Cells are shown by integer pixel translation (not [Alignment]), and speaking
-/// holds a single open-mouth cell — alternating cells reads as left-right shake
-/// because these atlases are not position-locked.
 class CartoonCoachSprite extends StatelessWidget {
   const CartoonCoachSprite({
     super.key,
@@ -30,10 +26,15 @@ class CartoonCoachSprite extends StatelessWidget {
   final Duration transitionDuration;
 
   int get frame {
-    // Speaking: hold open cell only. Cycling closed↔open shakes every persona.
-    if (motion == CoachMotion.speaking) return CoachViseme.open.index;
-    // Gesture cells (6–8) are also misaligned vs idle — skip until atlases
-    // are re-authored with locked head position.
+    if (motion == CoachMotion.speaking) {
+      // Only closed/open — other mouth cells add little and can feel jumpy.
+      return mouth == CoachViseme.closed
+          ? CoachViseme.closed.index
+          : CoachViseme.open.index;
+    }
+    if (motion == CoachMotion.thinking) return 7;
+    if (motion == CoachMotion.encouraging) return 8;
+    if (motion == CoachMotion.listening) return 6;
     return 0;
   }
 
@@ -62,7 +63,7 @@ class CartoonCoachSprite extends StatelessWidget {
                     height: side * 3,
                     fit: BoxFit.fill,
                     gaplessPlayback: true,
-                    filterQuality: FilterQuality.low,
+                    filterQuality: FilterQuality.medium,
                     alignment: Alignment.topLeft,
                   ),
                 ),
