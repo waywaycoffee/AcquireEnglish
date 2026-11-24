@@ -18,6 +18,7 @@ class PlayerScreen extends StatelessWidget {
     this.videoPlanActivity,
     this.todayTaskId,
     this.dramaPlan = false,
+    this.onlinePreview = false,
     super.key,
   });
 
@@ -33,6 +34,7 @@ class PlayerScreen extends StatelessWidget {
   final String? videoPlanActivity;
   final String? todayTaskId;
   final bool dramaPlan;
+  final bool onlinePreview;
 
   @override
   Widget build(BuildContext context) {
@@ -48,6 +50,7 @@ class PlayerScreen extends StatelessWidget {
       autoOpenFullscreen: autoOpenFullscreen,
       initialLoopSentence: initialLoopSentence,
       dramaPlan: dramaPlan,
+      onlinePreview: onlinePreview,
       videoPlanActivity: videoPlanActivity,
       todayTaskId: todayTaskId,
     );

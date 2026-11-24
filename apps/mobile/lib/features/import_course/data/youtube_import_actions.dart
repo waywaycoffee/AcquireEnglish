@@ -7,113 +7,157 @@ import '../../library/presentation/library_mock_data.dart';
 import '../../membership/domain/module_access.dart';
 import '../../sync/presentation/user_assets_provider.dart';
 import '../domain/youtube_import.dart';
+import 'bilibili_episode_prepare.dart' show isUsableLocalVideoPath;
 import 'youtube_import_service.dart';
 
-/// Open an existing YouTube lesson or import it and open the player.
+/// Import only source metadata, then open the first episode for streaming.
 Future<bool> importYoutubeVideoById(
   BuildContext context,
   WidgetRef ref, {
   required String videoId,
   String level = 'A2',
+  bool closeSheetOnSuccess = false,
 }) async {
-  final String? id = YoutubeImport.extractVideoId(videoId) ??
-      (RegExp(r'^[A-Za-z0-9_-]{6,}$').hasMatch(videoId) ? videoId : null);
-  if (id == null) {
-    if (context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('无效的 YouTube 视频')),
-      );
-    }
+  final playlist = YoutubeImport.extractPlaylistId(videoId);
+  final id = YoutubeImport.extractVideoId(videoId);
+  if (id == null && playlist == null) {
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(const SnackBar(content: Text('无效的 YouTube 视频或合集')));
     return false;
   }
 
-  final YoutubeImportService service = const YoutubeImportService();
+  final router = GoRouter.of(context);
+  void open(String episodeId) {
+    if (!context.mounted) return;
+    if (closeSheetOnSuccess) Navigator.of(context).pop();
+    router.push('/episodes/$episodeId?preview=1');
+  }
+
+  final courseId = playlist == null
+      ? 'youtube-$id'
+      : 'youtube-playlist-$playlist';
+  final service = const YoutubeImportService();
   try {
-    final existing = ref.read(libraryCatalogProvider).where(
-      (course) => course.id == 'youtube-$id',
-    ).firstOrNull;
+    final existing = ref
+        .read(libraryCatalogProvider)
+        .where((course) => course.id == courseId)
+        .firstOrNull;
     if (existing != null && existing.episodes.isNotEmpty) {
-      if (context.mounted) context.push('/episodes/${existing.episodes.first.id}');
+      open(existing.episodes.first.id);
       return true;
     }
-    final YoutubeImportResult meta = await service.fetch(id).timeout(
-      const Duration(seconds: 25),
-    );
+    final String title;
+    final List<YoutubeImportResult> videos;
+    if (playlist == null) {
+      final video = await service
+          .fetch(id!, includeSubtitles: false)
+          .timeout(const Duration(seconds: 25));
+      title = video.title;
+      videos = [video];
+    } else {
+      final result = await service
+          .fetchPlaylist(playlist)
+          .timeout(const Duration(seconds: 35));
+      title = result.title;
+      videos = result.videos;
+    }
     if (!context.mounted) return false;
-    final String courseId = 'youtube-${meta.videoId}';
-    final bool hasEn = meta.enSubtitlePath != null;
-    final bool hasZh = meta.cnSubtitlePath != null;
-    final String videoAsset = meta.localVideoPath ?? meta.watchUrl;
-    final LibraryCourseData course = LibraryCourseData(
+    if (videos.isEmpty) throw StateError('此合集没有可播放的公开视频');
+    const cover = 'assets/img/app_icon.png';
+    final course = LibraryCourseData(
       id: courseId,
-      title: meta.title,
-      description: meta.author == null
-          ? meta.watchUrl
-          : '${meta.author} · ${meta.watchUrl}',
+      title: title,
+      description: playlist == null ? videos.first.watchUrl : videoId,
       sourceLabel: 'YouTube',
-      coverImage: 'assets/img/app_icon.png',
+      coverImage: cover,
       level: level,
       category: 'youtube',
       progressPercent: 0,
       totalWords: 0,
       completedEpisodes: 0,
-      totalEpisodes: 1,
+      totalEpisodes: videos.length,
       lastStudiedStr: '未学习',
       rating: 0,
-      episodes: <LibraryEpisodeItem>[
-        LibraryEpisodeItem(
-          id: '$courseId-01',
-          numberStr: '01',
-          title: meta.title,
-          durationMinutes: meta.durationMinutes,
-          hasChineseSubtitles: hasZh,
-          hasEnglishSubtitles: hasEn,
-          completed: false,
-          progressPercent: 0,
-          coverImage: 'assets/img/app_icon.png',
-          videoAsset: videoAsset,
-          sourceUrl: meta.watchUrl,
-          enSubtitleAsset: meta.enSubtitlePath,
-          cnSubtitleAsset: meta.cnSubtitlePath,
-          subtitleTracks: <LibrarySubtitleTrackItem>[
-            if (hasEn)
-              LibrarySubtitleTrackItem(
-                languageCode: 'en',
-                languageLabel: 'English',
-                path: meta.enSubtitlePath!,
-              ),
-            if (hasZh)
-              LibrarySubtitleTrackItem(
-                languageCode: 'zh',
-                languageLabel: '中文',
-                path: meta.cnSubtitlePath!,
-              ),
-          ],
-        ),
+      episodes: [
+        for (final (index, video) in videos.indexed)
+          LibraryEpisodeItem(
+            id: '$courseId-${(index + 1).toString().padLeft(2, '0')}',
+            numberStr: (index + 1).toString().padLeft(2, '0'),
+            title: video.title,
+            durationMinutes: video.durationMinutes,
+            hasChineseSubtitles: false,
+            hasEnglishSubtitles: false,
+            completed: false,
+            progressPercent: 0,
+            coverImage: cover,
+            videoAsset: video.watchUrl,
+            sourceUrl: video.watchUrl,
+          ),
       ],
     );
     try {
       await ref.read(userAssetsProvider.notifier).refresh();
     } catch (_) {}
-    final bool unlimited = await resolveModuleUnlocked(ref, 'video');
-    final bool ok = await ref
+    if (!context.mounted) return false;
+    final unlimited = await resolveModuleUnlocked(ref, 'video');
+    if (!context.mounted) return false;
+    final ok = await ref
         .read(libraryCatalogProvider.notifier)
         .importCourse(course, unlimitedPersonalLibrary: unlimited);
-    if (!context.mounted) return ok;
-    if (ok) {
-      context.push('/episodes/$courseId-01');
-    }
+    if (ok) open(course.episodes.first.id);
     return ok;
-  } catch (e) {
+  } catch (error) {
     if (context.mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '导入失败（需可用梯子访问 YouTube）：$e',
-          ),
-        ),
+        SnackBar(content: Text('无法打开 YouTube，请确认网络可访问 YouTube。$error')),
       );
     }
     return false;
+  }
+}
+
+final Set<String> _downloadingYoutubeCollections = {};
+
+Future<void> downloadYoutubeCollection(
+  BuildContext context,
+  WidgetRef ref,
+  LibraryCourseData course,
+) async {
+  if (!_downloadingYoutubeCollections.add(course.id)) return;
+  final messenger = ScaffoldMessenger.of(context);
+  final catalog = ref.read(libraryCatalogProvider.notifier);
+  final service = const YoutubeImportService();
+  var failed = 0;
+  messenger.showSnackBar(const SnackBar(content: Text('开始下载 YouTube 合集')));
+  try {
+    for (final episode in course.episodes) {
+      if (isUsableLocalVideoPath(episode.videoAsset)) continue;
+      final id = YoutubeImport.extractVideoId(episode.sourceUrl ?? '');
+      try {
+        final local = id == null ? null : await service.downloadLocalVideo(id);
+        if (local == null) {
+          failed++;
+          continue;
+        }
+        await catalog.updateEpisodeLocalMedia(
+          courseId: course.id,
+          episodeId: episode.id,
+          videoAsset: local,
+          videoMissing: false,
+        );
+      } catch (_) {
+        failed++;
+      }
+    }
+    if (messenger.mounted) {
+      messenger.showSnackBar(
+        SnackBar(
+          content: Text(failed == 0 ? '合集已下载' : '下载结束，$failed 集未成功，可重试'),
+        ),
+      );
+    }
+  } finally {
+    _downloadingYoutubeCollections.remove(course.id);
   }
 }

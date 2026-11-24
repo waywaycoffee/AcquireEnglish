@@ -6,12 +6,15 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../authentication/presentation/auth_session.dart';
 import '../../../router/app_router.dart';
+import '../../import_course/data/youtube_import_actions.dart';
 import '../../import_course/data/bilibili_collection_download.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/data/bilibili_episode_cover_backfill.dart';
 import '../../import_course/data/bilibili_import_service.dart';
 import '../../import_course/data/bilibili_open_or_import.dart';
+import '../../import_course/presentation/bilibili_collection_reservation.dart';
 import '../../import_course/data/direct_video_collection_download.dart';
 import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/domain/bilibili_import.dart';
@@ -575,6 +578,23 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                       sliver: SliverList(
                         delegate: SliverChildListDelegate(
                           <Widget>[
+                    if (selectedCourse.id.startsWith('youtube-') &&
+                        selectedCourse.episodes.length > 1)
+                      Align(
+                        alignment: Alignment.centerLeft,
+                        child: OutlinedButton(
+                          onPressed: () => unawaited(downloadYoutubeCollection(
+                            context, ref, selectedCourse,
+                          )),
+                          child: const Text('下载全部合集'),
+                        ),
+                      ),
+                    if (isMultiEpisodeBilibiliCourse(selectedCourse) &&
+                        selectedCourse.episodes.first.sourceUrl != null)
+                      BilibiliCollectionReservation(
+                        source: selectedCourse.episodes.first.sourceUrl!,
+                        key: ValueKey(selectedCourse.id),
+                      ),
                     if (selectedCourse.episodes.length > 1 &&
                         isMultiEpisodeBilibiliCourse(selectedCourse))
                       Consumer(
@@ -2075,27 +2095,15 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     final bool remoteStream = isRemoteStreamVideoAsset(item.videoAsset) ||
         isRemoteStreamVideoAsset(item.sourceUrl);
     final bool netdiskStream = isNetdiskCourse(course) && remoteStream;
-    final bool needLocalDownload = !netdiskStream &&
-        (item.videoMissing || !isUsableLocalVideoPath(item.videoAsset));
-    if (needLocalDownload && mounted) {
+    final bool onlineCourse = course.id.startsWith('bilibili-') ||
+        course.id.startsWith('youtube-');
+    if (onlineCourse && !isUsableLocalVideoPath(item.videoAsset)) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            '正在打开第 ${item.numberStr} 集并下载到本地…',
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+        const SnackBar(content: Text('正在在线播放，下载到本地后播放更流畅')),
       );
-    } else if (netdiskStream && mounted) {
+    } else if (netdiskStream) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            prefersNetdiskLandscapePlayback(course)
-                ? '正在横屏在线播放第 ${item.numberStr} 集（网盘直链，不先下载）'
-                : '正在在线播放第 ${item.numberStr} 集（网盘直链，不先下载）',
-          ),
-          duration: const Duration(seconds: 2),
-        ),
+        const SnackBar(content: Text('正在通过网盘直链在线播放')),
       );
     }
     context.pushNamed(
@@ -2103,6 +2111,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       pathParameters: <String, String>{'episodeId': item.id},
       queryParameters: <String, String>{
         'courseId': course.id,
+        if (onlineCourse &&
+            !isBilibiliCollectionReservationReady(
+              ref.read(authSessionProvider).email, course.id,
+            ) &&
+            !item.hasEnglishSubtitles && !item.hasChineseSubtitles)
+          'preview': '1',
         'autoplay': '1',
         if (prefersNetdiskLandscapePlayback(course)) 'fullscreen': '1',
       },

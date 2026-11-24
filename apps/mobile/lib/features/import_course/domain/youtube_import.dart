@@ -24,6 +24,18 @@ class YoutubeImport {
 
   static bool isYoutubeUrl(String raw) => extractVideoId(raw) != null;
 
+  static String? extractPlaylistId(String raw) {
+    final uri = Uri.tryParse(raw.trim());
+    final host = uri?.host.toLowerCase() ?? '';
+    if (host != 'youtu.be' &&
+        host != 'youtube.com' &&
+        !host.endsWith('.youtube.com')) {
+      return null;
+    }
+    final id = uri?.queryParameters['list'];
+    return id != null && RegExp(r'^[A-Za-z0-9_-]+$').hasMatch(id) ? id : null;
+  }
+
   static String watchUrl(String videoId) =>
       'https://www.youtube.com/watch?v=$videoId';
 }

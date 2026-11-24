@@ -5,13 +5,13 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../utils/url_utils.dart';
 import '../../authentication/presentation/auth_session.dart';
-import '../../settings/presentation/settings_provider.dart';
 import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../data/bilibili_open_or_import.dart';
 import 'recommended_bilibili_provider.dart';
+import 'bilibili_collection_reservation.dart';
 
 /// Curated Bilibili UPs + sample videos on the import / 视频学习 page.
 class RecommendedBilibiliSection extends ConsumerWidget {
@@ -57,7 +57,7 @@ class RecommendedBilibiliSection extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '点封面/标题：试看并只下当前一集；点右侧下载：拉取合集全部视频。'
+              '点封面或标题在线播放。合集可先看第一集，再预约字幕或下载全集。'
               '推荐片中英字幕已在云端缓存。关注仅保存在本 App，不会同步到 B 站。',
               style: TextStyle(
                 fontSize: 12,
@@ -337,8 +337,8 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                                 const SizedBox(height: 4),
                                 Text(
                                   video.hasSharedSubs
-                                      ? '云端已备中英字幕 · 点此试看本集'
-                                      : '点此试看并下载本集',
+                                      ? '点此在线播放'
+                                      : '点此在线播放',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
@@ -353,6 +353,10 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                         ],
                       ),
                     ),
+                  ),
+                  BilibiliCollectionReservation(
+                    key: ValueKey(video.watchUrl),
+                    source: video.watchUrl,
                   ),
                   IconButton(
                     tooltip: '下载合集全部视频',

@@ -42,7 +42,7 @@ class YoutubeImportResult {
 class YoutubeImportService {
   const YoutubeImportService();
 
-  Future<YoutubeImportResult> fetch(String videoId) async {
+  Future<YoutubeImportResult> fetch(String videoId, {bool includeSubtitles = true}) async {
     final YoutubeExplode yt = YoutubeExplode();
     try {
       final Video video = await yt.videos.get(YoutubeImport.watchUrl(videoId));
@@ -54,7 +54,7 @@ class YoutubeImportService {
 
       String? enPath;
       String? cnPath;
-      try {
+      if (includeSubtitles) try {
         final ClosedCaptionManifest manifest = await yt.videos.closedCaptions
             .getManifest(videoId);
         enPath = await _saveTrack(
@@ -90,6 +90,28 @@ class YoutubeImportService {
     }
   }
 
+  Future<({String title, List<YoutubeImportResult> videos})> fetchPlaylist(
+    String playlistId,
+  ) async {
+    final yt = YoutubeExplode();
+    try {
+      final playlist = await yt.playlists.get(playlistId);
+      final videos = await yt.playlists.getVideos(playlist.id).map((video) {
+        return YoutubeImportResult(
+          videoId: video.id.value,
+          title: video.title,
+          watchUrl: YoutubeImport.watchUrl(video.id.value),
+          durationMinutes: ((video.duration?.inSeconds ?? 60) / 60)
+              .ceil().clamp(1, 1440),
+          author: video.author,
+        );
+      }).toList();
+      return (title: playlist.title, videos: videos);
+    } finally {
+      yt.close();
+    }
+  }
+
   Future<String> resolvePlaybackUrl(String videoId) async {
     final yt = YoutubeExplode();
     try {
@@ -108,6 +130,7 @@ class YoutubeImportService {
   /// Download a progressive muxed stream for local playback / Whisper ASR.
   Future<String?> downloadLocalVideo(String videoId) async {
     final YoutubeExplode yt = YoutubeExplode();
+    File? partial;
     try {
       final Directory docs = await getApplicationDocumentsDirectory();
       final Directory dir = Directory('${docs.path}/youtube/$videoId');
@@ -134,18 +157,18 @@ class YoutubeImportService {
       final MuxedStreamInfo stream =
           muxed[muxed.length > 2 ? muxed.length ~/ 2 : muxed.length - 1];
       final Stream<List<int>> data = yt.videos.streamsClient.get(stream);
-      final IOSink sink = out.openWrite();
-      await data.pipe(sink);
-      await sink.flush();
-      await sink.close();
-      if (!out.existsSync() || out.lengthSync() < 1024) {
-        return null;
-      }
+      partial = File('${out.path}.${DateTime.now().microsecondsSinceEpoch}.part');
+      await data.pipe(partial.openWrite());
+      if (await partial.length() < 64 * 1024) return null;
+      await partial.rename(out.path);
       return out.path;
     } catch (_) {
       return null;
     } finally {
       yt.close();
+      if (partial != null && await partial.exists()) {
+        await partial.delete();
+      }
     }
   }
 

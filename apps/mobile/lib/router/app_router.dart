@@ -776,6 +776,7 @@ GoRouter goRouter(Ref ref) {
           videoPlanActivity: state.uri.queryParameters['activity'],
           todayTaskId: state.uri.queryParameters['todayTask'],
           dramaPlan: state.uri.queryParameters['plan'] == 'drama',
+          onlinePreview: state.uri.queryParameters['preview'] == '1',
         );
       },
     ).fade(),

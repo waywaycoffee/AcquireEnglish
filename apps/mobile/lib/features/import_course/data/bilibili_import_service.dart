@@ -9,7 +9,6 @@ import 'package:dio/io.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../../constants/env_config.dart';
-import '../../subtitle_completion/shared_bilibili_subtitle_sync.dart';
 import '../domain/bilibili_import.dart';
 import 'bilibili_media_proxy.dart';
 import 'subtitle_source_policy.dart';
@@ -645,7 +644,7 @@ class BilibiliImportService {
     return -1;
   }
 
-  Future<BilibiliImportResult> fetch(String rawInput) async {
+  Future<BilibiliImportResult> fetch(String rawInput, {bool includeSubtitles = true}) async {
     Map<String, String>? ids = await resolveIds(rawInput);
     if (ids == null) {
       throw ArgumentError('无效的 Bilibili 链接（含短链未能解析）');
@@ -700,7 +699,7 @@ class BilibiliImportService {
     String? enPath;
     String? cnPath;
     String? subtitleNote;
-    if (cid > 0 && (bvid.isNotEmpty || aid != null)) {
+    if (includeSubtitles && cid > 0 && (bvid.isNotEmpty || aid != null)) {
       try {
         final Map<String, String?> tracks = await _fetchSubtitles(
           bvid: bvid,
@@ -1076,55 +1075,21 @@ class BilibiliImportService {
       throw StateError('B 站取流失败：无可用地址');
     }
 
-    Object? lastDownloadError;
-    for (final String remoteUrl in remoteUrls) {
+    Object? lastError;
+    for (final remoteUrl in remoteUrls) {
       try {
-        onProgress?.call(null, '正在校验视频流…');
         await _assertRemoteIsPlayable(remoteUrl);
-        onProgress?.call(0, '正在下载视频到本地…');
-        final File local = await _downloadPlayableToCache(
-          mediaUrl: remoteUrl,
-          idKey: ref.idKey,
-          onProgress: (double? p) {
-            if (p == null) {
-              onProgress?.call(null, '正在下载视频…');
-              return;
-            }
-            onProgress?.call(
-              p,
-              '正在下载视频 ${(p * 100).clamp(0, 100).round()}%',
-            );
-          },
-        );
-        onProgress?.call(1, '下载完成');
-        return BilibiliPlayableMedia(uri: local.path, headers: null);
-      } catch (e) {
-        lastDownloadError = e;
-      }
-    }
-
-    // Last resort for playback only: stream via localhost proxy so media_kit
-    // can play while the user retries a full download later. ASR still needs
-    // ensureLocalCacheForAsr (real file).
-    final String? streamUrl = remoteUrls.isNotEmpty ? remoteUrls.first : null;
-    if (streamUrl != null) {
-      try {
-        onProgress?.call(null, '本地下载失败，改用代理流播放…');
-        final String proxy = await BilibiliMediaProxy.serve(
-          upstreamUrl: streamUrl,
+        final proxy = await BilibiliMediaProxy.serve(
+          upstreamUrl: remoteUrl,
           headers: _playHeadersWithAuth,
           dio: _dio,
         );
         return BilibiliPlayableMedia(uri: proxy, headers: null);
-      } catch (e) {
-        lastDownloadError ??= e;
+      } catch (error) {
+        lastError = error;
       }
     }
-
-    throw StateError(
-      '本地下载失败：${_dioErrorSummary(lastDownloadError)}。'
-      '请检查网络后重试；已登录时可获得更稳定的取流。',
-    );
+    throw StateError('B 站在线播放失败：${_dioErrorSummary(lastError)}');
   }
 
   /// Ensure a local MP4 exists for ASR / offline tooling.
@@ -1141,11 +1106,6 @@ class BilibiliImportService {
     }
     onProgress?.call(null, '正在准备本地视频…');
     final _BilibiliVideoRef ref = await _resolveVideoRef(rawInput);
-    unawaited(requestSharedSubtitlesForDownload(
-      bvid: ref.bvid,
-      page: ref.page,
-      cid: ref.cid,
-    ));
     final File? cached = await _existingCacheFile(ref.idKey);
     if (cached != null) {
       onProgress?.call(1, '使用已缓存视频');

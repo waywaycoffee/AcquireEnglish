@@ -10,8 +10,6 @@ import '../../membership/domain/module_access.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../settings/presentation/bilibili_login_sheet.dart';
 import '../../settings/presentation/settings_provider.dart';
-import '../../subtitle_completion/subtitle_completion_enqueue.dart';
-import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/personal_import_sync.dart';
 import '../../sync/presentation/user_assets_provider.dart';
@@ -109,31 +107,14 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
     });
     try {
       final BilibiliImportService service = _serviceForSettings();
-      final BilibiliImportResult meta = await service.fetchAndDownloadLocal(
-        cleaned,
-        onProgress: (double? progress, String message) {
-          if (!mounted) {
-            return;
-          }
-          setState(() {
-            _progress = progress;
-            _status = message;
-          });
-        },
+      final BilibiliImportResult meta = await service.fetch(
+        cleaned, includeSubtitles: false,
       );
       if (!mounted) return;
-      if (meta.localVideoPath == null || meta.localVideoPath!.isEmpty) {
-        throw StateError('视频未能下载到本地');
-      }
       final LibraryCourseData course = buildLibraryCourseFromBilibiliImport(
         meta,
       );
-      final bool alreadyInLibrary = ref
-          .read(libraryCatalogProvider)
-          .any((LibraryCourseData item) => item.id == course.id);
-      final LibraryEpisodeItem? importedEpisode = course.episodes
-          .where((LibraryEpisodeItem episode) => !episode.videoMissing)
-          .firstOrNull;
+      final LibraryEpisodeItem? importedEpisode = course.episodes.firstOrNull;
       // Refresh entitlements so Pro is recognized without visiting 会员页 first.
       try {
         await ref.read(userAssetsProvider.notifier).refresh();
@@ -146,12 +127,6 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       if (!ok || importedEpisode == null) {
         throw StateError('视频未能加入书库，请重试');
       }
-      unawaited(
-        _queueSubtitleCompletion(
-          course,
-          ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
-        ),
-      );
       // Auto-save to personal cloud; shared if official pack passes audit.
       final AuthSessionState auth = ref.read(authSessionProvider);
       if (auth.isLoggedIn) {
@@ -205,17 +180,10 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           } catch (_) {}
         }());
       }
-      // 试看/点推荐：只下载当前这一集。整部合集请点视频列表旁的下载按钮。
-      final String hint = bilibiliImportSuccessHint(meta);
-      final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
-      final String success;
-      if (course.episodes.length > 1) {
-        success = alreadyInLibrary
-            ? '已补下本集。其余集请在课程页点下载按钮一次拉取。'
-            : '已导入合集目录（共 ${course.episodes.length} 集），本集已下载；其余集请点列表旁下载。';
-      } else {
-        success = '已加入书库。$hint 缺失字幕会在课程页后台自动补全。';
-      }
+      final messenger = ScaffoldMessenger.of(context);
+      final success = course.episodes.length > 1
+          ? '在线播放第一集。预约后会在工作站准备字幕，也可手动下载合集。'
+          : '在线播放。手动下载后，本地播放更流畅。';
       Navigator.of(context).pop(importedEpisode.id);
       messenger.showSnackBar(SnackBar(content: Text(success)));
     } catch (e) {
@@ -248,11 +216,9 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
-          hasCookie
-              ? '粘贴分享文案后会先下载视频与官方字幕到本地，再加入书库。'
-              : '粘贴分享文案后会先下载视频到本地。官方字幕需先登录 B 站（扫码即可）。',
-          style: const TextStyle(color: StudyShellTokens.textSecondary),
+        const Text(
+          '粘贴分享文案后可在线播放。',
+          style: TextStyle(color: StudyShellTokens.textSecondary),
         ),
         if (!hasCookie) ...<Widget>[
           const SizedBox(height: 8),
@@ -315,23 +281,6 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           ),
         ),
       ],
-    );
-  }
-}
-
-Future<void> _queueSubtitleCompletion(
-  LibraryCourseData course,
-  String? cookie,
-) async {
-  try {
-    await enqueueSubtitleCompletionForCourse(
-      course: course,
-      bilibiliCookieHeader: cookie,
-    );
-    SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
-  } catch (error, stackTrace) {
-    FlutterError.reportError(
-      FlutterErrorDetails(exception: error, stack: stackTrace),
     );
   }
 }

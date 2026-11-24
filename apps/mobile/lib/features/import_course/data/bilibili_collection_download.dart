@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
-import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import 'bilibili_episode_prepare.dart';
 import 'bilibili_import_service.dart';
 import 'bilibili_multipage.dart';
@@ -248,40 +247,18 @@ Future<void> downloadRemainingBilibiliEpisodes({
       final CancelToken episodeToken = CancelToken();
       _activeCancelTokens[courseId] = episodeToken;
       try {
-        final BilibiliEpisodePrepareResult prepared =
-            await prepareBilibiliEpisode(
-              service: service,
-              source: source,
-              currentVideoAsset: current.videoAsset,
-              existingEnSubtitlePath: current.enSubtitleAsset,
-              existingZhSubtitlePath: current.cnSubtitleAsset,
-              cancelToken: episodeToken,
-              onProgress: (String detail) {
-                // Prefer byte % from "正在下载视频 N%" when present.
-                final RegExpMatch? pct = RegExp(
-                  r'正在下载视频\s+(\d+)%',
-                ).firstMatch(detail);
-                double local = 0.15;
-                if (pct != null) {
-                  local = ((int.tryParse(pct.group(1)!) ?? 0) / 100.0).clamp(
-                    0.0,
-                    0.95,
-                  );
-                } else if (detail.contains('完成') || detail.contains('本地')) {
-                  local = 0.98;
-                }
-                publish(
-                  message: '第 ${current.numberStr} 集：$detail',
-                  progress: episodeBase + episodeSpan * local,
-                );
-              },
-            ).timeout(
-              const Duration(minutes: 8),
-              onTimeout: () => throw TimeoutException(
-                '第 ${current.numberStr} 集下载超时',
-              ),
-            );
-        if (!isUsableLocalVideoPath(prepared.localVideoPath)) {
+        final localVideoPath = await service.ensureLocalCacheForAsr(
+          source,
+          cancelToken: episodeToken,
+          onProgress: (progress, message) => publish(
+            message: '第 ${current.numberStr} 集：$message',
+            progress: episodeBase + episodeSpan * (progress ?? 0.15),
+          ),
+        ).timeout(const Duration(minutes: 8), onTimeout: () {
+          episodeToken.cancel('下载超时');
+          throw TimeoutException('第 ${current.numberStr} 集下载超时');
+        });
+        if (!isUsableLocalVideoPath(localVideoPath)) {
           failed += 1;
           _episodeDownloadCooldownUntil[current.id] =
               DateTime.now().add(_episodeFailCooldown);
@@ -304,26 +281,12 @@ Future<void> downloadRemainingBilibiliEpisodes({
         await catalog.updateEpisodeLocalMedia(
           courseId: courseId,
           episodeId: current.id,
-          videoAsset: prepared.localVideoPath,
+          videoAsset: localVideoPath,
           sourceUrl: source,
-          enSubtitlePath: prepared.enSubtitlePath,
-          zhSubtitlePath: prepared.zhSubtitlePath,
           coverImage: cover.isEmpty ? null : cover,
           videoMissing: false,
         );
         _episodeDownloadCooldownUntil.remove(current.id);
-        await enqueueSubtitleCompletionForEpisode(
-          episodeId: current.id,
-          videoPath: prepared.localVideoPath,
-          zhSubtitlePath: prepared.zhSubtitlePath,
-          enSubtitlePath: prepared.enSubtitlePath,
-          sourceUrl: source,
-          title: current.title,
-          course: catalog.state
-              .where((LibraryCourseData c) => c.id == courseId)
-              .firstOrNull,
-          episode: current,
-        );
         success += 1;
         publish(
           message: '第 ${current.numberStr} 集下载完成（${i + 1}/${pending.length}）',
@@ -332,7 +295,7 @@ Future<void> downloadRemainingBilibiliEpisodes({
         );
         developer.log(
           'collection download ok ${current.id} '
-          'video=${prepared.localVideoPath}',
+          'video=${localVideoPath}',
           name: 'bilibili.collection',
         );
       } catch (e, st) {

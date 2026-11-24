@@ -21,7 +21,10 @@ import '../../daily_review/data/memory_item_store.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
 import '../domain/episode_clip_due.dart';
+import '../../import_course/data/bilibili_collection_download.dart';
+import '../../import_course/data/bilibili_open_or_import.dart';
 import '../../import_course/data/youtube_import_service.dart';
+import '../../import_course/data/youtube_import_actions.dart';
 import '../../import_course/domain/youtube_import.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_import_service.dart';
@@ -190,6 +193,7 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
     this.videoPlanActivity,
     this.todayTaskId,
     this.dramaPlan = false,
+    this.onlinePreview = false,
     super.key,
   });
 
@@ -209,6 +213,7 @@ class PadPortraitPlayerScreen extends ConsumerStatefulWidget {
 
   /// Drama hub: stricter study-plan guidance.
   final bool dramaPlan;
+  final bool onlinePreview;
 
   @override
   ConsumerState<PadPortraitPlayerScreen> createState() =>
@@ -517,6 +522,13 @@ class PadPortraitPlayerScreenState
             : resource.episode?.progressTimeStr);
     _videoAsset = resource.videoAsset;
 
+    if (widget.onlinePreview) {
+      state.isPlaying = widget.autoPlay;
+      setState(() => _isBootstrapping = false);
+      await _initVideo();
+      return;
+    }
+
     // Cloud progress last-write-wins by updated_at (fallback: farther position).
     // Hard-cap so a slow/unreachable API cannot freeze「正在打开课程…」.
     try {
@@ -618,7 +630,9 @@ class PadPortraitPlayerScreenState
         zhSub ??= recoveredSubtitles?.zhPath;
       }
     }
-    if (_needsBilibiliPrepare(resource)) {
+    if (_needsBilibiliPrepare(resource) &&
+        isUsableLocalVideoPath(resource.videoAsset) &&
+        !resource.course!.id.startsWith('bilibili-')) {
       if (mounted) {
         setState(() {
           _videoLoading = true;
@@ -1472,6 +1486,40 @@ class PadPortraitPlayerScreenState
     return prepared;
   }
 
+  bool _downloadingOnlineEpisode = false;
+
+  Future<void> _downloadCurrentOnlineEpisode(
+    LibraryCourseData course,
+    LibraryEpisodeItem episode,
+  ) async {
+    if (_downloadingOnlineEpisode) return;
+    _downloadingOnlineEpisode = true;
+    final source = episode.sourceUrl ?? episode.videoAsset ?? '';
+    final catalog = ref.read(libraryCatalogProvider.notifier);
+    _showMessage('开始下载本集，可继续在线播放');
+    try {
+      final String? path;
+      if (course.id.startsWith('youtube-')) {
+        final id = YoutubeImport.extractVideoId(source);
+        path = id == null ? null : await const YoutubeImportService().downloadLocalVideo(id);
+      } else {
+        path = await BilibiliImportService.withCookie(
+          ref.read(learningSettingsProvider).resolvedBilibiliCookieHeader,
+        ).ensureLocalCacheForAsr(source);
+      }
+      if (path == null) throw StateError('无可用下载源');
+      await catalog.updateEpisodeLocalMedia(
+        courseId: course.id, episodeId: episode.id, videoAsset: path,
+        videoMissing: false,
+      );
+      if (mounted) _showMessage('本集已下载，下次打开将优先使用本地视频');
+    } catch (error) {
+      if (mounted) _showMessage('下载失败：$error');
+    } finally {
+      _downloadingOnlineEpisode = false;
+    }
+  }
+
   Future<void> _initVideo() async {
     await _disposeVideo();
     if (!mounted) return;
@@ -1873,6 +1921,9 @@ class PadPortraitPlayerScreenState
     } else if (text.length > 80) {
       text = '${text.substring(0, 77)}...';
     }
+    if (source != null && YoutubeImport.isYoutubeUrl(source) && source.startsWith('http')) {
+      return 'YouTube 无法播放，请检查网络能否访问 YouTube。$text';
+    }
     if (text.contains('B站') ||
         (source != null && BilibiliImport.isWatchPageUrl(source))) {
       return 'B站视频无法播放：$text';
@@ -2070,13 +2121,17 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
   }
 
   Future<void> _ensureImportTimeSubtitleCompletion() async {
-    if (!mounted) {
+    if (widget.onlinePreview || !mounted) {
       return;
     }
     final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
       courses: ref.read(libraryCatalogProvider),
       episodeId: widget.episodeId,
     );
+    final courseId = resource.course?.id ?? '';
+    if (courseId.startsWith('youtube-') || courseId.startsWith('bilibili-')) {
+      return;
+    }
     final String? videoPath = _videoAsset ?? resource.videoAsset;
     if (!isUsableLocalVideoPath(videoPath)) {
       return;
@@ -3452,6 +3507,36 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 }
               },
             ),
+            if (course != null && episode != null &&
+                (course.id.startsWith('bilibili-') || course.id.startsWith('youtube-')))
+              Wrap(
+                alignment: WrapAlignment.center,
+                children: [
+                  if (!isUsableLocalVideoPath(episode.videoAsset))
+                    TextButton(
+                      onPressed: () => unawaited(_downloadCurrentOnlineEpisode(course, episode)),
+                      child: const Text('下载本集到本地'),
+                    ),
+                  if (course.episodes.length > 1 && isMultiEpisodeBilibiliCourse(course))
+                    TextButton(
+                      onPressed: () => unawaited(downloadBilibiliCollectionForWatchUrl(
+                        context, ref, watchUrl: episode.sourceUrl ?? episode.videoAsset ?? '',
+                      )),
+                      child: const Text('下载全部合集'),
+                    ),
+                  if (course.id.startsWith('youtube-') && course.episodes.length > 1)
+                    TextButton(
+                      onPressed: () => unawaited(downloadYoutubeCollection(context, ref, course)),
+                      child: const Text('下载全部合集'),
+                    ),
+                  if (widget.onlinePreview)
+                    Text(course.episodes.length > 1
+                        ? (course.id.startsWith('youtube-')
+                            ? '在线播放第一集 · 暂不准备字幕'
+                            : '在线播放试看 · 预约后准备字幕')
+                        : '在线播放 · 下载到本地更流畅'),
+                ],
+              ),
             Expanded(
               child: Padding(
                 padding: EdgeInsets.fromLTRB(0, compactPlayer ? 2 : 6, 0, 0),

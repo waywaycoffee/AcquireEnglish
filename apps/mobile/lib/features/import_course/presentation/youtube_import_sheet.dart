@@ -3,17 +3,9 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../library/presentation/library_catalog_provider.dart';
-import '../../library/presentation/library_mock_data.dart';
-import '../../membership/domain/module_access.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
 import '../../shared/presentation/widgets/youtube_brand_icon.dart';
-import '../../subtitle_completion/subtitle_completion_enqueue.dart';
-import '../../subtitle_completion/subtitle_completion_scheduler.dart';
-import '../../sync/presentation/user_assets_provider.dart';
-import '../data/bilibili_episode_prepare.dart';
-import '../data/youtube_import_service.dart';
-import '../domain/youtube_import.dart';
+import '../data/youtube_import_actions.dart';
 
 Future<void> showYoutubeImportSheet(BuildContext context, WidgetRef ref) {
   return showModalBottomSheet<void>(
@@ -43,7 +35,6 @@ class _YoutubeImportForm extends ConsumerStatefulWidget {
 
 class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
   final TextEditingController _controller = TextEditingController();
-  final YoutubeImportService _service = const YoutubeImportService();
   String? _error;
   bool _busy = false;
 
@@ -54,123 +45,20 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
   }
 
   Future<void> _submit() async {
-    final String? id = YoutubeImport.extractVideoId(_controller.text);
-    if (id == null) {
-      setState(() => _error = '请输入有效的 YouTube 链接或视频 ID');
-      return;
-    }
     setState(() {
       _busy = true;
       _error = null;
     });
-    try {
-      YoutubeImportResult meta = await _service.fetch(id);
-      final String courseId = 'youtube-${meta.videoId}';
-      final bool hasEn = meta.enSubtitlePath != null;
-      final bool hasZh = meta.cnSubtitlePath != null;
-      // Missing captions → download local MP4 so Whisper ASR can fill them.
-      if (!hasEn || !hasZh) {
-        final String? local = await _service.downloadLocalVideo(meta.videoId);
-        if (local != null) {
-          meta = meta.copyWith(localVideoPath: local);
-        }
-      }
-      final String videoAsset = meta.localVideoPath ?? meta.watchUrl;
-      final LibraryCourseData course = LibraryCourseData(
-        id: courseId,
-        title: meta.title,
-        description: meta.author == null
-            ? meta.watchUrl
-            : '${meta.author} · ${meta.watchUrl}',
-        sourceLabel: 'YouTube',
-        coverImage: 'assets/img/app_icon.png',
-        level: 'A2',
-        category: 'youtube',
-        progressPercent: 0,
-        totalWords: 0,
-        completedEpisodes: 0,
-        totalEpisodes: 1,
-        lastStudiedStr: '未学习',
-        rating: 0,
-        episodes: <LibraryEpisodeItem>[
-          LibraryEpisodeItem(
-            id: '$courseId-01',
-            numberStr: '01',
-            title: meta.title,
-            durationMinutes: meta.durationMinutes,
-            hasChineseSubtitles: hasZh,
-            hasEnglishSubtitles: hasEn,
-            completed: false,
-            progressPercent: 0,
-            coverImage: 'assets/img/app_icon.png',
-            videoAsset: videoAsset,
-            sourceUrl: meta.watchUrl,
-            enSubtitleAsset: meta.enSubtitlePath,
-            cnSubtitleAsset: meta.cnSubtitlePath,
-            subtitleTracks: <LibrarySubtitleTrackItem>[
-              if (hasEn)
-                LibrarySubtitleTrackItem(
-                  languageCode: 'en',
-                  languageLabel: 'English',
-                  path: meta.enSubtitlePath!,
-                ),
-              if (hasZh)
-                LibrarySubtitleTrackItem(
-                  languageCode: 'zh',
-                  languageLabel: '中文',
-                  path: meta.cnSubtitlePath!,
-                ),
-            ],
-          ),
-        ],
-      );
-      try {
-        await ref.read(userAssetsProvider.notifier).refresh();
-      } catch (_) {}
-      final bool unlimited = await resolveModuleUnlocked(ref, 'video');
-      final bool ok = await ref
-          .read(libraryCatalogProvider.notifier)
-          .importCourse(course, unlimitedPersonalLibrary: unlimited);
-      final bool canLocalAsr = course.episodes.any(
-        (LibraryEpisodeItem ep) => isUsableLocalVideoPath(ep.videoAsset),
-      );
-      if (ok && (!hasEn || !hasZh) && canLocalAsr) {
-        await enqueueSubtitleCompletionForCourse(course: course);
-        SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
-      }
-      if (!mounted) {
-        return;
-      }
-      setState(() => _busy = false);
-      Navigator.of(context).pop();
-      final String subtitleHint;
-      if (hasEn && hasZh) {
-        subtitleHint = '中英字幕已就绪。';
-      } else if (!canLocalAsr) {
-        subtitleHint = !hasEn && !hasZh
-            ? '缺中英字幕；未能下载本地视频，请稍后重试补全。'
-            : (!hasEn ? '缺英文字幕；未能下载本地视频。' : '缺中文字幕；未能下载本地视频。');
-      } else {
-        subtitleHint = !hasEn && !hasZh
-            ? '缺中英字幕，已下载并开始后台 ASR 补全。'
-            : (!hasEn
-                  ? '缺英文字幕，已下载并开始后台 ASR 补全。'
-                  : '缺中文字幕，已下载并开始后台 ASR 补全。');
-      }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(ok ? '已加入书库。$subtitleHint' : '该书库中已有此 YouTube 课程'),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) {
-        return;
-      }
-      setState(() {
-        _busy = false;
-        _error = '导入失败：$e';
-      });
-    }
+    final opened = await importYoutubeVideoById(
+      context, ref,
+      videoId: _controller.text.trim(),
+      closeSheetOnSuccess: true,
+    );
+    if (!mounted || opened) return;
+    setState(() {
+      _busy = false;
+      _error = '请检查链接及 YouTube 网络连接后重试';
+    });
   }
 
   @override
@@ -197,7 +85,7 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
         ),
         const SizedBox(height: 8),
         const Text(
-          '粘贴链接后自动拉取标题与字幕轴；无字幕则进入学习页用 ASR。需可用梯子。',
+          '支持视频和合集链接。合集先在线播放第一集。需可访问 YouTube 的网络。',
           style: TextStyle(color: StudyShellTokens.textSecondary),
         ),
         const SizedBox(height: 12),
@@ -236,7 +124,7 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
                   ),
                 )
               : const YoutubeBrandIcon(size: 20),
-          label: Text(_busy ? '拉取中…' : '加入书库'),
+          label: Text(_busy ? '拉取中…' : '打开播放'),
         ),
       ],
     );
