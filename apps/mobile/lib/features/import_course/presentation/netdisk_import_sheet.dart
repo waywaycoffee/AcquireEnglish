@@ -232,8 +232,8 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
         _busy = false;
         _error = qr
             ? '请用百度 App 扫码；会绑定 App 里当前登录的号，完成后自动刷新'
-            : '请在浏览器用 linghusgc / 嘉佑真好 的账号密码或短信登录（不要扫码），'
-                '成功页须显示「嘉佑真好」';
+            : '请在无痕浏览器登录：用户名填 linghusgc（不要填手机号、不要短信），'
+                '再输入密码。成功页必须是「嘉佑真好」，若仍是令狐上官冲1 说明又用了手机号登录。';
       });
       _oauthPoll?.cancel();
       _oauthPoll = Timer.periodic(const Duration(seconds: 3), (_) {
@@ -523,11 +523,13 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                   if (_openlistReady && !_bound) ...<Widget>[
                     if (_useBaiduOauth) ...<Widget>[
                       Text(
-                        '一号多护照时请用「账号密码登录」，不要扫码'
-                        '（扫码会绑百度 App 当前号，容易变成令狐上官1）。'
-                        '成功页须出现「嘉佑真好」。',
+                        '一号两护照时：不要扫码、不要用手机号/短信登录'
+                        '（短信会进「令狐上官冲1」）。\n'
+                        '请用无痕浏览器打开授权页，登录名填 linghusgc + 密码'
+                        '（不要填手机号）。成功页必须是「嘉佑真好」。',
                         style: TextStyle(
                           fontSize: 13,
+                          height: 1.35,
                           color: AppDesignTokens.textSecondary,
                         ),
                       ),
@@ -544,7 +546,9 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                           minimumSize: const Size.fromHeight(48),
                         ),
                         icon: const Icon(Icons.password_rounded),
-                        label: Text(_busy ? '打开授权中…' : '账号密码登录（推荐）'),
+                        label: Text(
+                          _busy ? '打开授权中…' : '用户名 linghusgc + 密码登录',
+                        ),
                       ),
                       const SizedBox(height: 8),
                       OutlinedButton.icon(
