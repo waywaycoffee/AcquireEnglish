@@ -3596,9 +3596,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           listening: avatarListening,
           label: stageLabel,
           imageAsset: persona.assetPath,
-          spriteAsset: _started && useCartoonLips
-              ? persona.cartoonAssetPath
-              : null,
+          // Show atlas as soon as the oral stage opens (not only after start).
+          spriteAsset: useCartoonLips ? persona.cartoonAssetPath : null,
           encouraging: _coachEncouraging,
           thinking: _busy || (_duplexLive && _duplexThinking),
           displayName: persona.displayName,

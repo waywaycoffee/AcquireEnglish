@@ -771,6 +771,11 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       );
       LearningSettingsState coerced = _migrateAwayFromLocalWhisper(loaded);
       coerced = _preferGpuOllamaTranslation(coerced);
+      // Scheme 2 default: local cartoon atlas. Clear legacy "force off" prefs
+      // left from the temporary portrait-only experiment.
+      if (!coerced.cartoonDigitalHuman) {
+        coerced = coerced.copyWith(cartoonDigitalHuman: true);
+      }
       // Oral coach is hold-to-talk; drop the old prod LiveKit default so the
       // app no longer advertises full-duplex for the digital-human tab.
       const String legacyDefaultLiveKit =
@@ -1402,9 +1407,8 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           (state.bilibiliUserId.trim().isNotEmpty
               ? state.bilibiliUserId
               : null),
-      cartoonDigitalHuman: json['cartoonDigitalHuman'] is bool
-          ? json['cartoonDigitalHuman'] as bool
-          : null,
+      // Keep scheme-2 cartoon atlas on even if cloud still has the old false.
+      cartoonDigitalHuman: true,
       digitalHumanId: _stringOrNull(json['digitalHumanId']),
       // Preserve device-local endpoints.
       cloudApiBaseUrl: state.cloudApiBaseUrl,
