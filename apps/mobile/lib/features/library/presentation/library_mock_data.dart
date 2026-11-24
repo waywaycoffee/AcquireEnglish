@@ -206,6 +206,15 @@ bool looksLikeInternalLibraryId(String raw) {
       value.startsWith('link-');
 }
 
+bool looksLikeYoutubeCourse(LibraryCourseData course) {
+  final String source = course.sourceLabel.trim().toLowerCase();
+  final String id = course.id.trim().toLowerCase();
+  final String category = course.category.trim().toLowerCase();
+  return source == 'youtube' ||
+      id.startsWith('youtube-') ||
+      category == 'youtube';
+}
+
 /// Prefer a user-renamed episode title, never raw `bilibili-season-*` ids.
 String libraryEpisodeDisplayTitle(
   LibraryCourseData course,

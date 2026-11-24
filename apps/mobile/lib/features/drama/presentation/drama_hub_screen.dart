@@ -142,7 +142,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                   TextButton(
                     onPressed: widget.onSwitchToVideos ??
                         () => context.go('/library'),
-                    child: const Text('或去「视频」Tab 看 B 站等片库'),
+                    child: const Text('或去「B站」Tab 看片库'),
                   ),
                 ],
               ),

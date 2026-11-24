@@ -250,11 +250,16 @@ async def english_browse_feed(
         max_length=80,
         description="Optional extra keyword; mixed with English-native seeds",
     ),
+    level: str | None = Query(
+        default=None,
+        max_length=16,
+        description="Optional CEFR / level hint (A1–C2); overrides profile level",
+    ),
     user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ) -> list[DailyFeedItemOut]:
-    """Community browse: English-audio-first Bilibili videos (not library courses)."""
-    level = "A2"
+    """English-audio-first Bilibili browse for the video module 「全英可逛」."""
+    resolved_level = (level or "").strip().upper() or "A2"
     cookie: str | None = None
     already_imported: set[str] = set()
     if user is not None:
@@ -262,7 +267,8 @@ async def english_browse_feed(
             select(UserPreference).where(UserPreference.user_id == user.id)
         )
         pref = pref_result.scalar_one_or_none()
-        level = (pref.level if pref else None) or "A2"
+        if not (level or "").strip():
+            resolved_level = (pref.level if pref else None) or "A2"
         cookie = (pref.bilibili_cookie if pref else None) or None
         imported_result = await db.execute(
             select(UserLinkCourse.external_id).where(
@@ -274,7 +280,9 @@ async def english_browse_feed(
             str(ext) for ext in imported_result.scalars().all() if ext
         }
 
-    level_hint = LEVEL_HINTS.get((level or "A2").upper(), "英语学习")
+    level_hint = LEVEL_HINTS.get(
+        (resolved_level or "A2").upper(), "英语学习"
+    )
     pairs: list[tuple[str, str]] = list(ENGLISH_BROWSE_KEYWORDS)
     extra = (q or "").strip()
     if extra:

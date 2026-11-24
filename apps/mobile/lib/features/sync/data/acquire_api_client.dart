@@ -1481,12 +1481,16 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
-  /// Community 「全英可逛」: English-audio-first Bilibili browse (not library).
-  Future<List<AcquireDailyFeedItemDto>> englishBrowseFeed({String? query}) async {
+  /// 「全英可逛」: English-audio-first Bilibili browse (not library courses).
+  Future<List<AcquireDailyFeedItemDto>> englishBrowseFeed({
+    String? query,
+    String? level,
+  }) async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.englishBrowseFeed,
       queryParameters: <String, dynamic>{
         if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+        if (level != null && level.trim().isNotEmpty) 'level': level.trim(),
       },
       options: Options(
         // Optional auth — guests can browse; cookie used when signed in.

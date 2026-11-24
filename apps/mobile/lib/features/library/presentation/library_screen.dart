@@ -24,6 +24,7 @@ import '../../community/presentation/english_browse_screen.dart';
 import '../../import_course/presentation/course_import_entry.dart';
 import '../../import_course/presentation/recommended_bilibili_section.dart';
 import '../../import_course/presentation/widgets/import_course_flow.dart';
+import '../../import_course/presentation/youtube_import_sheet.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/asr_subtitle_cache.dart';
 import '../../player/presentation/full_transcript_reader.dart';
@@ -68,13 +69,16 @@ const String _libraryViewModePrefsKey = 'library_course_view_mode_v1';
 const String _librarySortPrefsKey = 'library_course_sort_v1';
 const String _libraryCefrFilterPrefsKey = 'library_course_cefr_filter_v1';
 
-enum LibraryShelfTab { videos, drama }
+enum LibraryShelfTab { bilibili, englishBrowse, drama, youtube }
+
+/// Backward-compatible alias used by older deep links / call sites.
+const LibraryShelfTab libraryShelfTabVideos = LibraryShelfTab.bilibili;
 
 class LibraryScreen extends ConsumerStatefulWidget {
   const LibraryScreen({
     super.key,
     this.initialView = LibraryScreenView.list,
-    this.initialShelfTab = LibraryShelfTab.videos,
+    this.initialShelfTab = LibraryShelfTab.bilibili,
     this.initialCourseId,
     this.initialEpisodeId,
     this.pickCoverImage,
@@ -217,7 +221,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   void _scheduleBilibiliSearch(String raw) {
     final String q = raw.trim();
     _biliSearchDebounce?.cancel();
-    if (q.isEmpty) {
+    if (shelfTab != LibraryShelfTab.bilibili || q.isEmpty) {
       setState(() {
         _biliHits = const <AcquireDailyFeedItemDto>[];
         _biliSearching = false;
@@ -398,7 +402,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       LibraryCourseData course,
     ) {
       final bool isDrama = looksLikeDramaCourse(course);
-      return shelfTab == LibraryShelfTab.drama ? isDrama : !isDrama;
+      final bool isYoutube = looksLikeYoutubeCourse(course);
+      switch (shelfTab) {
+        case LibraryShelfTab.drama:
+          return isDrama;
+        case LibraryShelfTab.youtube:
+          return isYoutube;
+        case LibraryShelfTab.bilibili:
+          return !isDrama && !isYoutube;
+        case LibraryShelfTab.englishBrowse:
+          return false;
+      }
     }).toList(growable: false);
     final List<LibraryCourseMatch> browsedCourses = browseLibraryCourses(
       courses: shelfCourses,
@@ -434,9 +448,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ? '导入影视'
             : showDetail
             ? selectedCourse.title
-            : shelfTab == LibraryShelfTab.drama
-                ? '美剧'
-                : '视频',
+            : switch (shelfTab) {
+                LibraryShelfTab.bilibili => 'B站',
+                LibraryShelfTab.englishBrowse => '全英可逛',
+                LibraryShelfTab.drama => '美剧',
+                LibraryShelfTab.youtube => 'YouTube',
+              },
         subtitle: showImport
             ? '影视库'
             : showDetail
@@ -448,9 +465,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ? '把本地视频和字幕整理成新的学习片库。'
             : showDetail
             ? null
-            : shelfTab == LibraryShelfTab.drama
-                ? '网盘季集 + SRT · 四阶段精学'
-                : 'B 站 / 本地 / 网盘短片 · 挑一部练耳朵',
+            : switch (shelfTab) {
+                LibraryShelfTab.bilibili => 'B 站 / 本地短片 · 搜索或导入练耳朵',
+                LibraryShelfTab.englishBrowse => '英语原声 B 站精选 · 可选难度',
+                LibraryShelfTab.drama => '网盘季集 + SRT · 四阶段精学',
+                LibraryShelfTab.youtube => '需自备梯子 · 粘贴链接导入学习',
+              },
         leading: showImport
             ? AnimatedBuilder(
                 animation: importFlowController,
@@ -1308,28 +1328,52 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     pagePadding,
                     0,
                   ),
-                  child: SegmentedButton<LibraryShelfTab>(
-                    segments: const <ButtonSegment<LibraryShelfTab>>[
-                      ButtonSegment<LibraryShelfTab>(
-                        value: LibraryShelfTab.videos,
-                        label: Text('视频'),
-                        icon: Icon(Icons.smart_display_outlined, size: 18),
-                      ),
-                      ButtonSegment<LibraryShelfTab>(
-                        value: LibraryShelfTab.drama,
-                        label: Text('美剧'),
-                        icon: Icon(Icons.live_tv_outlined, size: 18),
-                      ),
-                    ],
-                    selected: <LibraryShelfTab>{shelfTab},
-                    onSelectionChanged: (Set<LibraryShelfTab> next) {
-                      if (next.isEmpty) return;
-                      setState(() {
-                        shelfTab = next.first;
-                        editMode = false;
-                        selectedCourseIds.clear();
-                      });
-                    },
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: <Widget>[
+                        for (final (LibraryShelfTab tab, String label, IconData icon)
+                            in <(LibraryShelfTab, String, IconData)>[
+                          (
+                            LibraryShelfTab.bilibili,
+                            'B站',
+                            Icons.smart_display_outlined,
+                          ),
+                          (
+                            LibraryShelfTab.englishBrowse,
+                            '全英可逛',
+                            Icons.travel_explore_rounded,
+                          ),
+                          (
+                            LibraryShelfTab.drama,
+                            '美剧',
+                            Icons.live_tv_outlined,
+                          ),
+                          (
+                            LibraryShelfTab.youtube,
+                            'YouTube',
+                            Icons.ondemand_video_rounded,
+                          ),
+                        ])
+                          Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: ChoiceChip(
+                              avatar: Icon(icon, size: 16),
+                              label: Text(label),
+                              selected: shelfTab == tab,
+                              onSelected: (bool selected) {
+                                if (!selected) return;
+                                setState(() {
+                                  shelfTab = tab;
+                                  editMode = false;
+                                  selectedCourseIds.clear();
+                                  showDetail = false;
+                                });
+                              },
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
                 ),
                 Expanded(
@@ -1338,10 +1382,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           embedded: true,
                           onSwitchToVideos: () {
                             setState(() {
-                              shelfTab = LibraryShelfTab.videos;
+                              shelfTab = LibraryShelfTab.bilibili;
                             });
                           },
                         )
+                      : shelfTab == LibraryShelfTab.englishBrowse
+                      ? const EnglishBrowseScreen(embedded: true)
                       : LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
                 final double contentWidth = constraints.maxWidth - pagePadding * 2;
@@ -1375,71 +1421,48 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   controller: listScrollController,
                   padding: EdgeInsets.all(pagePadding),
                   children: <Widget>[
-                Material(
-                  color: const Color(0xFF0F172A),
-                  borderRadius: BorderRadius.circular(18),
-                  child: InkWell(
+                if (shelfTab == LibraryShelfTab.youtube) ...<Widget>[
+                  Material(
+                    color: const Color(0xFF0F172A),
                     borderRadius: BorderRadius.circular(18),
-                    onTap: () {
-                      Navigator.of(context).push<void>(
-                        MaterialPageRoute<void>(
-                          builder: (_) => const EnglishBrowseScreen(),
-                        ),
-                      );
-                    },
                     child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
-                      child: Row(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Container(
-                            width: 46,
-                            height: 46,
-                            decoration: BoxDecoration(
-                              color: AppDesignTokens.brandGreen.withValues(
-                                alpha: 0.22,
-                              ),
-                              borderRadius: BorderRadius.circular(14),
-                            ),
-                            child: const Icon(
-                              Icons.travel_explore_rounded,
-                              color: AppDesignTokens.brandGreen,
+                          const Text(
+                            'YouTube 学习库',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w900,
+                              fontSize: 16,
                             ),
                           ),
-                          const SizedBox(width: 12),
-                          const Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Text(
-                                  '全英可逛',
-                                  style: TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.w900,
-                                    fontSize: 17,
-                                  ),
-                                ),
-                                SizedBox(height: 3),
-                                Text(
-                                  '英语原声 B 站精选 · 点封面即可试看导入',
-                                  style: TextStyle(
-                                    color: Color(0xFF94A3B8),
-                                    fontWeight: FontWeight.w600,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
+                          const SizedBox(height: 6),
+                          Text(
+                            '打开、解析与下载 YouTube 通常需要你自己准备可用的网络环境（梯子）。'
+                            ' 粘贴链接导入后，可在本页继续学习。',
+                            style: TextStyle(
+                              color: Colors.white.withValues(alpha: 0.72),
+                              fontWeight: FontWeight.w600,
+                              fontSize: 12,
+                              height: 1.4,
                             ),
                           ),
-                          const Icon(
-                            Icons.chevron_right_rounded,
-                            color: Colors.white70,
+                          const SizedBox(height: 12),
+                          FilledButton.icon(
+                            onPressed: () => unawaited(
+                              showYoutubeImportSheet(context, ref),
+                            ),
+                            icon: const Icon(Icons.link_rounded),
+                            label: const Text('粘贴 YouTube 链接导入'),
                           ),
                         ],
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(height: 12),
+                  const SizedBox(height: 12),
+                ],
                 DecoratedBox(
                   decoration: BoxDecoration(
                     color: AppDesignTokens.appWhite.withValues(alpha: 0.9),
@@ -1456,7 +1479,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     onSubmitted: (_) => _applySearch(),
                     textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
-                      hintText: '搜索本地课程，或直接搜 B站视频…',
+                      hintText: shelfTab == LibraryShelfTab.youtube
+                          ? '搜索已导入的 YouTube 课程…'
+                          : '搜索本地课程，或直接搜 B站视频…',
                       hintStyle: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppDesignTokens.textSecondary,
@@ -1577,55 +1602,60 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   ],
                 ),
                 const SizedBox(height: 10),
-                // Keep import actions on their own full-width row so B站 is
-                // never clipped by the phone's right edge. Same entry as 首页.
-                CourseImportActionButtons(enabled: !editMode),
-                if (!editMode) ...<Widget>[
-                  const SizedBox(height: 18),
-                  Material(
-                    color: AppDesignTokens.brandGreenDark.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(16),
-                    child: InkWell(
+                if (shelfTab == LibraryShelfTab.bilibili) ...<Widget>[
+                  // Keep import actions on their own full-width row so B站 is
+                  // never clipped by the phone's right edge. Same entry as 首页.
+                  CourseImportActionButtons(enabled: !editMode),
+                  if (!editMode) ...<Widget>[
+                    const SizedBox(height: 18),
+                    Material(
+                      color: AppDesignTokens.brandGreenDark.withValues(
+                        alpha: 0.08,
+                      ),
                       borderRadius: BorderRadius.circular(16),
-                      onTap: () => context.push('/courses/oral-core-9000'),
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
-                        child: Row(
-                          children: <Widget>[
-                            Icon(
-                              Icons.school_outlined,
-                              color: AppDesignTokens.brandGreenDark,
-                            ),
-                            const SizedBox(width: 12),
-                            const Expanded(
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: <Widget>[
-                                  Text(
-                                    '官方课 · 核心口语 9000 句',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.w800,
-                                      fontSize: 15,
-                                    ),
-                                  ),
-                                  SizedBox(height: 4),
-                                  Text(
-                                    '151 课情景句型 · 跟读 / 练习 / AI 讨论',
-                                    style: TextStyle(fontSize: 12),
-                                  ),
-                                ],
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(16),
+                        onTap: () => context.push('/courses/oral-core-9000'),
+                        child: Padding(
+                          padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                          child: Row(
+                            children: <Widget>[
+                              Icon(
+                                Icons.school_outlined,
+                                color: AppDesignTokens.brandGreenDark,
                               ),
-                            ),
-                            const Icon(Icons.chevron_right),
-                          ],
+                              const SizedBox(width: 12),
+                              const Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(
+                                      '官方课 · 核心口语 9000 句',
+                                      style: TextStyle(
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 15,
+                                      ),
+                                    ),
+                                    SizedBox(height: 4),
+                                    Text(
+                                      '151 课情景句型 · 跟读 / 练习 / AI 讨论',
+                                      style: TextStyle(fontSize: 12),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              const Icon(Icons.chevron_right),
+                            ],
+                          ),
                         ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 18),
-                  const RecommendedBilibiliSection(),
+                    const SizedBox(height: 18),
+                    const RecommendedBilibiliSection(),
+                  ],
                 ],
-                if (hasActiveQuery) ...<Widget>[
+                if (shelfTab == LibraryShelfTab.bilibili &&
+                    hasActiveQuery) ...<Widget>[
                   const SizedBox(height: 14),
                   Text(
                     episodeHitCount > 0
@@ -1648,12 +1678,18 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 ],
                 const SizedBox(height: 24),
                 if (filteredCourses.isEmpty && !hasActiveQuery)
-                  const _EmptyLibraryState(query: '')
+                  _EmptyLibraryState(
+                    query: '',
+                    youtubeShelf: shelfTab == LibraryShelfTab.youtube,
+                  )
                 else if (filteredCourses.isEmpty &&
                     hasActiveQuery &&
-                    !_biliSearching &&
-                    _biliHits.isEmpty)
-                  _EmptyLibraryState(query: query)
+                    (shelfTab != LibraryShelfTab.bilibili ||
+                        (!_biliSearching && _biliHits.isEmpty)))
+                  _EmptyLibraryState(
+                    query: query,
+                    youtubeShelf: shelfTab == LibraryShelfTab.youtube,
+                  )
                 else if (viewMode == LibraryCourseViewMode.grid ||
                     viewMode == LibraryCourseViewMode.compact)
                   Wrap(
@@ -2945,9 +2981,13 @@ class _BilibiliSearchResults extends StatelessWidget {
 }
 
 class _EmptyLibraryState extends StatelessWidget {
-  const _EmptyLibraryState({required this.query});
+  const _EmptyLibraryState({
+    required this.query,
+    this.youtubeShelf = false,
+  });
 
   final String query;
+  final bool youtubeShelf;
 
   @override
   Widget build(BuildContext context) {
@@ -2966,7 +3006,9 @@ class _EmptyLibraryState extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            hasQuery ? '没有找到匹配课程' : '还没有导入任何课程',
+            hasQuery
+                ? '没有找到匹配课程'
+                : (youtubeShelf ? '还没有 YouTube 课程' : '还没有导入任何课程'),
             style: TextStyle(
               fontSize: 22,
               fontWeight: FontWeight.w900,
@@ -2976,8 +3018,12 @@ class _EmptyLibraryState extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             hasQuery
-                ? '本地库没有匹配项。上方 B站搜索若有结果，可直接点开导入；也可换个关键词。'
-                : '先导入你自己的视频和字幕资源，再开始精听。',
+                ? (youtubeShelf
+                    ? '换个关键词，或上方粘贴 YouTube 链接导入（需自备梯子）。'
+                    : '本地库没有匹配项。上方 B站搜索若有结果，可直接点开导入；也可换个关键词。')
+                : (youtubeShelf
+                    ? '请先准备可用的网络环境，再粘贴 YouTube 链接导入学习。'
+                    : '先导入你自己的视频和字幕资源，再开始精听。'),
             style: TextStyle(
               fontSize: 14,
               height: 1.55,

@@ -486,9 +486,13 @@ GoRouter goRouter(Ref ref) {
         final String tab = (state.uri.queryParameters['tab'] ?? '').trim();
         return LibraryScreen(
           initialView: _parseLibraryView(initialView),
-          initialShelfTab: tab == 'drama'
-              ? LibraryShelfTab.drama
-              : LibraryShelfTab.videos,
+          initialShelfTab: switch (tab) {
+            'drama' => LibraryShelfTab.drama,
+            'english' || 'browse' || 'english-browse' =>
+              LibraryShelfTab.englishBrowse,
+            'youtube' || 'yt' => LibraryShelfTab.youtube,
+            _ => LibraryShelfTab.bilibili,
+          },
           initialCourseId: state.uri.queryParameters['courseId'],
           initialEpisodeId: state.uri.queryParameters['episodeId'],
         );
