@@ -1,0 +1,690 @@
+{
+  "version": "2.22",
+  "children": [
+    {
+      "type": "frame",
+      "id": "landscape-player",
+      "name": "美剧精听 · 横屏 · 双语字幕",
+      "x": 0,
+      "y": 0,
+      "width": 1120,
+      "height": 584,
+      "layout": "none",
+      "fill": "#101923",
+      "children": [
+        {
+          "type": "rectangle",
+          "id": "header",
+          "x": 0,
+          "y": 0,
+          "width": 1120,
+          "height": 62,
+          "fill": "#15202b",
+          "cornerRadius": 0
+        },
+        {
+          "type": "text",
+          "id": "exit",
+          "x": 22,
+          "y": 19,
+          "content": "‹  返回",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 18,
+          "fontWeight": "normal",
+          "fill": "#ecf0f0"
+        },
+        {
+          "type": "text",
+          "id": "title",
+          "x": 116,
+          "y": 16,
+          "content": "美剧精听  /  第 02 集",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 21,
+          "fontWeight": "bold",
+          "fill": "#ecf0f0"
+        },
+        {
+          "type": "text",
+          "id": "mode",
+          "x": 956,
+          "y": 20,
+          "content": "横屏学习",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 16,
+          "fontWeight": "normal",
+          "fill": "#a8f1c8"
+        },
+        {
+          "type": "rectangle",
+          "id": "video",
+          "x": 20,
+          "y": 78,
+          "width": 650,
+          "height": 366,
+          "fill": "#1e323b",
+          "cornerRadius": 12
+        },
+        {
+          "type": "rectangle",
+          "id": "footage",
+          "x": 37,
+          "y": 94,
+          "width": 616,
+          "height": 271,
+          "fill": "#243e47",
+          "cornerRadius": 8
+        },
+        {
+          "type": "rectangle",
+          "id": "window",
+          "x": 332,
+          "y": 109,
+          "width": 273,
+          "height": 233,
+          "fill": "#365967",
+          "cornerRadius": 6
+        },
+        {
+          "type": "rectangle",
+          "id": "window-divider",
+          "x": 461,
+          "y": 109,
+          "width": 5,
+          "height": 233,
+          "fill": "#203841",
+          "cornerRadius": 0
+        },
+        {
+          "type": "rectangle",
+          "id": "window-crossbar",
+          "x": 332,
+          "y": 227,
+          "width": 273,
+          "height": 5,
+          "fill": "#203841",
+          "cornerRadius": 0
+        },
+        {
+          "type": "rectangle",
+          "id": "sofa",
+          "x": 75,
+          "y": 233,
+          "width": 245,
+          "height": 94,
+          "fill": "#724b3b",
+          "cornerRadius": 18
+        },
+        {
+          "type": "rectangle",
+          "id": "sofa-seat",
+          "x": 61,
+          "y": 281,
+          "width": 272,
+          "height": 52,
+          "fill": "#a57353",
+          "cornerRadius": 14
+        },
+        {
+          "type": "rectangle",
+          "id": "caption",
+          "x": 99,
+          "y": 378,
+          "width": 492,
+          "height": 48,
+          "fill": "#111b23",
+          "cornerRadius": 8
+        },
+        {
+          "type": "text",
+          "id": "caption-text",
+          "x": 130,
+          "y": 390,
+          "content": "I thought you were working late.",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 21,
+          "fontWeight": "bold",
+          "fill": "#ecf0f0"
+        },
+        {
+          "type": "rectangle",
+          "id": "timeline",
+          "x": 24,
+          "y": 461,
+          "width": 642,
+          "height": 4,
+          "fill": "#354652",
+          "cornerRadius": 2
+        },
+        {
+          "type": "rectangle",
+          "id": "played",
+          "x": 24,
+          "y": 461,
+          "width": 212,
+          "height": 4,
+          "fill": "#7adeaa",
+          "cornerRadius": 2
+        },
+        {
+          "type": "text",
+          "id": "position",
+          "x": 24,
+          "y": 475,
+          "content": "08:24 / 25:31",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#aebbc4"
+        },
+        {
+          "type": "rectangle",
+          "id": "prev-bg",
+          "x": 24,
+          "y": 518,
+          "width": 84,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "prev",
+          "x": 35,
+          "y": 525,
+          "content": "上一句",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "play-bg",
+          "x": 117,
+          "y": 518,
+          "width": 84,
+          "height": 35,
+          "fill": "#244b3d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "play",
+          "x": 128,
+          "y": 525,
+          "content": "暂停",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#a8f1c8"
+        },
+        {
+          "type": "rectangle",
+          "id": "next-bg",
+          "x": 210,
+          "y": 518,
+          "width": 84,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "next",
+          "x": 221,
+          "y": 525,
+          "content": "下一句",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "speed-bg",
+          "x": 337,
+          "y": 518,
+          "width": 77,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "speed",
+          "x": 348,
+          "y": 525,
+          "content": "1.0×",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "loop-bg",
+          "x": 423,
+          "y": 518,
+          "width": 98,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "loop",
+          "x": 434,
+          "y": 525,
+          "content": "单句循环",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "shadow-bg",
+          "x": 530,
+          "y": 518,
+          "width": 136,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "shadow",
+          "x": 541,
+          "y": 525,
+          "content": "跟读当前句",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "side",
+          "x": 686,
+          "y": 78,
+          "width": 414,
+          "height": 488,
+          "fill": "#17232f",
+          "cornerRadius": 12
+        },
+        {
+          "type": "rectangle",
+          "id": "tab-0-bg",
+          "x": 699,
+          "y": 87,
+          "width": 62,
+          "height": 35,
+          "fill": "#244b3d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "tab-0",
+          "x": 710,
+          "y": 94,
+          "content": "字幕",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#a8f1c8"
+        },
+        {
+          "type": "rectangle",
+          "id": "tab-1-bg",
+          "x": 764,
+          "y": 87,
+          "width": 62,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "tab-1",
+          "x": 775,
+          "y": 94,
+          "content": "跟读",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "tab-2-bg",
+          "x": 829,
+          "y": 87,
+          "width": 62,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "tab-2",
+          "x": 840,
+          "y": 94,
+          "content": "数字人",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "tab-3-bg",
+          "x": 894,
+          "y": 87,
+          "width": 62,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "tab-3",
+          "x": 905,
+          "y": 94,
+          "content": "听写",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "tab-4-bg",
+          "x": 959,
+          "y": 87,
+          "width": 62,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "tab-4",
+          "x": 970,
+          "y": 94,
+          "content": "练习",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "tab-5-bg",
+          "x": 1024,
+          "y": 87,
+          "width": 62,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "tab-5",
+          "x": 1035,
+          "y": 94,
+          "content": "背单词",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "row-0",
+          "x": 701,
+          "y": 139,
+          "width": 383,
+          "height": 80,
+          "fill": "#202e3a",
+          "cornerRadius": 10
+        },
+        {
+          "type": "text",
+          "id": "time-0",
+          "x": 714,
+          "y": 150,
+          "content": "08:19",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 13,
+          "fontWeight": "normal",
+          "fill": "#adbcc6"
+        },
+        {
+          "type": "text",
+          "id": "en-0",
+          "x": 767,
+          "y": 148,
+          "content": "You’re home early.",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 17,
+          "fontWeight": "normal",
+          "fill": "#f3f9f6"
+        },
+        {
+          "type": "text",
+          "id": "zh-0",
+          "x": 767,
+          "y": 177,
+          "content": "你回来得真早。",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 15,
+          "fontWeight": "normal",
+          "fill": "#c1d0d5"
+        },
+        {
+          "type": "rectangle",
+          "id": "row-1",
+          "x": 701,
+          "y": 230,
+          "width": 383,
+          "height": 135,
+          "fill": "#24483d",
+          "cornerRadius": 10
+        },
+        {
+          "type": "rectangle",
+          "id": "current-marker",
+          "x": 701,
+          "y": 240,
+          "width": 3,
+          "height": 115,
+          "fill": "#7adeaa",
+          "cornerRadius": 2
+        },
+        {
+          "type": "text",
+          "id": "time-1",
+          "x": 714,
+          "y": 241,
+          "content": "08:24",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 13,
+          "fontWeight": "normal",
+          "fill": "#a8f1c8"
+        },
+        {
+          "type": "text",
+          "id": "en-1",
+          "x": 767,
+          "y": 239,
+          "content": "I thought you were working late.",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 17,
+          "fontWeight": "bold",
+          "fill": "#f3f9f6"
+        },
+        {
+          "type": "text",
+          "id": "zh-1",
+          "x": 767,
+          "y": 268,
+          "content": "我以为你今天要加班。",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 15,
+          "fontWeight": "normal",
+          "fill": "#c1d0d5"
+        },
+        {
+          "type": "rectangle",
+          "id": "replay-bg",
+          "x": 767,
+          "y": 313,
+          "width": 82,
+          "height": 35,
+          "fill": "#244b3d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "replay",
+          "x": 778,
+          "y": 320,
+          "content": "重听本句",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#a8f1c8"
+        },
+        {
+          "type": "rectangle",
+          "id": "save-bg",
+          "x": 859,
+          "y": 313,
+          "width": 86,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "save",
+          "x": 870,
+          "y": 320,
+          "content": "收藏句子",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "follow-bg",
+          "x": 955,
+          "y": 313,
+          "width": 83,
+          "height": 35,
+          "fill": "#24313d",
+          "cornerRadius": 9
+        },
+        {
+          "type": "text",
+          "id": "follow",
+          "x": 966,
+          "y": 320,
+          "content": "跟读",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 14,
+          "fontWeight": "normal",
+          "fill": "#d3dee7"
+        },
+        {
+          "type": "rectangle",
+          "id": "row-2",
+          "x": 701,
+          "y": 377,
+          "width": 383,
+          "height": 80,
+          "fill": "#202e3a",
+          "cornerRadius": 10
+        },
+        {
+          "type": "text",
+          "id": "time-2",
+          "x": 714,
+          "y": 388,
+          "content": "08:28",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 13,
+          "fontWeight": "normal",
+          "fill": "#adbcc6"
+        },
+        {
+          "type": "text",
+          "id": "en-2",
+          "x": 767,
+          "y": 386,
+          "content": "The meeting was called off.",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 17,
+          "fontWeight": "normal",
+          "fill": "#f3f9f6"
+        },
+        {
+          "type": "text",
+          "id": "zh-2",
+          "x": 767,
+          "y": 415,
+          "content": "会议取消了。",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 15,
+          "fontWeight": "normal",
+          "fill": "#c1d0d5"
+        },
+        {
+          "type": "rectangle",
+          "id": "row-3",
+          "x": 701,
+          "y": 466,
+          "width": 383,
+          "height": 80,
+          "fill": "#202e3a",
+          "cornerRadius": 10
+        },
+        {
+          "type": "text",
+          "id": "time-3",
+          "x": 714,
+          "y": 477,
+          "content": "08:33",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 13,
+          "fontWeight": "normal",
+          "fill": "#adbcc6"
+        },
+        {
+          "type": "text",
+          "id": "en-3",
+          "x": 767,
+          "y": 475,
+          "content": "Want me to make dinner?",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 17,
+          "fontWeight": "normal",
+          "fill": "#f3f9f6"
+        },
+        {
+          "type": "text",
+          "id": "zh-3",
+          "x": 767,
+          "y": 504,
+          "content": "要我做晚饭吗？",
+          "fontFamily": "Microsoft YaHei",
+          "fontSize": 15,
+          "fontWeight": "normal",
+          "fill": "#c1d0d5"
+        }
+      ]
+    }
+  ]
+}

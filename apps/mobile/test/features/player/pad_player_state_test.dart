@@ -13,6 +13,7 @@ import 'package:common_learn_english/features/player/presentation/widgets/player
 import 'package:common_learn_english/features/player/presentation/widgets/player_subtitle_list.dart';
 import 'package:common_learn_english/features/player/presentation/widgets/player_transcript_panel.dart';
 import 'package:common_learn_english/features/player/presentation/widgets/player_video_panel.dart';
+import 'package:common_learn_english/features/player/presentation/widgets/study_mode_tabs.dart';
 import 'package:common_learn_english/features/settings/presentation/settings_provider.dart';
 import 'package:common_learn_english/features/shared/data/word_lookup_service.dart';
 import 'package:common_learn_english/features/shared/data/word_pronunciation_service.dart';
@@ -1169,6 +1170,80 @@ void main() {
     );
     await tester.pumpAndSettle();
     expect(find.text('逐句精听'), findsOneWidget);
+  });
+
+  testWidgets('fullscreen study mode survives rotation and shows six tabs', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+    final PlayerMockState state = PlayerMockState()
+      ..loadLines(const <PlayerSubtitleLine>[
+        PlayerSubtitleLine(
+          startTime: '00:01',
+          english: 'Hello there.',
+          chinese: '',
+          startMs: 1000,
+          endMs: 2500,
+        ),
+      ]);
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: PlayerFullscreenVideoScreen(
+          playerState: state,
+          studyPanelBuilder: (_) => StudyModeTabs(
+            value: StudyModeTab.subtitles,
+            onChanged: (_) {},
+          ),
+          highlightWords: true,
+          isMuted: false,
+          volumeLevel: 1,
+          onTogglePlaying: state.togglePlaying,
+          onPreviousLine: state.previousLine,
+          onReplayLine: () => state.selectLine(state.activeLineIndex),
+          onNextLine: state.nextLine,
+          onSeekBackward: () {},
+          onSeekForward: () {},
+          onSelectLine: state.selectLine,
+          onSeek: (_) {},
+          onSpeedSelected: state.selectSpeed,
+          onSelectSubtitleMode: state.setSubtitleMode,
+          onToggleShadowing: state.toggleShadowing,
+          onToggleLoop: state.toggleLoop,
+          onToggleMuted: () {},
+          onVolumeChanged: (_) {},
+          onSubtitleLookupOpen: () {},
+          onCollectWord: (_) {},
+          episodes: const <LibraryEpisodeItem>[],
+          activeEpisodeId: 'episode-1',
+          onExit: () {},
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    expect(tester.takeException(), isNull);
+    expect(find.byType(StudyModeTabs), findsNothing);
+
+    tester.view.physicalSize = const Size(844, 390);
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('学习模式'));
+    await tester.pumpAndSettle();
+    expect(find.byType(StudyModeTabs), findsOneWidget);
+    for (final tab in StudyModeTab.values) {
+      expect(find.byKey(ValueKey<String>('study-tab-${tab.name}')), findsOneWidget);
+    }
+    expect(
+      tester.getTopLeft(find.byType(StudyModeTabs)).dx,
+      greaterThanOrEqualTo(tester.getTopRight(find.byType(PlayerVideoPanel)).dx),
+    );
+    expect(tester.takeException(), isNull);
+
+    tester.view.physicalSize = const Size(390, 844);
+    await tester.pumpAndSettle();
+    expect(find.byType(StudyModeTabs), findsNothing);
+    expect(tester.takeException(), isNull);
   });
 
   testWidgets(

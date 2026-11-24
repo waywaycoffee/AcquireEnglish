@@ -245,6 +245,7 @@ Future<({String? enPath, String? zhPath})?> tryApplySharedBilibiliSubtitles({
   bool requireBilingual = false,
   String? existingEnPath,
   String? existingZhPath,
+
   /// When set, reject shared packs whose duration clearly mismatches this video
   /// (合集/分P 串台防护 — wrong-page SRT under the same BV).
   int? expectedDurationSec,

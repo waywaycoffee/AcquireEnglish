@@ -2996,6 +2996,7 @@ class AcquireApiClient {
   Future<SharedSubtitleGpuJob?> enqueueSharedSubtitleJob({
     required String bvid,
     int page = 1,
+    bool reportErrors = false,
   }) async {
     final String id = bvid.trim();
     if (id.isEmpty) {
@@ -3022,9 +3023,11 @@ class AcquireApiClient {
       }
       return SharedSubtitleGpuJob(id: '', bvid: id, page: page, state: 'queued');
     } on DioException {
+      if (reportErrors) rethrow;
       // Missing login or offline ECS must not block local fill / import.
       return null;
     } catch (_) {
+      if (reportErrors) rethrow;
       return null;
     }
   }
@@ -3034,6 +3037,7 @@ class AcquireApiClient {
     required String bvid,
     required String subtitleEnSrt,
     int page = 1,
+    bool reportErrors = false,
     String? title,
     int? cid,
     int? durationSec,
@@ -3071,8 +3075,10 @@ class AcquireApiClient {
       }
       return SharedSubtitleGpuJob(id: '', bvid: id, page: page, state: 'queued');
     } on DioException {
+      if (reportErrors) rethrow;
       return null;
     } catch (_) {
+      if (reportErrors) rethrow;
       return null;
     }
   }
@@ -3104,7 +3110,6 @@ class AcquireApiClient {
         ),
       );
       if (response.statusCode == 404 || response.data == null) {
-        await enqueueSharedSubtitleJob(bvid: bvid, page: page);
         return null;
       }
       return SharedBilibiliSubtitlePack.fromJson(
@@ -3112,7 +3117,6 @@ class AcquireApiClient {
       );
     } on DioException catch (error) {
       if (error.response?.statusCode == 404) {
-        await enqueueSharedSubtitleJob(bvid: bvid, page: page);
         return null;
       }
       rethrow;

@@ -54,6 +54,7 @@ class _FakeSharedApi extends AcquireApiClient {
   Future<SharedSubtitleGpuJob?> enqueueSharedSubtitleJob({
     required String bvid,
     int page = 1,
+    bool reportErrors = false,
   }) async {
     enqueueCalls += 1;
     lastEnqueuedBvid = bvid;
@@ -146,7 +147,7 @@ void main() {
   );
 
   test(
-    'public lookup only fills tracks missing from the personal library',
+    'public lookup fills only the missing track and keeps local corrections',
     () async {
       const String bvid = 'BV1CS4y1v7sQ';
       final String publicEn = buildSampleEnglishSrt(cues: 6);
@@ -177,6 +178,8 @@ void main() {
         RegExp(r'[^\n]+(?=\n\n)'),
         'My corrected sentence.',
       );
+      final File localEnglish = File("${docs.path}/corrected-en.srt");
+      await localEnglish.writeAsString(personalEn);
       api.personalEnglish = personalEn;
       final result = await tryApplySharedBilibiliSubtitles(
         api: api,
@@ -186,8 +189,9 @@ void main() {
           idKey: '$bvid-p02',
         ),
         documentsDirectory: () async => docs,
+        existingEnPath: localEnglish.path,
       );
-      expect(api.requests, ['personal-en', 'public']);
+      expect(api.requests, ['public']);
       expect(await File(result!.enPath!).readAsString(), personalEn);
       expect(await File(result.zhPath!).readAsString(), publicZh);
     },

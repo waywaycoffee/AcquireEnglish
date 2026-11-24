@@ -19,6 +19,7 @@ import 'widgets/subtitle_chunk_highlight.dart';
 class PlayerFullscreenVideoScreen extends StatefulWidget {
   const PlayerFullscreenVideoScreen({
     required this.playerState,
+    this.studyPanelBuilder,
     this.subtitleLetterCase = '保留原样',
     required this.highlightWords,
     this.subtitleWordHighlightStyle = '绿色填充',
@@ -81,6 +82,7 @@ class PlayerFullscreenVideoScreen extends StatefulWidget {
   });
 
   final PlayerMockState playerState;
+  final WidgetBuilder? studyPanelBuilder;
   final String subtitleLetterCase;
   final bool highlightWords;
   final String subtitleWordHighlightStyle;
@@ -166,7 +168,7 @@ class _PlayerFullscreenVideoScreenState
   late double _volumeLevel = widget.volumeLevel;
 
   void _ensureSubtitlePanelVisible({bool forceSetState = false}) {
-    if (_userCollapsedSubtitlePanel) {
+    if (widget.studyPanelBuilder != null || _userCollapsedSubtitlePanel) {
       return;
     }
     if (!widget.playerState.hasLines || _showSubtitlePanel) {
@@ -199,6 +201,7 @@ class _PlayerFullscreenVideoScreenState
       }
       if (widget.playerState.isPlaying ||
           (widget.playerState.hasLines &&
+              widget.studyPanelBuilder == null &&
               !_showSubtitlePanel &&
               !_userCollapsedSubtitlePanel)) {
         setState(() {
@@ -222,7 +225,7 @@ class _PlayerFullscreenVideoScreenState
     final double ideal = screenWidth * 0.40;
     final double maxPanel = (screenWidth * 0.44).clamp(0.0, _subtitlePanelWidth);
     final double minPanel = screenWidth < 720 ? 280.0 : 300.0;
-    return ideal.clamp(minPanel, maxPanel);
+    return ideal.clamp(minPanel.clamp(0.0, maxPanel), maxPanel);
   }
 
   @override
@@ -277,7 +280,11 @@ class _PlayerFullscreenVideoScreenState
     final bool showBackControl = _showControls || !player.isPlaying;
     final bool showEpisodePanel =
         _showEpisodePanel && widget.episodes.isNotEmpty;
-    final bool showSubtitlePanel = _showSubtitlePanel && player.hasLines;
+    final Size viewport = MediaQuery.sizeOf(context);
+    final bool canSplit = viewport.width > viewport.height && viewport.width >= 540;
+    final bool showSubtitlePanel = canSplit &&
+        _showSubtitlePanel &&
+        (widget.studyPanelBuilder != null || player.hasLines);
     final double subtitlePanelWidth = _resolvedSubtitlePanelWidth(context);
     return Scaffold(
       backgroundColor: Colors.black,
@@ -388,7 +395,8 @@ class _PlayerFullscreenVideoScreenState
                       });
                     },
               isEpisodePanelOpen: _showEpisodePanel,
-              onToggleSubtitlePanel: player.hasLines
+              onToggleSubtitlePanel: canSplit &&
+                  (widget.studyPanelBuilder != null || player.hasLines)
                   ? () {
                       setState(() {
                         _showSubtitlePanel = !_showSubtitlePanel;
@@ -399,7 +407,7 @@ class _PlayerFullscreenVideoScreenState
                       });
                     }
                   : null,
-              isSubtitlePanelOpen: _showSubtitlePanel,
+              isSubtitlePanelOpen: showSubtitlePanel,
               onToggleFullscreen: widget.onExit,
               isFullscreen: true,
               sceneHeaderLeadingInset: 48,
@@ -466,7 +474,18 @@ class _PlayerFullscreenVideoScreenState
               ],
             ),
           ),
-          if (showSubtitlePanel)
+          if (showSubtitlePanel && widget.studyPanelBuilder != null)
+            SizedBox(
+              width: subtitlePanelWidth,
+              child: Material(
+                color: Theme.of(context).colorScheme.surface,
+                child: SafeArea(
+                  left: false,
+                  child: Builder(builder: widget.studyPanelBuilder!),
+                ),
+              ),
+            )
+          else if (showSubtitlePanel)
             _FullscreenSubtitlePanel(
               width: subtitlePanelWidth,
               episodeId: widget.activeEpisodeId,

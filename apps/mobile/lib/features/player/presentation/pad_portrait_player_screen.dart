@@ -266,6 +266,7 @@ class PadPortraitPlayerScreenState
   int _courseLastSavedMs = 0;
   bool _didAutoOpenFullscreen = false;
   bool _isFullscreenOpen = false;
+  final ValueNotifier<int> _fullscreenStudyRevision = ValueNotifier<int>(0);
   bool _pronunciationDialogActive = false;
   bool _generatingAiSubtitles = false;
   AsrSubtitleCancellationToken? _aiSubtitleCancellationToken;
@@ -473,6 +474,7 @@ class PadPortraitPlayerScreenState
     PlayerSystemMediaControls.unbind();
     unawaited(_disposeVideo().whenComplete(_releaseGraphicsCache));
     _transcriptReaderSession.dispose();
+    _fullscreenStudyRevision.dispose();
     super.dispose();
   }
 
@@ -3372,6 +3374,11 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
 
   @override
   Widget build(BuildContext context) {
+    if (_isFullscreenOpen) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _isFullscreenOpen) _fullscreenStudyRevision.value++;
+      });
+    }
     final ThemeMode themeMode = ref.watch(themeLogicProvider).themeMode;
     final Brightness platformBrightness = MediaQuery.platformBrightnessOf(
       context,
@@ -3669,43 +3676,12 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                           ),
                         ),
                       ),
-                    if (!bingeMode) ...<Widget>[
+                    if (!bingeMode && !_isFullscreenOpen) ...<Widget>[
                       SizedBox(height: compactPlayer ? 4 : 8),
                       StudyModeTabs(
                         value: _studyTab,
-                        onChanged: (StudyModeTab tab) {
-                          if (tab == StudyModeTab.coach) {
-                            unawaited(_openOralCoach(courseContext, activeLine));
-                            return;
-                          }
-                          if (tab == StudyModeTab.shadowing) {
-                            _enterShadowingMode();
-                            setState(() {
-                              _studyPlanStep = StudyPlanStep.output;
-                              _studyPlanDone.add(StudyPlanStep.intensive);
-                            });
-                            return;
-                          }
-                          setState(() {
-                            _studyTab = tab;
-                            // Dictation still auto-enables mosaic; other tabs
-                            // keep the user's current choice.
-                            if (tab == StudyModeTab.dictation) {
-                              _hardsubMosaicEnabled = true;
-                            }
-                            if (tab == StudyModeTab.subtitles) {
-                              _studyPlanStep = StudyPlanStep.intensive;
-                            } else if (tab == StudyModeTab.dictation) {
-                              _studyPlanStep = StudyPlanStep.output;
-                              _studyPlanDone.add(StudyPlanStep.intensive);
-                            } else if (tab == StudyModeTab.practice) {
-                              _studyPlanStep = StudyPlanStep.output;
-                              _studyPlanDone.add(StudyPlanStep.intensive);
-                            } else if (tab == StudyModeTab.wordCards) {
-                              _studyPlanStep = StudyPlanStep.review;
-                            }
-                          });
-                        },
+                        onChanged: (StudyModeTab tab) =>
+                            _selectStudyTab(tab, courseContext, activeLine),
                       ),
                       Expanded(
                         child: Padding(
@@ -3826,6 +3802,87 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     } finally {
       _oralCoachOpen = false;
     }
+  }
+
+  void _selectStudyTab(
+    StudyModeTab tab,
+    PlayerCourseLookupResult courseContext,
+    PlayerSubtitleLine activeLine,
+  ) {
+    if (tab == StudyModeTab.coach) {
+      unawaited(_openOralCoach(courseContext, activeLine));
+      return;
+    }
+    if (tab == StudyModeTab.shadowing) {
+      _enterShadowingMode();
+      setState(() {
+        _studyPlanStep = StudyPlanStep.output;
+        _studyPlanDone.add(StudyPlanStep.intensive);
+      });
+      return;
+    }
+    setState(() {
+      _studyTab = tab;
+      // Dictation still auto-enables mosaic; other tabs
+      // keep the user's current choice.
+      if (tab == StudyModeTab.dictation) {
+        _hardsubMosaicEnabled = true;
+      }
+      if (tab == StudyModeTab.subtitles) {
+        _studyPlanStep = StudyPlanStep.intensive;
+      } else if (tab == StudyModeTab.dictation) {
+        _studyPlanStep = StudyPlanStep.output;
+        _studyPlanDone.add(StudyPlanStep.intensive);
+      } else if (tab == StudyModeTab.practice) {
+        _studyPlanStep = StudyPlanStep.output;
+        _studyPlanDone.add(StudyPlanStep.intensive);
+      } else if (tab == StudyModeTab.wordCards) {
+        _studyPlanStep = StudyPlanStep.review;
+      }
+    });
+  }
+
+  Widget _buildFullscreenStudyPanel(
+    PlayerCourseLookupResult courseContext,
+    Set<String> savedVocabularyWords,
+    Set<String> learnedVocabularyWords,
+    Set<String> keyVocabularyWords,
+    SubtitleChunkHighlighter? chunkHighlighter,
+  ) {
+    return ValueListenableBuilder<int>(
+      valueListenable: _fullscreenStudyRevision,
+      builder: (context, _, child) {
+        if (!mounted) return const SizedBox.shrink();
+        final PlayerSubtitleLine activeLine = state.visibleLine ?? _emptySubtitleLine;
+        return Column(
+          children: <Widget>[
+            StudyModeTabs(
+              value: _studyTab,
+              onChanged: (tab) => _selectStudyTab(tab, courseContext, activeLine),
+            ),
+            Expanded(
+              child: _buildStudyTabBody(
+                courseContext: courseContext,
+                settings: ref.read(learningSettingsProvider),
+                canGenerateAiSubtitles:
+                    (_videoAsset?.isNotEmpty ?? false) && !_usingAiSubtitles,
+                visibleAssessment: selectPronunciationTarget(
+                  state: state,
+                  videoSource: _assessmentVideoSource(),
+                  videoReady: _videoReady,
+                  videoDuration: _videoDuration,
+                ),
+                activeLine: activeLine,
+                savedVocabularyWords: savedVocabularyWords,
+                learnedVocabularyWords: learnedVocabularyWords,
+                keyVocabularyWords: keyVocabularyWords,
+                chunkHighlighter: chunkHighlighter,
+              ),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   Widget _buildStudyTabBody({
@@ -5927,7 +5984,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         SubtitleVocabularyHighlight.savedWordsFromBook(
           ref.read(wordBookProvider),
         );
-    final Set<String> learnedVocabularyWords = ref.watch(learnedVocabularyProvider);
+    final Set<String> learnedVocabularyWords = ref.read(learnedVocabularyProvider);
     final Set<String> keyVocabularyWords =
         ref.read(recommendedWordsProvider);
     final SubtitleChunkHighlighter? chunkHighlighter = ref
@@ -5948,6 +6005,13 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         MaterialPageRoute<String>(
           builder: (BuildContext context) => PlayerFullscreenVideoScreen(
             playerState: state,
+            studyPanelBuilder: (_) => _buildFullscreenStudyPanel(
+              courseContext,
+              savedVocabularyWords,
+              learnedVocabularyWords,
+              keyVocabularyWords,
+              chunkHighlighter,
+            ),
             highlightWords: highlightWords,
             subtitleLetterCase: ref
                 .read(learningSettingsProvider)

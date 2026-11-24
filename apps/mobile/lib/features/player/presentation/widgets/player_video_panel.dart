@@ -651,6 +651,21 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
     );
   }
 
+  Widget _buildStudyStatus(Widget status) {
+    final VoidCallback? toggle = widget.onToggleSubtitlePanel;
+    if (!widget.isFullscreen || widget.videoErrorText != null || toggle == null) {
+      return status;
+    }
+    return Semantics(
+      button: true,
+      child: InkWell(
+        onTap: () => _handleControlTap(toggle),
+        borderRadius: BorderRadius.circular(24),
+        child: status,
+      ),
+    );
+  }
+
   Widget _buildVideoStage(
     BuildContext context,
     String? overlayText,
@@ -763,22 +778,25 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
                         child: IgnorePointer(
                           ignoring: widget.videoErrorText == null &&
                               !_showControls,
-                          child: _StatusBubble(
-                            compact: tinyControls,
-                            icon: widget.videoErrorText != null
-                                ? Icons.info_outline_rounded
-                                : Icons.menu_book_rounded,
-                            label: widget.videoErrorText ?? '学习模式',
-                            background: widget.isFullscreen
-                                ? const Color(0x33101827)
-                                : (widget.videoErrorText != null
-                                      ? const Color(0xCCFFFBEB)
-                                      : const Color(0xCCFFFFFF)),
-                            foreground: widget.isFullscreen
-                                ? Colors.white
-                                : (widget.videoErrorText != null
-                                      ? AppDesignTokens.textPrimary
-                                      : AppDesignTokens.primaryBlueDark),
+                          child: _buildStudyStatus(
+                            _StatusBubble(
+                              compact: tinyControls,
+                              icon: widget.videoErrorText != null
+                                  ? Icons.info_outline_rounded
+                                  : Icons.menu_book_rounded,
+                              label: widget.videoErrorText ??
+                                  (widget.isSubtitlePanelOpen ? '收起学习栏' : '学习模式'),
+                              background: widget.isFullscreen
+                                  ? const Color(0x33101827)
+                                  : (widget.videoErrorText != null
+                                        ? const Color(0xCCFFFBEB)
+                                        : const Color(0xCCFFFFFF)),
+                              foreground: widget.isFullscreen
+                                  ? Colors.white
+                                  : (widget.videoErrorText != null
+                                        ? AppDesignTokens.textPrimary
+                                        : AppDesignTokens.primaryBlueDark),
+                            ),
                           ),
                         ),
                       ),
