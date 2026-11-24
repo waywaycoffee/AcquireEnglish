@@ -344,25 +344,35 @@ p{{line-height:1.6;margin:0;color:#cbd5e1}}
 
 @router.get("/baidu/oauth/start")
 async def baidu_oauth_start(
+    mode: str = Query(
+        "password",
+        description="password=账号密码/短信登录（推荐）；qrcode=百度App扫码",
+    ),
     user: User = Depends(get_current_user),
 ) -> dict[str, Any]:
-    """Return Baidu authorize URL (QR-capable) for the logged-in Acquire user."""
+    """Return Baidu authorize URL for the logged-in Acquire user."""
     _require_openlist()
     if not settings.baidu_netdisk_oauth_configured:
         raise HTTPException(
             503,
             "服务端尚未配置百度网盘开放平台 APP KEY，请联系管理员",
         )
+    use_qr = mode.strip().lower() in {"qr", "qrcode", "scan"}
     state = baidu_oauth.mint_oauth_state(user.id)
     try:
-        url = baidu_oauth.build_authorize_url(state=state)
+        url = baidu_oauth.build_authorize_url(state=state, use_qrcode=use_qr)
     except RuntimeError as exc:
         raise HTTPException(503, str(exc)) from exc
     return {
         "authorize_url": url,
         "state": state,
+        "mode": "qrcode" if use_qr else "password",
         "expires_in": 15 * 60,
-        "hint": "请在打开的页面用百度 App 扫码或登录授权，完成后返回本 App",
+        "hint": (
+            "请用百度 App 扫码授权；扫码会绑定手机里当前登录的百度号"
+            if use_qr
+            else "请在打开的页面用账号密码或短信登录要绑定的百度号（勿扫码，避免绑错）"
+        ),
     }
 
 

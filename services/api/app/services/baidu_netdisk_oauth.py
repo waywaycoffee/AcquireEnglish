@@ -65,19 +65,26 @@ def parse_oauth_state(state: str) -> int | None:
         return None
 
 
-def build_authorize_url(*, state: str) -> str:
+def build_authorize_url(*, state: str, use_qrcode: bool = False) -> str:
+    """Build Baidu OAuth URL.
+
+    Default is password / SMS login with force_login=1. QR mode follows whatever
+    account is logged into the Baidu App and often binds the wrong passport when
+    one phone number has multiple Baidu identities.
+    """
     if not oauth_configured():
         raise RuntimeError("百度网盘 OAuth 未配置 APP KEY / SECRET")
-    params = {
+    params: dict[str, str] = {
         "response_type": "code",
         "client_id": settings.baidu_netdisk_app_key.strip(),
         "redirect_uri": redirect_uri(),
         "scope": "basic,netdisk",
         "display": "mobile",
-        "qrcode": "1",
         "force_login": "1",
         "state": state,
     }
+    if use_qrcode:
+        params["qrcode"] = "1"
     return f"{AUTHORIZE_URL}?{urlencode(params)}"
 
 

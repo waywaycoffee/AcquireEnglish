@@ -2221,9 +2221,12 @@ class AcquireApiClient {
   }
 
   /// Official Baidu Open Platform OAuth (QR / login). Returns authorize_url.
-  Future<Map<String, dynamic>> startBaiduNetdiskOauth() async {
+  Future<Map<String, dynamic>> startBaiduNetdiskOauth({
+    String mode = 'password',
+  }) async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.netdiskBaiduOauthStart,
+      queryParameters: <String, dynamic>{'mode': mode},
       options: Options(
         receiveTimeout: const Duration(seconds: 20),
         extra: const <String, Object>{

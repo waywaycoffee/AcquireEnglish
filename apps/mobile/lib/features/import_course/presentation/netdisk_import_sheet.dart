@@ -205,14 +205,15 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
     }
   }
 
-  Future<void> _startBaiduOauth() async {
+  Future<void> _startBaiduOauth({String mode = 'password'}) async {
     setState(() {
       _busy = true;
       _error = null;
     });
     try {
-      final Map<String, dynamic> started =
-          await ref.read(acquireApiClientProvider).startBaiduNetdiskOauth();
+      final Map<String, dynamic> started = await ref
+          .read(acquireApiClientProvider)
+          .startBaiduNetdiskOauth(mode: mode);
       final String url = '${started['authorize_url'] ?? ''}'.trim();
       if (url.isEmpty) {
         throw Exception('未返回授权地址');
@@ -226,9 +227,13 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
         throw Exception('无法打开百度授权页，请检查浏览器');
       }
       if (!mounted) return;
+      final bool qr = mode == 'qrcode';
       setState(() {
         _busy = false;
-        _error = '请在浏览器中用百度 App 扫码或登录授权，完成后会自动刷新';
+        _error = qr
+            ? '请用百度 App 扫码；会绑定 App 里当前登录的号，完成后自动刷新'
+            : '请在浏览器用 linghusgc / 嘉佑真好 的账号密码或短信登录（不要扫码），'
+                '成功页须显示「嘉佑真好」';
       });
       _oauthPoll?.cancel();
       _oauthPoll = Timer.periodic(const Duration(seconds: 3), (_) {
@@ -518,7 +523,9 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                   if (_openlistReady && !_bound) ...<Widget>[
                     if (_useBaiduOauth) ...<Widget>[
                       Text(
-                        '用百度账号扫码或登录授权，即可导入你自己网盘里的视频（不支持分享链接）。',
+                        '一号多护照时请用「账号密码登录」，不要扫码'
+                        '（扫码会绑百度 App 当前号，容易变成令狐上官1）。'
+                        '成功页须出现「嘉佑真好」。',
                         style: TextStyle(
                           fontSize: 13,
                           color: AppDesignTokens.textSecondary,
@@ -526,14 +533,33 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                       ),
                       const SizedBox(height: 12),
                       FilledButton.icon(
-                        onPressed: _busy ? null : _startBaiduOauth,
+                        onPressed: _busy
+                            ? null
+                            : () => unawaited(
+                                  _startBaiduOauth(mode: 'password'),
+                                ),
                         style: FilledButton.styleFrom(
                           backgroundColor: AppDesignTokens.primaryBlueDark,
                           foregroundColor: AppDesignTokens.onAccent,
                           minimumSize: const Size.fromHeight(48),
                         ),
+                        icon: const Icon(Icons.password_rounded),
+                        label: Text(_busy ? '打开授权中…' : '账号密码登录（推荐）'),
+                      ),
+                      const SizedBox(height: 8),
+                      OutlinedButton.icon(
+                        onPressed: _busy
+                            ? null
+                            : () => unawaited(
+                                  _startBaiduOauth(mode: 'qrcode'),
+                                ),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: AppDesignTokens.textPrimary,
+                          side: BorderSide(color: AppDesignTokens.borderGray),
+                          minimumSize: const Size.fromHeight(44),
+                        ),
                         icon: const Icon(Icons.qr_code_2_rounded),
-                        label: Text(_busy ? '打开授权中…' : '百度扫码 / 账号授权'),
+                        label: const Text('改用扫码（易绑错号）'),
                       ),
                       const SizedBox(height: 8),
                       TextButton(
