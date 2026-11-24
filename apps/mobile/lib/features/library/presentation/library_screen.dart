@@ -474,7 +474,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             : switch (shelfTab) {
                 LibraryShelfTab.bilibili => 'B 站 / 本地短片 · 搜索或导入练耳朵',
                 LibraryShelfTab.englishBrowse => '今日全站同一份精选 · 按难度每日生成',
-                LibraryShelfTab.drama => '网盘季集 + SRT · 四阶段精学',
+                LibraryShelfTab.drama => '精选片单 · 正片网盘导入精学',
                 LibraryShelfTab.youtube => '英语教育精选 · 按难度 · 需自备梯子',
                 LibraryShelfTab.dubbing => '看过的视频切成 1–3 分钟 · 人声分离配音',
               },
