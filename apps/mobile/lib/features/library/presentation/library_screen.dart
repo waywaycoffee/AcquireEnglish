@@ -51,6 +51,7 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../words/data/offline_word_dictionary.dart';
 import '../../words/presentation/vocab_iplus_provider.dart';
 import '../domain/video_difficulty.dart';
+import 'dub_clip_hub.dart';
 import 'library_browse.dart';
 import 'library_catalog_provider.dart';
 import 'library_mock_data.dart';
@@ -69,7 +70,7 @@ const String _libraryViewModePrefsKey = 'library_course_view_mode_v1';
 const String _librarySortPrefsKey = 'library_course_sort_v1';
 const String _libraryCefrFilterPrefsKey = 'library_course_cefr_filter_v1';
 
-enum LibraryShelfTab { bilibili, englishBrowse, drama, youtube }
+enum LibraryShelfTab { bilibili, englishBrowse, drama, youtube, dubbing }
 
 /// Backward-compatible alias used by older deep links / call sites.
 const LibraryShelfTab libraryShelfTabVideos = LibraryShelfTab.bilibili;
@@ -411,6 +412,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         case LibraryShelfTab.bilibili:
           return !isDrama && !isYoutube;
         case LibraryShelfTab.englishBrowse:
+        case LibraryShelfTab.dubbing:
           return false;
       }
     }).toList(growable: false);
@@ -453,6 +455,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 LibraryShelfTab.englishBrowse => '全英可逛',
                 LibraryShelfTab.drama => '美剧',
                 LibraryShelfTab.youtube => 'YouTube',
+                LibraryShelfTab.dubbing => '配音',
               },
         subtitle: showImport
             ? '影视库'
@@ -470,6 +473,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 LibraryShelfTab.englishBrowse => '英语原声 B 站精选 · 可选难度',
                 LibraryShelfTab.drama => '网盘季集 + SRT · 四阶段精学',
                 LibraryShelfTab.youtube => '需自备梯子 · 粘贴链接导入学习',
+                LibraryShelfTab.dubbing => '看过的视频切成 1–3 分钟 · 人声分离配音',
               },
         leading: showImport
             ? AnimatedBuilder(
@@ -1354,6 +1358,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             'YouTube',
                             Icons.ondemand_video_rounded,
                           ),
+                          (
+                            LibraryShelfTab.dubbing,
+                            '配音',
+                            Icons.mic_none_rounded,
+                          ),
                         ])
                           Padding(
                             padding: const EdgeInsets.only(right: 8),
@@ -1388,6 +1397,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         )
                       : shelfTab == LibraryShelfTab.englishBrowse
                       ? const EnglishBrowseScreen(embedded: true)
+                      : shelfTab == LibraryShelfTab.dubbing
+                      ? const DubClipHub()
                       : LayoutBuilder(
               builder: (BuildContext context, BoxConstraints constraints) {
                 final double contentWidth = constraints.maxWidth - pagePadding * 2;

@@ -33,6 +33,10 @@ class User(Base):
         String(64), unique=True, index=True, nullable=True
     )
     points_balance: Mapped[int] = mapped_column(Integer, default=0)
+    # Short share/referral code for Moments download QR attribution.
+    invite_code: Mapped[str | None] = mapped_column(
+        String(16), unique=True, index=True, nullable=True
+    )
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     progresses: Mapped[list["LessonProgress"]] = relationship(back_populates="user")
@@ -96,6 +100,29 @@ class UserPointsLedger(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
 
     user: Mapped[User] = relationship(back_populates="points_ledger")
+
+
+class ReferralInstall(Base):
+    """One successful install/register attribution per invitee."""
+
+    __tablename__ = "referral_installs"
+    __table_args__ = (
+        UniqueConstraint("invitee_user_id", name="uq_referral_invitee"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    referrer_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    invitee_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    invite_code: Mapped[str] = mapped_column(String(16), index=True)
+    points_awarded: Mapped[int] = mapped_column(Integer, default=0)
+    pro_days_awarded: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
 
 
 class LessonProgress(Base):

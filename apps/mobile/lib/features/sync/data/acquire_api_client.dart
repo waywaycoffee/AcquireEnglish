@@ -3708,6 +3708,25 @@ class AcquireApiClient {
     );
   }
 
+  Future<Map<String, dynamic>> fetchInviteCode() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.rewardsInviteCode,
+      options: _noCache,
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
+  Future<Map<String, dynamic>> claimReferralInstall({
+    required String inviteCode,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.rewardsReferralClaim,
+      data: <String, dynamic>{'invite_code': inviteCode.trim()},
+      options: _noCache,
+    );
+    return Map<String, dynamic>.from(response.data as Map);
+  }
+
   Options get _noCache => Options(
         extra: const <String, Object>{
           'dio_cache_interceptor_force_refresh': true,

@@ -491,6 +491,7 @@ GoRouter goRouter(Ref ref) {
             'english' || 'browse' || 'english-browse' =>
               LibraryShelfTab.englishBrowse,
             'youtube' || 'yt' => LibraryShelfTab.youtube,
+            'dub' || 'dubbing' || 'shadowing' => LibraryShelfTab.dubbing,
             _ => LibraryShelfTab.bilibili,
           },
           initialCourseId: state.uri.queryParameters['courseId'],

@@ -24,6 +24,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_rank_state_columns(conn)
     await _ensure_upload_task_notify_column(conn)
     await _ensure_product_feedback_columns(conn)
+    await _ensure_user_invite_code_column(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -382,4 +383,14 @@ async def _ensure_product_feedback_columns(conn: AsyncConnection) -> None:
                 "ALTER TABLE product_feedback "
                 "ADD COLUMN screenshot_url VARCHAR(512) DEFAULT ''"
             )
+        )
+
+
+async def _ensure_user_invite_code_column(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "users")
+    if existing is None:
+        return
+    if "invite_code" not in existing:
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN invite_code VARCHAR(16)")
         )

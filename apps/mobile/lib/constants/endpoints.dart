@@ -149,6 +149,8 @@ class Endpoints {
   static const String netdiskImportSeries = 'api/netdisk/import-series';
   static const String rewardsShare = 'api/rewards/share';
   static const String rewardsPoints = 'api/rewards/points';
+  static const String rewardsInviteCode = 'api/rewards/invite-code';
+  static const String rewardsReferralClaim = 'api/rewards/referral/claim';
   static const String foundationMediaManifest = 'api/foundation/media/manifest';
   static const String foundationMediaLookup = 'api/foundation/media/lookup';
   static const String foundationMediaUpload = 'api/foundation/media/upload';

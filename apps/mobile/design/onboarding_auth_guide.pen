@@ -6348,6 +6348,1114 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "X4Po2i",
+      "x": 5800,
+      "y": -518,
+      "name": "Share · Dub Score",
+      "clip": true,
+      "width": 1080,
+      "height": 1440,
+      "fill": "#070B12",
+      "layout": "vertical",
+      "gap": 26,
+      "padding": [
+        48,
+        48,
+        56,
+        48
+      ],
+      "children": [
+        {
+          "type": "frame",
+          "id": "GUZB9",
+          "name": "Dub Brand Row",
+          "width": "fill_container",
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "Pv2s1",
+              "name": "Dub Brand Left",
+              "gap": 14,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "jEDLr",
+                  "name": "Dub Dot",
+                  "width": 18,
+                  "height": 18,
+                  "fill": "#58CC02",
+                  "cornerRadius": 9999
+                },
+                {
+                  "type": "text",
+                  "id": "FSk7H",
+                  "name": "Dub Brand",
+                  "fill": "#F4F7FB",
+                  "content": "爱快英语",
+                  "fontFamily": "Unbounded",
+                  "fontSize": 28,
+                  "fontWeight": "700"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "vnYrs",
+              "name": "Dub Chip",
+              "fill": "#58CC02",
+              "content": "配音打卡",
+              "fontFamily": "Space Grotesk",
+              "fontSize": 22,
+              "fontWeight": "600"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "Ociyj",
+          "name": "Dub Frame Hero",
+          "metadata": {
+            "type": "unsplash",
+            "username": "tanyabarrow",
+            "link": "https://unsplash.com/@tanyabarrow",
+            "author": "T"
+          },
+          "clip": true,
+          "width": "fill_container",
+          "height": 520,
+          "fill": {
+            "type": "image",
+            "enabled": true,
+            "url": "https://images.unsplash.com/photo-1762417582857-5f87ff4c97ed?crop=entropy&cs=tinysrgb&fit=max&fm=jpg&ixid=M3w4NDM0ODN8MHwxfHJhbmRvbXx8fHx8fHx8fDE3OTU0OTA4MDF8&ixlib=rb-4.1.0&q=80&w=1080",
+            "mode": "cover"
+          },
+          "cornerRadius": 28,
+          "layout": "none",
+          "children": [
+            {
+              "type": "frame",
+              "id": "IFYNq",
+              "x": 0,
+              "y": 260,
+              "name": "Dub Shade",
+              "width": 984,
+              "height": 260,
+              "fill": {
+                "type": "gradient",
+                "gradientType": "linear",
+                "enabled": true,
+                "rotation": 90,
+                "size": {
+                  "height": 1
+                },
+                "colors": [
+                  {
+                    "color": "#070B1200",
+                    "position": 0
+                  },
+                  {
+                    "color": "#070B12CC",
+                    "position": 0.55
+                  },
+                  {
+                    "color": "#070B12",
+                    "position": 1
+                  }
+                ]
+              }
+            },
+            {
+              "type": "text",
+              "id": "nLU6p",
+              "x": 32,
+              "y": 400,
+              "name": "Dub Cover Title",
+              "fill": "#F4F7FB",
+              "content": "Friends · S01E03 配音片段",
+              "fontFamily": "Manrope",
+              "fontSize": 30,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "j1dLqH",
+              "x": 32,
+              "y": 448,
+              "name": "Dub Cover Meta",
+              "fill": "#8B98A8",
+              "content": "01:12–03:48 · 人声分离伴奏",
+              "fontFamily": "Space Grotesk",
+              "fontSize": 20,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "AbBdr",
+          "name": "Score Row",
+          "width": "fill_container",
+          "gap": 18,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "RJd9x",
+              "name": "Score Card",
+              "width": 280,
+              "fill": "#101820",
+              "cornerRadius": 22,
+              "stroke": "#243041",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 6,
+              "padding": [
+                28,
+                24
+              ],
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "w7mSc6",
+                  "name": "Score Value",
+                  "fill": "#58CC02",
+                  "content": "92",
+                  "fontFamily": "Unbounded",
+                  "fontSize": 72,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "CVoTw",
+                  "name": "Score Label",
+                  "fill": "#8B98A8",
+                  "content": "配音得分",
+                  "fontFamily": "Space Grotesk",
+                  "fontSize": 22,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "wMjb0",
+              "name": "Dub Stats",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "McOZ1",
+                  "name": "Dub Headline",
+                  "fill": "#F4F7FB",
+                  "content": "今日配音",
+                  "fontFamily": "Unbounded",
+                  "fontSize": 48,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "drKjO",
+                  "name": "Dub Sub",
+                  "fill": "#8B98A8",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "完成 1 段跟读配音 · 节奏 / 清晰度双评",
+                  "lineHeight": 1.35,
+                  "fontFamily": "Manrope",
+                  "fontSize": 24,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "F7WNCa",
+                  "name": "Metric Chips",
+                  "width": "fill_container",
+                  "gap": 10,
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "AkhH5",
+                      "name": "节奏 Chip",
+                      "fill": "#152033",
+                      "cornerRadius": 999,
+                      "gap": 8,
+                      "padding": [
+                        10,
+                        14
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "whW9t",
+                          "name": "节奏 L",
+                          "fill": "#8B98A8",
+                          "content": "节奏",
+                          "fontFamily": "Space Grotesk",
+                          "fontSize": 18,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "RAvSb",
+                          "name": "节奏 V",
+                          "fill": "#1CB0F6",
+                          "content": "A",
+                          "fontFamily": "Manrope",
+                          "fontSize": 18,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "gU1gR",
+                      "name": "清晰 Chip",
+                      "fill": "#152033",
+                      "cornerRadius": 999,
+                      "gap": 8,
+                      "padding": [
+                        10,
+                        14
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "eiqgc",
+                          "name": "清晰 L",
+                          "fill": "#8B98A8",
+                          "content": "清晰",
+                          "fontFamily": "Space Grotesk",
+                          "fontSize": 18,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "W4Wq4",
+                          "name": "清晰 V",
+                          "fill": "#1CB0F6",
+                          "content": "A-",
+                          "fontFamily": "Manrope",
+                          "fontSize": 18,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "frame",
+                      "id": "BPnCM",
+                      "name": "时长 Chip",
+                      "fill": "#152033",
+                      "cornerRadius": 999,
+                      "gap": 8,
+                      "padding": [
+                        10,
+                        14
+                      ],
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "y8w8fL",
+                          "name": "时长 L",
+                          "fill": "#8B98A8",
+                          "content": "时长",
+                          "fontFamily": "Space Grotesk",
+                          "fontSize": 18,
+                          "fontWeight": "normal"
+                        },
+                        {
+                          "type": "text",
+                          "id": "f2brc",
+                          "name": "时长 V",
+                          "fill": "#1CB0F6",
+                          "content": "2:36",
+                          "fontFamily": "Manrope",
+                          "fontSize": 18,
+                          "fontWeight": "800"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "uhybD",
+          "name": "Dub QR Row",
+          "width": "fill_container",
+          "fill": "#101820",
+          "cornerRadius": 22,
+          "stroke": "#243041",
+          "strokeWidth": 1,
+          "gap": 18,
+          "padding": 22,
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "frame",
+              "id": "YCQz5",
+              "name": "Dub Android Col",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "SaKlI",
+                  "name": "Dub Android QR",
+                  "clip": true,
+                  "width": 148,
+                  "height": 148,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 16,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "id": "PZ9Ci",
+                      "x": 10,
+                      "y": 10,
+                      "name": "qbase",
+                      "fill": "#0B1220",
+                      "width": 128,
+                      "height": 128
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "DJm4C",
+                      "x": 14,
+                      "y": 14,
+                      "name": "qc00",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "zM8TF",
+                      "x": 23,
+                      "y": 14,
+                      "name": "qc10",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "OvzEm",
+                      "x": 32,
+                      "y": 14,
+                      "name": "qc20",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "W3aCU",
+                      "x": 41,
+                      "y": 14,
+                      "name": "qc30",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "z5Kr1",
+                      "x": 50,
+                      "y": 14,
+                      "name": "qc40",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "ZDXC3",
+                      "x": 14,
+                      "y": 23,
+                      "name": "qc01",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "Jzo4Z",
+                      "x": 50,
+                      "y": 23,
+                      "name": "qc41",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "ESj7U",
+                      "x": 14,
+                      "y": 32,
+                      "name": "qc02",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "IzwGR",
+                      "x": 32,
+                      "y": 32,
+                      "name": "qc22",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "mzik7",
+                      "x": 50,
+                      "y": 32,
+                      "name": "qc42",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "S3nvDN",
+                      "x": 14,
+                      "y": 41,
+                      "name": "qc03",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "Z61sG",
+                      "x": 50,
+                      "y": 41,
+                      "name": "qc43",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "G0cHq",
+                      "x": 14,
+                      "y": 50,
+                      "name": "qc04",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "t29kk0",
+                      "x": 23,
+                      "y": 50,
+                      "name": "qc14",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "YiowK",
+                      "x": 32,
+                      "y": 50,
+                      "name": "qc24",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "Jupr6",
+                      "x": 41,
+                      "y": 50,
+                      "name": "qc34",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "KnX2T",
+                      "x": 50,
+                      "y": 50,
+                      "name": "qc44",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "r8BEY",
+                      "x": 86,
+                      "y": 14,
+                      "name": "qc80",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "MNBB7",
+                      "x": 122,
+                      "y": 14,
+                      "name": "qc120",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "bwZ7v",
+                      "x": 86,
+                      "y": 50,
+                      "name": "qc84",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "d1ibi",
+                      "x": 122,
+                      "y": 50,
+                      "name": "qc124",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "WLMww",
+                      "x": 14,
+                      "y": 86,
+                      "name": "qc08",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "eL9x0",
+                      "x": 50,
+                      "y": 86,
+                      "name": "qc48",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "oabPz",
+                      "x": 14,
+                      "y": 122,
+                      "name": "qc012",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "araTC",
+                      "x": 50,
+                      "y": 122,
+                      "name": "qc412",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "GvfT7",
+                      "x": 86,
+                      "y": 86,
+                      "name": "qc88",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "CuXzV",
+                      "x": 104,
+                      "y": 104,
+                      "name": "qc1010",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "ZxSiV",
+                      "x": 68,
+                      "y": 68,
+                      "name": "qc66",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "gJnuc",
+                      "x": 77,
+                      "y": 95,
+                      "name": "qc79",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "mFuP0",
+                      "x": 95,
+                      "y": 77,
+                      "name": "qc97",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "vU8KJ",
+                  "name": "Dub Android Label",
+                  "fill": "#F4F7FB",
+                  "content": "Android 下载",
+                  "fontFamily": "Space Grotesk",
+                  "fontSize": 20,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "NujPt",
+              "name": "Dub iOS Col",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 12,
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "dGpuy",
+                  "name": "Dub iOS QR",
+                  "clip": true,
+                  "width": 148,
+                  "height": 148,
+                  "fill": "#FFFFFF",
+                  "cornerRadius": 16,
+                  "layout": "none",
+                  "children": [
+                    {
+                      "type": "rectangle",
+                      "id": "dlXzd",
+                      "x": 10,
+                      "y": 10,
+                      "name": "qbase",
+                      "fill": "#0B1220",
+                      "width": 128,
+                      "height": 128
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "wmlHD",
+                      "x": 14,
+                      "y": 14,
+                      "name": "qc00",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "sz1GS",
+                      "x": 23,
+                      "y": 14,
+                      "name": "qc10",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "Ub5AZ",
+                      "x": 32,
+                      "y": 14,
+                      "name": "qc20",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "CP6WT",
+                      "x": 41,
+                      "y": 14,
+                      "name": "qc30",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "LsFpt",
+                      "x": 50,
+                      "y": 14,
+                      "name": "qc40",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "KBh2P",
+                      "x": 14,
+                      "y": 23,
+                      "name": "qc01",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "r124W",
+                      "x": 50,
+                      "y": 23,
+                      "name": "qc41",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "lnigr",
+                      "x": 14,
+                      "y": 32,
+                      "name": "qc02",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "fIF7l",
+                      "x": 32,
+                      "y": 32,
+                      "name": "qc22",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "L67CyH",
+                      "x": 50,
+                      "y": 32,
+                      "name": "qc42",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "J1UCpY",
+                      "x": 14,
+                      "y": 41,
+                      "name": "qc03",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "iuH7Q",
+                      "x": 50,
+                      "y": 41,
+                      "name": "qc43",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "NTtQA",
+                      "x": 14,
+                      "y": 50,
+                      "name": "qc04",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "FDHJt",
+                      "x": 23,
+                      "y": 50,
+                      "name": "qc14",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "eq2eG",
+                      "x": 32,
+                      "y": 50,
+                      "name": "qc24",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "ALJ1y",
+                      "x": 41,
+                      "y": 50,
+                      "name": "qc34",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "ne2O8",
+                      "x": 50,
+                      "y": 50,
+                      "name": "qc44",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "bjMGF",
+                      "x": 86,
+                      "y": 14,
+                      "name": "qc80",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "aXHW1",
+                      "x": 122,
+                      "y": 14,
+                      "name": "qc120",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "EK6CQ",
+                      "x": 86,
+                      "y": 50,
+                      "name": "qc84",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "qTgaQ",
+                      "x": 122,
+                      "y": 50,
+                      "name": "qc124",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "t3HqM",
+                      "x": 14,
+                      "y": 86,
+                      "name": "qc08",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "BumHg",
+                      "x": 50,
+                      "y": 86,
+                      "name": "qc48",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "JSN9M",
+                      "x": 14,
+                      "y": 122,
+                      "name": "qc012",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "ad50D",
+                      "x": 50,
+                      "y": 122,
+                      "name": "qc412",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "EKGuP",
+                      "x": 86,
+                      "y": 86,
+                      "name": "qc88",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "Uv0he",
+                      "x": 104,
+                      "y": 104,
+                      "name": "qc1010",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "vhQv7",
+                      "x": 68,
+                      "y": 68,
+                      "name": "qc66",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "vpKZd",
+                      "x": 77,
+                      "y": 95,
+                      "name": "qc79",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    },
+                    {
+                      "type": "rectangle",
+                      "id": "pmNcF",
+                      "x": 95,
+                      "y": 77,
+                      "name": "qc97",
+                      "fill": "#FFFFFF",
+                      "width": 8,
+                      "height": 8
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "X9HOO",
+                  "name": "Dub iOS Label",
+                  "fill": "#F4F7FB",
+                  "content": "iOS 下载",
+                  "fontFamily": "Space Grotesk",
+                  "fontSize": 20,
+                  "fontWeight": "600"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "f65f7Z",
+              "name": "Dub CTA",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "z1L6xg",
+                  "name": "Dub CTA Title",
+                  "fill": "#F4F7FB",
+                  "content": "扫码一起配",
+                  "fontFamily": "Manrope",
+                  "fontSize": 28,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "vlspo",
+                  "name": "Dub CTA Body",
+                  "fill": "#8B98A8",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "好友经你的码下载\n你得积分 · 送 Pro 一周",
+                  "lineHeight": 1.35,
+                  "fontFamily": "Manrope",
+                  "fontSize": 20,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "D99THf",
+          "name": "Dub Footer",
+          "width": "fill_container",
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "bcl7R",
+              "name": "Dub Foot L",
+              "fill": "#8B98A8",
+              "content": "#爱快英语 · 配音分享",
+              "fontFamily": "Space Grotesk",
+              "fontSize": 20,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "kDslj",
+              "name": "Dub Foot R",
+              "fill": "#1CB0F6",
+              "content": "acquireenglish.app",
+              "fontFamily": "Space Grotesk",
+              "fontSize": 18,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
     }
   ],
   "variables": {
