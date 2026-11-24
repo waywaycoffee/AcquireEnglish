@@ -309,7 +309,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   int _speakGen = 0;
   final FlutterTts _cartoonTts = FlutterTts();
 
-  /// Local cartoon mouth cues (fallback when LiveTalking video is unavailable).
+  /// Local cartoon atlas mouth cues (scheme 2).
   CoachViseme _coachMouth = CoachViseme.closed;
   CoachAnimationTimeline? _mouthTimeline;
   DateTime? _mouthClockStart;
@@ -3565,12 +3565,19 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           : (_started ? '按住麦克风说话' : '按住麦克风开始对话'))));
     final bool avatarSpeaking = _coachSpeaking || _duplexAgentSpeaking;
     final bool avatarListening = _recordingActive || _duplexLearnerSpeaking;
+    final bool useCartoonLips =
+        settings.cartoonDigitalHuman && persona.hasCartoonAtlas;
     final String stageLabel = avatarSpeaking
-        ? '外教在说…'
-        : (avatarListening ? '外教在听…' : persona.displayName);
-    // LiveTalking WebRTC when connected; otherwise still portrait.
+        ? (useCartoonLips ? '数字人唇形…' : '外教在说…')
+        : (avatarListening
+              ? '外教在听…'
+              : (useCartoonLips
+                    ? '${persona.displayName} · 数字人唇形'
+                    : persona.displayName));
+    // Scheme 2: local cartoon atlas. LiveTalking only if cartoon is off.
     final Widget? liveVideo =
-        (_wantsLiveTalking(settings) &&
+        (!useCartoonLips &&
+            _wantsLiveTalking(settings) &&
             _liveConnected &&
             _liveRenderer != null)
         ? RTCVideoView(
@@ -3589,10 +3596,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           listening: avatarListening,
           label: stageLabel,
           imageAsset: persona.assetPath,
+          spriteAsset: _started && useCartoonLips
+              ? persona.cartoonAssetPath
+              : null,
           encouraging: _coachEncouraging,
           thinking: _busy || (_duplexLive && _duplexThinking),
           displayName: persona.displayName,
           liveVideo: liveVideo,
+          mouth: !avatarSpeaking
+              ? CoachViseme.closed
+              : (_mouthTimeline != null ? _coachMouth : null),
         ),
         const DecoratedBox(
           decoration: BoxDecoration(

@@ -502,10 +502,9 @@ class SettingsScreen extends ConsumerWidget {
               _SelectRow(
                 title: '陪练引擎',
                 description:
-                    '视频陪练管线=主题对话 + 有 avatar 时走 LiveTalking 真人唇形；'
-                    'LiveTalking=仅唇形 WebRTC；'
-                    '本地 TTS=仅语音，无 GPU 数字人。'
-                    '对话仍是按住说话（半双工）。',
+                    '视频陪练管线=主题对话 + 本地卡通 atlas 口型（默认）；'
+                    'LiveTalking=可选 GPU 真人唇形（当前未默认开启）；'
+                    '本地 TTS=仅语音。对话仍是按住说话（半双工）。',
                 value: oralCoachBackendOptions.contains(settings.oralCoachBackend)
                     ? settings.oralCoachBackend
                     : '本地 TTS',

@@ -296,7 +296,7 @@ class LearningSettingsState {
     this.bilibiliSessdata = '',
     this.bilibiliUserId = '',
     this.digitalHumanId = defaultDigitalHumanId,
-    this.cartoonDigitalHuman = false,
+    this.cartoonDigitalHuman = true,
   });
 
   factory LearningSettingsState.defaults() {
@@ -437,19 +437,11 @@ class LearningSettingsState {
       usesOralCoachPipeline ||
       oralCoachBackend == '本地 TTS';
 
-  /// Real-time wav2lip WebRTC on the GPU box (simplex hold-to-talk unchanged).
+  /// Real-time wav2lip WebRTC on the GPU box.
   ///
-  /// On when the selected persona maps to a LiveTalking `--avatar_id` and the
-  /// coach backend is not local-TTS-only. Connect fails soft → portrait + TTS.
-  bool get usesRealtimeLipSync {
-    if (oralCoachBackend == '本地 TTS') {
-      return false;
-    }
-    if (resolvedOralCoachServerUrl.trim().isEmpty) {
-      return false;
-    }
-    return selectedDigitalHuman.liveTalkingAvatarId.trim().isNotEmpty;
-  }
+  /// Off while scheme 2 (local cartoon atlas) is the default digital-human
+  /// presentation. Flip on later when a persona should use LiveTalking.
+  bool get usesRealtimeLipSync => false;
 
   bool get isBilibiliLoggedIn => hasBilibiliCookie;
 
@@ -766,7 +758,9 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         liveKitUrl: _stringOrNull(json['liveKitUrl']),
         bilibiliSessdata: _stringOrNull(json['bilibiliSessdata']),
         bilibiliUserId: _stringOrNull(json['bilibiliUserId']),
-        cartoonDigitalHuman: false,
+        cartoonDigitalHuman: json['cartoonDigitalHuman'] is bool
+            ? json['cartoonDigitalHuman'] as bool
+            : true,
         digitalHumanId: () {
           final String? raw = _stringOrNull(json['digitalHumanId']);
           if (raw == null || raw.isEmpty) {
@@ -777,8 +771,6 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       );
       LearningSettingsState coerced = _migrateAwayFromLocalWhisper(loaded);
       coerced = _preferGpuOllamaTranslation(coerced);
-      // Cartoon sprite atlases were removed — always use portrait photos.
-      coerced = coerced.copyWith(cartoonDigitalHuman: false);
       // Oral coach is hold-to-talk; drop the old prod LiveKit default so the
       // app no longer advertises full-duplex for the digital-human tab.
       const String legacyDefaultLiveKit =
@@ -1206,8 +1198,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   }
 
   void setCartoonDigitalHuman(bool value) {
-    // Cartoon digital-human sprites are removed; keep flag forced off.
-    state = state.copyWith(cartoonDigitalHuman: false);
+    state = state.copyWith(cartoonDigitalHuman: value);
     _persist();
   }
 
@@ -1411,7 +1402,9 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           (state.bilibiliUserId.trim().isNotEmpty
               ? state.bilibiliUserId
               : null),
-      cartoonDigitalHuman: false,
+      cartoonDigitalHuman: json['cartoonDigitalHuman'] is bool
+          ? json['cartoonDigitalHuman'] as bool
+          : null,
       digitalHumanId: _stringOrNull(json['digitalHumanId']),
       // Preserve device-local endpoints.
       cloudApiBaseUrl: state.cloudApiBaseUrl,
