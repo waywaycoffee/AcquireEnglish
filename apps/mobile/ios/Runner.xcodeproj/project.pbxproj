@@ -223,6 +223,7 @@
 				9705A1C41CF9048500538489 /* Embed Frameworks */,
 				3B06AD1E1E4923F5004D2608 /* Thin Binary */,
 				F1ED2D47EA90ABFA316C7F0A /* [CP] Embed Pods Frameworks */,
+				A1B2C3D4E5F60718293A4B5C /* Patch WeChat MinimumOSVersion */,
 			);
 			buildRules = (
 			);
@@ -374,6 +375,25 @@
 		};
 /* End PBXShellScriptBuildPhase section */
 
+		A1B2C3D4E5F60718293A4B5C /* Patch WeChat MinimumOSVersion */ = {
+			isa = PBXShellScriptBuildPhase;
+			alwaysOutOfDate = 1;
+			buildActionMask = 2147483647;
+			files = (
+			);
+			inputFileListPaths = (
+			);
+			inputPaths = (
+			);
+			name = "Patch WeChat MinimumOSVersion";
+			outputFileListPaths = (
+			);
+			outputPaths = (
+			);
+			runOnlyForDeploymentPostprocessing = 0;
+			shellPath = /bin/sh;
+			shellScript = "\"${SRCROOT}/scripts/patch_wechat_minos.sh\"\n";
+		};
 /* Begin PBXSourcesBuildPhase section */
 		331C807D294A63A400263BE5 /* Sources */ = {
 			isa = PBXSourcesBuildPhase;

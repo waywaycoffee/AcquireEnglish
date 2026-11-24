@@ -48,4 +48,10 @@ post_install do |installer|
       end
     end
   end
+
+  # WeChat OpenSDK binary is built for iOS 15+, but vendor Info.plist still says 12.0.
+  # App Store Connect rejects: "does not support the minimum OS Version specified in the Info.plist".
+  Dir.glob(File.join(installer.sandbox.root, '**/WechatOpenSDK.framework/Info.plist')).each do |plist|
+    system('/usr/bin/plutil', '-replace', 'MinimumOSVersion', '-string', '15.0', plist)
+  end
 end
