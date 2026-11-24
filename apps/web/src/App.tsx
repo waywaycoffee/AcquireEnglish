@@ -1,6 +1,7 @@
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider, useAuth } from "./auth";
 import HomePage from "./pages/HomePage";
+import BetaPage from "./pages/BetaPage";
 import LandingPage from "./pages/LandingPage";
 import LoginPage from "./pages/LoginPage";
 import NetdiskPage from "./pages/NetdiskPage";
@@ -31,6 +32,7 @@ export default function App() {
         {/* Public product site for WeChat / store review — no login wall */}
         <Route path="/" element={<LandingPage />} />
         <Route path="/about" element={<LandingPage />} />
+        <Route path="/beta" element={<BetaPage />} />
         <Route path="/privacy" element={<PrivacyPage />} />
         <Route path="/terms" element={<TermsPage />} />
         <Route path="/login" element={<LoginPage />} />

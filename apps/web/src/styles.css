@@ -562,6 +562,78 @@ input {
   margin: 0;
 }
 
+.landing-beta-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px 14px;
+  margin: 0 0 22px;
+  padding: 12px 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(251, 191, 36, 0.35);
+  background: rgba(251, 191, 36, 0.08);
+  color: #fde68a;
+  font-size: 0.95rem;
+  line-height: 1.45;
+}
+
+.landing-beta-banner:hover {
+  border-color: rgba(251, 191, 36, 0.55);
+  background: rgba(251, 191, 36, 0.12);
+}
+
+.landing-beta-tag {
+  display: inline-flex;
+  align-items: center;
+  padding: 2px 10px;
+  border-radius: 999px;
+  background: rgba(251, 191, 36, 0.2);
+  color: #fbbf24;
+  font-size: 0.8rem;
+  font-weight: 700;
+  letter-spacing: 0.02em;
+}
+
+.beta-page .beta-hero-card h2 {
+  margin: 6px 0 12px;
+  font-family: var(--font-display);
+  font-size: 1.35rem;
+}
+
+.beta-block h3 {
+  margin: 28px 0 10px;
+  font-size: 1.1rem;
+}
+
+.beta-list {
+  margin: 0;
+  padding-left: 1.2rem;
+}
+
+.beta-list li {
+  margin: 10px 0;
+  color: var(--muted);
+}
+
+.beta-list li strong {
+  color: var(--text);
+}
+
+.beta-callout {
+  border-left: 3px solid #93c5fd;
+  padding: 4px 0 4px 14px;
+  margin: 12px 0 8px;
+}
+
+.beta-callout p,
+.beta-callout li {
+  color: var(--muted);
+}
+
+.beta-callout strong {
+  color: var(--text);
+}
+
 .landing-footer {
   margin-top: 64px;
   padding-top: 20px;

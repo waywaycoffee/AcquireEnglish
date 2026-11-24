@@ -105,6 +105,7 @@ export default function LandingPage() {
           <a href="#shots">界面</a>
           <a href="#flow">流程</a>
           <a href="#info">应用信息</a>
+          <Link to="/beta">内测公告</Link>
           <Link to="/privacy">隐私政策</Link>
           <Link to="/terms">用户协议</Link>
         </nav>
@@ -119,6 +120,13 @@ export default function LandingPage() {
       </header>
 
       <main id="top" className="landing-main">
+        <Link className="landing-beta-banner" to="/beta">
+          <span className="landing-beta-tag">内测进行中</span>
+          <span>
+            App 封闭内测开放报名：请阅读视频功能介绍、内容来源免责声明与社区素材共建义务 →
+          </span>
+        </Link>
+
         <section className="landing-hero">
           <div className="landing-hero-copy">
             <p className="landing-kicker">视频英语学习应用</p>
@@ -266,6 +274,8 @@ export default function LandingPage() {
       <footer className="landing-footer muted">
         <p>© {new Date().getFullYear()} 爱快英语 Acquire English</p>
         <p>
+          <Link to="/beta">内测公告</Link>
+          {" · "}
           <Link to="/privacy">隐私政策</Link>
           {" · "}
           <Link to="/terms">用户协议</Link>
