@@ -3,11 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../idle_jobs/idle_job_drain.dart';
+import '../../../import_course/data/netdisk_drama_reservation.dart';
 import '../../../import_course/data/netdisk_local_download.dart';
 import '../../../player/domain/episode_study_progress.dart';
 import '../../../player/presentation/episode_study_progress_provider.dart';
 import '../../../subtitle_completion/subtitle_completion_status_provider.dart';
-import '../library_catalog_provider.dart';
 import '../library_mock_data.dart';
 import 'episode_list_item.dart';
 
@@ -89,6 +90,11 @@ class CourseEpisodeTile extends ConsumerWidget {
           );
     final bool showDownload = cacheKey != null &&
         (netdiskPlayUrlForEpisode(item) != null || cache != null);
+    final bool reserved = isNetdiskDramaEpisodeReserved(item.id) ||
+        (cache?.isScheduled ?? false);
+    final String? downloadLabel = !showDownload
+        ? null
+        : (cache?.label ?? (reserved ? '已预约' : '未下载'));
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomPadding),
@@ -103,21 +109,29 @@ class CourseEpisodeTile extends ConsumerWidget {
         subtitleFillActive: fill?.active ?? false,
         subtitleFillProgress: fill?.progress,
         studyStage: studyStage,
-        downloadLabel: showDownload
-            ? (cache?.label ?? '未下载')
-            : null,
+        downloadLabel: downloadLabel,
         downloadProgress: cache?.progress,
         downloadReady: cache?.isReady ?? false,
         downloadActive: cache?.isDownloading ?? false,
-        onDownloadTap: showDownload && !(cache?.isReady ?? false)
+        onDownloadTap: showDownload &&
+                !(cache?.isReady ?? false) &&
+                !(cache?.isDownloading ?? false)
             ? () {
-                unawaited(
-                  enqueueNetdiskEpisodeDownload(
+                if (reserved) {
+                  unawaited(cancelNetdiskDramaEpisode(item.id));
+                  return;
+                }
+                final String? cid = courseId;
+                if (cid == null || cid.isEmpty) return;
+                unawaited(() async {
+                  final bool ok = await scheduleNetdiskDramaEpisode(
                     episode: item,
-                    catalog: ref.read(libraryCatalogProvider.notifier),
-                    courseId: courseId,
-                  ),
-                );
+                    courseId: cid,
+                  );
+                  if (ok) {
+                    kickNetdiskDramaIdleDrain(ref);
+                  }
+                }());
               }
             : null,
         onTap: onTap,

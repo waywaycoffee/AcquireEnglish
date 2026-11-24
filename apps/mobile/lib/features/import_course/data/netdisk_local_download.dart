@@ -317,7 +317,13 @@ final Map<String, NetdiskEpisodeCacheInfo> _episodeCacheSeed =
     <String, NetdiskEpisodeCacheInfo>{};
 NetdiskEpisodeCacheNotifier? _episodeCacheNotifier;
 
-enum NetdiskEpisodeCachePhase { remote, partial, downloading, ready }
+enum NetdiskEpisodeCachePhase {
+  remote,
+  scheduled,
+  partial,
+  downloading,
+  ready,
+}
 
 class NetdiskEpisodeCacheInfo {
   const NetdiskEpisodeCacheInfo({
@@ -343,6 +349,8 @@ class NetdiskEpisodeCacheInfo {
         final double? p = progress;
         if (p == null) return '未下完';
         return '未下完 ${(p * 100).round()}%';
+      case NetdiskEpisodeCachePhase.scheduled:
+        return '已预约';
       case NetdiskEpisodeCachePhase.remote:
         return '未下载';
     }
@@ -350,6 +358,7 @@ class NetdiskEpisodeCacheInfo {
 
   bool get isReady => phase == NetdiskEpisodeCachePhase.ready;
   bool get isDownloading => phase == NetdiskEpisodeCachePhase.downloading;
+  bool get isScheduled => phase == NetdiskEpisodeCachePhase.scheduled;
 }
 
 class NetdiskEpisodeCacheNotifier
@@ -450,20 +459,39 @@ Future<NetdiskEpisodeCacheInfo> probeNetdiskEpisodeCache(
       progress: _episodeCacheSeed[key]?.progress,
     );
   }
+  // Reservation bookkeeping lives in netdisk_drama_reservation.dart; avoid
+  // importing it here (cycle). Callers pass [treatAsScheduled] when known.
   return const NetdiskEpisodeCacheInfo(
     phase: NetdiskEpisodeCachePhase.remote,
   );
 }
 
 Future<void> refreshNetdiskEpisodeCacheStates(
-  Iterable<LibraryEpisodeItem> episodes,
-) async {
+  Iterable<LibraryEpisodeItem> episodes, {
+  bool Function(LibraryEpisodeItem episode)? isScheduled,
+}) async {
   for (final LibraryEpisodeItem ep in episodes) {
     final String? key = netdiskEpisodeCacheKey(ep);
     if (key == null) continue;
     // Don't overwrite live download ticks with a stale probe.
     if (_netdiskDownloadsInFlight.containsKey(key)) continue;
-    publishNetdiskEpisodeCache(key, await probeNetdiskEpisodeCache(ep));
+    final NetdiskEpisodeCacheInfo live = await probeNetdiskEpisodeCache(ep);
+    if (live.phase == NetdiskEpisodeCachePhase.ready ||
+        live.phase == NetdiskEpisodeCachePhase.downloading ||
+        live.phase == NetdiskEpisodeCachePhase.partial) {
+      publishNetdiskEpisodeCache(key, live);
+      continue;
+    }
+    if (isScheduled?.call(ep) ?? false) {
+      publishNetdiskEpisodeCache(
+        key,
+        const NetdiskEpisodeCacheInfo(
+          phase: NetdiskEpisodeCachePhase.scheduled,
+        ),
+      );
+      continue;
+    }
+    publishNetdiskEpisodeCache(key, live);
   }
 }
 

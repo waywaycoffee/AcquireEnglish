@@ -7,6 +7,8 @@ import 'package:go_router/go_router.dart';
 
 import '../../daily_review/data/memory_item_store.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../idle_jobs/idle_job_drain.dart';
+import '../../import_course/data/netdisk_drama_reservation.dart';
 import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/presentation/netdisk_import_sheet.dart';
 import '../../library/presentation/library_catalog_provider.dart';
@@ -107,7 +109,13 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       final LibraryCourseData scanTarget = selected;
       _cacheScanCourseId = scanTarget.id;
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(refreshNetdiskEpisodeCacheStates(scanTarget.episodes));
+        unawaited(
+          refreshNetdiskEpisodeCacheStates(
+            scanTarget.episodes,
+            isScheduled: (LibraryEpisodeItem ep) =>
+                isNetdiskDramaEpisodeReserved(ep.id),
+          ),
+        );
       });
     }
     final Map<String, NetdiskEpisodeCacheInfo> cacheMap =
@@ -135,7 +143,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       children: <Widget>[
         if (!widget.embedded) ...<Widget>[
           Text(
-            '点海报打开剧集；正版公开片单全员可学。添加片源只挂播放地址，点「下载」才会存到手机。',
+            '点海报打开剧集；正版公开片单全员可学。添加片源只挂播放地址；可按集「预约学习」，空闲时后台下载到手机。',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppDesignTokens.textSecondary,
                   height: 1.4,
@@ -243,8 +251,12 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
               final NetdiskEpisodeCacheInfo? cache =
                   netdiskEpisodeCacheOf(cacheMap, ep);
               final bool canDownload = netdiskPlayUrlForEpisode(ep) != null;
-              final String downloadLabel =
-                  cache?.label ?? (canDownload ? '未下载' : '');
+              final bool reserved = isNetdiskDramaEpisodeReserved(ep.id) ||
+                  (cache?.isScheduled ?? false);
+              final String downloadLabel = cache?.label ??
+                  (reserved
+                      ? '已预约'
+                      : (canDownload ? '未下载' : ''));
               final bool downloading = cache?.isDownloading ?? false;
               final bool ready = cache?.isReady ?? false;
               return Card(
@@ -270,7 +282,10 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                                     ? Icons.download_done_rounded
                                     : (downloading
                                         ? Icons.downloading_rounded
-                                        : Icons.download_for_offline_outlined),
+                                        : (reserved
+                                            ? Icons.schedule_rounded
+                                            : Icons
+                                                .download_for_offline_outlined)),
                                 size: 16,
                                 color: ready
                                     ? (AppDesignTokens.isDark
@@ -296,17 +311,24 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                               if (canDownload && !ready && !downloading)
                                 TextButton(
                                   onPressed: () {
-                                    unawaited(
-                                      enqueueNetdiskEpisodeDownload(
+                                    if (reserved) {
+                                      unawaited(
+                                        cancelNetdiskDramaEpisode(ep.id),
+                                      );
+                                      return;
+                                    }
+                                    unawaited(() async {
+                                      final bool ok =
+                                          await scheduleNetdiskDramaEpisode(
                                         episode: ep,
-                                        catalog: ref.read(
-                                          libraryCatalogProvider.notifier,
-                                        ),
                                         courseId: courseId,
-                                      ),
-                                    );
+                                      );
+                                      if (ok) {
+                                        kickNetdiskDramaIdleDrain(ref);
+                                      }
+                                    }());
                                   },
-                                  child: const Text('下载'),
+                                  child: Text(reserved ? '取消预约' : '预约学习'),
                                 ),
                             ],
                           ),
@@ -405,7 +427,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '美剧精学',
-        description: '精选片单 · 添加片源后点下载才落盘',
+        description: '精选片单 · 预约学习后空闲下载',
         trailing: IconButton(
           tooltip: '添加网盘片源',
           onPressed: () => showNetdiskImportSheet(context, ref),

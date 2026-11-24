@@ -14,7 +14,10 @@ void dailyFeedBackgroundDispatcher() {
       await handleSubtitleCompletionBackgroundTask();
       return true;
     }
-    if (task == kIdleJobsTask || task == '${kIdleJobsTask}_periodic') {
+    if (task == kIdleJobsTask ||
+        task == '${kIdleJobsTask}_periodic' ||
+        task == kNetdiskDramaIdleTask ||
+        task == '${kNetdiskDramaIdleTask}_periodic') {
       await handleIdleJobsBackgroundTask();
       return true;
     }

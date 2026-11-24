@@ -6,7 +6,14 @@ const String kIdleJobsEnabledKey = 'idle_jobs_enabled_v1';
 const String kIdleJobQueueKey = 'idle_job_queue_v1';
 const String kIdleJobsWakeKey = 'idle_jobs_wake_v1';
 
-enum IdleJobKind { subtitleDrain, modelPrefetch, vocabEnrich, cloudSync }
+enum IdleJobKind {
+  subtitleDrain,
+  modelPrefetch,
+  vocabEnrich,
+  cloudSync,
+  /// Reserved US-drama / netdisk episode — download when the device is idle.
+  netdiskDrama,
+}
 
 extension IdleJobKindX on IdleJobKind {
   String get label => switch (this) {
@@ -14,6 +21,7 @@ extension IdleJobKindX on IdleJobKind {
     IdleJobKind.modelPrefetch => '模型预取',
     IdleJobKind.vocabEnrich => '生词 AI 补全',
     IdleJobKind.cloudSync => '云同步',
+    IdleJobKind.netdiskDrama => '美剧预约下载',
   };
 }
 
@@ -172,6 +180,23 @@ class IdleJobQueue {
         .where((IdleJob j) => !j.key.startsWith(prefix))
         .toList(growable: false);
     await _save(jobs);
+  }
+
+  Future<void> cancel(String id) async {
+    final List<IdleJob> jobs = load()
+        .where((IdleJob j) => j.id != id)
+        .toList(growable: false);
+    await _save(jobs);
+  }
+
+  bool isPending({required IdleJobKind kind, required String key}) {
+    final String id = '${kind.name}:$key';
+    return load().any(
+      (IdleJob j) =>
+          j.id == id &&
+          (j.status == IdleJobStatus.pending ||
+              j.status == IdleJobStatus.running),
+    );
   }
 
   List<IdleJob> get pending =>
