@@ -541,7 +541,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _mouthTimeline = CoachAnimationTimeline.estimate(speak, dur);
     _mouthClockStart = DateTime.now();
     _mouthTicker?.cancel();
-    _mouthTicker = Timer.periodic(const Duration(milliseconds: 50), (_) {
+    // ~12 fps mouth updates — smoother than 20 Hz setState thrash.
+    _mouthTicker = Timer.periodic(const Duration(milliseconds: 80), (_) {
       if (!mounted || _mouthTimeline == null || _mouthClockStart == null) {
         return;
       }

@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import '../../domain/coach_animation_timeline.dart';
 
 /// Three-by-three raster atlas. Fixed actions never invoke a video model.
+///
+/// Frames switch by shifting a single cached [Image.asset] (no AnimatedSwitcher),
+/// so mouth / gesture cuts do not flash white between cells.
 class CartoonCoachSprite extends StatelessWidget {
   const CartoonCoachSprite({
     super.key,
@@ -21,13 +24,17 @@ class CartoonCoachSprite extends StatelessWidget {
   final CoachMotion motion;
   final CoachViseme mouth;
   final double phase;
+
+  /// Kept for API compatibility; fades are disabled to avoid flicker.
   final Duration transitionDuration;
+
   int get frame {
     if (motion == CoachMotion.speaking) return mouth.index;
     if (motion == CoachMotion.thinking) return 7;
     if (motion == CoachMotion.encouraging) return 8;
     if (motion == CoachMotion.listening) return 6;
-    return phase > 0.94 ? 5 : 0;
+    // Narrow idle blink window — avoids thrashing 0↔5 near pulse peaks.
+    return (phase > 0.97 && phase < 0.995) ? 5 : 0;
   }
 
   @override
@@ -35,8 +42,7 @@ class CartoonCoachSprite extends StatelessWidget {
     builder: (BuildContext context, BoxConstraints constraints) {
       final double side = constraints.biggest.shortestSide;
       final int index = frame;
-      final cell = SizedBox(
-        key: ValueKey<int>(index),
+      return SizedBox(
         width: side,
         height: side,
         child: ClipRect(
@@ -51,14 +57,11 @@ class CartoonCoachSprite extends StatelessWidget {
               width: side * 3,
               height: side * 3,
               fit: BoxFit.fill,
+              gaplessPlayback: true,
+              filterQuality: FilterQuality.medium,
             ),
           ),
         ),
-      );
-      return Center(
-        child: transitionDuration == Duration.zero
-            ? cell
-            : AnimatedSwitcher(duration: transitionDuration, child: cell),
       );
     },
   );

@@ -20,6 +20,7 @@ void main() {
     );
     expect(sprite(CoachMotion.idle, CoachViseme.open, 0).frame, 0);
     expect(sprite(CoachMotion.idle, CoachViseme.closed, .98).frame, 5);
+    expect(sprite(CoachMotion.idle, CoachViseme.closed, .9).frame, 0);
     expect(sprite(CoachMotion.listening, CoachViseme.closed, 0).frame, 6);
     expect(sprite(CoachMotion.thinking, CoachViseme.closed, 0).frame, 7);
     expect(sprite(CoachMotion.encouraging, CoachViseme.closed, 0).frame, 8);

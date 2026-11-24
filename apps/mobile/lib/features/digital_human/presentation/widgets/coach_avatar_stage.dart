@@ -69,17 +69,18 @@ class CoachAvatarStage extends StatelessWidget {
       animation: reduceMotion ? const AlwaysStoppedAnimation<double>(0) : pulse,
       builder: (BuildContext context, Widget? child) {
         final double t = reduceMotion ? 0 : pulse.value;
-        final double bob = speaking
-            ? math.sin(t * math.pi * 2) * 6
-            : listening
-            ? math.sin(t * math.pi * 2) * 3
-            : math.sin(t * math.pi) * 2;
+        // Softer motion with cartoon atlas — large bob reads as flicker.
+        final bool cartoon = spriteAsset != null;
+        final double bobAmp = cartoon
+            ? (speaking ? 2.0 : listening ? 1.2 : 0.8)
+            : (speaking ? 6.0 : listening ? 3.0 : 2.0);
+        final double bob = math.sin(t * math.pi * (cartoon ? 2 : 1)) * bobAmp;
         final double scale = speaking
-            ? 1.0 + math.sin(t * math.pi * 2) * 0.008
+            ? 1.0 + math.sin(t * math.pi * 2) * (cartoon ? 0.004 : 0.008)
             : listening
-            ? 1.0 + math.sin(t * math.pi * 2) * 0.005
+            ? 1.0 + math.sin(t * math.pi * 2) * (cartoon ? 0.002 : 0.005)
             : 1.0;
-        final double tilt = !reduceMotion && listening && !speaking
+        final double tilt = !reduceMotion && listening && !speaking && !cartoon
             ? math.sin(t * math.pi * 2) * 0.018
             : 0;
         return Stack(
@@ -116,9 +117,8 @@ class CoachAvatarStage extends StatelessWidget {
                                       ? _approxViseme(t)
                                       : CoachViseme.closed),
                               phase: t,
-                              transitionDuration: reduceMotion
-                                  ? Duration.zero
-                                  : const Duration(milliseconds: 90),
+                              // Hard cuts only — AnimatedSwitcher fades flash.
+                              transitionDuration: Duration.zero,
                               motion: encouraging
                                   ? CoachMotion.encouraging
                                   : speaking
