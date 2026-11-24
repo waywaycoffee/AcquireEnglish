@@ -3506,16 +3506,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           : (_started ? '按住麦克风说话' : '按住麦克风开始对话'))));
     final bool avatarSpeaking = _coachSpeaking || _duplexAgentSpeaking;
     final bool avatarListening = _recordingActive || _duplexLearnerSpeaking;
-    final bool useCartoonLips =
-        settings.cartoonDigitalHuman && persona.hasCartoonAtlas;
     final String stageLabel = avatarSpeaking
-        ? (useCartoonLips ? '数字人唇形…' : '外教在说…')
-        : (avatarListening
-              ? '外教在听…'
-              : (useCartoonLips
-                    ? '${persona.displayName} · 数字人唇形'
-                    : persona.displayName));
-    // Never attach LiveTalking 真人 WebRTC — 数字人 uses local cartoon atlas.
+        ? '外教在说…'
+        : (avatarListening ? '外教在听…' : persona.displayName);
+    // Portrait-only digital human (no cartoon atlas / sprite lips).
     final Widget? liveVideo = null;
 
     final Widget avatarStage = Stack(
@@ -3527,17 +3521,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           listening: avatarListening,
           label: stageLabel,
           imageAsset: persona.assetPath,
-          spriteAsset: _started && useCartoonLips
-              ? persona.cartoonAssetPath
-              : null,
           encouraging: _coachEncouraging,
           thinking: _busy || (_duplexLive && _duplexThinking),
           displayName: persona.displayName,
           liveVideo: liveVideo,
-          // Timeline when TTS text known; null → pulse-based approx for duplex.
-          mouth: !avatarSpeaking
-              ? CoachViseme.closed
-              : (_mouthTimeline != null ? _coachMouth : null),
         ),
         const DecoratedBox(
           decoration: BoxDecoration(

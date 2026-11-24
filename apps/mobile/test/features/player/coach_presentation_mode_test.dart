@@ -7,7 +7,7 @@ void main() {
         LearningSettingsState.defaults().copyWith(
           oralCoachBackend: '视频陪练管线',
           oralCoachPipelineUrl: 'https://example.test/coach',
-          cartoonDigitalHuman: true,
+          cartoonDigitalHuman: false,
         );
     expect(settings.usesRealtimeLipSync, isFalse);
     final LearningSettingsState portrait = settings.copyWith(

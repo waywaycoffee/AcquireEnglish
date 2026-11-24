@@ -11,7 +11,6 @@ class DigitalHumanPersona {
     required this.voiceLabel,
     this.voiceGender = 'female',
     this.recommendedVoiceId,
-    this.hasCartoonAtlas = true,
     this.isChild = false,
     this.isAsianAppearance = false,
     this.localPitch = 1.0,
@@ -22,9 +21,8 @@ class DigitalHumanPersona {
   final String displayName;
   final String tagline;
 
-  /// Local Flutter asset for idle stage / home picker.
+  /// Local Flutter asset for idle stage / home picker (portrait photo).
   final String assetPath;
-  String get cartoonAssetPath => 'assets/img/digital_human/$id-cartoon.webp';
 
   /// Matching LiveTalking `--avatar_id` when lip-sync backend is used.
   final String liveTalkingAvatarId;
@@ -38,7 +36,6 @@ class DigitalHumanPersona {
   /// Short Chinese label shown in the picker.
   final String voiceLabel;
   final String? recommendedVoiceId;
-  final bool hasCartoonAtlas;
   final bool isChild;
 
   /// Asian-coded portrait: must wire a native Mandarin+English TTS voice.

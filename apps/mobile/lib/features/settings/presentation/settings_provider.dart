@@ -296,7 +296,7 @@ class LearningSettingsState {
     this.bilibiliSessdata = '',
     this.bilibiliUserId = '',
     this.digitalHumanId = defaultDigitalHumanId,
-    this.cartoonDigitalHuman = true,
+    this.cartoonDigitalHuman = false,
   });
 
   factory LearningSettingsState.defaults() {
@@ -758,7 +758,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
         liveKitUrl: _stringOrNull(json['liveKitUrl']),
         bilibiliSessdata: _stringOrNull(json['bilibiliSessdata']),
         bilibiliUserId: _stringOrNull(json['bilibiliUserId']),
-        cartoonDigitalHuman: json['cartoonDigitalHuman'] is bool ? json['cartoonDigitalHuman'] as bool : true,
+        cartoonDigitalHuman: false,
         digitalHumanId: () {
           final String? raw = _stringOrNull(json['digitalHumanId']);
           if (raw == null || raw.isEmpty) {
@@ -769,6 +769,8 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       );
       LearningSettingsState coerced = _migrateAwayFromLocalWhisper(loaded);
       coerced = _preferGpuOllamaTranslation(coerced);
+      // Cartoon sprite atlases were removed — always use portrait photos.
+      coerced = coerced.copyWith(cartoonDigitalHuman: false);
       // Oral coach is hold-to-talk; drop the old prod LiveKit default so the
       // app no longer advertises full-duplex for the digital-human tab.
       const String legacyDefaultLiveKit =
@@ -1196,7 +1198,8 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   }
 
   void setCartoonDigitalHuman(bool value) {
-    state = state.copyWith(cartoonDigitalHuman: value);
+    // Cartoon digital-human sprites are removed; keep flag forced off.
+    state = state.copyWith(cartoonDigitalHuman: false);
     _persist();
   }
 
@@ -1400,9 +1403,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
           (state.bilibiliUserId.trim().isNotEmpty
               ? state.bilibiliUserId
               : null),
-      cartoonDigitalHuman: json['cartoonDigitalHuman'] is bool
-          ? json['cartoonDigitalHuman'] as bool
-          : null,
+      cartoonDigitalHuman: false,
       digitalHumanId: _stringOrNull(json['digitalHumanId']),
       // Preserve device-local endpoints.
       cloudApiBaseUrl: state.cloudApiBaseUrl,
