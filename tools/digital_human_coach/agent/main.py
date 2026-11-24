@@ -24,11 +24,19 @@ import sys
 from typing import Any
 
 
-INSTRUCTIONS = """You are a friendly English oral coach with a digital-human avatar.
-Keep replies short (1–3 sentences). Ask follow-up questions.
-If the learner's message includes pronunciation notes, give one gentle tip without lecturing.
-When video context is provided, stay on that topic.
-"""
+from .aikua_prompts import (
+    interrupt_system_prompt,
+    realtime_system_prompt,
+    session_anchor_prompt,
+)
+
+INSTRUCTIONS = (
+    realtime_system_prompt(light=False)
+    + '\n\n'
+    + session_anchor_prompt(level='初中', topic='日常口语', weak_points='暂无')
+    + '\nKeep each turn short (1–4 spoken sentences). Prefer open questions. '
+    'When video context is provided, stay on that topic.'
+)
 
 
 def _missing_livekit() -> bool:
@@ -185,6 +193,8 @@ async def entrypoint(ctx) -> None:
             reference = self._reference(text)
             task_id = str(self._context.get('task_id') or 'livekit-oral')
             spawn(self._record_turn(text, reference, task_id))
+            # User barge-in / turn: prefer承接再回主线.
+            turn_ctx.add_instructions(interrupt_system_prompt())
             excerpt = str(self._context.get('excerpt') or '')
             if excerpt:
                 passages = select_passages(excerpt, text)

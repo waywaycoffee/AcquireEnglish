@@ -5,48 +5,50 @@ import re
 
 import httpx
 
+from ..aikua_prompts import (
+    realtime_system_prompt,
+    session_anchor_prompt,
+    silence_system_prompt,
+)
 from ..config import Settings
 from .base import LlmReply, PronunciationResult, VideoContext
 
 
-SYSTEM = (
-    'You are a warm virtual English tutor with a visible digital-human avatar. '
-    'You support: FREE CASUAL CHAT (scenario_task_id=freechat), VIDEO-GROUNDED oral '
-    'practice, or SCENARIO DIALOGUE role-play (restaurant, hotel, weekend, etc.). '
-    'Not "repeat after me" shadowing.\n'
-    '\n'
-    'GOALS every turn:\n'
-    '1) If scenario_task_id is freechat, chat naturally about any everyday topic the '
-    'learner brings up (day, hobbies, feelings, opinions). Be a friendly conversation '
-    'partner; do not force a restaurant/hotel script or video retell. '
-    'If a live scene_description from the learner camera/photo is provided, talk '
-    'about that real-world scene first: name objects, teach useful words, and ask the '
-    'learner to describe what they see. Else if a non-freechat scenario task is '
-    'provided, stay in that scene: role-play as the other party (waiter, receptionist, '
-    'friend…), teach useful lines, and push the learner toward the stated goal. '
-    'If no scenario (or scenario is video_line) and no live scene, ask questions about '
-    'the video/article content.\n'
-    '2) If the learner is stuck, silent, vague, or says they do not know '
-    '(e.g. "I don\'t know", "嗯", "没什么", short filler), actively guide: '
-    'offer a model phrase, spotlight 1 key vocabulary/grammar point, then invite '
-    'them to try a short answer.\n'
-    '3) If the learner\'s English has grammar or word-choice mistakes, correct promptly '
-    'and clearly in the spoken reply (e.g. "Better: …" or "Say: …"), then continue. '
-    'Also put short notes in the JSON "corrections" array.\n'
-    '\n'
-    'STYLE:\n'
-    '- Keep each spoken "text" under 4 short sentences.\n'
-    '- End with exactly one clear question or invitation to speak.\n'
-    '- Adapt difficulty (A2–C1). For freechat, follow the learner topic; '
-    'otherwise stay on the scenario or video topic.\n'
-    '- Prefer concrete prompts over generic "what do you think?".\n'
-    '\n'
-    'CRITICAL LANGUAGE RULE: Reply in clear spoken ENGLISH only by default. '
-    'Do not mix Chinese into the reply. '
-    'Use Chinese only when the learner explicitly asks for Chinese '
-    '(e.g. "用中文", "speak Chinese", "in Chinese"). '
-    'If they switch back to English, resume English immediately.'
-)
+def _map_difficulty_level(raw: str) -> str:
+    value = (raw or '').strip().upper()
+    if value in {'A1', 'A2', '入门', 'BEGINNER'}:
+        return '入门'
+    if value in {'B1', '初中', 'JUNIOR'}:
+        return '初中'
+    if value in {'B2', '高中', 'SENIOR', 'GAOKAO'}:
+        return '高中'
+    if value in {'C1', 'C2', '雅思', 'IELTS'}:
+        return '雅思'
+    return '初中'
+
+
+def _coach_system(context: VideoContext, *, stuck: bool = False) -> str:
+    """AcquireEnglish 口语数字人主提示词 + 会话锚点。"""
+    level = _map_difficulty_level(context.difficulty)
+    topic = (
+        context.topic_summary.strip()
+        or context.episode_title.strip()
+        or context.course_title.strip()
+        or '日常口语'
+    )
+    base = realtime_system_prompt(light=False)
+    anchor = session_anchor_prompt(level=level, topic=topic, weak_points='暂无')
+    extra = (
+        '\n\n会话能力补充：支持 freechat、视频主题口语、情景角色扮演。'
+        '若提供 scene_description，优先围绕眼前实物教词与描述。'
+        '每轮 spoken text 控制在 4 句以内；默认英语台词。'
+    )
+    if stuck:
+        return f'{base}\n\n{anchor}\n\n{silence_system_prompt()}{extra}'
+    return f'{base}\n\n{anchor}{extra}'
+
+
+SYSTEM = realtime_system_prompt(light=False)
 
 _STUCK_CUES = re.compile(
     r"(?i)^\s*("
@@ -551,10 +553,11 @@ class OpenAiLlm:
                 {
                     'role': 'system',
                     'content': (
-                        SYSTEM
+                        _coach_system(context, stuck=_is_stuck(learner_text))
                         + ' Reply as compact JSON. The "text" field must be English'
                         ' unless the learner asked for Chinese.'
                         ' Include diagnosis when learner used Chinese or non-idiomatic English.'
+                        ' You may append a short expression tag like (微笑)/(思考)/(平静).'
                     ),
                 },
                 {'role': 'user', 'content': json.dumps(user, ensure_ascii=False)},
@@ -621,7 +624,7 @@ class OllamaLlm:
         )
         unused = _remaining_talk_topics(context, history)
         prompt = (
-            f'{SYSTEM}\n\n'
+            f'{_coach_system(context, stuck=stuck)}\n\n'
             f'Context: {context.topic_blurb()}\n'
             f'Topic summary: {context.topic_summary}\n'
             f'Excerpt: {context.article_excerpt[:3500]}\n'
