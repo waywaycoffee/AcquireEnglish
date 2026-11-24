@@ -9,6 +9,7 @@ import '../../sync/data/acquire_api_client.dart';
 
 import '../../authentication/presentation/account_storage.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../daily_path/domain/course_plan.dart';
 import '../../daily_path/domain/reading_course_splitter.dart';
 import '../../daily_path/presentation/course_unit_quiz_screen.dart';
@@ -70,6 +71,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   bool _sentenceTranslate = false;
   int _freqThreshold = kReadingDefaultFreqThreshold;
   Timer? _saveDebounce;
+  Timer? _readingTick;
   bool _opened = false;
   bool _playingRemote = false;
   bool _speakingSentence = false;
@@ -117,6 +119,15 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       unawaited(
         ref.read(offlineWordDictionaryProvider).ensureLoaded(),
       );
+    });
+    _readingTick = Timer.periodic(const Duration(seconds: 20), (_) {
+      if (!mounted) return;
+      if (WidgetsBinding.instance.lifecycleState != AppLifecycleState.resumed) {
+        return;
+      }
+      ref.read(learningActivityProvider.notifier).recordReadingDuration(
+            duration: const Duration(seconds: 20),
+          );
     });
   }
 
@@ -273,6 +284,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     if (_readingDone?.isCompleted == false) _readingDone!.complete();
     unawaited(_readingAudio?.stop());
     _saveDebounce?.cancel();
+    _readingTick?.cancel();
     _scroll.dispose();
     super.dispose();
   }

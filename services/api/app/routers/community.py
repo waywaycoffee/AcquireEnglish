@@ -54,7 +54,16 @@ PostKind = Literal[
     "shadowing",
     "sentence_make",
 ]
-LeaderboardMetric = Literal["study_today", "study_week", "vocab"]
+LeaderboardMetric = Literal[
+    "study_today",
+    "study_week",
+    "vocab",
+    "video_count",
+    "video_seconds",
+    "reading_seconds",
+    "vocab_seconds",
+    "vocab_learned",
+]
 PkStatus = Literal["pending", "completed", "declined"]
 
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -416,12 +425,22 @@ class StudyStatsIn(BaseModel):
     day: str = Field(min_length=10, max_length=10)
     study_seconds: int = Field(ge=0, le=86400)
     vocab_count: int | None = Field(default=None, ge=0, le=500000)
+    video_count: int | None = Field(default=None, ge=0, le=5000)
+    video_seconds: int | None = Field(default=None, ge=0, le=86400)
+    reading_seconds: int | None = Field(default=None, ge=0, le=86400)
+    vocab_seconds: int | None = Field(default=None, ge=0, le=86400)
+    vocab_learned_count: int | None = Field(default=None, ge=0, le=50000)
 
 
 class StudyStatsOut(BaseModel):
     day: str
     study_seconds: int
     vocab_count: int
+    video_count: int = 0
+    video_seconds: int = 0
+    reading_seconds: int = 0
+    vocab_seconds: int = 0
+    vocab_learned_count: int = 0
 
 
 class LeaderboardEntryOut(BaseModel):
@@ -1007,18 +1026,41 @@ async def upsert_study_stats(
             )
         )
     ).scalar_one_or_none()
+    def _max_opt(current: int, incoming: int | None) -> int:
+        if incoming is None:
+            return current
+        return max(current, int(incoming))
+
     if row is None:
         row = UserStudyStatsDaily(
             user_id=user.id,
             day=payload.day,
             study_seconds=payload.study_seconds,
             vocab_count=vocab,
+            video_count=int(payload.video_count or 0),
+            video_seconds=int(payload.video_seconds or 0),
+            reading_seconds=int(payload.reading_seconds or 0),
+            vocab_seconds=int(payload.vocab_seconds or 0),
+            vocab_learned_count=int(payload.vocab_learned_count or 0),
         )
         db.add(row)
     else:
         # Keep the max so concurrent devices don't shrink reported time.
         row.study_seconds = max(int(row.study_seconds or 0), payload.study_seconds)
         row.vocab_count = max(int(row.vocab_count or 0), vocab)
+        row.video_count = _max_opt(int(row.video_count or 0), payload.video_count)
+        row.video_seconds = _max_opt(
+            int(row.video_seconds or 0), payload.video_seconds
+        )
+        row.reading_seconds = _max_opt(
+            int(row.reading_seconds or 0), payload.reading_seconds
+        )
+        row.vocab_seconds = _max_opt(
+            int(row.vocab_seconds or 0), payload.vocab_seconds
+        )
+        row.vocab_learned_count = _max_opt(
+            int(row.vocab_learned_count or 0), payload.vocab_learned_count
+        )
     await _ensure_profile(db, user)
     await db.commit()
     await db.refresh(row)
@@ -1026,6 +1068,11 @@ async def upsert_study_stats(
         day=row.day,
         study_seconds=int(row.study_seconds or 0),
         vocab_count=int(row.vocab_count or 0),
+        video_count=int(row.video_count or 0),
+        video_seconds=int(row.video_seconds or 0),
+        reading_seconds=int(row.reading_seconds or 0),
+        vocab_seconds=int(row.vocab_seconds or 0),
+        vocab_learned_count=int(row.vocab_learned_count or 0),
     )
 
 
@@ -1058,15 +1105,34 @@ async def leaderboard(
         visible_ids.add(uid)
 
     scores: dict[int, int] = defaultdict(int)
-    if metric == "study_today":
+    today_star_metrics = {
+        "video_count",
+        "video_seconds",
+        "reading_seconds",
+        "vocab_seconds",
+        "vocab_learned",
+    }
+    if metric == "study_today" or metric in today_star_metrics:
         rows = (
             await db.execute(
                 select(UserStudyStatsDaily).where(UserStudyStatsDaily.day == today)
             )
         ).scalars().all()
         for row in rows:
-            if row.user_id in visible_ids:
+            if row.user_id not in visible_ids:
+                continue
+            if metric == "study_today":
                 scores[row.user_id] = int(row.study_seconds or 0)
+            elif metric == "video_count":
+                scores[row.user_id] = int(row.video_count or 0)
+            elif metric == "video_seconds":
+                scores[row.user_id] = int(row.video_seconds or 0)
+            elif metric == "reading_seconds":
+                scores[row.user_id] = int(row.reading_seconds or 0)
+            elif metric == "vocab_seconds":
+                scores[row.user_id] = int(row.vocab_seconds or 0)
+            else:  # vocab_learned
+                scores[row.user_id] = int(row.vocab_learned_count or 0)
     elif metric == "study_week":
         rows = (
             await db.execute(

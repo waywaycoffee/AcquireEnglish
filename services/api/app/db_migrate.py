@@ -25,6 +25,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_upload_task_notify_column(conn)
     await _ensure_product_feedback_columns(conn)
     await _ensure_user_invite_code_column(conn)
+    await _ensure_study_stats_star_columns(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -394,3 +395,21 @@ async def _ensure_user_invite_code_column(conn: AsyncConnection) -> None:
         await conn.execute(
             text("ALTER TABLE users ADD COLUMN invite_code VARCHAR(16)")
         )
+
+
+async def _ensure_study_stats_star_columns(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "user_study_stats_daily")
+    if existing is None:
+        return
+    cols = {
+        "video_count": "INTEGER DEFAULT 0",
+        "video_seconds": "INTEGER DEFAULT 0",
+        "reading_seconds": "INTEGER DEFAULT 0",
+        "vocab_seconds": "INTEGER DEFAULT 0",
+        "vocab_learned_count": "INTEGER DEFAULT 0",
+    }
+    for name, ddl in cols.items():
+        if name not in existing:
+            await conn.execute(
+                text(f"ALTER TABLE user_study_stats_daily ADD COLUMN {name} {ddl}")
+            )

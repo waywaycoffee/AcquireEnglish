@@ -4044,6 +4044,11 @@ class AcquireApiClient {
     required String day,
     required int studySeconds,
     int? vocabCount,
+    int? videoCount,
+    int? videoSeconds,
+    int? readingSeconds,
+    int? vocabSeconds,
+    int? vocabLearnedCount,
   }) async {
     await _dio.post<Map<String, dynamic>>(
       Endpoints.communityStudyStats,
@@ -4051,6 +4056,12 @@ class AcquireApiClient {
         'day': day,
         'study_seconds': studySeconds,
         if (vocabCount != null) 'vocab_count': vocabCount,
+        if (videoCount != null) 'video_count': videoCount,
+        if (videoSeconds != null) 'video_seconds': videoSeconds,
+        if (readingSeconds != null) 'reading_seconds': readingSeconds,
+        if (vocabSeconds != null) 'vocab_seconds': vocabSeconds,
+        if (vocabLearnedCount != null)
+          'vocab_learned_count': vocabLearnedCount,
       },
       options: _noCache,
     );

@@ -632,6 +632,12 @@ class UserStudyStatsDaily(Base):
     day: Mapped[str] = mapped_column(String(10), index=True)
     study_seconds: Mapped[int] = mapped_column(Integer, default=0)
     vocab_count: Mapped[int] = mapped_column(Integer, default=0)
+    # Today learning-star metrics (monotonic max on upsert).
+    video_count: Mapped[int] = mapped_column(Integer, default=0)
+    video_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    reading_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    vocab_seconds: Mapped[int] = mapped_column(Integer, default=0)
+    vocab_learned_count: Mapped[int] = mapped_column(Integer, default=0)
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )

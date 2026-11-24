@@ -114,20 +114,36 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     );
   }
 
-  void recordPlayDuration({required Duration duration, DateTime? occurredAt}) {
+  void recordPlayDuration({
+    required Duration duration,
+    DateTime? occurredAt,
+    String category = 'video',
+  }) {
     if (duration <= Duration.zero) {
       return;
     }
-    ref.read(studyActivityServiceProvider).playback(duration);
+    if (category == 'video') {
+      ref.read(studyActivityServiceProvider).playback(duration);
+    }
     final DateTime at = occurredAt ?? DateTime.now();
     final String dayKey = _dayKey(at);
     final LearningDailyRecord previous =
         state.records[dayKey] ?? LearningDailyRecord.empty(dayKey);
     final int beforeBuckets = previous.studyMilliseconds ~/
         const Duration(minutes: 10).inMilliseconds;
+    final int ms = duration.inMilliseconds;
     _updateDay(at, (LearningDailyRecord record) {
       return record.copyWith(
-        studyMilliseconds: record.studyMilliseconds + duration.inMilliseconds,
+        studyMilliseconds: record.studyMilliseconds + ms,
+        videoStudyMilliseconds: category == 'video'
+            ? record.videoStudyMilliseconds + ms
+            : null,
+        readingStudyMilliseconds: category == 'reading'
+            ? record.readingStudyMilliseconds + ms
+            : null,
+        vocabStudyMilliseconds: category == 'vocab'
+            ? record.vocabStudyMilliseconds + ms
+            : null,
       );
     });
     final LearningDailyRecord next =
@@ -144,6 +160,23 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
         );
       }
     }
+    _scheduleStudyStatsSync();
+  }
+
+  void recordReadingDuration({required Duration duration, DateTime? occurredAt}) {
+    recordPlayDuration(
+      duration: duration,
+      occurredAt: occurredAt,
+      category: 'reading',
+    );
+  }
+
+  void recordVocabDuration({required Duration duration, DateTime? occurredAt}) {
+    recordPlayDuration(
+      duration: duration,
+      occurredAt: occurredAt,
+      category: 'vocab',
+    );
   }
 
   void recordSentenceStudy({
@@ -268,6 +301,7 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
         watchedVideoKeys: <String>{...record.watchedVideoKeys, key},
       );
     });
+    _scheduleStudyStatsSync();
   }
 
   void recordArticleRead({required String articleKey, DateTime? occurredAt}) {
@@ -296,6 +330,7 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     _updateDay(occurredAt ?? DateTime.now(), (LearningDailyRecord record) {
       return record.copyWith(savedWordCount: record.savedWordCount + 1);
     });
+    _scheduleStudyStatsSync();
   }
 
   void recordPhraseSaved({DateTime? occurredAt}) {
@@ -487,13 +522,27 @@ class LearningActivityNotifier extends Notifier<LearningActivityState> {
     _lastStudySyncAt = now;
     final LearningDailyRecord today = state.today;
     final int seconds = today.studyMilliseconds ~/ 1000;
-    if (seconds <= 0) {
+    final int videoSeconds = today.videoStudyMilliseconds ~/ 1000;
+    final int readingSeconds = today.readingStudyMilliseconds ~/ 1000;
+    final int vocabSeconds = today.vocabStudyMilliseconds ~/ 1000;
+    final int videoCount = today.watchedVideoKeys.length;
+    final int vocabLearned = today.savedWordCount;
+    if (seconds <= 0 &&
+        videoCount <= 0 &&
+        readingSeconds <= 0 &&
+        vocabSeconds <= 0 &&
+        vocabLearned <= 0) {
       return;
     }
     try {
       await ref.read(acquireApiClientProvider).upsertCommunityStudyStats(
             day: today.dayKey,
             studySeconds: seconds,
+            videoCount: videoCount,
+            videoSeconds: videoSeconds > 0 ? videoSeconds : null,
+            readingSeconds: readingSeconds > 0 ? readingSeconds : null,
+            vocabSeconds: vocabSeconds > 0 ? vocabSeconds : null,
+            vocabLearnedCount: vocabLearned > 0 ? vocabLearned : null,
           );
     } catch (_) {
       // Best-effort; local learning stats remain source of truth offline.
@@ -668,6 +717,9 @@ class LearningDailyRecord {
     required this.savedPhraseCount,
     required this.savedSentenceCount,
     required this.checkedIn,
+    this.videoStudyMilliseconds = 0,
+    this.readingStudyMilliseconds = 0,
+    this.vocabStudyMilliseconds = 0,
   });
 
   factory LearningDailyRecord.fromJson(
@@ -677,6 +729,9 @@ class LearningDailyRecord {
     return LearningDailyRecord(
       dayKey: dayKey,
       studyMilliseconds: json['studyMilliseconds'] as int? ?? 0,
+      videoStudyMilliseconds: json['videoStudyMilliseconds'] as int? ?? 0,
+      readingStudyMilliseconds: json['readingStudyMilliseconds'] as int? ?? 0,
+      vocabStudyMilliseconds: json['vocabStudyMilliseconds'] as int? ?? 0,
       learnedSentenceKeys:
           ((json['learnedSentenceKeys'] as List<Object?>?) ?? const <Object?>[])
               .cast<String>()
@@ -705,6 +760,9 @@ class LearningDailyRecord {
   factory LearningDailyRecord.empty(String dayKey) => LearningDailyRecord(
         dayKey: dayKey,
         studyMilliseconds: 0,
+        videoStudyMilliseconds: 0,
+        readingStudyMilliseconds: 0,
+        vocabStudyMilliseconds: 0,
         learnedSentenceKeys: const <String>{},
         watchedVideoKeys: const <String>{},
         readArticleKeys: const <String>{},
@@ -718,6 +776,9 @@ class LearningDailyRecord {
 
   final String dayKey;
   final int studyMilliseconds;
+  final int videoStudyMilliseconds;
+  final int readingStudyMilliseconds;
+  final int vocabStudyMilliseconds;
   final Set<String> learnedSentenceKeys;
   final Set<String> watchedVideoKeys;
   final Set<String> readArticleKeys;
@@ -742,6 +803,9 @@ class LearningDailyRecord {
 
   LearningDailyRecord copyWith({
     int? studyMilliseconds,
+    int? videoStudyMilliseconds,
+    int? readingStudyMilliseconds,
+    int? vocabStudyMilliseconds,
     Set<String>? learnedSentenceKeys,
     Set<String>? watchedVideoKeys,
     Set<String>? readArticleKeys,
@@ -755,6 +819,12 @@ class LearningDailyRecord {
     return LearningDailyRecord(
       dayKey: dayKey,
       studyMilliseconds: studyMilliseconds ?? this.studyMilliseconds,
+      videoStudyMilliseconds:
+          videoStudyMilliseconds ?? this.videoStudyMilliseconds,
+      readingStudyMilliseconds:
+          readingStudyMilliseconds ?? this.readingStudyMilliseconds,
+      vocabStudyMilliseconds:
+          vocabStudyMilliseconds ?? this.vocabStudyMilliseconds,
       learnedSentenceKeys: learnedSentenceKeys ?? this.learnedSentenceKeys,
       watchedVideoKeys: watchedVideoKeys ?? this.watchedVideoKeys,
       readArticleKeys: readArticleKeys ?? this.readArticleKeys,
@@ -769,6 +839,9 @@ class LearningDailyRecord {
 
   Map<String, Object?> toJson() => <String, Object?>{
         'studyMilliseconds': studyMilliseconds,
+        'videoStudyMilliseconds': videoStudyMilliseconds,
+        'readingStudyMilliseconds': readingStudyMilliseconds,
+        'vocabStudyMilliseconds': vocabStudyMilliseconds,
         'learnedSentenceKeys': learnedSentenceKeys.toList(growable: false),
         'watchedVideoKeys': watchedVideoKeys.toList(growable: false),
         'readArticleKeys': readArticleKeys.toList(growable: false),

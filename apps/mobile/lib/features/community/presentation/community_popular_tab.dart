@@ -3,13 +3,12 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../authentication/presentation/auth_session.dart';
 import '../../import_course/data/bilibili_open_or_import.dart';
 import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
-import '../../sync/data/acquire_api_client.dart';
 import '../data/community_models.dart';
 import 'community_provider.dart';
+import 'community_today_stars.dart';
 
 /// 「热门」: videos / books others studied today, ranked by learner count.
 class CommunityPopularTab extends ConsumerWidget {
@@ -116,16 +115,7 @@ class CommunityPopularTab extends ConsumerWidget {
                   const SizedBox(height: 10),
                 ],
               const SizedBox(height: 18),
-              Text(
-                '学习时长排名',
-                style: TextStyle(
-                  fontWeight: FontWeight.w900,
-                  fontSize: 16,
-                  color: AppDesignTokens.textPrimary,
-                ),
-              ),
-              const SizedBox(height: 8),
-              const _LeaderboardSnippet(),
+              const CommunityTodayStars(),
             ],
           );
         },
@@ -348,120 +338,5 @@ class _HotRankCard extends StatelessWidget {
         ),
       ),
     );
-  }
-}
-
-class _LeaderboardSnippet extends ConsumerStatefulWidget {
-  const _LeaderboardSnippet();
-
-  @override
-  ConsumerState<_LeaderboardSnippet> createState() =>
-      _LeaderboardSnippetState();
-}
-
-class _LeaderboardSnippetState extends ConsumerState<_LeaderboardSnippet> {
-  late Future<List<LeaderboardEntryDto>> _future;
-
-  @override
-  void initState() {
-    super.initState();
-    _future = _load();
-  }
-
-  Future<List<LeaderboardEntryDto>> _load() async {
-    if (!ref.read(authSessionProvider).isLoggedIn) {
-      return const <LeaderboardEntryDto>[];
-    }
-    return ref
-        .read(acquireApiClientProvider)
-        .communityLeaderboard(metric: 'study_today');
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final bool loggedIn = ref.watch(authSessionProvider).isLoggedIn;
-    if (!loggedIn) {
-      return const _EmptyHint(text: '登录后可查看今日学习时长排名');
-    }
-    return FutureBuilder<List<LeaderboardEntryDto>>(
-      future: _future,
-      builder: (
-        BuildContext context,
-        AsyncSnapshot<List<LeaderboardEntryDto>> snapshot,
-      ) {
-        if (snapshot.connectionState != ConnectionState.done) {
-          return const Padding(
-            padding: EdgeInsets.symmetric(vertical: 12),
-            child: Center(child: CircularProgressIndicator()),
-          );
-        }
-        if (snapshot.hasError) {
-          return _EmptyHint(text: '排行榜加载失败：${snapshot.error}');
-        }
-        final List<LeaderboardEntryDto> rows =
-            snapshot.data ?? const <LeaderboardEntryDto>[];
-        if (rows.isEmpty) {
-          return const _EmptyHint(text: '今日还没有学习时长数据');
-        }
-        return Column(
-          children: <Widget>[
-            for (final LeaderboardEntryDto row in rows.take(8))
-              Padding(
-                padding: const EdgeInsets.only(bottom: 8),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 12,
-                    vertical: 10,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppDesignTokens.appWhite,
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: AppDesignTokens.borderGray),
-                  ),
-                  child: Row(
-                    children: <Widget>[
-                      SizedBox(
-                        width: 28,
-                        child: Text(
-                          '${row.rank}',
-                          style: TextStyle(
-                            fontWeight: FontWeight.w900,
-                            color: AppDesignTokens.textPrimary,
-                          ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          row.displayName + (row.isMe ? '（我）' : ''),
-                          style: TextStyle(
-                            fontWeight: FontWeight.w700,
-                            color: AppDesignTokens.textPrimary,
-                          ),
-                        ),
-                      ),
-                      Text(
-                        _fmtSeconds(row.value),
-                        style: TextStyle(
-                          fontWeight: FontWeight.w800,
-                          color: AppDesignTokens.primaryBlueDark,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-          ],
-        );
-      },
-    );
-  }
-
-  String _fmtSeconds(int seconds) {
-    if (seconds < 60) return '${seconds}s';
-    final int m = seconds ~/ 60;
-    if (m < 60) return '${m} 分钟';
-    final int h = m ~/ 60;
-    final int rm = m % 60;
-    return rm == 0 ? '${h} 小时' : '${h}h ${rm}m';
   }
 }

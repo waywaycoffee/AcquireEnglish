@@ -29,6 +29,7 @@ import '../../review_hub/presentation/review_recall_theme.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../sync/data/study_activity_service.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../words/domain/foundation_media.dart';
@@ -2800,6 +2801,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         .grade(source.key, rating, expectedReviews: record.reviews);
     if (!mounted) return;
     unawaited(ref.read(studyActivityServiceProvider).touchReview());
+    ref.read(learningActivityProvider.notifier).recordVocabDuration(
+          duration: const Duration(seconds: 25),
+        );
     _sessionRatings[source.key] = rating;
     if (rating == fsrs.Rating.again || rating == fsrs.Rating.hard) {
       _missedKeys.add(source.key);
