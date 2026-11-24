@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 
@@ -8,6 +9,8 @@ import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import 'bilibili_episode_prepare.dart';
 import 'netdisk_local_download.dart';
+
+final Set<String> _reservationDownloadsInFlight = <String>{};
 
 const String kNetdiskDramaReservationsKey = 'netdisk_drama_reservations_v1';
 
@@ -152,6 +155,44 @@ Future<bool> scheduleNetdiskDramaEpisode({
     );
   }
   return true;
+}
+
+/// Ensure the reserved episode is downloading (or already local).
+Future<void> ensureReservedNetdiskDramaDownload({
+  required String episodeId,
+  LibraryCatalogNotifier? catalog,
+}) async {
+  final String id = episodeId.trim();
+  if (id.isEmpty) return;
+  if (!_reservationDownloadsInFlight.add(id)) {
+    return;
+  }
+  try {
+    final IdleJob? job = IdleJobQueue.shared.pending
+        .where(
+          (IdleJob j) =>
+              j.kind == IdleJobKind.netdiskDrama && j.key == id,
+        )
+        .firstOrNull;
+    if (job != null) {
+      await drainOneNetdiskDramaReservation(job: job, catalog: catalog);
+      return;
+    }
+    final NetdiskDramaReservation? row =
+        loadNetdiskDramaReservations()[id];
+    if (row == null) return;
+    await drainOneNetdiskDramaReservation(
+      job: IdleJob(
+        kind: IdleJobKind.netdiskDrama,
+        key: id,
+        status: IdleJobStatus.pending,
+        createdAtMs: DateTime.now().millisecondsSinceEpoch,
+      ),
+      catalog: catalog,
+    );
+  } finally {
+    _reservationDownloadsInFlight.remove(id);
+  }
 }
 
 Future<void> cancelNetdiskDramaEpisode(String episodeId) async {

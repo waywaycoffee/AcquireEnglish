@@ -112,7 +112,11 @@ class CourseEpisodeTile extends ConsumerWidget {
         downloadLabel: downloadLabel,
         downloadProgress: cache?.progress,
         downloadReady: cache?.isReady ?? false,
-        downloadActive: cache?.isDownloading ?? false,
+        downloadActive: (cache?.isDownloading ?? false) ||
+            ((cache?.progress != null) &&
+                !(cache?.isReady ?? false) &&
+                (reserved ||
+                    cache?.phase == NetdiskEpisodeCachePhase.partial)),
         onDownloadTap: showDownload &&
                 !(cache?.isReady ?? false) &&
                 !(cache?.isDownloading ?? false)

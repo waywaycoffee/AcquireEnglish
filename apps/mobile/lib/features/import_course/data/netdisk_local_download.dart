@@ -285,7 +285,19 @@ Future<({String uri, Map<String, String>? headers})>
       return (uri: cached.path, headers: null);
     }
   }
-  onProgress?.call(0, '正在下载本集以流畅播放…');
+  final String? idKey =
+      importId?.toString() ?? playUrl.hashCode.toRadixString(16);
+  final NetdiskEpisodeCacheInfo? live = netdiskEpisodeCacheInfoForKey(idKey);
+  if (live != null &&
+      (live.isDownloading || live.isScheduled || live.phase == NetdiskEpisodeCachePhase.partial) &&
+      live.progress != null) {
+    onProgress?.call(
+      live.progress,
+      '继续下载本集 ${(live.progress! * 100).round()}%…',
+    );
+  } else {
+    onProgress?.call(0, '正在下载本集以流畅播放…');
+  }
   try {
     final File local = await cacheNetdiskEpisodeLocally(
       playUrl: playUrl,
@@ -312,10 +324,25 @@ Future<({String uri, Map<String, String>? headers})>
 }
 
 final Set<String> _prefetchInFlightPlayUrls = <String>{};
-final Map<String, Future<File>> _netdiskDownloadsInFlight = <String, Future<File>>{};
+final Map<String, Future<File>> _netdiskDownloadsInFlight =
+    <String, Future<File>>{};
+final Map<String, Set<void Function(double? progress)>> _netdiskProgressListeners =
+    <String, Set<void Function(double? progress)>>{};
 final Map<String, NetdiskEpisodeCacheInfo> _episodeCacheSeed =
     <String, NetdiskEpisodeCacheInfo>{};
 NetdiskEpisodeCacheNotifier? _episodeCacheNotifier;
+
+NetdiskEpisodeCacheInfo? netdiskEpisodeCacheInfoForKey(String? key) {
+  final String id = (key ?? '').trim();
+  if (id.isEmpty) return null;
+  return _episodeCacheSeed[id];
+}
+
+bool isNetdiskEpisodeDownloadInFlight(String? key) {
+  final String id = (key ?? '').trim();
+  if (id.isEmpty) return false;
+  return _netdiskDownloadsInFlight.containsKey(id);
+}
 
 enum NetdiskEpisodeCachePhase {
   remote,
@@ -547,83 +574,127 @@ Future<File> cacheNetdiskEpisodeLocally({
   final int? importId = parseNetdiskImportIdFromUrl(playUrl);
   final String idKey = importId?.toString() ??
       playUrl.hashCode.toRadixString(16);
-  final Future<File>? existingJob = _netdiskDownloadsInFlight[idKey];
-  if (existingJob != null) {
-    publishNetdiskEpisodeCache(
-      idKey,
-      const NetdiskEpisodeCacheInfo(
-        phase: NetdiskEpisodeCachePhase.downloading,
-      ),
-    );
-    final File shared = await existingJob;
-    onProgress?.call(1);
-    publishNetdiskEpisodeCache(
-      idKey,
-      NetdiskEpisodeCacheInfo(
-        phase: NetdiskEpisodeCachePhase.ready,
-        progress: 1,
-        localPath: shared.path,
-      ),
-    );
-    return shared;
+
+  void emit(double? p) {
+    if (onProgress != null) {
+      onProgress(p);
+    }
   }
-  publishNetdiskEpisodeCache(
+
+  final Set<void Function(double? progress)> listeners =
+      _netdiskProgressListeners.putIfAbsent(
     idKey,
-    const NetdiskEpisodeCacheInfo(
-      phase: NetdiskEpisodeCachePhase.downloading,
-      progress: 0,
-    ),
+    () => <void Function(double? progress)>{},
   );
-  final Future<File> job = _cacheNetdiskEpisodeLocallyImpl(
-    playUrl: playUrl,
-    importId: importId,
-    idKey: idKey,
-    onProgress: (double? p) {
+  listeners.add(emit);
+
+  try {
+    final Future<File>? existingJob = _netdiskDownloadsInFlight[idKey];
+    if (existingJob != null) {
+      // Join in-flight job and inherit current % instead of resetting to 0.
+      final double? current = _episodeCacheSeed[idKey]?.progress;
+      emit(current);
       publishNetdiskEpisodeCache(
         idKey,
         NetdiskEpisodeCacheInfo(
           phase: NetdiskEpisodeCachePhase.downloading,
-          progress: p,
+          progress: current,
         ),
       );
-      onProgress?.call(p);
-    },
-  );
-  _netdiskDownloadsInFlight[idKey] = job;
-  try {
-    final File file = await job;
-    publishNetdiskEpisodeCache(
-      idKey,
-      NetdiskEpisodeCacheInfo(
-        phase: NetdiskEpisodeCachePhase.ready,
-        progress: 1,
-        localPath: file.path,
-      ),
-    );
-    return file;
-  } catch (e) {
-    final Directory dir = await netdiskMediaDirectory();
-    final File part = File('${dir.path}/$idKey.mkv.part');
-    if (part.existsSync() && part.lengthSync() > 1024) {
+      final File shared = await existingJob;
+      emit(1);
       publishNetdiskEpisodeCache(
         idKey,
         NetdiskEpisodeCacheInfo(
-          phase: NetdiskEpisodeCachePhase.partial,
-          progress: _episodeCacheSeed[idKey]?.progress,
+          phase: NetdiskEpisodeCachePhase.ready,
+          progress: 1,
+          localPath: shared.path,
         ),
       );
-    } else {
+      return shared;
+    }
+
+    final double? resumeProgress = _episodeCacheSeed[idKey]?.progress;
+    publishNetdiskEpisodeCache(
+      idKey,
+      NetdiskEpisodeCacheInfo(
+        phase: NetdiskEpisodeCachePhase.downloading,
+        progress: resumeProgress ?? 0,
+      ),
+    );
+    emit(resumeProgress ?? 0);
+
+    late final Future<File> job;
+    job = _cacheNetdiskEpisodeLocallyImpl(
+      playUrl: playUrl,
+      importId: importId,
+      idKey: idKey,
+      onProgress: (double? p) {
+        publishNetdiskEpisodeCache(
+          idKey,
+          NetdiskEpisodeCacheInfo(
+            phase: NetdiskEpisodeCachePhase.downloading,
+            progress: p,
+          ),
+        );
+        final Set<void Function(double? progress)>? all =
+            _netdiskProgressListeners[idKey];
+        if (all != null) {
+          for (final void Function(double? progress) listener
+              in List<void Function(double? progress)>.from(all)) {
+            listener(p);
+          }
+        }
+      },
+    );
+    _netdiskDownloadsInFlight[idKey] = job;
+    try {
+      final File file = await job;
       publishNetdiskEpisodeCache(
         idKey,
-        const NetdiskEpisodeCacheInfo(
-          phase: NetdiskEpisodeCachePhase.remote,
+        NetdiskEpisodeCacheInfo(
+          phase: NetdiskEpisodeCachePhase.ready,
+          progress: 1,
+          localPath: file.path,
         ),
       );
+      return file;
+    } catch (e) {
+      final Directory dir = await netdiskMediaDirectory();
+      final File part = File('${dir.path}/$idKey.mkv.part');
+      if (part.existsSync() && part.lengthSync() > 1024) {
+        publishNetdiskEpisodeCache(
+          idKey,
+          NetdiskEpisodeCacheInfo(
+            phase: NetdiskEpisodeCachePhase.partial,
+            progress: _episodeCacheSeed[idKey]?.progress,
+          ),
+        );
+      } else if (_episodeCacheSeed[idKey]?.isScheduled ?? false) {
+        publishNetdiskEpisodeCache(
+          idKey,
+          const NetdiskEpisodeCacheInfo(
+            phase: NetdiskEpisodeCachePhase.scheduled,
+          ),
+        );
+      } else {
+        publishNetdiskEpisodeCache(
+          idKey,
+          const NetdiskEpisodeCacheInfo(
+            phase: NetdiskEpisodeCachePhase.remote,
+          ),
+        );
+      }
+      rethrow;
+    } finally {
+      if (identical(_netdiskDownloadsInFlight[idKey], job)) {
+        _netdiskDownloadsInFlight.remove(idKey);
+      }
     }
-    rethrow;
   } finally {
-    if (identical(_netdiskDownloadsInFlight[idKey], job)) {
-      _netdiskDownloadsInFlight.remove(idKey);
+    listeners.remove(emit);
+    if (listeners.isEmpty) {
+      _netdiskProgressListeners.remove(idKey);
     }
   }
 }
@@ -681,6 +752,12 @@ Future<File> _cacheNetdiskEpisodeLocallyImpl({
     await touchNetdiskMediaAccess(out);
     onProgress?.call(1);
     return out;
+  }
+  // Surface resumed .part progress immediately (avoid UI jumping back to 0%).
+  if (offset > 0 && expectedTotal != null && expectedTotal > 0) {
+    onProgress?.call((offset / expectedTotal).clamp(0.0, 0.99));
+  } else if (offset > 0) {
+    onProgress?.call(null);
   }
 
   // Server ignored / rejected Range → restart clean.

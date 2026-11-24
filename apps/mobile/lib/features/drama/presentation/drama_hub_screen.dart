@@ -259,6 +259,12 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                       : (canDownload ? '未下载' : ''));
               final bool downloading = cache?.isDownloading ?? false;
               final bool ready = cache?.isReady ?? false;
+              final bool showProgressBar = downloading ||
+                  (cache?.progress != null &&
+                      !ready &&
+                      (reserved ||
+                          cache?.phase ==
+                              NetdiskEpisodeCachePhase.partial));
               return Card(
                 color: AppDesignTokens.appWhite,
                 margin: const EdgeInsets.only(bottom: 8),
@@ -332,7 +338,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                                 ),
                             ],
                           ),
-                          if (downloading) ...<Widget>[
+                          if (showProgressBar) ...<Widget>[
                             const SizedBox(height: 6),
                             ClipRRect(
                               borderRadius: BorderRadius.circular(999),

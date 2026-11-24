@@ -14,41 +14,50 @@ import 'idle_job_scheduler.dart';
 
 bool _idleDrainRunning = false;
 
-/// After booking a drama episode, drain one download while the app is open.
+/// After booking a drama episode, start download now (Workmanager is backup).
 void kickNetdiskDramaIdleDrain(WidgetRef ref) {
+  final LibraryCatalogNotifier catalog =
+      ref.read(libraryCatalogProvider.notifier);
   unawaited(() async {
-    await scheduleIdleJobs();
-    await drainIdleJobs(ref);
+    // Do not await Workmanager — it can hang and block the download kick.
+    unawaited(scheduleIdleJobs());
+    final List<IdleJob> dramaJobs = IdleJobQueue.shared.pending
+        .where((IdleJob j) => j.kind == IdleJobKind.netdiskDrama)
+        .toList(growable: false);
+    for (final IdleJob job in dramaJobs) {
+      await ensureReservedNetdiskDramaDownload(
+        episodeId: job.key,
+        catalog: catalog,
+      );
+    }
+    if (idleJobsEnabled()) {
+      await drainIdleJobs(ref);
+    }
   }());
 }
 
 /// Drain pending idle jobs while the app process is alive (resume / FGS).
 Future<void> drainIdleJobs(WidgetRef ref) async {
-  if (!idleJobsEnabled()) return;
   if (_idleDrainRunning) return;
   _idleDrainRunning = true;
   try {
-    final List<IdleJob> pending = IdleJobQueue.shared.pending;
-    if (pending.isEmpty) {
-      SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
-      return;
-    }
+    final LibraryCatalogNotifier catalog =
+        ref.read(libraryCatalogProvider.notifier);
 
-    // Prefer one reserved drama download first — netdisk is slow; do not stack.
-    final IdleJob? drama = pending
+    // Always process reserved drama downloads — independent of idle toggle.
+    final IdleJob? drama = IdleJobQueue.shared.pending
         .where((IdleJob j) => j.kind == IdleJobKind.netdiskDrama)
         .firstOrNull;
     if (drama != null) {
-      await drainOneNetdiskDramaReservation(
-        job: drama,
-        catalog: ref.read(libraryCatalogProvider.notifier),
+      await ensureReservedNetdiskDramaDownload(
+        episodeId: drama.key,
+        catalog: catalog,
       );
       final bool moreDrama = IdleJobQueue.shared.pending.any(
         (IdleJob j) => j.kind == IdleJobKind.netdiskDrama,
       );
       if (moreDrama) {
-        await scheduleIdleJobs();
-        // Keep chaining while the app process is alive.
+        unawaited(scheduleIdleJobs());
         unawaited(
           Future<void>.delayed(const Duration(seconds: 2), () {
             unawaited(drainIdleJobs(ref));
@@ -57,10 +66,19 @@ Future<void> drainIdleJobs(WidgetRef ref) async {
       }
     }
 
-    for (final IdleJob job in IdleJobQueue.shared.pending) {
+    if (!idleJobsEnabled()) {
+      return;
+    }
+
+    final List<IdleJob> pending = IdleJobQueue.shared.pending;
+    if (pending.isEmpty) {
+      SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
+      return;
+    }
+
+    for (final IdleJob job in pending) {
       switch (job.kind) {
         case IdleJobKind.netdiskDrama:
-          // Handled above one-at-a-time; skip further in this pass.
           continue;
         case IdleJobKind.subtitleDrain:
           SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
