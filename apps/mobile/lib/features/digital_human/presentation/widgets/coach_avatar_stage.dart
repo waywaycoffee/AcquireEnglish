@@ -65,22 +65,79 @@ class CoachAvatarStage extends StatelessWidget {
       );
     }
     final reduceMotion = MediaQuery.disableAnimationsOf(context);
+    final String? sprite = spriteAsset;
+    // Cartoon atlas cells are not pixel-registered — bob/tilt reads as
+    // left-right shake when combined with mouth cuts. Keep the sprite still.
+    if (sprite != null) {
+      final CoachMotion motion = encouraging
+          ? CoachMotion.encouraging
+          : speaking
+          ? CoachMotion.speaking
+          : listening
+          ? CoachMotion.listening
+          : thinking
+          ? CoachMotion.thinking
+          : CoachMotion.idle;
+      return Stack(
+        fit: StackFit.expand,
+        children: <Widget>[
+          const DecoratedBox(
+            decoration: BoxDecoration(
+              gradient: RadialGradient(
+                center: Alignment(0, -0.2),
+                radius: 0.95,
+                colors: <Color>[
+                  Color(0xFF4A3A6E),
+                  Color(0xFF2A2038),
+                  Color(0xFF18122A),
+                ],
+              ),
+            ),
+          ),
+          Center(
+            child: SizedBox.square(
+              dimension: 196,
+              child: CartoonCoachSprite(
+                asset: sprite,
+                mouth: mouth ?? CoachViseme.closed,
+                phase: 0,
+                transitionDuration: Duration.zero,
+                motion: motion,
+              ),
+            ),
+          ),
+          Positioned(
+            left: 24,
+            right: 24,
+            bottom: 28,
+            child: Text(
+              label,
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                color: Colors.white.withValues(alpha: 0.78),
+                fontWeight: FontWeight.w700,
+                fontSize: 14,
+              ),
+            ),
+          ),
+        ],
+      );
+    }
     return AnimatedBuilder(
       animation: reduceMotion ? const AlwaysStoppedAnimation<double>(0) : pulse,
       builder: (BuildContext context, Widget? child) {
         final double t = reduceMotion ? 0 : pulse.value;
-        // Softer motion with cartoon atlas — large bob reads as flicker.
-        final bool cartoon = spriteAsset != null;
-        final double bobAmp = cartoon
-            ? (speaking ? 2.0 : listening ? 1.2 : 0.8)
-            : (speaking ? 6.0 : listening ? 3.0 : 2.0);
-        final double bob = math.sin(t * math.pi * (cartoon ? 2 : 1)) * bobAmp;
-        final double scale = speaking
-            ? 1.0 + math.sin(t * math.pi * 2) * (cartoon ? 0.004 : 0.008)
+        final double bob = speaking
+            ? math.sin(t * math.pi * 2) * 6
             : listening
-            ? 1.0 + math.sin(t * math.pi * 2) * (cartoon ? 0.002 : 0.005)
+            ? math.sin(t * math.pi * 2) * 3
+            : math.sin(t * math.pi) * 2;
+        final double scale = speaking
+            ? 1.0 + math.sin(t * math.pi * 2) * 0.008
+            : listening
+            ? 1.0 + math.sin(t * math.pi * 2) * 0.005
             : 1.0;
-        final double tilt = !reduceMotion && listening && !speaking && !cartoon
+        final double tilt = !reduceMotion && listening && !speaking
             ? math.sin(t * math.pi * 2) * 0.018
             : 0;
         return Stack(
@@ -104,33 +161,7 @@ class CoachAvatarStage extends StatelessWidget {
                 offset: Offset(0, bob),
                 child: Transform.rotate(
                   angle: tilt,
-                  child: Transform.scale(
-                    scale: scale,
-                    child: spriteAsset == null
-                        ? child
-                        : SizedBox.square(
-                            dimension: 196,
-                            child: CartoonCoachSprite(
-                              asset: spriteAsset!,
-                              mouth: mouth ??
-                                  (speaking
-                                      ? _approxViseme(t)
-                                      : CoachViseme.closed),
-                              phase: t,
-                              // Hard cuts only — AnimatedSwitcher fades flash.
-                              transitionDuration: Duration.zero,
-                              motion: encouraging
-                                  ? CoachMotion.encouraging
-                                  : speaking
-                                  ? CoachMotion.speaking
-                                  : listening
-                                  ? CoachMotion.listening
-                                  : thinking
-                                  ? CoachMotion.thinking
-                                  : CoachMotion.idle,
-                            ),
-                          ),
-                  ),
+                  child: Transform.scale(scale: scale, child: child),
                 ),
               ),
             ),
@@ -151,26 +182,15 @@ class CoachAvatarStage extends StatelessWidget {
           ],
         );
       },
-      child: spriteAsset == null
-          ? _AvatarDisc(
-              speaking: speaking,
-              listening: listening,
-              pulse: pulse,
-              imageAsset: imageAsset,
-              displayName: displayName,
-            )
-          : null,
+      child: _AvatarDisc(
+        speaking: speaking,
+        listening: listening,
+        pulse: pulse,
+        imageAsset: imageAsset,
+        displayName: displayName,
+      ),
     );
   }
-}
-
-CoachViseme _approxViseme(double phase) {
-  final double t = phase - phase.floorToDouble();
-  if (t < 0.22) return CoachViseme.open;
-  if (t < 0.44) return CoachViseme.wide;
-  if (t < 0.66) return CoachViseme.rounded;
-  if (t < 0.84) return CoachViseme.teeth;
-  return CoachViseme.closed;
 }
 
 class _AvatarDisc extends StatelessWidget {

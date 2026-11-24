@@ -543,8 +543,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _mouthTimeline = CoachAnimationTimeline.estimate(speak, dur);
     _mouthClockStart = DateTime.now();
     _mouthTicker?.cancel();
-    // ~12 fps mouth updates — smoother than 20 Hz setState thrash.
-    _mouthTicker = Timer.periodic(const Duration(milliseconds: 80), (_) {
+    // Slow mouth cuts — Mia atlas cells are not locked, fast swaps look like shake.
+    DateTime lastFlip = DateTime.fromMillisecondsSinceEpoch(0);
+    _mouthTicker = Timer.periodic(const Duration(milliseconds: 140), (_) {
       if (!mounted || _mouthTimeline == null || _mouthClockStart == null) {
         return;
       }
@@ -552,9 +553,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         DateTime.now().difference(_mouthClockStart!),
         playing: true,
       );
-      if (next != _coachMouth) {
-        setState(() => _coachMouth = next);
+      if (next == _coachMouth) return;
+      final DateTime now = DateTime.now();
+      if (now.difference(lastFlip) < const Duration(milliseconds: 160)) {
+        return;
       }
+      lastFlip = now;
+      setState(() => _coachMouth = next);
     });
   }
 
