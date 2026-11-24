@@ -291,8 +291,8 @@ class LearningSettingsState {
     this.oralCoachServerUrl = defaultLiveTalkingUrlPublic,
     this.oralCoachPipelineUrl = 'https://acquireenglish.curlhairai.com/coach',
     this.voicePracticeServerUrl = '',
-    this.liveKitUrl =
-        'wss://acquireenglish-e5la1koz.livekit.cloud',
+    // Oral coach defaults to half-duplex hold-to-talk; LiveKit is optional.
+    this.liveKitUrl = '',
     this.bilibiliSessdata = '',
     this.bilibiliUserId = '',
     this.digitalHumanId = defaultDigitalHumanId,
@@ -769,11 +769,12 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
       );
       LearningSettingsState coerced = _migrateAwayFromLocalWhisper(loaded);
       coerced = _preferGpuOllamaTranslation(coerced);
-      // Prod LiveKit was added after some installs saved an empty liveKitUrl.
-      if (coerced.liveKitUrl.trim().isEmpty) {
-        coerced = coerced.copyWith(
-          liveKitUrl: LearningSettingsState.defaults().liveKitUrl,
-        );
+      // Oral coach is hold-to-talk; drop the old prod LiveKit default so the
+      // app no longer advertises full-duplex for the digital-human tab.
+      const String legacyDefaultLiveKit =
+          'wss://acquireenglish-e5la1koz.livekit.cloud';
+      if (coerced.liveKitUrl.trim() == legacyDefaultLiveKit) {
+        coerced = coerced.copyWith(liveKitUrl: '');
       }
       // Digital-human URL: empty → public HTTPS; migrate Tailscale / LAN saves.
       final String oralCoachUrl = coerced.oralCoachServerUrl.trim();

@@ -15,12 +15,10 @@ import 'package:flutter_test/flutter_test.dart';
 /// Each group maps to a user-facing capability that must stay green.
 void main() {
   group('F01 设置默认与生产地址', () {
-    test('默认 LiveKit / 陪练管线指向生产托管', () {
+    test('默认陪练管线指向生产托管；口语 Tab 默认半双工（无 LiveKit）', () {
       final LearningSettingsState defaults = LearningSettingsState.defaults();
-      expect(
-        defaults.liveKitUrl,
-        contains('acquireenglish-e5la1koz.livekit.cloud'),
-      );
+      expect(defaults.liveKitUrl, isEmpty);
+      expect(defaults.usesLiveKit, isFalse);
       expect(
         defaults.oralCoachPipelineUrl,
         'https://acquireenglish.curlhairai.com/coach',

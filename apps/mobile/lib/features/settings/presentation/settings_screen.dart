@@ -545,10 +545,10 @@ class SettingsScreen extends ConsumerWidget {
               _InputRow(
                 title: 'LiveKit 房间地址（可选）',
                 description:
-                    '填入后口语 Tab 可加入全双工房间（需服务端配置 LIVEKIT_* 并运行 Agent）。'
-                    '例如 wss://xxx.livekit.cloud。留空则只用 HTTP 管线。',
+                    '数字人口语默认按住说话（半双工）。此处仅留给双人练习等可选实时房间；'
+                    '口语 Tab 不会自动开全双工。例如 wss://xxx.livekit.cloud。留空即可。',
                 value: settings.liveKitUrl,
-                hintText: 'wss://…livekit…',
+                hintText: '留空（推荐）',
                 onChanged: (String value) {
                   ref
                       .read(learningSettingsProvider.notifier)
