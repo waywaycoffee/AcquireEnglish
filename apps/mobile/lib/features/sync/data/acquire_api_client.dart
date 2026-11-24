@@ -2303,6 +2303,7 @@ class AcquireApiClient {
     };
   }
 
+  /// Starts async series import; returns ``{job_id, ...}``. Poll [netdiskImportJob].
   Future<Map<String, dynamic>> importNetdiskSeries({
     required String provider,
     required String folderPath,
@@ -2315,6 +2316,13 @@ class AcquireApiClient {
         'folder_path': folderPath,
         if (title != null && title.trim().isNotEmpty) 'title': title.trim(),
       },
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> netdiskImportJob(String jobId) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.netdiskImportJob(jobId),
     );
     return response.data as Map<String, dynamic>;
   }

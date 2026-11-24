@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 from pathlib import PurePosixPath
@@ -679,65 +680,205 @@ async def import_netdisk_videos(
     return NetdiskImportOut(items=items, series_course=series_course)
 
 
-@router.post("/import-series", response_model=NetdiskImportOut)
-async def import_netdisk_series(
-    payload: NetdiskImportSeriesIn,
-    user: User = Depends(get_current_user),
-    db: AsyncSession = Depends(get_db),
-) -> NetdiskImportOut:
-    """Import all videos in a folder as one multi-episode course."""
-    _require_openlist()
-    binding = await _binding_or_400(db, user.id, payload.provider)
+async def _resolve_import_folder(
+    *,
+    db: AsyncSession,
+    user: User,
+    provider: Provider,
+    folder_path: str,
+) -> tuple[UserNetdiskBinding, str]:
+    binding = await _binding_or_400(db, user.id, provider)
     mount = binding.openlist_mount_path.rstrip("/")
-    folder = payload.folder_path.strip().rstrip("/")
+    folder = folder_path.strip().rstrip("/")
     if not folder.startswith(mount):
-        # Allow relative path under mount.
-        folder = join_mount(binding.openlist_mount_path, payload.folder_path)
+        folder = join_mount(binding.openlist_mount_path, folder_path)
     if not folder.startswith(mount):
         raise HTTPException(400, "文件夹不属于当前绑定网盘")
+    return binding, folder
 
+
+async def _run_series_import_job(
+    *,
+    job_id: str,
+    user_id: int,
+    provider: Provider,
+    folder: str,
+    title_override: str | None,
+) -> None:
+    from app.database import SessionLocal
+    from app.services import netdisk_import_jobs as jobs
+
+    await jobs.update_job(
+        job_id,
+        status="running",
+        phase="scanning",
+        message="正在扫描网盘视频…",
+    )
     try:
-        # Include Season 01/02… subfolders (Desperate Housewives layout).
         video_paths = await OpenListClient().fs_list_video_paths_recursive(
             folder,
             max_depth=3,
             max_videos=500,
         )
     except OpenListError as exc:
-        raise HTTPException(502, f"列目录失败：{exc}") from exc
+        await jobs.update_job(
+            job_id,
+            status="error",
+            phase="error",
+            error=f"列目录失败：{exc}",
+            message=str(exc),
+        )
+        return
 
     if not video_paths:
-        raise HTTPException(
-            400,
-            "该文件夹及子文件夹下没有可导入的视频（可先进入某一季再导入）",
+        await jobs.update_job(
+            job_id,
+            status="error",
+            phase="error",
+            error="该文件夹及子文件夹下没有可导入的视频",
+            message="没有可导入的视频",
         )
+        return
 
     ordered = sort_video_paths(video_paths)
-    series_key = series_key_for(user.id, payload.provider, folder)
-    title = folder_title(folder, payload.title)
-    items: list[NetdiskImportItemOut] = []
-    links: list[UserLinkCourse] = []
-    for i, path in enumerate(ordered, start=1):
-        link, item = await _upsert_video_link(
-            db=db,
-            user=user,
-            provider=payload.provider,
-            path=path,
-            series_key=series_key,
-            series_title=title,
-            episode_index=i,
-        )
-        items.append(item)
-        if link is not None and item.ok:
-            links.append(link)
-
-    await db.commit()
-    if not links:
-        raise HTTPException(502, "导入失败：没有成功写入的视频")
-    series_course = CourseOut.model_validate(
-        to_series_course_out(links, series_key=series_key, series_title=title)
+    total = len(ordered)
+    series_key = series_key_for(user_id, provider, folder)
+    title = folder_title(folder, title_override)
+    await jobs.update_job(
+        job_id,
+        phase="importing",
+        total=total,
+        done=0,
+        message=f"找到 {total} 个视频，开始写入…",
     )
-    return NetdiskImportOut(items=items, series_course=series_course)
+
+    items: list[dict[str, Any]] = []
+    ok_n = 0
+    failed_n = 0
+    try:
+        async with SessionLocal() as db:
+            user = await db.get(User, user_id)
+            if user is None:
+                await jobs.update_job(
+                    job_id,
+                    status="error",
+                    phase="error",
+                    error="用户不存在",
+                    message="用户不存在",
+                )
+                return
+            links: list[UserLinkCourse] = []
+            for i, path in enumerate(ordered, start=1):
+                link, item = await _upsert_video_link(
+                    db=db,
+                    user=user,
+                    provider=provider,
+                    path=path,
+                    series_key=series_key,
+                    series_title=title,
+                    episode_index=i,
+                )
+                items.append(item.model_dump())
+                if link is not None and item.ok:
+                    links.append(link)
+                    ok_n += 1
+                else:
+                    failed_n += 1
+                await jobs.update_job(
+                    job_id,
+                    done=i,
+                    ok=ok_n,
+                    failed=failed_n,
+                    message=f"导入中 {i}/{total} · 成功 {ok_n}",
+                )
+            await db.commit()
+            if not links:
+                await jobs.update_job(
+                    job_id,
+                    status="error",
+                    phase="error",
+                    error="导入失败：没有成功写入的视频",
+                    message="没有成功写入的视频",
+                    result={"items": items},
+                )
+                return
+            series_course = CourseOut.model_validate(
+                to_series_course_out(
+                    links, series_key=series_key, series_title=title
+                )
+            )
+            await jobs.update_job(
+                job_id,
+                status="done",
+                phase="done",
+                done=total,
+                ok=ok_n,
+                failed=failed_n,
+                message=f"完成：成功 {ok_n}，失败 {failed_n}",
+                result={
+                    "items": items,
+                    "series_course": series_course.model_dump(),
+                },
+            )
+    except Exception as exc:  # noqa: BLE001
+        await jobs.update_job(
+            job_id,
+            status="error",
+            phase="error",
+            error=str(exc)[:500],
+            message=f"导入异常：{exc}",
+        )
+
+
+@router.post("/import-series")
+async def import_netdisk_series(
+    payload: NetdiskImportSeriesIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Start async series import; poll ``GET /import-jobs/{id}`` for progress."""
+    from app.services import netdisk_import_jobs as jobs
+
+    _require_openlist()
+    _, folder = await _resolve_import_folder(
+        db=db,
+        user=user,
+        provider=payload.provider,
+        folder_path=payload.folder_path,
+    )
+    job_id = await jobs.create_job(
+        user_id=user.id,
+        provider=payload.provider,
+        folder=folder,
+    )
+    asyncio.create_task(
+        _run_series_import_job(
+            job_id=job_id,
+            user_id=user.id,
+            provider=payload.provider,
+            folder=folder,
+            title_override=payload.title,
+        )
+    )
+    return {
+        "job_id": job_id,
+        "status": "queued",
+        "message": "已开始导入，请轮询进度",
+        "poll_path": f"/api/netdisk/import-jobs/{job_id}",
+    }
+
+
+@router.get("/import-jobs/{job_id}")
+async def get_netdisk_import_job(
+    job_id: str,
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    from app.services import netdisk_import_jobs as jobs
+
+    job = await jobs.get_job(job_id)
+    if job is None or int(job.get("user_id") or 0) != user.id:
+        raise HTTPException(404, "导入任务不存在")
+    return job
 
 
 @router.get("/play/{import_id}")

@@ -53,6 +53,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   bool _showAdvancedCookie = false;
   String? _healthError;
   String? _error;
+  String? _progressHint;
   String? _listHint;
   String _mountPath = '';
   String? _baiduAccountLabel;
@@ -426,19 +427,54 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
     setState(() {
       _busy = true;
       _error = null;
+      _progressHint = '正在启动导入…';
     });
     try {
-      final Map<String, dynamic> result = await ref
-          .read(acquireApiClientProvider)
-          .importNetdiskSeries(
-            provider: _provider,
-            folderPath: _currentFolderPath,
-          );
-      await _finishImport(result);
+      final AcquireApiClient api = ref.read(acquireApiClientProvider);
+      final Map<String, dynamic> started = await api.importNetdiskSeries(
+        provider: _provider,
+        folderPath: _currentFolderPath,
+      );
+      final String jobId = '${started['job_id'] ?? ''}';
+      if (jobId.isEmpty) {
+        throw Exception('服务器未返回导入任务 ID');
+      }
+      Map<String, dynamic> job = started;
+      for (int i = 0; i < 1800; i++) {
+        job = await api.netdiskImportJob(jobId);
+        final String status = '${job['status'] ?? ''}';
+        final String message = '${job['message'] ?? ''}';
+        final int done = int.tryParse('${job['done'] ?? 0}') ?? 0;
+        final int total = int.tryParse('${job['total'] ?? 0}') ?? 0;
+        if (!mounted) return;
+        setState(() {
+          _progressHint = message.isNotEmpty
+              ? message
+              : (total > 0 ? '导入中 $done/$total' : '处理中…');
+        });
+        if (status == 'done') {
+          final Object? resultRaw = job['result'];
+          final Map<String, dynamic> result = resultRaw is Map<String, dynamic>
+              ? resultRaw
+              : resultRaw is Map
+                  ? resultRaw.map(
+                      (Object? k, Object? v) => MapEntry('$k', v),
+                    )
+                  : <String, dynamic>{};
+          await _finishImport(result);
+          return;
+        }
+        if (status == 'error') {
+          throw Exception('${job['error'] ?? job['message'] ?? '导入失败'}');
+        }
+        await Future<void>.delayed(const Duration(seconds: 1));
+      }
+      throw Exception('导入超时，请稍后在课程库查看是否已写入');
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _busy = false;
+        _progressHint = null;
         _error = '$error'.replaceFirst('Exception: ', '');
       });
     }
@@ -815,12 +851,23 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                       ),
                       child: Text(
                         _busy
-                            ? '导入中…'
+                            ? (_progressHint ?? '导入中…')
                             : _videoPathsInDir.isNotEmpty
                                 ? '导入本文件夹为课程（${_videoPathsInDir.length} 集）'
                                 : '导入本文件夹为课程（含 Season 子目录）',
                       ),
                     ),
+                    if (_busy && _progressHint != null) ...<Widget>[
+                      const SizedBox(height: 8),
+                      Text(
+                        _progressHint!,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: AppDesignTokens.textSecondary,
+                        ),
+                      ),
+                    ],
                     const SizedBox(height: 8),
                     OutlinedButton(
                       onPressed: _busy || _selected.isEmpty
@@ -832,7 +879,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                       ),
                       child: Text(
                         _busy
-                            ? '导入中…'
+                            ? '请稍候…'
                             : '导入选中 ${_selected.length} 个视频（合并为本目录合集）',
                       ),
                     ),
