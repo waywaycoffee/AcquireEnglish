@@ -3097,44 +3097,48 @@ class AcquireApiClient {
     }
   }
 
-  /// Returns null on 404 / network miss (shared cache optional).
-  ///
-  /// On miss, best-effort enqueues a cloud GPU generation job so workers can
-  /// fill the shared pack for later downloads.
+  /// Reads a shared pack for the requested episode without enqueuing work.
   Future<SharedBilibiliSubtitlePack?> getSharedBilibiliSubtitle({
     required String bvid,
     int page = 1,
     int? cid,
   }) async {
-    try {
-      final Response<dynamic> response = await _dio.get(
-        Endpoints.sharedSubtitlesBilibili,
-        queryParameters: <String, dynamic>{
-          'bvid': bvid,
-          'page': page,
-          if (cid != null) 'cid': cid,
-        },
-        options: Options(
-          validateStatus: (int? status) =>
-              status != null &&
-              ((status >= 200 && status < 300) || status == 404),
-          extra: const <String, Object>{
-            'dio_cache_interceptor_force_refresh': true,
+    Future<SharedBilibiliSubtitlePack?> lookup(String lookupId) async {
+      try {
+        final Response<dynamic> response = await _dio.get(
+          Endpoints.sharedSubtitlesBilibili,
+          queryParameters: <String, dynamic>{
+            'bvid': lookupId,
+            'page': page,
+            if (cid != null) 'cid': cid,
           },
-        ),
-      );
-      if (response.statusCode == 404 || response.data == null) {
-        return null;
+          options: Options(
+            validateStatus: (int? status) =>
+                status != null &&
+                ((status >= 200 && status < 300) || status == 404),
+            extra: const <String, Object>{
+              'dio_cache_interceptor_force_refresh': true,
+            },
+          ),
+        );
+        if (response.statusCode == 404 || response.data == null) {
+          return null;
+        }
+        return SharedBilibiliSubtitlePack.fromJson(
+          response.data as Map<String, dynamic>,
+        );
+      } on DioException catch (error) {
+        if (error.response?.statusCode == 404) {
+          return null;
+        }
+        rethrow;
       }
-      return SharedBilibiliSubtitlePack.fromJson(
-        response.data as Map<String, dynamic>,
-      );
-    } on DioException catch (error) {
-      if (error.response?.statusCode == 404) {
-        return null;
-      }
-      rethrow;
     }
+
+    final SharedBilibiliSubtitlePack? exact = await lookup(bvid);
+    final String legacyId = bvid.toUpperCase();
+    // Older ECS deployments match uppercase legacy rows only by exact key.
+    return exact ?? (legacyId == bvid ? null : await lookup(legacyId));
   }
 
   Future<List<PersonalImportAsset>> listPersonalImports() async {

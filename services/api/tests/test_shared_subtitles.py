@@ -13,8 +13,9 @@ import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
 
 import app.models  # noqa: F401
-from app.database import Base, engine
+from app.database import Base, SessionLocal, engine
 from app.main import app as fastapi_app
+from app.models import SharedBilibiliSubtitle
 from app.shared_subtitle_quality import evaluate_shared_pack
 
 
@@ -93,6 +94,30 @@ def test_quality_accepts_good_pack():
     assert result.passed is True
     assert result.score >= 0.55
     assert result.cue_count == 10
+
+
+@pytest.mark.asyncio
+async def test_get_legacy_uppercase_bvid_matches_only_requested_page():
+    async with SessionLocal() as db:
+        db.add(
+            SharedBilibiliSubtitle(
+                bvid="BV1CS4Y1V7SQ",
+                page=14,
+                subtitle_en_srt=_sample_en_srt(),
+                subtitle_zh_srt=_sample_zh_srt(),
+            )
+        )
+        await db.commit()
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        params = {"bvid": "BV1CS4y1v7sQ", "page": 14}
+        response = await client.get("/api/shared-subtitles/bilibili", params=params)
+        assert response.status_code == 200
+        assert response.json()["page"] == 14
+        assert response.json()["subtitle_zh_srt"] == _sample_zh_srt()
+        params["page"] = 13
+        response = await client.get("/api/shared-subtitles/bilibili", params=params)
+        assert response.status_code == 404
 
 
 @pytest.mark.asyncio

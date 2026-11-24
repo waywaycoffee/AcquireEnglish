@@ -12,7 +12,6 @@ from app.deps import get_current_user
 from app.models import SharedBilibiliSubtitle, User
 from app.shared_subtitle_store import (
     get_shared_bilibili_pack,
-    normalize_bvid,
     preview_zh_from_srt,
     upsert_shared_bilibili_pack,
 )
@@ -186,14 +185,7 @@ async def get_shared_bilibili_subtitle(
     cid: int | None = Query(default=None, ge=1),
     db: AsyncSession = Depends(get_db),
 ) -> SharedBilibiliSubtitleOut:
-    key = normalize_bvid(bvid)
-    result = await db.execute(
-        select(SharedBilibiliSubtitle).where(
-            SharedBilibiliSubtitle.bvid == key,
-            SharedBilibiliSubtitle.page == page,
-        )
-    )
-    row = result.scalar_one_or_none()
+    row = await get_shared_bilibili_pack(db, bvid=bvid, page=page)
     if row is None and cid is not None:
         # Fallback: same cid under another page number (rare remux).
         alt = await db.execute(
