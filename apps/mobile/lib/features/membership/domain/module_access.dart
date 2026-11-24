@@ -37,6 +37,8 @@ bool isFreeReadingPreviewDocId(String docId) {
   final String id = docId.trim();
   if (id.isEmpty) return false;
   if (id.startsWith('starter-')) return true;
+  // Grade textbook shelf placeholders (metadata / import guide only).
+  if (id.startsWith('k12-textbook:')) return true;
   if (id == kDefaultWizardOfOzEntry.stableDocId) return true;
   if (isFreeTrialCourseSeedId(id) || isFreeTrialSeedId(id)) return true;
   return false;

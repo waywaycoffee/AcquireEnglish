@@ -632,6 +632,8 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                         unawaited(showReadingNetdiskImportSheet(context, ref));
                       case 'catalog':
                         context.push('/reading/catalog');
+                      case 'textbooks':
+                        context.push('/reading/textbooks');
                       case 'materials':
                         context.push('/material-courses');
                       case 'video':
@@ -659,6 +661,10 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                     const PopupMenuItem<String>(
                       value: 'catalog',
                       child: Text('在线书库'),
+                    ),
+                    const PopupMenuItem<String>(
+                      value: 'textbooks',
+                      child: Text('K12 教材书架'),
                     ),
                     const PopupMenuItem<String>(
                       value: 'materials',

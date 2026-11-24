@@ -83,6 +83,16 @@ class ExamHomeScreen extends ConsumerWidget {
                 onAction: () => context.push('/discover'),
               ),
             ],
+            if (_isK12GradeFamily(family.id)) ...<Widget>[
+              const SizedBox(height: 16),
+              _HintCard(
+                text: '查看本年级英语教材目录（书名 / 版本 / 封面占位），点击进入电子书阅读。',
+                actionLabel: '打开教材书架',
+                onAction: () => context.push(
+                  '/reading/textbooks?grade=${Uri.encodeQueryComponent(family.id)}',
+                ),
+              ),
+            ],
             const SizedBox(height: 20),
             _SectionTitle('今日备考'),
             const SizedBox(height: 10),
@@ -165,6 +175,12 @@ String _countdownLabel(String? iso) {
   return '已过考 ${-diff} 天';
 }
 
+bool _isK12GradeFamily(String familyId) {
+  return familyId.startsWith('k12_g') ||
+      familyId.startsWith('k12_j') ||
+      familyId.startsWith('k12_s');
+}
+
 class _EmptyTargetBody extends StatelessWidget {
   const _EmptyTargetBody({required this.ref});
 
@@ -209,9 +225,9 @@ class _EmptyTargetBody extends StatelessWidget {
             final double chipWidth = (constraints.maxWidth - gap * 2) / 3;
             const List<({String label, String route})> items =
                 <({String label, String route})>[
-              (label: '小学', route: '/exam/select?track=k12'),
-              (label: '初中', route: '/exam/select?track=k12'),
-              (label: '高中', route: '/exam/select?track=k12'),
+              (label: '小学', route: '/reading/textbooks?stage=primary'),
+              (label: '初中', route: '/reading/textbooks?stage=junior'),
+              (label: '高中', route: '/reading/textbooks?stage=senior'),
               (label: '四六级', route: '/exam/select?track=cet'),
               (
                 label: '考研',

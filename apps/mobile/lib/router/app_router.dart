@@ -57,6 +57,8 @@ import '../features/phrases/presentation/phrases_screen.dart';
 import '../features/player/presentation/player_screen.dart';
 import '../features/course_decompose/presentation/material_course_edit_screen.dart';
 import '../features/course_decompose/presentation/my_material_courses_screen.dart';
+import '../features/reading/domain/k12_textbook_catalog.dart';
+import '../features/reading/presentation/k12_textbook_shelf_screen.dart';
 import '../features/reading/presentation/reading_catalog_screen.dart';
 import '../features/reading/presentation/reading_hub_screen.dart';
 import '../features/reading/presentation/reading_library_provider.dart';
@@ -665,6 +667,22 @@ GoRouter goRouter(Ref ref) {
       path: '/reading/catalog',
       builder: (BuildContext context, GoRouterState state) =>
           const ReadingCatalogScreen(),
+    ).fade(),
+    GoRoute(
+      path: '/reading/textbooks',
+      builder: (BuildContext context, GoRouterState state) {
+        final String grade =
+            (state.uri.queryParameters['grade'] ?? '').trim();
+        final String stageName =
+            (state.uri.queryParameters['stage'] ?? '').trim();
+        final K12TextbookStage? stage = K12TextbookStage.values
+            .where((K12TextbookStage s) => s.name == stageName)
+            .firstOrNull;
+        return K12TextbookShelfScreen(
+          initialGradeId: grade.isEmpty ? null : grade,
+          initialStage: stage,
+        );
+      },
     ).fade(),
     GoRoute(
       path: '/material-courses',
