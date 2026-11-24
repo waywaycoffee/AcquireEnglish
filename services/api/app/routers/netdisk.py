@@ -697,21 +697,20 @@ async def import_netdisk_series(
         raise HTTPException(400, "文件夹不属于当前绑定网盘")
 
     try:
-        content_rows = await OpenListClient().fs_list_all(folder)
+        # Include Season 01/02… subfolders (Desperate Housewives layout).
+        video_paths = await OpenListClient().fs_list_video_paths_recursive(
+            folder,
+            max_depth=3,
+            max_videos=500,
+        )
     except OpenListError as exc:
         raise HTTPException(502, f"列目录失败：{exc}") from exc
 
-    video_paths: list[str] = []
-    for item in content_rows:
-        if bool(item.get("is_dir")):
-            continue
-        name = str(item.get("name") or "")
-        if not is_video_name(name):
-            continue
-        video_paths.append(f"{folder}/{name}")
-
     if not video_paths:
-        raise HTTPException(400, "该文件夹下没有可导入的视频")
+        raise HTTPException(
+            400,
+            "该文件夹及子文件夹下没有可导入的视频（可先进入某一季再导入）",
+        )
 
     ordered = sort_video_paths(video_paths)
     series_key = series_key_for(user.id, payload.provider, folder)

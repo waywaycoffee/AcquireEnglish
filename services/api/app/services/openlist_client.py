@@ -454,6 +454,45 @@ class OpenListClient:
                 break
         return items
 
+    async def fs_list_video_paths_recursive(
+        self,
+        path: str,
+        *,
+        max_depth: int = 3,
+        max_videos: int = 500,
+    ) -> list[str]:
+        """Collect video file paths under ``path`` (Season folders etc.)."""
+        root = path.rstrip("/") or "/"
+        found: list[str] = []
+
+        async def _walk(folder: str, depth: int) -> None:
+            if len(found) >= max_videos or depth > max_depth:
+                return
+            try:
+                rows = await self.fs_list_all(folder)
+            except OpenListError:
+                return
+            subdirs: list[str] = []
+            for row in rows:
+                name = str(row.get("name") or "").strip()
+                if not name or name in (".", ".."):
+                    continue
+                child = f"{folder.rstrip('/')}/{name}"
+                if bool(row.get("is_dir")):
+                    subdirs.append(child)
+                    continue
+                if is_video_name(name):
+                    found.append(child)
+                    if len(found) >= max_videos:
+                        return
+            for sub in sorted(subdirs, key=lambda p: p.lower()):
+                if len(found) >= max_videos:
+                    return
+                await _walk(sub, depth + 1)
+
+        await _walk(root, 0)
+        return found
+
     async def fs_get(self, path: str) -> dict[str, Any]:
         data = await self._request(
             "POST",

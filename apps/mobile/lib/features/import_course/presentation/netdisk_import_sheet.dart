@@ -97,6 +97,15 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
       .where((String p) => p.isNotEmpty)
       .toList(growable: false);
 
+  bool get _hasSeasonDirs => _entries.any(
+        (Map<String, dynamic> row) => row['is_dir'] == true,
+      );
+
+  /// Parent show folders (Season 01…) can import recursively via API.
+  bool get _canImportFolderAsSeries =>
+      _currentFolderPath.isNotEmpty &&
+      (_videoPathsInDir.isNotEmpty || _hasSeasonDirs);
+
   String _credentialHint() {
     switch (_provider) {
       case 'quark':
@@ -407,11 +416,11 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
 
   Future<void> _importFolderAsSeries() async {
     if (_currentFolderPath.isEmpty) {
-      setState(() => _error = '请先进入剧季文件夹');
+      setState(() => _error = '请先进入剧集文件夹');
       return;
     }
-    if (_videoPathsInDir.isEmpty) {
-      setState(() => _error = '当前文件夹没有视频');
+    if (!_canImportFolderAsSeries) {
+      setState(() => _error = '当前文件夹没有视频或季目录');
       return;
     }
     setState(() {
@@ -797,7 +806,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                             ),
                     ),
                     FilledButton(
-                      onPressed: _busy || _videoPathsInDir.isEmpty
+                      onPressed: _busy || !_canImportFolderAsSeries
                           ? null
                           : _importFolderAsSeries,
                       style: FilledButton.styleFrom(
@@ -807,7 +816,9 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                       child: Text(
                         _busy
                             ? '导入中…'
-                            : '导入本文件夹为课程（${_videoPathsInDir.length} 集）',
+                            : _videoPathsInDir.isNotEmpty
+                                ? '导入本文件夹为课程（${_videoPathsInDir.length} 集）'
+                                : '导入本文件夹为课程（含 Season 子目录）',
                       ),
                     ),
                     const SizedBox(height: 8),
