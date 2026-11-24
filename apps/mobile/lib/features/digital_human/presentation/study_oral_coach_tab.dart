@@ -271,7 +271,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   int _podcastIndex = 0;
   int _podcastDisplayedThrough = -1;
   Duration _podcastOffset = Duration.zero;
-  List<String> _podcastLines = const <String>[];
+  List<PodcastGuideSegment> _podcastLines = const <PodcastGuideSegment>[];
 
   String _liveKitStatus = '';
   int _questUtterances = 0;
@@ -1210,14 +1210,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           mainAxisSize: MainAxisSize.min,
           children: [
             ListTile(
-              leading: const Icon(Icons.person_outline),
-              title: const Text('单人讲解'),
-              subtitle: const Text('由当前数字人讲解文章'),
+              leading: const Icon(Icons.record_voice_over_outlined),
+              title: const Text('引导对话（推荐）'),
+              subtitle: const Text('讲一点 → 提问 → 等你开口，再说下一段'),
               onTap: () => Navigator.pop(sheetContext, true),
             ),
             ListTile(
               leading: const Icon(Icons.people_outline),
-              title: const Text('双人对谈'),
+              title: const Text('双声部引导'),
+              subtitle: const Text('两位主持轮流讲解并邀请你回答'),
               onTap: () => Navigator.pop(sheetContext, false),
             ),
           ],
@@ -1226,7 +1227,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     );
     if (!mounted || single == null) return;
     if (_podcastSingleHost != single) {
-      _podcastLines = const [];
+      _podcastLines = const <PodcastGuideSegment>[];
       _podcastOffset = Duration.zero;
       _podcastIndex = 0;
       _podcastDisplayedThrough = -1;
@@ -1242,7 +1243,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _podcastPlaying = true;
       _podcastPausedForQuestion = false;
       _duplexLive = false;
-      _status = _podcastLines.isEmpty ? '正在准备文章播客…' : '正在播放文章播客。按住麦克风可提问';
+      _status = _podcastLines.isEmpty ? '正在准备引导对话…' : '引导对话进行中…';
     });
     _idlePromptTimer?.cancel();
     await _liveKit.disconnect();
@@ -1253,7 +1254,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     try {
       if (_podcastLines.isEmpty) {
         final excerpt = widget.articleExcerpt.trim();
-        List<String> generated = const [];
+        List<PodcastGuideSegment> generated = const <PodcastGuideSegment>[];
         try {
           generated = await ref.read(acquireApiClientProvider).generatePodcastScript(
             excerpt.length > 6000 ? excerpt.substring(0, 6000) : excerpt,
@@ -1261,21 +1262,30 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           );
         } catch (_) {}
         if (!mounted || generation != _podcastGeneration) return;
-        _podcastLines = generated.isNotEmpty ? generated : [
-          for (final passage in tutorSourceLines(excerpt).take(4)) ...[
-            'Here is a passage from the article.',
-            passage,
-          ],
-        ];
+        _podcastLines = generated.isNotEmpty
+            ? generated
+            : <PodcastGuideSegment>[
+                for (final String passage
+                    in tutorSourceLines(excerpt).take(3)) ...<PodcastGuideSegment>[
+                  PodcastGuideSegment(
+                    text: 'Here is a short line from the article: $passage',
+                  ),
+                  const PodcastGuideSegment(
+                    text: 'Can you say that idea in your own words?',
+                    awaitUser: true,
+                  ),
+                ],
+              ];
       }
       if (_podcastIndex == _podcastLines.length) {
         _podcastIndex = 0;
         _podcastDisplayedThrough = -1;
       }
-      setState(() => _status = '正在播放文章播客。按住麦克风可提问');
+      setState(() => _status = '引导对话中 · 听到提问后请开口');
       while (mounted && generation == _podcastGeneration &&
           _podcastIndex < _podcastLines.length) {
-        final text = _podcastLines[_podcastIndex];
+        final PodcastGuideSegment segment = _podcastLines[_podcastIndex];
+        final String text = segment.text;
         final host = _podcastIndex.isEven;
         final persona = settings.selectedDigitalHuman;
         if (_podcastIndex > _podcastDisplayedThrough) {
@@ -1305,20 +1315,31 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         );
         if (!mounted || generation != _podcastGeneration) return;
         if (!played) throw StateError('播客音频暂不可用');
+        final bool waitForUser = segment.awaitUser;
         setState(() {
           _podcastIndex++;
           _podcastOffset = Duration.zero;
+          if (waitForUser) {
+            _podcastPlaying = false;
+            _podcastPausedForQuestion = true;
+            _status = '轮到你了 · 按住麦克风回答，说完自动继续';
+          }
         });
+        if (waitForUser) {
+          return;
+        }
       }
       if (mounted && generation == _podcastGeneration) {
-        setState(() => _status = '本段播客已播完');
+        setState(() => _status = '本段引导对话已完成');
       }
     } catch (_) {
       if (mounted && generation == _podcastGeneration) {
         setState(() => _status = '播客音频暂不可用，可从当前段重试');
       }
     } finally {
-      if (mounted && generation == _podcastGeneration) {
+      if (mounted &&
+          generation == _podcastGeneration &&
+          !_podcastPausedForQuestion) {
         setState(() => _podcastPlaying = false);
       }
     }

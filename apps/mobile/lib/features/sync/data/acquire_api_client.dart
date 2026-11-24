@@ -365,6 +365,19 @@ class SharedSubtitleGpuJob {
       state == 'failed' || (error.trim().isNotEmpty && state == 'failed');
 }
 
+/// One beat of an article dialogue-guide podcast.
+class PodcastGuideSegment {
+  const PodcastGuideSegment({
+    required this.text,
+    this.awaitUser = false,
+  });
+
+  final String text;
+
+  /// After TTS finishes, pause and wait for the learner to speak.
+  final bool awaitUser;
+}
+
 class SharedBilibiliSubtitlePack {
   const SharedBilibiliSubtitlePack({
     required this.bvid,
@@ -3837,19 +3850,54 @@ class AcquireApiClient {
     );
   }
 
-  Future<List<String>> generatePodcastScript(
+  /// Dialogue-guide podcast: coach beats + optional learner turns.
+  Future<List<PodcastGuideSegment>> generatePodcastScript(
     String excerpt, {
     required bool singleHost,
   }) async {
     final response = await _dio.post<dynamic>(
       'api/podcast/script',
       data: <String, dynamic>{'excerpt': excerpt, 'single_host': singleHost},
-      options: Options(receiveTimeout: const Duration(seconds: 18)),
+      options: Options(receiveTimeout: const Duration(seconds: 22)),
     );
     final body = response.data;
-    final lines = body is Map ? body['lines'] : null;
-    if (lines is! List) return const [];
-    return lines.whereType<String>().take(10).toList(growable: false);
+    if (body is! Map) return const <PodcastGuideSegment>[];
+    final Object? segments = body['segments'];
+    if (segments is List && segments.isNotEmpty) {
+      final List<PodcastGuideSegment> out = <PodcastGuideSegment>[];
+      for (final Object? row in segments.take(10)) {
+        if (row is Map) {
+          final String text = '${row['text'] ?? ''}'.trim();
+          if (text.isEmpty) continue;
+          out.add(
+            PodcastGuideSegment(
+              text: text,
+              awaitUser: row['await_user'] == true,
+            ),
+          );
+        } else if (row is String && row.trim().isNotEmpty) {
+          final String text = row.trim();
+          out.add(
+            PodcastGuideSegment(text: text, awaitUser: text.endsWith('?')),
+          );
+        }
+      }
+      return out;
+    }
+    final Object? lines = body['lines'];
+    if (lines is! List) return const <PodcastGuideSegment>[];
+    return lines
+        .whereType<String>()
+        .map((String line) => line.trim())
+        .where((String line) => line.isNotEmpty)
+        .take(10)
+        .map(
+          (String line) => PodcastGuideSegment(
+            text: line,
+            awaitUser: line.endsWith('?'),
+          ),
+        )
+        .toList(growable: false);
   }
 
   /// Cloud DeepSeek grammar analysis (ECS-cached). Null when offline / unpaid path fails.
