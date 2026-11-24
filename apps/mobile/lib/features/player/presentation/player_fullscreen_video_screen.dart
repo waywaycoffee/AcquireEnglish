@@ -244,7 +244,11 @@ class _PlayerFullscreenVideoScreenState
       _selectedEmbeddedSubtitleId = widget.selectedEmbeddedSubtitleId;
     }
     // Lines may arrive after open on the same state object — open the side list.
-    _ensureSubtitlePanelVisible();
+    // Never setState synchronously from didUpdateWidget (parent may still be building).
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
+      _ensureSubtitlePanelVisible(forceSetState: true);
+    });
   }
 
   @override
@@ -413,11 +417,11 @@ class _PlayerFullscreenVideoScreenState
               sceneHeaderLeadingInset: 48,
               sceneHeaderTopInset: isMacOS ? -4 : null,
               onControlsVisibilityChanged: (bool visible) {
-                if (_showControls != visible) {
-                  setState(() {
-                    _showControls = visible;
-                  });
-                }
+                if (_showControls == visible) return;
+                WidgetsBinding.instance.addPostFrameCallback((_) {
+                  if (!mounted || _showControls == visible) return;
+                  setState(() => _showControls = visible);
+                });
               },
               videoSurface: widget.videoSurface,
               videoAspectRatio: widget.videoAspectRatio,

@@ -280,7 +280,15 @@ class _PlayerVideoPanelState extends State<PlayerVideoPanel> {
       return;
     }
     setState(() => _showControls = visible);
-    widget.onControlsVisibilityChanged?.call(visible);
+    // Parent often calls setState in this callback — defer so we never notify
+    // during build / didUpdateWidget of this panel.
+    final ValueChanged<bool>? cb = widget.onControlsVisibilityChanged;
+    if (cb != null) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        cb(visible);
+      });
+    }
   }
 
   void _handleControlTap(VoidCallback callback) {

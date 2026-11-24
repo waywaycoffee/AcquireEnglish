@@ -3,10 +3,41 @@
 from __future__ import annotations
 
 import hashlib
+import re
 from pathlib import PurePosixPath
 from typing import Any
 
 from app.services.netdisk_play import signed_play_url
+
+_SEASON_NAME_RE = re.compile(r"^(season\s*)?s\d{1,2}$", re.IGNORECASE)
+_VERSION_FOLDER_HINTS = (
+    "字幕",
+    "版本",
+    "中英",
+    "纯英",
+    "无字幕",
+    "可切换",
+    "1080",
+    "720p",
+    "2160",
+    "bluray",
+    "web-dl",
+    "webrip",
+    "remux",
+    "x264",
+    "x265",
+    "hevc",
+)
+
+# Curated shelf titles — prefer these when a path segment matches.
+_CURATED_SHOW_TITLES: tuple[tuple[tuple[str, ...], str], ...] = (
+    (("绝望的主妇", "绝望主妇", "desperate housewives"), "绝望主妇"),
+    (("老友记", "friends", "f.r.i.e.n.d.s"), "老友记"),
+    (("摩登家庭", "modern family"), "摩登家庭"),
+    (("生活大爆炸", "big bang theory", "tbbt"), "生活大爆炸"),
+    (("哈利·波特", "哈利波特", "harry potter"), "哈利·波特"),
+    (("王冠", "the crown"), "王冠"),
+)
 
 
 def series_key_for(user_id: int, provider: str, folder_path: str) -> str:
@@ -20,9 +51,35 @@ def series_course_id(series_key: str) -> str:
     return f"netdisk-series-{series_key}"
 
 
+def _looks_like_version_folder(name: str) -> bool:
+    lower = name.lower()
+    return any(h.lower() in lower for h in _VERSION_FOLDER_HINTS)
+
+
+def curated_title_from_path(folder_path: str) -> str | None:
+    blob = folder_path.lower()
+    for aliases, title in _CURATED_SHOW_TITLES:
+        for alias in aliases:
+            if alias.lower() in blob:
+                return title
+    return None
+
+
 def folder_title(folder_path: str, override: str | None = None) -> str:
     if override and override.strip():
         return override.strip()[:512]
+    curated = curated_title_from_path(folder_path)
+    if curated:
+        return curated
+    parts = [p for p in PurePosixPath(folder_path.rstrip("/")).parts if p and p != "/"]
+    for name in reversed(parts):
+        if name.startswith("ae-u"):
+            continue
+        if _SEASON_NAME_RE.match(name.strip()):
+            continue
+        if _looks_like_version_folder(name):
+            continue
+        return name[:512]
     name = PurePosixPath(folder_path.rstrip("/")).name
     return (name or "网盘剧集")[:512]
 

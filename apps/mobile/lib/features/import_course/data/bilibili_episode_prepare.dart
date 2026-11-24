@@ -141,7 +141,9 @@ bool isRemoteSubtitlePath(String? path) {
   }
   return value.startsWith('http://') ||
       value.startsWith('https://') ||
-      value.startsWith('/media/');
+      value.startsWith('/media/') ||
+      // Personal netdisk softsubs (materialize to disk before playback when possible).
+      value.contains('/api/imports/') && value.contains('/srt/');
 }
 
 /// Local file **or** cloud `/media` / http(s) subtitle URL usable by the player.

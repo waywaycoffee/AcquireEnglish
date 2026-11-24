@@ -16,6 +16,7 @@ import '../../home/presentation/learning_dashboard_provider.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_import_service.dart';
 import '../../import_course/data/bilibili_multipage.dart';
+import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/data/subtitle_source_policy.dart';
 import '../../import_course/domain/bilibili_import.dart';
 import 'hardsub_asr_repair.dart';import '../../library/presentation/library_catalog_provider.dart';
@@ -354,6 +355,28 @@ class PadLandscapePlayerScreenState
 
     String? enSub = resource.englishSubtitleAsset;
     String? zhSub = resource.chineseSubtitleAsset;
+    final LibraryCourseData? netdiskCourse = resource.course;
+    if (netdiskCourse != null &&
+        (netdiskCourse.id.startsWith('netdisk-series-') ||
+            isNetdiskCourse(netdiskCourse))) {
+      try {
+        await materializeNetdiskSoftsubs(
+          api: ref.read(acquireApiClientProvider),
+          catalog: ref.read(libraryCatalogProvider.notifier),
+          courseId: netdiskCourse.id,
+          episode: resource.episode,
+          importId: parseNetdiskImportIdFromUrl(resource.videoAsset) ??
+              parseNetdiskImportIdFromUrl(enSub) ??
+              parseNetdiskImportIdFromUrl(zhSub),
+        );
+        resource = resolvePlayerCourseForEpisode(
+          courses: ref.read(libraryCatalogProvider),
+          episodeId: widget.episodeId,
+        );
+        enSub = resource.englishSubtitleAsset;
+        zhSub = resource.chineseSubtitleAsset;
+      } catch (_) {}
+    }
     final ({String? en, String? zh, bool dropped}) filtered =
         await _filterForeignSubtitles(
           resource: resource,

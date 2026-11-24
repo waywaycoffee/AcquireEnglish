@@ -10,7 +10,10 @@ from app.deps import get_current_user_optional
 from app.link_import import to_course_out
 from app.models import User, UserLinkCourse
 from app.schemas import CourseOut
-from app.services.netdisk_series import to_series_course_out
+from app.services.netdisk_series import (
+    curated_title_from_path,
+    to_series_course_out,
+)
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -35,13 +38,21 @@ async def _user_link_courses(db: AsyncSession, user: User) -> list[CourseOut]:
         key = (row.series_key or "").strip()
         if key and key in series_groups and key not in emitted_series:
             group = series_groups[key]
-            title = next(
-                (r.series_title for r in group if r.series_title),
-                group[0].title,
+            path_blob = " ".join(
+                (r.watch_url or "") for r in group[:5]
+            )
+            title = (
+                curated_title_from_path(path_blob)
+                or next(
+                    (r.series_title for r in group if r.series_title),
+                    group[0].title,
+                )
             )
             out.append(
                 CourseOut.model_validate(
-                    to_series_course_out(group, series_key=key, series_title=title or "网盘剧集")
+                    to_series_course_out(
+                        group, series_key=key, series_title=title or "网盘剧集"
+                    )
                 )
             )
             emitted_series.add(key)
@@ -79,7 +90,11 @@ async def course_detail(
         rows = list(result.scalars().all())
         if not rows:
             raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Course not found")
-        title = next((r.series_title for r in rows if r.series_title), rows[0].title)
+        path_blob = " ".join((r.watch_url or "") for r in rows[:5])
+        title = (
+            curated_title_from_path(path_blob)
+            or next((r.series_title for r in rows if r.series_title), rows[0].title)
+        )
         return CourseOut.model_validate(
             to_series_course_out(rows, series_key=series_key, series_title=title or "网盘剧集")
         )
@@ -108,9 +123,15 @@ async def course_detail(
                 )
             )
             group = list(group_result.scalars().all())
-            title = next(
-                (r.series_title for r in group if r.series_title),
-                row.series_title or row.title,
+            path_blob = " ".join(
+                (r.watch_url or "") for r in (group or [row])[:5]
+            )
+            title = (
+                curated_title_from_path(path_blob)
+                or next(
+                    (r.series_title for r in group if r.series_title),
+                    row.series_title or row.title,
+                )
             )
             return CourseOut.model_validate(
                 to_series_course_out(

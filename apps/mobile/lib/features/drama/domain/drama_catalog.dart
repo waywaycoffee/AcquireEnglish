@@ -33,8 +33,10 @@ const List<DramaCatalogEntry> kDramaCatalog = <DramaCatalogEntry>[
     blurb: '郊区生活与悬疑 · 日常口语密集',
     matchAliases: <String>[
       '绝望主妇',
+      '绝望的主妇',
       'desperate housewives',
       'desperate.housewives',
+      'desperate_housewives',
       'dh s0',
     ],
     accent: 0xFF8B4557,
@@ -106,9 +108,28 @@ const List<DramaCatalogEntry> kDramaCatalog = <DramaCatalogEntry>[
   ),
 ];
 
-String _courseBlob(LibraryCourseData course) =>
-    '${course.title} ${course.description} ${course.category} ${course.sourceLabel}'
-        .toLowerCase();
+String _courseBlob(LibraryCourseData course) {
+  final StringBuffer buf = StringBuffer()
+    ..write(course.title)
+    ..write(' ')
+    ..write(course.description)
+    ..write(' ')
+    ..write(course.category)
+    ..write(' ')
+    ..write(course.sourceLabel);
+  for (final LibraryEpisodeItem ep in course.episodes.take(8)) {
+    buf
+      ..write(' ')
+      ..write(ep.title)
+      ..write(' ')
+      ..write(ep.videoAsset)
+      ..write(' ')
+      ..write(ep.sourceUrl ?? '')
+      ..write(' ')
+      ..write(ep.enSubtitleAsset ?? '');
+  }
+  return buf.toString().toLowerCase();
+}
 
 bool catalogEntryMatchesCourse(
   DramaCatalogEntry entry,

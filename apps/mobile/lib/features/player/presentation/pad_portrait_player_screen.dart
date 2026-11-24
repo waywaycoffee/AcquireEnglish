@@ -562,6 +562,30 @@ class PadPortraitPlayerScreenState
     // Bilibili: pull official subs + force local MP4 before the player opens.
     String? enSub = resource.englishSubtitleAsset;
     String? zhSub = resource.chineseSubtitleAsset;
+    // Netdisk: /api/imports/{id}/srt needs auth — pull to local files first so
+    // the player does not treat softsubs as missing and start ASR.
+    final LibraryCourseData? netdiskCourse = resource.course;
+    if (netdiskCourse != null &&
+        (netdiskCourse.id.startsWith('netdisk-series-') ||
+            isNetdiskCourse(netdiskCourse))) {
+      try {
+        await materializeNetdiskSoftsubs(
+          api: ref.read(acquireApiClientProvider),
+          catalog: ref.read(libraryCatalogProvider.notifier),
+          courseId: netdiskCourse.id,
+          episode: resource.episode,
+          importId: parseNetdiskImportIdFromUrl(resource.videoAsset) ??
+              parseNetdiskImportIdFromUrl(enSub) ??
+              parseNetdiskImportIdFromUrl(zhSub),
+        );
+        resource = resolvePlayerCourseForEpisode(
+          courses: ref.read(libraryCatalogProvider),
+          episodeId: widget.episodeId,
+        );
+        enSub = resource.englishSubtitleAsset;
+        zhSub = resource.chineseSubtitleAsset;
+      } catch (_) {}
+    }
     // Never keep another episode's CC after 合集 local MP4 overwrite.
     final ({String? en, String? zh, bool dropped}) filtered =
         await _filterForeignSubtitles(
