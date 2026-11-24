@@ -265,7 +265,19 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
               c.id.startsWith('youtube-'),
         )
         .toList(growable: false);
-    state = <LibraryCourseData>[...cloudCourses, ...localOnly, ...youtube];
+    // Keep materialized local softsubs (Documents/netdisk|bilibili) when cloud
+    // catalog still points at /api/imports — otherwise every sync undoes play-time
+    // materialize and softsubs look "missing" again.
+    final Map<String, LibraryCourseData> previousById = <String, LibraryCourseData>{
+      for (final LibraryCourseData c in withoutPlaceholders) c.id: c,
+    };
+    final List<LibraryCourseData> mergedCloud = cloudCourses
+        .map(
+          (LibraryCourseData cloud) =>
+              _preserveLocalSoftsubPaths(cloud, previousById[cloud.id]),
+        )
+        .toList(growable: false);
+    state = <LibraryCourseData>[...mergedCloud, ...localOnly, ...youtube];
     await _persistImportedCourses();
   }
 
@@ -1704,4 +1716,71 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
         : <String>[segments.first];
     return '$prefix${managedSegments.join('/')}';
   }
+}
+
+bool _isLocalSoftsubFile(String? path) {
+  final String value = (path ?? '').trim();
+  if (value.isEmpty) {
+    return false;
+  }
+  if (value.startsWith('http://') ||
+      value.startsWith('https://') ||
+      value.startsWith('/api/') ||
+      value.startsWith('/media/')) {
+    return false;
+  }
+  try {
+    final File file = File(value);
+    return file.existsSync() && file.lengthSync() > 16;
+  } catch (_) {
+    return false;
+  }
+}
+
+/// Prefer on-disk softsubs over cloud `/api/imports` after catalog sync.
+LibraryCourseData _preserveLocalSoftsubPaths(
+  LibraryCourseData cloud,
+  LibraryCourseData? previous,
+) {
+  if (previous == null || previous.episodes.isEmpty) {
+    return cloud;
+  }
+  final Map<String, LibraryEpisodeItem> prevById = <String, LibraryEpisodeItem>{
+    for (final LibraryEpisodeItem e in previous.episodes) e.id: e,
+  };
+  final List<LibraryEpisodeItem> episodes = cloud.episodes.map((
+    LibraryEpisodeItem ep,
+  ) {
+    final LibraryEpisodeItem? prev = prevById[ep.id];
+    if (prev == null) {
+      return ep;
+    }
+    final String? en = _isLocalSoftsubFile(prev.enSubtitleAsset)
+        ? prev.enSubtitleAsset
+        : ep.enSubtitleAsset;
+    final String? zh = _isLocalSoftsubFile(prev.cnSubtitleAsset)
+        ? prev.cnSubtitleAsset
+        : ep.cnSubtitleAsset;
+    final String? video = _isLocalSoftsubFile(prev.videoAsset)
+        ? prev.videoAsset
+        : ep.videoAsset;
+    if (en == ep.enSubtitleAsset &&
+        zh == ep.cnSubtitleAsset &&
+        video == ep.videoAsset) {
+      return ep;
+    }
+    return ep.copyWith(
+      enSubtitleAsset: en,
+      cnSubtitleAsset: zh,
+      videoAsset: video,
+      hasEnglishSubtitles:
+          (en != null && en.trim().isNotEmpty) || ep.hasEnglishSubtitles,
+      hasChineseSubtitles:
+          (zh != null && zh.trim().isNotEmpty) || ep.hasChineseSubtitles,
+      videoMissing: video == null || video.trim().isEmpty
+          ? ep.videoMissing
+          : false,
+    );
+  }).toList(growable: false);
+  return cloud.copyWith(episodes: episodes);
 }

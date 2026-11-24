@@ -8,9 +8,8 @@ import '../import_course/data/bilibili_multipage.dart';
 import '../import_course/data/ensure_official_softsubs.dart';
 import '../import_course/data/subtitle_source_policy.dart';
 import '../library/presentation/library_mock_data.dart';
+import '../player/data/softsub_resolver.dart';
 import '../player/presentation/bilingual_subtitle_helpers.dart';
-import '../player/presentation/player_mock_state.dart';
-import '../player/presentation/player_subtitle_loader.dart';
 import '../player/presentation/subtitle_file_persist.dart';
 import '../player/presentation/subtitle_sentence_merge.dart';
 import '../sync/data/acquire_api_client.dart';
@@ -91,14 +90,18 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
     // Existing Chinese is never auto-cleared; only missing sides enqueue fill.
     bool needEnglish = enHits * 2 < total;
     bool needChinese = zhHits * 2 < total;
-    // Official softsubs on disk still satisfy a side even when the ASR cache
-    // is English-only / sparse ZH (player prefers official when present).
-    if (needEnglish &&
-        await _subtitleFileHasLanguage(
-          enSubtitlePath,
-          requireEnglish: true,
-        )) {
-      needEnglish = false;
+    // Official / netdisk softsubs still satisfy a side when ASR cache is sparse.
+    if (needEnglish) {
+      String? enPath = isUsableSubtitlePath(enSubtitlePath)
+          ? enSubtitlePath!.trim()
+          : null;
+      enPath ??= await existingOfficialBilibiliSubtitle(
+        idKey: sourceKey,
+        fileName: 'en.srt',
+      );
+      if (await _subtitleFileHasLanguage(enPath, requireEnglish: true)) {
+        needEnglish = false;
+      }
     }
     if (needChinese && !ignoreOfficialChinese) {
       String? zhPath = isUsableSubtitlePath(zhSubtitlePath)
@@ -141,8 +144,7 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
       fileName: 'zh.srt',
     );
   }
-  // Paths may exist but be empty, unreadable, or the wrong language (e.g. a
-  // Chinese CC saved as en.srt). Size + cue language must both pass.
+  // Unified SoftsubResolver: materialize /api/imports, then language-probe.
   final bool hasReliableEn = await _subtitleFileHasLanguage(
     enPath,
     requireEnglish: true,
@@ -160,66 +162,12 @@ Future<SubtitleCompletionNeed> detectSubtitleCompletionNeed({
   );
 }
 
-/// True when the SRT exists, is non-trivial, and ≥ half of cues match [lang].
+/// True when softsubs resolve + language-probe (via [softsubHasLanguage]).
 Future<bool> _subtitleFileHasLanguage(
   String? path, {
   required bool requireEnglish,
-}) async {
-  final String? trimmed = isUsableSubtitlePath(path) ? path!.trim() : null;
-  if (trimmed == null) {
-    return false;
-  }
-  // Netdisk / personal import softsubs are auth-gated API URLs. [File] cannot
-  // see them; the player materializes to disk. Treat matching /srt/{lang} as
-  // present so we do not false-trigger「云端字幕未就绪」+ ASR.
-  final String lower = trimmed.toLowerCase();
-  if (lower.contains('/api/imports/') && lower.contains('/srt/')) {
-    if (requireEnglish) {
-      return lower.contains('/srt/en');
-    }
-    return lower.contains('/srt/zh');
-  }
-  if (isRemoteSubtitlePath(trimmed) &&
-      (lower.startsWith('http://') || lower.startsWith('https://'))) {
-    // Signed CDN softsub URL — presence already means the course published it.
-    if (requireEnglish) {
-      return lower.contains('en.srt') ||
-          lower.contains('/en.') ||
-          lower.contains('lang=en') ||
-          lower.contains('/srt/en');
-    }
-    return lower.contains('zh.srt') ||
-        lower.contains('/zh.') ||
-        lower.contains('lang=zh') ||
-        lower.contains('/srt/zh') ||
-        lower.contains('cn.srt');
-  }
-  try {
-    final File file = File(trimmed);
-    if (!file.existsSync() || file.lengthSync() < 16) {
-      return false;
-    }
-    final List<PlayerSubtitleLine> lines = await loadSubtitleLines(trimmed);
-    if (lines.isEmpty) {
-      return false;
-    }
-    int hits = 0;
-    for (final PlayerSubtitleLine line in lines) {
-      final String primary = requireEnglish
-          ? (line.english.trim().isNotEmpty ? line.english : line.chinese)
-          : (line.chinese.trim().isNotEmpty ? line.chinese : line.english);
-      if (requireEnglish) {
-        if (looksEnglish(primary) && !looksChinese(primary)) {
-          hits += 1;
-        }
-      } else if (looksChinese(primary)) {
-        hits += 1;
-      }
-    }
-    return hits * 2 >= lines.length;
-  } catch (_) {
-    return false;
-  }
+}) {
+  return softsubHasLanguage(path, requireEnglish: requireEnglish);
 }
 
 /// Missing-subtitle chip the user tapped on the course episode list.

@@ -13,11 +13,15 @@ import '../../words/domain/foundation_media.dart';
 import '../../words/domain/server_syllabus_catalog.dart';
 import '../../words/domain/syllabus_book.dart';
 import '../../exam/domain/exam_pack.dart';
+import '../../player/data/softsub_paths.dart';
 import '../../writing/domain/writing_models.dart';
 
 final Provider<AcquireApiClient> acquireApiClientProvider =
     Provider<AcquireApiClient>((Ref ref) {
-      return AcquireApiClient(ref.watch(networkRepositoryProvider));
+      final AcquireApiClient client =
+          AcquireApiClient(ref.watch(networkRepositoryProvider));
+      SoftsubAuthBridge.bindApiClient(client);
+      return client;
     });
 
 class AcquireUser {

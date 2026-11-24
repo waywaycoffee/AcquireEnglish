@@ -4,6 +4,7 @@ import 'package:dio/dio.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../../library/presentation/library_mock_data.dart';
+import '../../player/data/softsub_paths.dart';
 import '../domain/bilibili_import.dart';
 import 'bilibili_import_service.dart';
 import 'bilibili_multipage.dart';
@@ -135,29 +136,17 @@ Future<String?> existingOfficialBilibiliSubtitle({
 }
 
 bool isRemoteSubtitlePath(String? path) {
-  final String value = path?.trim() ?? '';
-  if (value.isEmpty) {
-    return false;
-  }
-  return value.startsWith('http://') ||
-      value.startsWith('https://') ||
-      value.startsWith('/media/') ||
-      // Personal netdisk softsubs (materialize to disk before playback when possible).
-      value.contains('/api/imports/') && value.contains('/srt/');
+  final SoftsubPathKind kind = classifySoftsubPath(path);
+  return kind == SoftsubPathKind.importsApi ||
+      kind == SoftsubPathKind.mediaRelative ||
+      kind == SoftsubPathKind.httpUrl;
 }
 
-/// Local file **or** cloud `/media` / http(s) subtitle URL usable by the player.
-bool isUsableSubtitlePath(String? path) {
-  final String value = path?.trim() ?? '';
-  if (value.isEmpty) {
-    return false;
-  }
-  if (isRemoteSubtitlePath(value)) {
-    return true;
-  }
-  final File file = File(value);
-  return file.existsSync() && file.lengthSync() > 16;
-}
+/// Local file **or** cloud `/media` / `/api/imports` / http(s) softsub URL.
+///
+/// Delegates to [softsubPathLooksPresent] so netdisk + B站 + ECS media share
+/// one definition (avoids false ASR when only the path shape is remote).
+bool isUsableSubtitlePath(String? path) => softsubPathLooksPresent(path);
 
 /// Softsub path allowed for this episode's watch URL / BV-page.
 ///

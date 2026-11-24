@@ -2,8 +2,10 @@ import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
+import 'package:path_provider/path_provider.dart';
 
 import '../../../constants/endpoints.dart';
+import '../data/softsub_paths.dart';
 
 String createPlayerMediaUri(String source) {
   if (source.startsWith('http://') || source.startsWith('https://')) {
@@ -22,6 +24,9 @@ bool playerMediaAvailable(String source) {
   if (source.startsWith('/media/')) {
     return true;
   }
+  if (source.contains('/api/imports/') && source.contains('/srt/')) {
+    return true;
+  }
   if (source.startsWith('assets/')) {
     return true;
   }
@@ -30,6 +35,35 @@ bool playerMediaAvailable(String source) {
 
 Future<String> loadPlayerTextSource(String source) async {
   final String trimmed = source.trim();
+  // Auth-gated personal import softsubs — Dio via SoftsubAuthBridge, then local.
+  if (classifySoftsubPath(trimmed) == SoftsubPathKind.importsApi) {
+    final bool english = trimmed.toLowerCase().contains('/srt/en');
+    final int? importId = _importIdFromPath(trimmed);
+    if (importId == null) {
+      throw StateError('无效的网盘字幕路径');
+    }
+    final Directory docs = await getApplicationDocumentsDirectory();
+    final File cached = File(
+      '${docs.path}/netdisk/$importId/${english ? 'en' : 'zh'}.srt',
+    );
+    if (cached.existsSync() && cached.lengthSync() > 16) {
+      return cached.readAsString();
+    }
+    final SoftsubImportSrtFetcher? fetcher = SoftsubAuthBridge.fetchImportSrt;
+    if (fetcher == null) {
+      throw StateError('网盘字幕未绑定登录客户端');
+    }
+    final String? body = await fetcher(
+      importId: importId,
+      lang: english ? 'en' : 'zh',
+    );
+    if (body == null || body.trim().isEmpty) {
+      throw StateError('网盘字幕为空');
+    }
+    await cached.parent.create(recursive: true);
+    await cached.writeAsString(body, flush: true);
+    return body;
+  }
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     final HttpClient client = HttpClient();
     try {
@@ -57,6 +91,11 @@ Future<String> loadPlayerTextSource(String source) async {
     return File(trimmed).readAsString();
   }
   return rootBundle.loadString(trimmed);
+}
+
+int? _importIdFromPath(String path) {
+  final Match? m = RegExp(r'/api/imports/(\d+)/srt/').firstMatch(path);
+  return m == null ? null : int.tryParse(m.group(1)!);
 }
 
 bool _isLocalFilePath(String source) {
