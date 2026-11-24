@@ -313,6 +313,181 @@ Future<({String uri, Map<String, String>? headers})>
 
 final Set<String> _prefetchInFlightPlayUrls = <String>{};
 final Map<String, Future<File>> _netdiskDownloadsInFlight = <String, Future<File>>{};
+final Map<String, NetdiskEpisodeCacheInfo> _episodeCacheSeed =
+    <String, NetdiskEpisodeCacheInfo>{};
+NetdiskEpisodeCacheNotifier? _episodeCacheNotifier;
+
+enum NetdiskEpisodeCachePhase { remote, partial, downloading, ready }
+
+class NetdiskEpisodeCacheInfo {
+  const NetdiskEpisodeCacheInfo({
+    required this.phase,
+    this.progress,
+    this.localPath,
+  });
+
+  final NetdiskEpisodeCachePhase phase;
+  /// 0–1 when known; null = indeterminate.
+  final double? progress;
+  final String? localPath;
+
+  String get label {
+    switch (phase) {
+      case NetdiskEpisodeCachePhase.ready:
+        return '已下载';
+      case NetdiskEpisodeCachePhase.downloading:
+        final double? p = progress;
+        if (p == null) return '下载中…';
+        return '下载中 ${(p * 100).round()}%';
+      case NetdiskEpisodeCachePhase.partial:
+        final double? p = progress;
+        if (p == null) return '未下完';
+        return '未下完 ${(p * 100).round()}%';
+      case NetdiskEpisodeCachePhase.remote:
+        return '未下载';
+    }
+  }
+
+  bool get isReady => phase == NetdiskEpisodeCachePhase.ready;
+  bool get isDownloading => phase == NetdiskEpisodeCachePhase.downloading;
+}
+
+class NetdiskEpisodeCacheNotifier
+    extends Notifier<Map<String, NetdiskEpisodeCacheInfo>> {
+  @override
+  Map<String, NetdiskEpisodeCacheInfo> build() {
+    _episodeCacheNotifier = this;
+    ref.onDispose(() {
+      if (identical(_episodeCacheNotifier, this)) {
+        _episodeCacheNotifier = null;
+      }
+    });
+    return Map<String, NetdiskEpisodeCacheInfo>.from(_episodeCacheSeed);
+  }
+
+  void put(String key, NetdiskEpisodeCacheInfo info) {
+    _episodeCacheSeed[key] = info;
+    state = <String, NetdiskEpisodeCacheInfo>{...state, key: info};
+  }
+}
+
+final NotifierProvider<NetdiskEpisodeCacheNotifier,
+        Map<String, NetdiskEpisodeCacheInfo>> netdiskEpisodeCacheProvider =
+    NotifierProvider<NetdiskEpisodeCacheNotifier,
+        Map<String, NetdiskEpisodeCacheInfo>>(NetdiskEpisodeCacheNotifier.new);
+
+void publishNetdiskEpisodeCache(String key, NetdiskEpisodeCacheInfo info) {
+  if (key.trim().isEmpty) return;
+  _episodeCacheSeed[key] = info;
+  _episodeCacheNotifier?.put(key, info);
+}
+
+String? netdiskEpisodeCacheKey(LibraryEpisodeItem episode) {
+  return parseNetdiskImportIdFromUrl(episode.videoAsset)?.toString() ??
+      parseNetdiskImportIdFromUrl(episode.sourceUrl)?.toString() ??
+      parseNetdiskImportIdFromUrl(episode.enSubtitleAsset)?.toString();
+}
+
+String? netdiskPlayUrlForEpisode(LibraryEpisodeItem episode) {
+  for (final String? raw in <String?>[
+    episode.sourceUrl,
+    episode.videoAsset,
+  ]) {
+    final String value = (raw ?? '').trim();
+    if (isNetdiskPlayUrl(value)) {
+      return value;
+    }
+  }
+  return null;
+}
+
+NetdiskEpisodeCacheInfo? netdiskEpisodeCacheOf(
+  Map<String, NetdiskEpisodeCacheInfo> map,
+  LibraryEpisodeItem episode,
+) {
+  final String? key = netdiskEpisodeCacheKey(episode);
+  if (key == null) return null;
+  return map[key] ?? _episodeCacheSeed[key];
+}
+
+Future<NetdiskEpisodeCacheInfo> probeNetdiskEpisodeCache(
+  LibraryEpisodeItem episode,
+) async {
+  if (isUsableLocalVideoPath(episode.videoAsset)) {
+    return NetdiskEpisodeCacheInfo(
+      phase: NetdiskEpisodeCachePhase.ready,
+      progress: 1,
+      localPath: episode.videoAsset!.trim(),
+    );
+  }
+  final int? importId = parseNetdiskImportIdFromUrl(episode.videoAsset) ??
+      parseNetdiskImportIdFromUrl(episode.sourceUrl);
+  if (importId == null) {
+    return const NetdiskEpisodeCacheInfo(
+      phase: NetdiskEpisodeCachePhase.remote,
+    );
+  }
+  final String key = '$importId';
+  if (_netdiskDownloadsInFlight.containsKey(key)) {
+    return _episodeCacheSeed[key] ??
+        const NetdiskEpisodeCacheInfo(
+          phase: NetdiskEpisodeCachePhase.downloading,
+        );
+  }
+  final File? cached = await findCachedNetdiskMedia(importId);
+  if (cached != null) {
+    return NetdiskEpisodeCacheInfo(
+      phase: NetdiskEpisodeCachePhase.ready,
+      progress: 1,
+      localPath: cached.path,
+    );
+  }
+  final Directory dir = await netdiskMediaDirectory();
+  final File part = File('${dir.path}/$key.mkv.part');
+  if (part.existsSync() && part.lengthSync() > 1024) {
+    return NetdiskEpisodeCacheInfo(
+      phase: NetdiskEpisodeCachePhase.partial,
+      progress: _episodeCacheSeed[key]?.progress,
+    );
+  }
+  return const NetdiskEpisodeCacheInfo(
+    phase: NetdiskEpisodeCachePhase.remote,
+  );
+}
+
+Future<void> refreshNetdiskEpisodeCacheStates(
+  Iterable<LibraryEpisodeItem> episodes,
+) async {
+  for (final LibraryEpisodeItem ep in episodes) {
+    final String? key = netdiskEpisodeCacheKey(ep);
+    if (key == null) continue;
+    // Don't overwrite live download ticks with a stale probe.
+    if (_netdiskDownloadsInFlight.containsKey(key)) continue;
+    publishNetdiskEpisodeCache(key, await probeNetdiskEpisodeCache(ep));
+  }
+}
+
+/// Start / resume one episode from the list page (deduped with player).
+Future<File?> enqueueNetdiskEpisodeDownload({
+  required LibraryEpisodeItem episode,
+  LibraryCatalogNotifier? catalog,
+  String? courseId,
+}) async {
+  final String? playUrl = netdiskPlayUrlForEpisode(episode);
+  if (playUrl == null) {
+    return null;
+  }
+  final File file = await cacheNetdiskEpisodeLocally(playUrl: playUrl);
+  if (catalog != null && courseId != null && courseId.isNotEmpty) {
+    await catalog.updateEpisodeLocalMedia(
+      courseId: courseId,
+      episodeId: episode.id,
+      videoAsset: file.path,
+      videoMissing: false,
+    );
+  }
+  return file;
+}
 
 /// Warm the next episode while the current one plays from local cache.
 void prefetchNetdiskPlayUrl(String? playUrl) {
@@ -346,19 +521,78 @@ Future<File> cacheNetdiskEpisodeLocally({
       playUrl.hashCode.toRadixString(16);
   final Future<File>? existingJob = _netdiskDownloadsInFlight[idKey];
   if (existingJob != null) {
+    publishNetdiskEpisodeCache(
+      idKey,
+      const NetdiskEpisodeCacheInfo(
+        phase: NetdiskEpisodeCachePhase.downloading,
+      ),
+    );
     final File shared = await existingJob;
     onProgress?.call(1);
+    publishNetdiskEpisodeCache(
+      idKey,
+      NetdiskEpisodeCacheInfo(
+        phase: NetdiskEpisodeCachePhase.ready,
+        progress: 1,
+        localPath: shared.path,
+      ),
+    );
     return shared;
   }
+  publishNetdiskEpisodeCache(
+    idKey,
+    const NetdiskEpisodeCacheInfo(
+      phase: NetdiskEpisodeCachePhase.downloading,
+      progress: 0,
+    ),
+  );
   final Future<File> job = _cacheNetdiskEpisodeLocallyImpl(
     playUrl: playUrl,
     importId: importId,
     idKey: idKey,
-    onProgress: onProgress,
+    onProgress: (double? p) {
+      publishNetdiskEpisodeCache(
+        idKey,
+        NetdiskEpisodeCacheInfo(
+          phase: NetdiskEpisodeCachePhase.downloading,
+          progress: p,
+        ),
+      );
+      onProgress?.call(p);
+    },
   );
   _netdiskDownloadsInFlight[idKey] = job;
   try {
-    return await job;
+    final File file = await job;
+    publishNetdiskEpisodeCache(
+      idKey,
+      NetdiskEpisodeCacheInfo(
+        phase: NetdiskEpisodeCachePhase.ready,
+        progress: 1,
+        localPath: file.path,
+      ),
+    );
+    return file;
+  } catch (e) {
+    final Directory dir = await netdiskMediaDirectory();
+    final File part = File('${dir.path}/$idKey.mkv.part');
+    if (part.existsSync() && part.lengthSync() > 1024) {
+      publishNetdiskEpisodeCache(
+        idKey,
+        NetdiskEpisodeCacheInfo(
+          phase: NetdiskEpisodeCachePhase.partial,
+          progress: _episodeCacheSeed[idKey]?.progress,
+        ),
+      );
+    } else {
+      publishNetdiskEpisodeCache(
+        idKey,
+        const NetdiskEpisodeCacheInfo(
+          phase: NetdiskEpisodeCachePhase.remote,
+        ),
+      );
+    }
+    rethrow;
   } finally {
     if (identical(_netdiskDownloadsInFlight[idKey], job)) {
       _netdiskDownloadsInFlight.remove(idKey);
@@ -617,12 +851,16 @@ int pendingNetdiskEpisodes(LibraryCourseData course) {
   if (!isNetdiskCourse(course)) {
     return 0;
   }
-  return course.episodes
-      .where(
-        (LibraryEpisodeItem e) =>
-            e.videoMissing || !isUsableLocalVideoPath(e.videoAsset),
-      )
-      .length;
+  return course.episodes.where((LibraryEpisodeItem e) {
+    if (isUsableLocalVideoPath(e.videoAsset)) {
+      return false;
+    }
+    final String? key = netdiskEpisodeCacheKey(e);
+    if (key != null && (_episodeCacheSeed[key]?.isReady ?? false)) {
+      return false;
+    }
+    return true;
+  }).length;
 }
 
 /// Write API softsubs for a netdisk import onto disk and catalog.

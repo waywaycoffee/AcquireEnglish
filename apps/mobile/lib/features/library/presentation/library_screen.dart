@@ -1193,6 +1193,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                 return CourseEpisodeTile(
                                   key: ValueKey<String>(item.id),
                                   item: item,
+                                  courseId: selectedCourse.id,
                                   selected: item.id == selectedEpisodeId,
                                   fallbackCoverImage: selectedCourse.coverImage,
                                   bottomPadding: compact ? 12 : 16,
@@ -1282,6 +1283,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                                       visibleEpisodes[index];
                                   return CourseEpisodeTile(
                                     item: item,
+                                    courseId: selectedCourse.id,
                                     selected: item.id == selectedEpisodeId,
                                     fallbackCoverImage:
                                         selectedCourse.coverImage,
@@ -2084,6 +2086,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       showDetail = true;
     });
     _maybeBackfillBilibiliEpisodeCovers(course);
+    if (isNetdiskCourse(course)) {
+      unawaited(refreshNetdiskEpisodeCacheStates(course.episodes));
+    }
   }
 
   bool _openingEpisode = false;

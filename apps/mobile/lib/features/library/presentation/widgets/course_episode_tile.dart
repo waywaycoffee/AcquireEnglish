@@ -1,9 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../import_course/data/netdisk_local_download.dart';
 import '../../../player/domain/episode_study_progress.dart';
 import '../../../player/presentation/episode_study_progress_provider.dart';
 import '../../../subtitle_completion/subtitle_completion_status_provider.dart';
+import '../library_catalog_provider.dart';
 import '../library_mock_data.dart';
 import 'episode_list_item.dart';
 
@@ -22,6 +26,7 @@ class CourseEpisodeTile extends ConsumerWidget {
     required this.onRerecognizeChinese,
     required this.onMissingEnglishTap,
     required this.onMissingChineseTap,
+    this.courseId,
     this.trailing,
     this.bottomPadding = 16,
     super.key,
@@ -36,6 +41,7 @@ class CourseEpisodeTile extends ConsumerWidget {
   final VoidCallback onRerecognizeChinese;
   final VoidCallback onMissingEnglishTap;
   final VoidCallback onMissingChineseTap;
+  final String? courseId;
   final Widget? trailing;
   final double bottomPadding;
 
@@ -73,6 +79,16 @@ class CourseEpisodeTile extends ConsumerWidget {
             episodeProgressOf(map, item.id).stage,
       ),
     );
+    final String? cacheKey = netdiskEpisodeCacheKey(item);
+    final NetdiskEpisodeCacheInfo? cache = cacheKey == null
+        ? null
+        : ref.watch(
+            netdiskEpisodeCacheProvider.select(
+              (Map<String, NetdiskEpisodeCacheInfo> map) => map[cacheKey],
+            ),
+          );
+    final bool showDownload = cacheKey != null &&
+        (netdiskPlayUrlForEpisode(item) != null || cache != null);
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomPadding),
@@ -87,6 +103,23 @@ class CourseEpisodeTile extends ConsumerWidget {
         subtitleFillActive: fill?.active ?? false,
         subtitleFillProgress: fill?.progress,
         studyStage: studyStage,
+        downloadLabel: showDownload
+            ? (cache?.label ?? '未下载')
+            : null,
+        downloadProgress: cache?.progress,
+        downloadReady: cache?.isReady ?? false,
+        downloadActive: cache?.isDownloading ?? false,
+        onDownloadTap: showDownload && !(cache?.isReady ?? false)
+            ? () {
+                unawaited(
+                  enqueueNetdiskEpisodeDownload(
+                    episode: item,
+                    catalog: ref.read(libraryCatalogProvider.notifier),
+                    courseId: courseId,
+                  ),
+                );
+              }
+            : null,
         onTap: onTap,
         onViewTranscript: onViewTranscript,
         onRerecognizeEnglish: onRerecognizeEnglish,

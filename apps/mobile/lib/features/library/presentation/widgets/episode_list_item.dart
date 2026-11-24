@@ -53,6 +53,11 @@ class EpisodeListItem extends StatelessWidget {
     this.subtitleFillProgress,
     this.subtitleFillActive = false,
     this.studyStage,
+    this.downloadLabel,
+    this.downloadProgress,
+    this.downloadReady = false,
+    this.downloadActive = false,
+    this.onDownloadTap,
     super.key,
   });
 
@@ -81,6 +86,13 @@ class EpisodeListItem extends StatelessWidget {
 
   /// Four-stage study dots (video / drama progress).
   final EpisodeStudyStage? studyStage;
+
+  /// Netdisk / local video cache chip + bar (美剧列表).
+  final String? downloadLabel;
+  final double? downloadProgress;
+  final bool downloadReady;
+  final bool downloadActive;
+  final VoidCallback? onDownloadTap;
 
   @override
   Widget build(BuildContext context) {
@@ -140,6 +152,26 @@ class EpisodeListItem extends StatelessWidget {
                     textColor: _isPendingBilibiliDownload(item)
                         ? AppDesignTokens.primaryBlue
                         : AppDesignTokens.dangerText,
+                  ),
+                if ((downloadLabel ?? '').trim().isNotEmpty)
+                  _InfoChip(
+                    icon: downloadReady
+                        ? Icons.download_done_rounded
+                        : (downloadActive
+                            ? Icons.downloading_rounded
+                            : Icons.download_for_offline_outlined),
+                    label: downloadLabel!.trim(),
+                    backgroundColor: downloadReady
+                        ? AppDesignTokens.successSoft
+                        : AppDesignTokens.infoSoft,
+                    textColor: downloadReady
+                        ? (AppDesignTokens.isDark
+                            ? AppDesignTokens.brandGreen
+                            : AppDesignTokens.brandGreenDark)
+                        : AppDesignTokens.primaryBlue,
+                    onTap: downloadReady || downloadActive
+                        ? null
+                        : onDownloadTap,
                   ),
                 _InfoChip(
                   icon: englishFillFailed
@@ -236,6 +268,20 @@ class EpisodeListItem extends StatelessWidget {
                 borderRadius: BorderRadius.circular(999),
                 child: LinearProgressIndicator(
                   value: (subtitleFillProgress ?? 0.08).clamp(0.05, 1.0),
+                  minHeight: 8,
+                  backgroundColor: AppDesignTokens.infoSoft,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppDesignTokens.primaryBlue,
+                  ),
+                ),
+              ),
+            ],
+            if (downloadActive) ...<Widget>[
+              const SizedBox(height: 10),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: downloadProgress,
                   minHeight: 8,
                   backgroundColor: AppDesignTokens.infoSoft,
                   valueColor: const AlwaysStoppedAnimation<Color>(

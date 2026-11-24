@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../daily_review/data/memory_item_store.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/presentation/netdisk_import_sheet.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
@@ -46,6 +49,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
   String? _selectedCourseId;
   bool _syncedDue = false;
   bool _coversPrefetched = false;
+  String? _cacheScanCourseId;
 
   @override
   void initState() {
@@ -94,6 +98,15 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
         }
       }
     }
+    if (selected != null && selected.id != _cacheScanCourseId) {
+      final LibraryCourseData scanTarget = selected;
+      _cacheScanCourseId = scanTarget.id;
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(refreshNetdiskEpisodeCacheStates(scanTarget.episodes));
+      });
+    }
+    final Map<String, NetdiskEpisodeCacheInfo> cacheMap =
+        ref.watch(netdiskEpisodeCacheProvider);
 
     int masteredEps = 0;
     int totalEps = 0;
@@ -192,8 +205,8 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
           )
         else ...<Widget>[
           Text(
-            '${libraryCourseDisplayTitle(selected)}  ·  '
-            '${selected.episodes.length} 集',
+            '${libraryCourseDisplayTitle(selected!)}  ·  '
+            '${selected!.episodes.length} 集',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: AppDesignTokens.textPrimary,
@@ -217,10 +230,18 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          ..._filteredEpisodes(selected, progressMap).map(
+          ..._filteredEpisodes(selected!, progressMap).map(
             (LibraryEpisodeItem ep) {
+              final String courseId = selected!.id;
               final EpisodeStudyProgress p =
                   episodeProgressOf(progressMap, ep.id);
+              final NetdiskEpisodeCacheInfo? cache =
+                  netdiskEpisodeCacheOf(cacheMap, ep);
+              final bool canDownload = netdiskPlayUrlForEpisode(ep) != null;
+              final String downloadLabel =
+                  cache?.label ?? (canDownload ? '未下载' : '');
+              final bool downloading = cache?.isDownloading ?? false;
+              final bool ready = cache?.isReady ?? false;
               return Card(
                 color: AppDesignTokens.appWhite,
                 margin: const EdgeInsets.only(bottom: 8),
@@ -231,7 +252,77 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                   ),
                   subtitle: Padding(
                     padding: const EdgeInsets.only(top: 8),
-                    child: EpisodeStageDots(stage: p.stage),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: <Widget>[
+                        EpisodeStageDots(stage: p.stage),
+                        if (downloadLabel.isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 8),
+                          Row(
+                            children: <Widget>[
+                              Icon(
+                                ready
+                                    ? Icons.download_done_rounded
+                                    : (downloading
+                                        ? Icons.downloading_rounded
+                                        : Icons.download_for_offline_outlined),
+                                size: 16,
+                                color: ready
+                                    ? (AppDesignTokens.isDark
+                                        ? AppDesignTokens.brandGreen
+                                        : AppDesignTokens.brandGreenDark)
+                                    : AppDesignTokens.primaryBlue,
+                              ),
+                              const SizedBox(width: 6),
+                              Expanded(
+                                child: Text(
+                                  downloadLabel,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w700,
+                                    color: ready
+                                        ? (AppDesignTokens.isDark
+                                            ? AppDesignTokens.brandGreen
+                                            : AppDesignTokens.brandGreenDark)
+                                        : AppDesignTokens.primaryBlue,
+                                  ),
+                                ),
+                              ),
+                              if (canDownload && !ready && !downloading)
+                                TextButton(
+                                  onPressed: () {
+                                    unawaited(
+                                      enqueueNetdiskEpisodeDownload(
+                                        episode: ep,
+                                        catalog: ref.read(
+                                          libraryCatalogProvider.notifier,
+                                        ),
+                                        courseId: courseId,
+                                      ),
+                                    );
+                                  },
+                                  child: const Text('下载'),
+                                ),
+                            ],
+                          ),
+                          if (downloading) ...<Widget>[
+                            const SizedBox(height: 6),
+                            ClipRRect(
+                              borderRadius: BorderRadius.circular(999),
+                              child: LinearProgressIndicator(
+                                value: cache?.progress,
+                                minHeight: 6,
+                                backgroundColor: AppDesignTokens.infoSoft,
+                                valueColor:
+                                    const AlwaysStoppedAnimation<Color>(
+                                  AppDesignTokens.primaryBlue,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ],
+                    ),
                   ),
                   trailing: Icon(
                     Icons.chevron_right,
