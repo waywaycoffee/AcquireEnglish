@@ -51,6 +51,7 @@ from app.routers import (
     public_lexicon,
     pregen_cache,
     reading_backup,
+    read_aloud,
     reading_speech,
     course_quiz,
     exam_reading_parse,
@@ -164,6 +165,7 @@ app.include_router(fingerprint_cache.admin_router, prefix="/api")
 app.include_router(rewards.router, prefix="/api")
 app.include_router(cosmetics.router, prefix="/api")
 app.include_router(review_sync.router, prefix="/api")
+app.include_router(read_aloud.router, prefix="/api")
 app.include_router(reading_backup.router, prefix="/api")
 app.include_router(wordbook_backup.router, prefix="/api")
 app.include_router(app_settings_backup.router, prefix="/api")

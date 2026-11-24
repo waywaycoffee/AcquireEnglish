@@ -9,6 +9,7 @@ import '../../authentication/presentation/account_storage.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../exam/data/exam_error_book_store.dart';
+import '../../home/presentation/read_aloud_report_provider.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
 import '../../reading/data/reading_vocab_lists.dart';
@@ -52,6 +53,7 @@ Future<void> runDeviceSyncBootstrap(
   } catch (_) {}
 
   await Future.wait(<Future<void>>[
+    _safe(() => (ref.read(readAloudReportProvider.notifier) as ReadAloudReport).sync()),
     _safe(() async {
       await (ref.read(progressSyncServiceProvider) as ProgressSyncService)
           .pullIndexed();

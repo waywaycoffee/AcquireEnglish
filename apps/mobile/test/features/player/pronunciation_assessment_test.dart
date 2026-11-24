@@ -6,6 +6,28 @@ import 'package:common_learn_english/features/player/presentation/pronunciation_
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('assessment keeps word and phone evidence from ECS and SDK', () {
+    for (final cloud in [false, true]) {
+      final result = PronunciationAssessmentResult.tryParse({
+        (cloud ? 'words' : 'Words'): [
+          {
+            (cloud ? 'word' : 'Word'): 'though',
+            (cloud ? 'match_tag' : 'MatchTag'): 0,
+            (cloud ? 'phones' : 'PhoneInfos'): [
+              {
+                (cloud ? 'phone' : 'Phone'): 'd',
+                (cloud ? 'reference_phone' : 'ReferencePhone'): 'dh',
+                (cloud ? 'accuracy' : 'PronAccuracy'): 42,
+              },
+            ],
+          },
+        ],
+      });
+      expect(result!.words.single.phones.single.referencePhone, 'dh');
+      expect(result.words.single.phones.single.accuracy, 42);
+      expect(result.weakWords, {'though'});
+    }
+  });
   test('shadowing score accounts for omitted words and labels word errors', () {
     final result = PronunciationAssessmentResult.tryParse({
       'score': 96,

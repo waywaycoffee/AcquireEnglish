@@ -13,6 +13,7 @@ import '../../membership/domain/oral_doc_library.dart';
 import '../../membership/domain/oral_explore_entitlements.dart';
 import '../../player/data/pronunciation_providers.dart';
 import '../../player/domain/pronunciation_assessment.dart';
+import '../../player/presentation/widgets/pronunciation_assessment_dialog.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
@@ -748,6 +749,23 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
                 ),
               ),
             ),
+            if (RegExp('[A-Za-z]').hasMatch(widget.focusedSentence))
+              Align(
+                alignment: Alignment.centerLeft,
+                child: TextButton.icon(
+                  onPressed: _busy || _recordingActive
+                      ? null
+                      : () => showPronunciationAssessmentDialog(
+                          context,
+                          target: PronunciationAssessmentTarget.wordOnly(
+                            widget.focusedSentence,
+                          ),
+                          readingPractice: true,
+                        ),
+                  icon: const Icon(Icons.record_voice_over_outlined),
+                  label: const Text('跟读当前句'),
+                ),
+              ),
             if ((_error ?? '').isNotEmpty)
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 20),

@@ -79,7 +79,17 @@ export type EmailSendResult = {
 
 export type SmsSendResult = EmailSendResult;
 
+export type ReadAloudAttempt = {
+  id: string;
+  day: string;
+  durationMs: number;
+  weakWords: string[];
+};
+
 export const api = {
+  readAloud: (token: string, since: string, signal: AbortSignal) =>
+    request<ReadAloudAttempt[]>(`/api/read-aloud?since=${encodeURIComponent(since)}`, { signal }, token),
+
   sendEmailCode: (email: string) =>
     request<EmailSendResult>("/api/auth/email/send", {
       method: "POST",

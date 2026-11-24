@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../learning_dashboard_provider.dart';
+import 'read_aloud_report_card.dart';
 
 /// Home card: today activity counts with today-vs-yesterday deltas + period sheet.
 class LearningActivityStatsCard extends ConsumerWidget {
@@ -58,6 +59,8 @@ class LearningActivityStatsCard extends ConsumerWidget {
               value: stats.todayFavoriteCount,
               delta: stats.deltaFavoriteCount,
             ),
+            const Divider(),
+            const ReadAloudReportCard(),
             const SizedBox(height: 4),
             Text(
               '与昨天对比；不依赖是否加入今日课程',

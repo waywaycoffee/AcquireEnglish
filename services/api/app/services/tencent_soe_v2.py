@@ -66,6 +66,7 @@ async def evaluate(app_id: str, secret_id: str, secret_key: str, pcm: bytes, ref
                         "words": [
                             {
                                 "word": word.get("Word"),
+                                "reference_word": word.get("ReferenceWord"),
                                 "accuracy": word.get("PronAccuracy"),
                                 "match_tag": word.get("MatchTag"),
                                 "phones": [

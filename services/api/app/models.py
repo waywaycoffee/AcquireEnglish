@@ -1,13 +1,15 @@
-from datetime import datetime
+from datetime import date, datetime
 
 from sqlalchemy import (
     BigInteger,
     Boolean,
+    Date,
     DateTime,
     Float,
     ForeignKey,
     Index,
     Integer,
+    JSON,
     String,
     Text,
     UniqueConstraint,
@@ -1675,3 +1677,14 @@ class PublishedNetdiskSeries(Base):
         DateTime(timezone=True), nullable=True
     )
     reviewed_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
+
+
+class ReadAloudAttempt(Base):
+    __tablename__ = "read_aloud_attempts"
+    __table_args__ = (Index("ix_read_aloud_user_day", "user_id", "day"),)
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    attempt_id: Mapped[str] = mapped_column(String(64), primary_key=True)
+    day: Mapped[date] = mapped_column(Date)
+    duration_ms: Mapped[int] = mapped_column(Integer)
+    weak_words: Mapped[list[str]] = mapped_column(JSON)

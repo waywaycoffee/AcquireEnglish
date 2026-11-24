@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { api, type Course, type Preferences } from "../api";
+import ReadAloudReport from "./ReadAloudReport";
 import { useAuth } from "../auth";
 
 const LEVELS = ["A1", "A2", "B1", "B2", "C1"];
@@ -105,6 +106,7 @@ export default function HomePage() {
 
       {error ? <div className="error">{error}</div> : null}
 
+      {token && <ReadAloudReport key={user?.id} token={token} />}
       <section className="card" style={{ marginBottom: 24 }}>
         <h2 style={{ fontFamily: "var(--font-display)", marginTop: 0 }}>网盘剧集导入</h2>
         <p className="muted" style={{ marginTop: 0 }}>

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:convert';
 import 'dart:io';
 import 'dart:math';
 import 'dart:ui' show ImageFilter;
@@ -10,17 +11,21 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../../constants/feature_flags.dart';
 import '../../../home/presentation/learning_dashboard_provider.dart';
+import '../../../home/presentation/read_aloud_report_provider.dart';
 import '../../../settings/data/pronunciation_credentials.dart';
+import '../../../sync/data/acquire_api_client.dart';
 import '../../data/pronunciation_audio_extractor.dart';
 import '../../data/dub_session_store.dart';
 import '../../data/pronunciation_providers.dart';
 import '../../data/tencent_pronunciation_service.dart';
 import '../../domain/pronunciation_assessment.dart';
+import 'pronunciation_phone_details.dart';
 
 Future<void> showPronunciationAssessmentDialog(
   BuildContext context, {
   required PronunciationAssessmentTarget target,
   String? episodeId,
+  bool readingPractice = false,
   ValueChanged<PronunciationAssessmentResult>? onResult,
 }) {
   return showDialog<void>(
@@ -30,15 +35,17 @@ Future<void> showPronunciationAssessmentDialog(
     builder: (BuildContext context) => PronunciationAssessmentDialog(
       target: target,
       episodeId: episodeId,
+      readingPractice: readingPractice,
       onResult: onResult,
     ),
   );
 }
 
 class PronunciationAssessmentDialog extends ConsumerStatefulWidget {
-  const PronunciationAssessmentDialog({required this.target, this.episodeId, this.onResult, super.key});
+  const PronunciationAssessmentDialog({required this.target, this.episodeId, this.readingPractice = false, this.onResult, super.key});
 
   final String? episodeId;
+  final bool readingPractice;
   final ValueChanged<PronunciationAssessmentResult>? onResult;
 
   final PronunciationAssessmentTarget target;
@@ -67,6 +74,7 @@ class _PronunciationAssessmentDialogState
   PronunciationAssessmentResult? _result;
   String? _recordingPath;
   DateTime? _takeCreatedAt;
+  String? _readAloudAttemptId;
   String? _message;
   String? _referenceError;
   bool _loadingReference = true;
@@ -357,6 +365,8 @@ class _PronunciationAssessmentDialogState
         _message = reachedLimit ? '已达到 60 秒上限，录音已停止。' : null;
       });
       _takeCreatedAt = DateTime.now();
+      _readAloudAttemptId = newReadAloudAttemptId();
+      _recordReadAloud();
       if (widget.episodeId != null) {
         await _saveTake();
         if (mounted && !_resourcesReleased) await _score();
@@ -370,6 +380,20 @@ class _PronunciationAssessmentDialogState
         _message = '保存临时录音失败，请重试。';
       });
     }
+  }
+
+  void _recordReadAloud() {
+    if (widget.episodeId == null && !widget.readingPractice) return;
+    final String? id = _readAloudAttemptId;
+    final DateTime? at = _takeCreatedAt;
+    final int? duration = _recording?.durationMs;
+    if (id == null || at == null || duration == null) return;
+    unawaited(
+      ref.read(readAloudReportProvider.notifier)
+          .record(id: id, at: at, durationMs: duration,
+              weakWords: _result?.weakWords ?? const {})
+          .catchError((Object _) {}),
+    );
   }
 
   Future<void> _saveTake() async {
@@ -439,39 +463,55 @@ class _PronunciationAssessmentDialogState
       _result = null;
     });
     try {
-      final PronunciationCredentials credentials;
-      try {
-        credentials = await ref.read(pronunciationCredentialsProvider.future).timeout(const Duration(seconds: 5));
-      } catch (_) {
-        throw const PronunciationAssessmentException(
-          '读取评测密钥失败，请到「设置 - 跟读评测」检查配置。',
-        );
+      PronunciationAssessmentResult? result;
+      if (widget.readingPractice) {
+        try {
+          final response = await ref.read(acquireApiClientProvider)
+              .evaluateRecording(widget.target.text, base64Encode(audio.bytes))
+              .timeout(const Duration(seconds: 35));
+          result = PronunciationAssessmentResult.tryParse(response);
+        } catch (_) {
+          // Existing device-side credentials are an optional fallback.
+        }
       }
-      if (!mounted || _resourcesReleased || attempt != _assessmentAttempt) {
-        return;
+      if (!mounted || _resourcesReleased || attempt != _assessmentAttempt) return;
+      if (result == null) {
+        final PronunciationCredentials credentials;
+        try {
+          credentials = await ref.read(pronunciationCredentialsProvider.future).timeout(const Duration(seconds: 5));
+        } catch (_) {
+          throw const PronunciationAssessmentException(
+            '读取评测密钥失败，请到「设置 - 跟读评测」检查配置。',
+          );
+        }
+        if (!mounted || _resourcesReleased || attempt != _assessmentAttempt) {
+          return;
+        }
+        if (!credentials.isComplete) {
+          throw const PronunciationAssessmentException(
+            '请先在「设置 - 跟读评测」中填写并保存腾讯云密钥。',
+          );
+        }
+        result = await ref
+            .read(tencentPronunciationServiceProvider)
+            .evaluate(
+              credentials: credentials,
+              target: widget.target,
+              audio: audio,
+              onCancelAvailable: _registerAssessmentCancel,
+            ).timeout(const Duration(seconds: 20));
       }
-      if (!credentials.isComplete) {
-        throw const PronunciationAssessmentException(
-          '请先在「设置 - 跟读评测」中填写并保存腾讯云密钥。',
-        );
-      }
-      final PronunciationAssessmentResult result = await ref
-          .read(tencentPronunciationServiceProvider)
-          .evaluate(
-            credentials: credentials,
-            target: widget.target,
-            audio: audio,
-            onCancelAvailable: _registerAssessmentCancel,
-          ).timeout(const Duration(seconds: 20));
+      final PronunciationAssessmentResult scored = result;
       _cancelAssessment = null;
       if (!mounted || _resourcesReleased || attempt != _assessmentAttempt) {
         return;
       }
       setState(() {
-        _result = result;
+        _result = scored;
         _assessing = false;
       });
-      widget.onResult?.call(result);
+      _recordReadAloud();
+      widget.onResult?.call(scored);
       await _saveTake();
     } on TimeoutException {
       final Future<void> Function()? cancel = _cancelAssessment;
@@ -1060,6 +1100,7 @@ class _PronunciationAssessmentDialogState
             );
           },
         ),
+        PronunciationPhoneDetails(result: result),
         if (result.words.isNotEmpty) ...<Widget>[
           const SizedBox(height: 12),
           const Text(

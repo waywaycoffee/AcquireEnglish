@@ -4610,6 +4610,29 @@ class AcquireApiClient {
     return AvatarMeDto.fromJson(response.data as Map<String, dynamic>);
   }
 
+  Future<List<Map<String, dynamic>>> getReadAloudAttempts(
+    String token,
+    String since,
+  ) async {
+    final response = await _dio.get<List<dynamic>>(
+      'api/read-aloud',
+      queryParameters: {'since': since},
+      options: _noCache.copyWith(headers: {'Authorization': 'Bearer $token'}),
+    );
+    return (response.data ?? []).whereType<Map<String, dynamic>>().toList();
+  }
+
+  Future<void> putReadAloudAttempts(
+    String token,
+    List<Map<String, dynamic>> attempts,
+  ) async {
+    await _dio.put<void>(
+      'api/read-aloud',
+      data: {'attempts': attempts},
+      options: _noCache.copyWith(headers: {'Authorization': 'Bearer $token'}),
+    );
+  }
+
   Future<({int wrongItemCount, int dueReviewCount})> learningSummary() async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.learningSummary,

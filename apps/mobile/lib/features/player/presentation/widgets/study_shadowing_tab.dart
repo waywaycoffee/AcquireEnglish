@@ -13,6 +13,7 @@ import 'package:path_provider/path_provider.dart';
 import '../../../authentication/presentation/auth_session.dart';
 import '../../../community/data/community_models.dart';
 import '../../../home/presentation/learning_dashboard_provider.dart';
+import '../../../home/presentation/read_aloud_report_provider.dart';
 import '../../../settings/data/pronunciation_credentials.dart';
 import '../../../settings/presentation/settings_provider.dart';
 import '../../../sync/data/acquire_api_client.dart';
@@ -22,6 +23,7 @@ import '../../data/pronunciation_audio_extractor.dart';
 import '../../data/pronunciation_providers.dart';
 import '../../data/voice_practice_client.dart';
 import '../../domain/pronunciation_assessment.dart';
+import 'pronunciation_phone_details.dart';
 import '../player_mock_state.dart';
 import 'comparison_waveform_painter.dart';
 import 'shadow_hundred_stats_card.dart';
@@ -199,6 +201,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
   bool _dubTakeSaved = false;
   bool? _hasSavedCurrentTake;
   DateTime? _takeCreatedAt;
+  String? _readAloudAttemptId;
   @override
   void initState() {
     super.initState();
@@ -649,6 +652,8 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       _recordPracticeAttempt();
       widget.onPracticeCompleted?.call();
       _takeCreatedAt = DateTime.now();
+      _readAloudAttemptId = newReadAloudAttemptId();
+      _recordReadAloud();
       await _persistDubTake(path);
       await _scoreAfterRecording(path: path, audio: audio);
     } catch (_) {
@@ -890,6 +895,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
           if (score != null) {
             widget.onScoreForReview?.call(score);
           }
+          _recordReadAloud();
           await _persistDubTake(path);
           return;
         }
@@ -921,6 +927,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
           if (score != null) {
             widget.onScoreForReview?.call(score);
           }
+          _recordReadAloud();
           await _persistDubTake(path);
           return;
         } catch (error) {
@@ -990,6 +997,19 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
       return '评测暂时不可用';
     }
     return text;
+  }
+
+  void _recordReadAloud() {
+    final String? id = _readAloudAttemptId;
+    final DateTime? at = _takeCreatedAt;
+    final int? duration = _recording?.durationMs;
+    if (id == null || at == null || duration == null) return;
+    unawaited(
+      ref.read(readAloudReportProvider.notifier)
+          .record(id: id, at: at, durationMs: duration,
+              weakWords: _assessment?.weakWords ?? const {})
+          .catchError((Object _) {}),
+    );
   }
 
   Future<void> _persistDubTake(String wavPath) async {
@@ -1359,6 +1379,7 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                   Text(tip),
                   const SizedBox(height: 8),
                 ],
+                PronunciationPhoneDetails(result: _assessment!),
                 Text('发音评分：${_assessment!.scoreForReference(widget.line.english) ?? "—"}分'),
                 Text(
                   '准确度 ${_assessment!.accuracy?.round() ?? "—"} · 流利度 ${_assessment!.fluency?.round() ?? "—"} · 完整度 ${_assessment!.completion?.round() ?? "—"}',

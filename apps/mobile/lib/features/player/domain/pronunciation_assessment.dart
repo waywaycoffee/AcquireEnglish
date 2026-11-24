@@ -82,16 +82,30 @@ class PronunciationCredentials {
   }
 }
 
+class PronunciationPhoneResult {
+  const PronunciationPhoneResult({
+    required this.phone,
+    required this.referencePhone,
+    this.accuracy,
+  });
+
+  final String phone;
+  final String referencePhone;
+  final double? accuracy;
+}
+
 class PronunciationWordResult {
   const PronunciationWordResult({
     required this.word,
     required this.referenceWord,
     required this.matchTag,
     this.accuracy,
+    this.phones = const [],
   });
 
   final String word;
   final String referenceWord;
+  final List<PronunciationPhoneResult> phones;
   final int matchTag;
 
   String get shadowingFeedback => switch (matchTag) {
@@ -163,6 +177,13 @@ class PronunciationAssessmentResult {
     return errors;
   }
 
+  Set<String> get weakWords => {
+    for (final word in words)
+      if (word.isShadowingError || word.phones.any((p) => (p.accuracy ?? 100) < 60))
+        if (word.referenceWord.trim().isNotEmpty)
+          word.referenceWord.trim().toLowerCase(),
+  };
+
   /// Phrase one practice suggestion using only the assessment evidence.
   String? shadowingTip() {
     final PronunciationWordResult? issue = words
@@ -228,6 +249,22 @@ class PronunciationAssessmentResult {
         final Object? rawWord = item['Word'] ?? item['word'];
         final Object? rawReference =
             item['ReferenceWord'] ?? item['reference_word'] ?? rawWord;
+        final Object? rawPhones = item['PhoneInfos'] ?? item['phones'];
+        final List<PronunciationPhoneResult> phones = [];
+        if (rawPhones is List) {
+          for (final Object? entry in rawPhones) {
+            if (entry is! Map) continue;
+            final phone = (entry['Phone'] ?? entry['phone'])?.toString().trim() ?? '';
+            final reference =
+                (entry['ReferencePhone'] ?? entry['reference_phone'])?.toString().trim() ?? '';
+            if (phone.isEmpty && reference.isEmpty) continue;
+            phones.add(PronunciationPhoneResult(
+              phone: phone,
+              referencePhone: reference,
+              accuracy: number(entry['PronAccuracy'] ?? entry['accuracy'], max: 100),
+            ));
+          }
+        }
         words.add(
           PronunciationWordResult(
             word: rawWord is String ? rawWord : '$rawWord'.trim(),
@@ -235,6 +272,7 @@ class PronunciationAssessmentResult {
                 ? rawReference
                 : '$rawReference'.trim(),
             matchTag: tag,
+            phones: List.unmodifiable(phones),
             accuracy: number(
               item['PronAccuracy'] ?? item['accuracy'],
               max: 100,
