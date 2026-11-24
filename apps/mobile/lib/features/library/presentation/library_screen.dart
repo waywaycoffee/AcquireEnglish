@@ -20,6 +20,7 @@ import '../../drama/domain/drama_course.dart';
 import '../../drama/presentation/drama_hub_screen.dart';
 import '../../membership/domain/free_trial_seeds.dart';
 import '../../membership/domain/module_access.dart';
+import '../../community/presentation/english_browse_screen.dart';
 import '../../import_course/presentation/course_import_entry.dart';
 import '../../import_course/presentation/recommended_bilibili_section.dart';
 import '../../import_course/presentation/widgets/import_course_flow.dart';
@@ -1374,6 +1375,71 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   controller: listScrollController,
                   padding: EdgeInsets.all(pagePadding),
                   children: <Widget>[
+                Material(
+                  color: const Color(0xFF0F172A),
+                  borderRadius: BorderRadius.circular(18),
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(18),
+                    onTap: () {
+                      Navigator.of(context).push<void>(
+                        MaterialPageRoute<void>(
+                          builder: (_) => const EnglishBrowseScreen(),
+                        ),
+                      );
+                    },
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 14, 14, 14),
+                      child: Row(
+                        children: <Widget>[
+                          Container(
+                            width: 46,
+                            height: 46,
+                            decoration: BoxDecoration(
+                              color: AppDesignTokens.brandGreen.withValues(
+                                alpha: 0.22,
+                              ),
+                              borderRadius: BorderRadius.circular(14),
+                            ),
+                            child: const Icon(
+                              Icons.travel_explore_rounded,
+                              color: AppDesignTokens.brandGreen,
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          const Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  '全英可逛',
+                                  style: TextStyle(
+                                    color: Colors.white,
+                                    fontWeight: FontWeight.w900,
+                                    fontSize: 17,
+                                  ),
+                                ),
+                                SizedBox(height: 3),
+                                Text(
+                                  '英语原声 B 站精选 · 点封面即可试看导入',
+                                  style: TextStyle(
+                                    color: Color(0xFF94A3B8),
+                                    fontWeight: FontWeight.w600,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const Icon(
+                            Icons.chevron_right_rounded,
+                            color: Colors.white70,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 12),
                 DecoratedBox(
                   decoration: BoxDecoration(
                     color: AppDesignTokens.appWhite.withValues(alpha: 0.9),
