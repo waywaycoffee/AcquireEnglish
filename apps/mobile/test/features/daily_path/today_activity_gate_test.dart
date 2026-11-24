@@ -12,7 +12,7 @@ class _UntestedPlacement extends VocabularyPlacement {
 }
 
 void main() {
-  testWidgets('leaving the placement test cannot open the daily chooser', (
+  testWidgets('untested journey opens due review before placement', (
     WidgetTester tester,
   ) async {
     final GoRouter router = GoRouter(
@@ -22,27 +22,35 @@ void main() {
           builder: (_, _) => const Scaffold(body: TodayActivityCard()),
         ),
         GoRoute(
-          path: SGRoute.vocabularyPlacement.route,
+          path: SGRoute.reviewSession.route,
           builder: (context, state) => Scaffold(
-            body: TextButton(
-              onPressed: context.pop,
-              child: Text('测试 ${state.uri.queryParameters['journey']}'),
+            body: Text(
+              '复习 due=${state.uri.queryParameters['due']} '
+              'journey=${state.uri.queryParameters['journeyReview']}',
             ),
           ),
+        ),
+        GoRoute(
+          path: SGRoute.vocabularyPlacement.route,
+          builder: (_, _) => const Scaffold(body: Text('词汇量测试')),
         ),
       ],
     );
     addTearDown(router.dispose);
-    await tester.pumpWidget(ProviderScope(
-      overrides: [vocabularyPlacementProvider.overrideWith(_UntestedPlacement.new)],
-      child: MaterialApp.router(routerConfig: router),
-    ));
+
+    await tester.pumpWidget(
+      ProviderScope(
+        overrides: [
+          vocabularyPlacementProvider.overrideWith(_UntestedPlacement.new),
+        ],
+        child: MaterialApp.router(routerConfig: router),
+      ),
+    );
     await tester.tap(find.text('今天的英语之旅'));
     await tester.pumpAndSettle();
-    expect(find.text('测试 1'), findsOneWidget);
-    await tester.tap(find.text('测试 1'));
-    await tester.pumpAndSettle();
-    expect(find.text('今天的英语之旅'), findsOneWidget);
+
+    expect(find.text('复习 due=1 journey=1'), findsOneWidget);
+    expect(find.text('词汇量测试'), findsNothing);
     expect(find.text('今天想做什么？'), findsNothing);
   });
 }

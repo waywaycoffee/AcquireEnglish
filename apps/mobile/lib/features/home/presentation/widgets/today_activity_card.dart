@@ -57,11 +57,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         DateUtils.isSameDay(today, DateTime.now());
 
     try {
-      if (!_assessed()) {
-        await context.push('${SGRoute.vocabularyPlacement.route}?journey=1');
-        if (!active() || !_assessed()) return;
-      }
-
+      // Review first: due cards do not need a vocabulary estimate.
+      // Placement is only required before learning new recommended content.
       switch (store.stage) {
         case JourneyStage.review:
           final bool? completed = await context.push<bool>(
@@ -75,6 +72,12 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           }
         learn:
         case JourneyStage.learn:
+          if (!_assessed()) {
+            await context.push(
+              '${SGRoute.vocabularyPlacement.route}?journey=1',
+            );
+            if (!active() || !_assessed()) return;
+          }
           final JourneyActivity? planned = store.activity;
           final JourneyActivity? activity =
               chooseAnother || planned == null || planned.route.isEmpty
