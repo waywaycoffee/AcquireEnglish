@@ -293,12 +293,14 @@ async def _upsert_binding(
         )
     )
     row = result.scalar_one_or_none()
+    # Reuse OpenList row by mount_path when re-binding after unbind left an orphan.
+    storage_id = await client.create_or_update_storage(
+        mount_path=mount,
+        provider=provider,
+        credential=credential,
+        storage_id=None if row is None else row.openlist_storage_id,
+    )
     if row is None:
-        storage_id = await client.create_storage(
-            mount_path=mount,
-            provider=provider,
-            credential=credential,
-        )
         row = UserNetdiskBinding(
             user_id=user_id,
             provider=provider,
@@ -308,20 +310,6 @@ async def _upsert_binding(
         )
         db.add(row)
     else:
-        storage_id = row.openlist_storage_id
-        if storage_id is None:
-            storage_id = await client.create_storage(
-                mount_path=mount,
-                provider=provider,
-                credential=credential,
-            )
-        else:
-            await client.update_storage(
-                storage_id=storage_id,
-                mount_path=mount,
-                provider=provider,
-                credential=credential,
-            )
         row.credential_enc = encrypt_credential(credential)
         row.openlist_mount_path = mount
         row.openlist_storage_id = storage_id
@@ -456,11 +444,22 @@ async def unbind_netdisk(
     row = result.scalar_one_or_none()
     if row is None:
         return {"ok": True}
-    if settings.openlist_configured and row.openlist_storage_id is not None:
-        try:
-            await OpenListClient().delete_storage(row.openlist_storage_id)
-        except OpenListError:
-            pass
+    if settings.openlist_configured:
+        client = OpenListClient()
+        deleted = False
+        if row.openlist_storage_id is not None:
+            try:
+                await client.delete_storage(row.openlist_storage_id)
+                deleted = True
+            except OpenListError:
+                deleted = False
+        if not deleted:
+            try:
+                await client.delete_storage_by_mount(
+                    row.openlist_mount_path or _mount_for(user.id, provider)
+                )
+            except OpenListError:
+                pass
     await db.delete(row)
     await db.commit()
     return {"ok": True}

@@ -200,6 +200,17 @@ class OpenListClient:
             return data
         return []
 
+    async def find_storage_by_mount(self, mount_path: str) -> dict[str, Any] | None:
+        target = "/" + mount_path.strip().strip("/")
+        for row in await self.list_storages():
+            raw = str(row.get("mount_path") or "").strip()
+            if not raw:
+                continue
+            normalized = "/" + raw.strip("/")
+            if normalized == target:
+                return row if isinstance(row, dict) else None
+        return None
+
     async def create_storage(
         self,
         *,
@@ -224,9 +235,9 @@ class OpenListClient:
         if isinstance(data, dict) and data.get("id") is not None:
             return int(data["id"])
         # Some versions return null data; resolve by mount_path.
-        for row in await self.list_storages():
-            if str(row.get("mount_path") or "") == mount_path:
-                return int(row["id"])
+        existing = await self.find_storage_by_mount(mount_path)
+        if existing and existing.get("id") is not None:
+            return int(existing["id"])
         raise OpenListError("OpenList 创建存储成功但未返回 id")
 
     async def update_storage(
@@ -253,12 +264,80 @@ class OpenListClient:
         }
         await self._request("POST", "/api/admin/storage/update", json_body=payload)
 
+    async def create_or_update_storage(
+        self,
+        *,
+        mount_path: str,
+        provider: str,
+        credential: str,
+        storage_id: int | None = None,
+        order: int = 0,
+    ) -> int:
+        """Prefer update when mount_path already exists (avoids UNIQUE constraint)."""
+        existing_id = storage_id
+        if existing_id is None:
+            found = await self.find_storage_by_mount(mount_path)
+            if found and found.get("id") is not None:
+                existing_id = int(found["id"])
+        if existing_id is not None:
+            try:
+                await self.update_storage(
+                    storage_id=existing_id,
+                    mount_path=mount_path,
+                    provider=provider,
+                    credential=credential,
+                    order=order,
+                )
+                return existing_id
+            except OpenListError:
+                # Stale id — fall through to create / rematch by path.
+                found = await self.find_storage_by_mount(mount_path)
+                if found and found.get("id") is not None:
+                    existing_id = int(found["id"])
+                    await self.update_storage(
+                        storage_id=existing_id,
+                        mount_path=mount_path,
+                        provider=provider,
+                        credential=credential,
+                        order=order,
+                    )
+                    return existing_id
+        try:
+            return await self.create_storage(
+                mount_path=mount_path,
+                provider=provider,
+                credential=credential,
+                order=order,
+            )
+        except OpenListError as exc:
+            detail = str(exc).lower()
+            if "unique" in detail or "constraint" in detail or "2067" in detail:
+                found = await self.find_storage_by_mount(mount_path)
+                if found and found.get("id") is not None:
+                    sid = int(found["id"])
+                    await self.update_storage(
+                        storage_id=sid,
+                        mount_path=mount_path,
+                        provider=provider,
+                        credential=credential,
+                        order=order,
+                    )
+                    return sid
+            raise
+
     async def delete_storage(self, storage_id: int) -> None:
         await self._request(
             "POST",
             "/api/admin/storage/delete",
             json_body={"id": storage_id},
         )
+
+    async def delete_storage_by_mount(self, mount_path: str) -> bool:
+        found = await self.find_storage_by_mount(mount_path)
+        if not found or found.get("id") is None:
+            return False
+        await self.delete_storage(int(found["id"]))
+        return True
 
     async def fs_list(self, path: str, *, page: int = 1, per_page: int = 100) -> dict[str, Any]:
         data = await self._request(
