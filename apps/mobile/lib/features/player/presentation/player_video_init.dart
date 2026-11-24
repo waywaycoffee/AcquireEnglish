@@ -14,11 +14,16 @@ Future<void> waitForVideoInitialization(
 Future<void> waitForPlayerReady(
   Player player, {
   Duration timeout = const Duration(seconds: 8),
+  /// When true (netdisk progressive MKV), do not proceed on duration alone —
+  /// audio can be ready while video is still black.
+  bool requireVideoSize = false,
 }) async {
   bool hasDuration = player.state.duration > Duration.zero;
   bool hasVideoSize =
       (player.state.width ?? 0) > 0 && (player.state.height ?? 0) > 0;
-  if (hasDuration && hasVideoSize) {
+  bool ready() =>
+      hasDuration && (!requireVideoSize || hasVideoSize);
+  if (ready()) {
     return;
   }
 
@@ -28,7 +33,7 @@ Future<void> waitForPlayerReady(
   StreamSubscription<int?>? heightSubscription;
 
   void completeIfReady() {
-    if (!completer.isCompleted && hasDuration && hasVideoSize) {
+    if (!completer.isCompleted && ready()) {
       completer.complete();
     }
   }
@@ -50,6 +55,8 @@ Future<void> waitForPlayerReady(
 
   try {
     await completer.future.timeout(timeout);
+  } on TimeoutException {
+    // Soft: proceed anyway so UI is not stuck forever on odd streams.
   } finally {
     await durationSubscription.cancel();
     await widthSubscription.cancel();

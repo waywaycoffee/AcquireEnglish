@@ -1284,13 +1284,23 @@ class PadLandscapePlayerScreenState
     }
 
     final bool isBilibili = BilibiliImport.isWatchPageUrl(_videoAsset!);
+    final LibraryCourseData? netdiskCourseLookup = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    ).course;
+    final bool isNetdiskStream = isNetdiskPlayUrl(_videoAsset) ||
+        (netdiskCourseLookup != null && isNetdiskCourse(netdiskCourseLookup));
     setState(() {
       _videoReady = false;
       _videoLoading = true;
-      _videoErrorText = isBilibili ? '正在解析 B 站视频…' : null;
+      _videoErrorText = isBilibili
+          ? '正在解析 B 站视频…'
+          : (isNetdiskStream ? '正在连接网盘视频…' : null);
     });
 
-    final Player player = createStudyVideoPlayer();
+    final Player player = createStudyVideoPlayer(
+      largeNetworkBuffer: isNetdiskStream || isBilibili,
+    );
     // Own the player before opening media so leaving during initialization
     // also releases its decoder and native video output.
     _videoPlayer = player;
@@ -1308,7 +1318,7 @@ class PadLandscapePlayerScreenState
       final ({String uri, Map<String, String>? headers}) media =
           await _resolvePlayableMedia(
             _videoAsset!,
-            onProgress: isBilibili
+            onProgress: (isBilibili || isNetdiskStream)
                 ? (double? _, String message) {
                     if (!mounted || !identical(_videoPlayer, player)) {
                       return;
@@ -1317,13 +1327,20 @@ class PadLandscapePlayerScreenState
                   }
                 : null,
           ).timeout(
-            Duration(minutes: isBilibili ? 8 : 1),
-            onTimeout: () =>
-                throw StateError(isBilibili ? '缓存 B 站视频超时，请检查网络后重试' : '视频加载超时'),
+            Duration(minutes: isBilibili ? 8 : (isNetdiskStream ? 3 : 1)),
+            onTimeout: () => throw StateError(
+              isBilibili
+                  ? '缓存 B 站视频超时，请检查网络后重试'
+                  : (isNetdiskStream ? '网盘视频连接超时，可先下载本集再播' : '视频加载超时'),
+            ),
           );
       if (!mounted || !identical(_videoPlayer, player)) return;
+      final bool playingLocalFile = !(media.uri.startsWith('http://') ||
+          media.uri.startsWith('https://'));
       setState(() {
-        _videoErrorText = isBilibili ? '正在连接播放器…' : null;
+        _videoErrorText = isBilibili
+            ? '正在连接播放器…'
+            : (isNetdiskStream && !playingLocalFile ? '正在缓冲画面…' : null);
       });
       await waitForVideoInitialization(() async {
         await player.open(
@@ -1331,12 +1348,16 @@ class PadLandscapePlayerScreenState
             createPlayerMediaUri(media.uri),
             httpHeaders: media.headers ?? const <String, String>{},
           ),
+          play: false,
         );
-      }, timeout: Duration(seconds: isBilibili ? 30 : 8));
+      }, timeout: Duration(seconds: isBilibili || isNetdiskStream ? 45 : 8));
       if (!mounted || !identical(_videoPlayer, player)) return;
       await waitForPlayerReady(
         player,
-        timeout: Duration(seconds: isBilibili ? 30 : 8),
+        timeout: Duration(
+          seconds: isBilibili ? 30 : (isNetdiskStream ? 60 : 8),
+        ),
+        requireVideoSize: isNetdiskStream && !playingLocalFile,
       );
       if (!mounted || !identical(_videoPlayer, player)) return;
       await suppressPlayerSoftSubtitles(player);
@@ -1348,7 +1369,11 @@ class PadLandscapePlayerScreenState
       _videoPosition = player.state.position;
       _syncVideoAspectRatio(player.state.width, player.state.height);
       if (initialPositionMs > 0) {
-        await player.seek(Duration(milliseconds: initialPositionMs));
+        final bool videoReady =
+            (player.state.width ?? 0) > 0 && (player.state.height ?? 0) > 0;
+        if (videoReady || playingLocalFile || !isNetdiskStream) {
+          await player.seek(Duration(milliseconds: initialPositionMs));
+        }
       }
       final bool shouldPlay = widget.autoPlay || state.isPlaying;
       if (shouldPlay) {
@@ -1356,6 +1381,31 @@ class PadLandscapePlayerScreenState
         await player.play();
       } else {
         await player.pause();
+      }
+      if (isNetdiskStream &&
+          !playingLocalFile &&
+          isNetdiskPlayUrl(_videoAsset)) {
+        unawaited(() async {
+          try {
+            final File local = await cacheNetdiskEpisodeLocally(
+              playUrl: _videoAsset!,
+            );
+            if (!mounted) return;
+            final PlayerCourseLookupResult res = resolvePlayerCourseForEpisode(
+              courses: ref.read(libraryCatalogProvider),
+              episodeId: widget.episodeId,
+            );
+            final String? courseId = res.course?.id;
+            final String? episodeId = res.episode?.id;
+            if (courseId == null || episodeId == null) return;
+            await ref.read(libraryCatalogProvider.notifier).updateEpisodeLocalMedia(
+                  courseId: courseId,
+                  episodeId: episodeId,
+                  videoAsset: local.path,
+                  videoMissing: false,
+                );
+          } catch (_) {}
+        }());
       }
       _videoPosition = player.state.position;
       if (!mounted || !identical(_videoPlayer, player)) return;
@@ -1420,7 +1470,21 @@ class PadLandscapePlayerScreenState
       if (local.existsSync() && local.lengthSync() > 64 * 1024) {
         return (uri: trimmed, headers: null);
       }
-    } else if (!BilibiliImport.isWatchPageUrl(trimmed) &&
+    }
+    if (isNetdiskPlayUrl(trimmed)) {
+      onProgress?.call(null, '正在解析网盘直链…');
+      final ({String uri, Map<String, String>? headers}) resolved =
+          await resolveNetdiskPlayableMedia(trimmed);
+      if (!(resolved.uri.startsWith('http://') ||
+          resolved.uri.startsWith('https://'))) {
+        if (mounted) {
+          setState(() => _videoAsset = resolved.uri);
+        }
+      }
+      return resolved;
+    }
+    if (!looksLocal &&
+        !BilibiliImport.isWatchPageUrl(trimmed) &&
         !BilibiliImport.looksLikeBilibiliInput(trimmed)) {
       return (uri: trimmed, headers: null);
     }

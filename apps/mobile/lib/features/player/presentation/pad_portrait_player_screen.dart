@@ -1605,7 +1605,15 @@ class PadPortraitPlayerScreenState
       _videoErrorText = isBilibili ? '正在解析 B 站视频…' : null;
     });
 
-    final Player player = createStudyVideoPlayer();
+    final LibraryCourseData? netdiskCourseLookup = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    ).course;
+    final bool isNetdiskStream = isNetdiskPlayUrl(_videoAsset) ||
+        (netdiskCourseLookup != null && isNetdiskCourse(netdiskCourseLookup));
+    final Player player = createStudyVideoPlayer(
+      largeNetworkBuffer: isNetdiskStream || isBilibili,
+    );
     // Own the player before opening media so leaving during initialization
     // also releases its decoder and native video output.
     _videoPlayer = player;
@@ -1620,6 +1628,9 @@ class PadPortraitPlayerScreenState
         ),
       );
       _videoController = controller;
+      if (isNetdiskStream && mounted) {
+        setState(() => _videoErrorText = '正在连接网盘视频…');
+      }
       final ({String uri, Map<String, String>? headers}) media =
           await _resolvePlayableMedia(
             _videoAsset!,
@@ -1630,15 +1641,29 @@ class PadPortraitPlayerScreenState
                     }
                     setState(() => _videoErrorText = message);
                   }
-                : null,
+                : (isNetdiskStream
+                    ? (double? _, String message) {
+                        if (!mounted || !identical(_videoPlayer, player)) {
+                          return;
+                        }
+                        setState(() => _videoErrorText = message);
+                      }
+                    : null),
           ).timeout(
-            Duration(minutes: isBilibili ? 8 : 1),
-            onTimeout: () =>
-                throw StateError(isBilibili ? '缓存 B 站视频超时，请检查网络后重试' : '视频加载超时'),
+            Duration(minutes: isBilibili ? 8 : (isNetdiskStream ? 3 : 1)),
+            onTimeout: () => throw StateError(
+              isBilibili
+                  ? '缓存 B 站视频超时，请检查网络后重试'
+                  : (isNetdiskStream ? '网盘视频连接超时，可点「先下后学」后离线播' : '视频加载超时'),
+            ),
           );
       if (!mounted || !identical(_videoPlayer, player)) return;
+      final bool playingLocalFile = !(media.uri.startsWith('http://') ||
+          media.uri.startsWith('https://'));
       setState(() {
-        _videoErrorText = isBilibili ? '正在连接播放器…' : null;
+        _videoErrorText = isBilibili
+            ? '正在连接播放器…'
+            : (isNetdiskStream && !playingLocalFile ? '正在缓冲画面…' : null);
       });
       await waitForVideoInitialization(() async {
         await player.open(
@@ -1648,11 +1673,15 @@ class PadPortraitPlayerScreenState
           ),
           play: false,
         );
-      }, timeout: Duration(seconds: isBilibili ? 30 : 8));
+      }, timeout: Duration(seconds: isBilibili || isNetdiskStream ? 45 : 8));
       if (!mounted || !identical(_videoPlayer, player)) return;
+      // Netdisk MKV: wait for real video size so we do not play audio-only black.
       await waitForPlayerReady(
         player,
-        timeout: Duration(seconds: isBilibili ? 30 : 8),
+        timeout: Duration(
+          seconds: isBilibili ? 30 : (isNetdiskStream ? 60 : 8),
+        ),
+        requireVideoSize: isNetdiskStream && !playingLocalFile,
       );
       if (!mounted || !identical(_videoPlayer, player)) return;
       // Hardsubs stay in-frame; never let mpv/libass softsubs cover them.
@@ -1664,8 +1693,14 @@ class PadPortraitPlayerScreenState
       _videoDuration = player.state.duration;
       _videoPosition = player.state.position;
       _syncVideoAspectRatio(player.state.width, player.state.height);
+      // Seeking mid-file over Baidu progressive HTTP before the first frame
+      // is what causes long black video + audio. Seek only after video is ready.
       if (initialPositionMs > 0) {
-        await player.seek(Duration(milliseconds: initialPositionMs));
+        final bool videoReady =
+            (player.state.width ?? 0) > 0 && (player.state.height ?? 0) > 0;
+        if (videoReady || playingLocalFile || !isNetdiskStream) {
+          await player.seek(Duration(milliseconds: initialPositionMs));
+        }
       }
       // Avoid pause→play stutter on open: start immediately when autoplay is on.
       final bool shouldPlay = widget.autoPlay || state.isPlaying;
@@ -1674,6 +1709,32 @@ class PadPortraitPlayerScreenState
         await player.play();
       } else {
         await player.pause();
+      }
+      // Warm local cache for this episode so next open is instant.
+      if (isNetdiskStream &&
+          !playingLocalFile &&
+          isNetdiskPlayUrl(_videoAsset)) {
+        unawaited(() async {
+          try {
+            final File local = await cacheNetdiskEpisodeLocally(
+              playUrl: _videoAsset!,
+            );
+            if (!mounted) return;
+            final PlayerCourseLookupResult res = resolvePlayerCourseForEpisode(
+              courses: ref.read(libraryCatalogProvider),
+              episodeId: widget.episodeId,
+            );
+            final String? courseId = res.course?.id;
+            final String? episodeId = res.episode?.id;
+            if (courseId == null || episodeId == null) return;
+            await ref.read(libraryCatalogProvider.notifier).updateEpisodeLocalMedia(
+                  courseId: courseId,
+                  episodeId: episodeId,
+                  videoAsset: local.path,
+                  videoMissing: false,
+                );
+          } catch (_) {}
+        }());
       }
       _videoPosition = player.state.position;
       if (!mounted || !identical(_videoPlayer, player)) return;
@@ -1745,7 +1806,22 @@ class PadPortraitPlayerScreenState
       if (local.existsSync() && local.lengthSync() > 64 * 1024) {
         return (uri: trimmed, headers: null);
       }
-    } else if (!BilibiliImport.isWatchPageUrl(trimmed) &&
+    }
+    // Netdisk signed play URL → local cache or Baidu CDN with pan UA.
+    if (isNetdiskPlayUrl(trimmed)) {
+      onProgress?.call(null, '正在解析网盘直链…');
+      final ({String uri, Map<String, String>? headers}) resolved =
+          await resolveNetdiskPlayableMedia(trimmed);
+      if (!(resolved.uri.startsWith('http://') ||
+          resolved.uri.startsWith('https://'))) {
+        if (mounted) {
+          setState(() => _videoAsset = resolved.uri);
+        }
+      }
+      return resolved;
+    }
+    if (!looksLocal &&
+        !BilibiliImport.isWatchPageUrl(trimmed) &&
         !BilibiliImport.looksLikeBilibiliInput(trimmed)) {
       return (uri: trimmed, headers: null);
     }

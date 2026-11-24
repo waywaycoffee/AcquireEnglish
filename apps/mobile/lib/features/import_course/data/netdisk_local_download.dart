@@ -5,12 +5,178 @@ import 'package:dio/dio.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:path_provider/path_provider.dart';
 
+import '../../../constants/endpoints.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../sync/data/acquire_api_client.dart';
 import 'bilibili_episode_prepare.dart';
+
+/// Baidu CDN often rejects anonymous media_kit fetches; always send these.
+const Map<String, String> kNetdiskStreamHeaders = <String, String>{
+  'User-Agent': 'pan.baidu.com',
+  'Referer': 'https://pan.baidu.com/',
+};
+
+bool isNetdiskPlayUrl(String? path) {
+  final String value = (path ?? '').trim().toLowerCase();
+  if (value.isEmpty) {
+    return false;
+  }
+  return value.contains('/api/netdisk/play/') ||
+      value.contains('netdisk/play/');
+}
+
+Future<File?> findCachedNetdiskMedia(int importId) async {
+  final Directory docs = await getApplicationDocumentsDirectory();
+  final Directory dir = Directory('${docs.path}/netdisk_media');
+  if (!dir.existsSync()) {
+    return null;
+  }
+  for (final String ext in <String>['.mkv', '.mp4', '.bin', '.ts', '.webm']) {
+    final File f = File('${dir.path}/$importId$ext');
+    if (f.existsSync() && f.lengthSync() > 64 * 1024) {
+      return f;
+    }
+  }
+  // Legacy downloadNetdiskCourseToLocal used sanitized names.
+  await for (final FileSystemEntity e in dir.list()) {
+    if (e is! File) {
+      continue;
+    }
+    final String name = e.uri.pathSegments.isEmpty
+        ? ''
+        : e.uri.pathSegments.last;
+    if (name.startsWith('$importId') && e.lengthSync() > 64 * 1024) {
+      return e;
+    }
+  }
+  return null;
+}
+
+String absoluteNetdiskPlayUrl(String playUrl) {
+  final String trimmed = playUrl.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
+  }
+  final String base = Endpoints.normalizeBaseUrl(Endpoints.baseUrl)
+      .replaceAll(RegExp(r'/$'), '');
+  if (trimmed.startsWith('/')) {
+    return '$base$trimmed';
+  }
+  return '$base/$trimmed';
+}
+
+/// Prefer local cache; else follow API→Baidu redirects and return CDN URL + headers.
+///
+/// Opening the bare `/api/netdisk/play/...` 302 in media_kit without Baidu UA
+/// commonly yields audio-only / long black video on phone.
+Future<({String uri, Map<String, String>? headers})> resolveNetdiskPlayableMedia(
+  String playUrl,
+) async {
+  final int? importId = parseNetdiskImportIdFromUrl(playUrl);
+  if (importId != null) {
+    final File? cached = await findCachedNetdiskMedia(importId);
+    if (cached != null) {
+      return (uri: cached.path, headers: null);
+    }
+  }
+
+  final String startUrl = absoluteNetdiskPlayUrl(playUrl);
+  final Dio dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 20),
+      receiveTimeout: const Duration(seconds: 30),
+      followRedirects: true,
+      maxRedirects: 10,
+      headers: <String, dynamic>{...kNetdiskStreamHeaders},
+      validateStatus: (int? s) => s != null && s >= 200 && s < 400,
+    ),
+  );
+  try {
+    // Tiny ranged GET so we land on the final CDN URL without downloading the film.
+    final Response<List<int>> resp = await dio.get<List<int>>(
+      startUrl,
+      options: Options(
+        responseType: ResponseType.bytes,
+        headers: <String, dynamic>{
+          ...kNetdiskStreamHeaders,
+          'Range': 'bytes=0-2047',
+        },
+      ),
+    );
+    final String finalUrl = resp.realUri.toString();
+    if (finalUrl.isNotEmpty) {
+      return (uri: finalUrl, headers: kNetdiskStreamHeaders);
+    }
+  } catch (_) {
+    // Fall through — media_kit may still open the API redirect with headers.
+  }
+  return (uri: startUrl, headers: kNetdiskStreamHeaders);
+}
+
+/// Download one episode into netdisk_media/{importId}.mkv for smooth local play.
+Future<File> cacheNetdiskEpisodeLocally({
+  required String playUrl,
+  void Function(double? progress)? onProgress,
+}) async {
+  final int? importId = parseNetdiskImportIdFromUrl(playUrl);
+  final String idKey = importId?.toString() ??
+      playUrl.hashCode.toRadixString(16);
+  final File? existing =
+      importId == null ? null : await findCachedNetdiskMedia(importId);
+  if (existing != null) {
+    onProgress?.call(1);
+    return existing;
+  }
+  final Directory docs = await getApplicationDocumentsDirectory();
+  final Directory dir = Directory('${docs.path}/netdisk_media');
+  await dir.create(recursive: true);
+  final File out = File('${dir.path}/$idKey.mkv');
+  final File temp = File('${out.path}.part');
+  if (temp.existsSync()) {
+    await temp.delete();
+  }
+  final Dio dio = Dio(
+    BaseOptions(
+      connectTimeout: const Duration(seconds: 30),
+      receiveTimeout: const Duration(hours: 2),
+      followRedirects: true,
+      maxRedirects: 10,
+      headers: <String, dynamic>{...kNetdiskStreamHeaders},
+    ),
+  );
+  int lastPercent = -1;
+  await dio.download(
+    absoluteNetdiskPlayUrl(playUrl),
+    temp.path,
+    onReceiveProgress: (int received, int total) {
+      if (total <= 0) {
+        onProgress?.call(null);
+        return;
+      }
+      final int percent = ((received / total) * 100).floor();
+      if (percent == lastPercent) {
+        return;
+      }
+      lastPercent = percent;
+      onProgress?.call((received / total).clamp(0.0, 1.0));
+    },
+  );
+  if (!temp.existsSync() || temp.lengthSync() < 64 * 1024) {
+    if (temp.existsSync()) {
+      await temp.delete();
+    }
+    throw StateError('下载文件过小或失败');
+  }
+  if (out.existsSync()) {
+    await out.delete();
+  }
+  await temp.rename(out.path);
+  onProgress?.call(1);
+  return out;
+}
 
 class NetdiskDownloadProgress {
   const NetdiskDownloadProgress({

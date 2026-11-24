@@ -56,7 +56,13 @@ Future<void> suppressPlayerSoftSubtitles(Player player) async {
 }
 
 /// Shared [Player] factory for study screens — libass off from the start.
-Player createStudyVideoPlayer() {
-  // Defaults already disable libass/osc; construct explicitly for clarity.
-  return Player(configuration: const PlayerConfiguration());
+///
+/// [largeNetworkBuffer] helps Baidu/OpenList MKV progressive streams where
+/// audio often starts before the first video keyframe arrives.
+Player createStudyVideoPlayer({bool largeNetworkBuffer = false}) {
+  return Player(
+    configuration: PlayerConfiguration(
+      bufferSize: largeNetworkBuffer ? 64 * 1024 * 1024 : 32 * 1024 * 1024,
+    ),
+  );
 }
