@@ -509,7 +509,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: <Widget>[
                 Text(
-                  '网盘导入',
+                  '添加片源',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 18,
@@ -519,7 +519,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '仅导入你自己网盘里的视频（不支持分享链接）',
+                  '把你自己网盘里的视频挂进片库（不等于下载到手机；不支持分享链接）',
                   textAlign: TextAlign.center,
                   style: TextStyle(
                     fontSize: 12,

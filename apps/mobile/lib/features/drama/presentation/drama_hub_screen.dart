@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -15,7 +16,6 @@ import '../../player/domain/episode_clip_due.dart';
 import '../../player/domain/episode_study_progress.dart';
 import '../../player/presentation/episode_study_progress_provider.dart';
 import '../../player/presentation/widgets/episode_stage_dots.dart';
-import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
@@ -54,9 +54,9 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
   @override
   void initState() {
     super.initState();
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      _warmDramaCovers();
-    });
+    // Sync disk index before first build so posters paint from FileImage.
+    primeDramaCoverCacheSyncFromPersisted();
+    unawaited(_warmDramaCovers());
   }
 
   Future<void> _warmDramaCovers() async {
@@ -64,6 +64,11 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       return;
     }
     _coversPrefetched = true;
+    await primeDramaCoverCacheFromDisk();
+    if (mounted) {
+      setState(() {});
+    }
+    // Missing covers download in background — do not block shelf paint.
     await prefetchAllDramaCovers();
     if (mounted) {
       setState(() {});
@@ -78,7 +83,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
     final List<LibraryCourseData> dramas = pruneSubsumedDramaFlats(
       catalog.where(looksLikeDramaCourse).toList(growable: false),
     );
-    // Curated posters own 绝望主妇 etc.; keep「我的已导入」for custom packs only.
+    // Curated posters own 绝望主妇 etc.; keep「其它片源」for custom packs only.
     final List<LibraryCourseData> importedShelf =
         dramasOutsideCuratedShelf(dramas);
     if (!_syncedDue && dramas.isNotEmpty) {
@@ -88,7 +93,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       });
     }
 
-    // Only show episodes after the user taps a poster (or picks 自建导入).
+    // Only show episodes after the user taps a poster (or picks 自建片源).
     LibraryCourseData? selected;
     if (_selectedCourseId != null) {
       for (final LibraryCourseData c in dramas) {
@@ -130,7 +135,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       children: <Widget>[
         if (!widget.embedded) ...<Widget>[
           Text(
-            '点海报打开剧集；正版公开片单全员可学，也可从网盘导入自有授权资源。',
+            '点海报打开剧集；正版公开片单全员可学。添加片源只挂播放地址，点「下载」才会存到手机。',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppDesignTokens.textSecondary,
                   height: 1.4,
@@ -152,7 +157,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
               TextButton.icon(
                 onPressed: () => showNetdiskImportSheet(context, ref),
                 icon: const Icon(Icons.cloud_download_outlined, size: 18),
-                label: const Text('网盘导入'),
+                label: const Text('添加片源'),
               ),
             ],
           ),
@@ -347,7 +352,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
         if (importedShelf.isNotEmpty) ...<Widget>[
           const SizedBox(height: 16),
           Text(
-            '其它已导入  ·  共 $masteredEps / $totalEps 集已掌握'
+            '其它片源  ·  共 $masteredEps / $totalEps 集已掌握'
             '${totalEps == 0 ? '' : ''}',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w800,
@@ -362,11 +367,11 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                 ? _selectedCourseId
                 : null,
             hint: Text(
-              '选择自建导入…',
+              '选择自建片源…',
               style: TextStyle(color: AppDesignTokens.textSecondary),
             ),
             decoration: InputDecoration(
-              labelText: '自建导入',
+              labelText: '自建片源',
               border: const OutlineInputBorder(),
               labelStyle: TextStyle(color: AppDesignTokens.textSecondary),
             ),
@@ -400,9 +405,9 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '美剧精学',
-        description: '精选片单 · 正片网盘导入',
+        description: '精选片单 · 添加片源后点下载才落盘',
         trailing: IconButton(
-          tooltip: '从网盘导入季集',
+          tooltip: '添加网盘片源',
           onPressed: () => showNetdiskImportSheet(context, ref),
           icon: const Icon(Icons.cloud_download_outlined),
         ),
@@ -449,7 +454,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                 const SizedBox(height: 12),
                 Text(
                   '${entry.blurb}\n\n'
-                  '当前账号还没有这套剧。可下拉刷新同步公开片单，或从网盘导入自有授权资源。',
+                  '当前账号还没有这套剧。可下拉刷新同步公开片单，或添加自有授权网盘片源（不会立刻下载视频）。',
                   style: TextStyle(
                     color: AppDesignTokens.textPrimary,
                     height: 1.45,
@@ -466,7 +471,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                     foregroundColor: AppDesignTokens.onAccent,
                   ),
                   icon: const Icon(Icons.cloud_download_outlined),
-                  label: const Text('去网盘导入'),
+                  label: const Text('去添加片源'),
                 ),
                 TextButton(
                   onPressed: () => Navigator.of(ctx).pop(),
@@ -610,9 +615,15 @@ class _CatalogPosterCardState extends State<_CatalogPosterCard> {
               fit: StackFit.expand,
               children: <Widget>[
                 if (cover != null && cover.isNotEmpty)
-                  CoverImage(
-                    path: cover,
+                  Image.file(
+                    File(cover),
                     fit: BoxFit.cover,
+                    // Decode near poster size — full ECS JPEGs are 100–800KB.
+                    cacheWidth: (118 *
+                            MediaQuery.devicePixelRatioOf(context))
+                        .round()
+                        .clamp(160, 480),
+                    gaplessPlayback: true,
                     errorBuilder: (_, __, ___) => ColoredBox(color: accent),
                   )
                 else
