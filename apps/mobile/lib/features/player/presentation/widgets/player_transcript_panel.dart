@@ -69,11 +69,13 @@ class PlayerTranscriptPanel extends StatefulWidget {
     this.onDictionaryOpened,
     this.onDictionaryClosed,
     this.fragmentsBySentenceStartMs = const <int, List<PlayerSubtitleLine>>{},
+    this.activeDifficultyLabel,
     super.key,
   });
 
   final List<PlayerSubtitleLine> lines;
   final Map<int, List<PlayerSubtitleLine>> fragmentsBySentenceStartMs;
+  final String? activeDifficultyLabel;
   final int activeIndex;
   final int timelineFollowEpoch;
 
@@ -233,6 +235,7 @@ class _PlayerTranscriptPanelState extends State<PlayerTranscriptPanel> {
       onDictionaryOpened: widget.onDictionaryOpened,
       onDictionaryClosed: widget.onDictionaryClosed,
       fragmentsBySentenceStartMs: widget.fragmentsBySentenceStartMs,
+      activeDifficultyLabel: widget.activeDifficultyLabel,
     );
 
     if (widget.studyDarkStyle) {

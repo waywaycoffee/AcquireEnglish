@@ -38,6 +38,7 @@ class SessionFields(BaseModel):
     scenario_goal: str = ''
     scenario_prompt: str = ''
     scene_description: str = ''
+    hint_enable: bool = True
 
 
 class SessionCreate(SessionFields):
@@ -63,6 +64,7 @@ class ContextUpdate(BaseModel):
     scenario_goal: str | None = None
     scenario_prompt: str | None = None
     scene_description: str | None = None
+    hint_enable: bool | None = None
 
 
 class TopicsBody(BaseModel):
@@ -79,6 +81,13 @@ class ConfirmBody(BaseModel):
     digital_human_id: str | None = None
     reply_language: str | None = None
     text_only: bool = False
+
+
+class HintBody(BaseModel):
+    tts_voice: str | None = None
+    digital_human_id: str | None = None
+    reply_language: str | None = None
+    text_only: bool = True
 
 
 class SpeakBody(BaseModel):
@@ -128,6 +137,10 @@ def _turn_payload(result: TurnResult) -> dict[str, Any]:
     }
     if result.diagnosis:
         payload['diagnosis'] = result.diagnosis
+    if result.scaffold_hints:
+        payload['scaffold_hints'] = list(result.scaffold_hints)
+    if (result.reference_answer or '').strip():
+        payload['reference_answer'] = result.reference_answer.strip()
     return payload
 
 
@@ -347,6 +360,23 @@ async def confirm_draft(sid: str, body: ConfirmBody) -> dict[str, Any]:
         )
     except KeyError:
         raise HTTPException(404, 'Draft not found or already used.') from None
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(422, str(exc)) from None
+    return _turn_payload(result)
+
+
+@app.post('/api/sessions/{sid}/hint')
+async def request_hint(sid: str, body: HintBody) -> dict[str, Any]:
+    """卡壳安全脚手架：渐进提示 + 参考句，不替用户开口。"""
+    session = _require_session(sid)
+    try:
+        result = await pipeline.request_hint(
+            session,
+            digital_human_id=body.digital_human_id,
+            tts_voice=body.tts_voice,
+            reply_language=body.reply_language,
+            text_only=body.text_only,
+        )
     except Exception as exc:  # noqa: BLE001
         raise HTTPException(422, str(exc)) from None
     return _turn_payload(result)

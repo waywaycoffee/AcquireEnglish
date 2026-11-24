@@ -183,6 +183,8 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
     this.standalone = false,
     this.guidedLesson = false,
     this.openSceneMenu = false,
+    this.hintEnable = true,
+    this.embedded = false,
     this.onConfirmedLearnerTurn,
     super.key,
   });
@@ -204,6 +206,12 @@ class StudyOralCoachTab extends ConsumerStatefulWidget {
   final bool standalone;
   final bool guidedLesson;
   final bool openSceneMenu;
+
+  /// 卡壳脚手架：给参考句式，不替用户开口。
+  final bool hintEnable;
+
+  /// Opened as in-player sheet / float (compact chrome).
+  final bool embedded;
   final ValueChanged<String>? onConfirmedLearnerTurn;
 
   @override
@@ -757,7 +765,108 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       scenarioGoal: scenario?.goal ?? '',
       scenarioPrompt: scenario?.prompt ?? '',
       sceneDescription: _sceneDescription,
+      hintEnable: widget.hintEnable,
     );
+  }
+
+  Future<void> _requestStuckHint() async {
+    if (!widget.hintEnable || _busy || _recordingActive) return;
+    final LearningSettingsState settings = ref.read(learningSettingsProvider);
+    setState(() {
+      _busy = true;
+      _status = '正在准备参考提示…';
+    });
+    try {
+      await _ensurePipelineSession(settings);
+      final OralCoachSession? session = _session;
+      if (!mounted || session == null) {
+        _clearBusy('点麦克风继续说');
+        return;
+      }
+      final DigitalHumanPersona persona = settings.selectedDigitalHuman;
+      final OralCoachTurnResult turn = await _pipelineClient.requestHint(
+        session: session,
+        digitalHumanId: persona.id,
+        ttsVoice: _coachVoice(persona),
+        replyLanguage: _preferChineseReply ? 'zh' : 'en',
+        textOnly: true,
+      );
+      if (!mounted) return;
+      final List<String> hints = turn.scaffoldHints
+          .map((String s) => s.trim())
+          .where((String s) => s.isNotEmpty)
+          .take(3)
+          .toList(growable: false);
+      String reference = turn.referenceAnswer.trim();
+      if (reference.isEmpty) {
+        final String focus = _tutorFocusLine.trim().isNotEmpty
+            ? _tutorFocusLine.trim()
+            : widget.topicSummary.trim();
+        reference = focus;
+      }
+      final String coach = preferEnglishCoachReply(
+        turn.coachText.trim().isNotEmpty
+            ? turn.coachText.trim()
+            : "No worries — here's a scaffold. Try one short sentence yourself.",
+        allowChinese: _preferChineseReply,
+        topic: _topicLabel,
+      );
+      setState(() {
+        _busy = false;
+        _status = '先看提示，再按住麦克风试说';
+        if (coach.isNotEmpty) {
+          _bubbles.add(_ChatBubble(role: 'coach', text: coach, hint: true));
+        }
+        for (final String hint in hints) {
+          _bubbles.add(
+            _ChatBubble(role: 'coach', text: '提示：$hint', hint: true),
+          );
+        }
+        if (reference.isNotEmpty) {
+          _bubbles.add(
+            _ChatBubble(
+              role: 'coach',
+              text: '参考句（请自己说）：$reference',
+              hint: true,
+            ),
+          );
+        }
+      });
+      _scrollChatToEnd();
+      if (coach.isNotEmpty) {
+        unawaited(_speakCoach(coach, settings));
+      }
+    } catch (error) {
+      if (!mounted) return;
+      // Offline / API fail: still give a local scaffold from current focus.
+      final String focus = _tutorFocusLine.trim().isNotEmpty
+          ? _tutorFocusLine.trim()
+          : (widget.articleExcerpt.trim().split('\n').firstWhere(
+                (String s) => s.trim().isNotEmpty,
+                orElse: () => widget.topicSummary,
+              ));
+      setState(() {
+        _busy = false;
+        _status = '本地提示已就绪';
+        _bubbles.add(
+          const _ChatBubble(
+            role: 'coach',
+            text: '卡壳很正常。先用提示开口，不要背整段。',
+            hint: true,
+          ),
+        );
+        if (focus.trim().isNotEmpty) {
+          _bubbles.add(
+            _ChatBubble(
+              role: 'coach',
+              text: '参考句（请自己说）：${focus.trim()}',
+              hint: true,
+            ),
+          );
+        }
+      });
+      _scrollChatToEnd();
+    }
   }
 
   Future<void> _releaseMic() async {
@@ -4402,6 +4511,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 icon: Icons.record_voice_over_outlined,
                 onTap: _busy ? null : _chooseEnglishVoice,
               ),
+              if (widget.hintEnable)
+                _DockRoundButton(
+                  label: '卡壳',
+                  icon: Icons.lightbulb_outline_rounded,
+                  onTap: _busy
+                      ? null
+                      : () => unawaited(_requestStuckHint()),
+                ),
               // Bottom dock is the only mic; center orb was removed as duplicate.
               Listener(
                 key: const ValueKey<String>('study-oral-coach-mic-legacy'),

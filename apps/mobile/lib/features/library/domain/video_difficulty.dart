@@ -160,3 +160,38 @@ String difficultyFingerprint(Iterable<String> episodeKeys) {
   final List<String> keys = episodeKeys.toList(growable: false)..sort();
   return keys.join('|');
 }
+
+/// Dual-dimension label: CEFR + 入门/中考/高考/雅思 band for K12 + adult.
+String examBandFromCefr(String cefr) {
+  switch (cefr.toUpperCase()) {
+    case 'A1':
+    case 'A2':
+      return '入门';
+    case 'B1':
+      return '中考';
+    case 'B2':
+      return '高考';
+    case 'C1':
+    case 'C2':
+      return '雅思';
+    default:
+      return '中考';
+  }
+}
+
+String dualDifficultyLabel(String cefr) {
+  final String level = cefr.toUpperCase();
+  return '$level · ${examBandFromCefr(level)}';
+}
+
+/// Lightweight per-sentence CEFR using the same coverage math as course scan.
+VideoDifficultyEstimate estimateSentenceDifficulty({
+  required String englishText,
+  required Set<String> topFrequencyWords,
+}) {
+  return estimateVideoDifficulty(
+    englishText: englishText,
+    topFrequencyWords: topFrequencyWords,
+    fingerprint: 'sentence:${englishText.hashCode}',
+  );
+}

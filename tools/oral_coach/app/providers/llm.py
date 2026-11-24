@@ -535,10 +535,19 @@ class OpenAiLlm:
                 'Default spoken language: English only. '
                 'Switch to Chinese only if the learner explicitly asks.'
             ),
+            'hint_enable': bool(getattr(context, 'hint_enable', True)),
             'format': {
                 'text': 'spoken tutor reply in English (Chinese only if asked)',
                 'difficulty': 'A2|B1|B2|C1',
                 'corrections': ['short grammar/vocab fixes when needed'],
+                'scaffold_hints': [
+                    'optional graded clue 1',
+                    'optional graded clue 2',
+                ],
+                'reference_answer': (
+                    'optional natural English sample for the learner to try '
+                    '(never speak it as if you are the learner)'
+                ),
                 'diagnosis': {
                     'source': 'original learner utterance when Chinese/mixed/awkward',
                     'literal_en': 'clear English meaning',
@@ -547,6 +556,13 @@ class OpenAiLlm:
                 },
             },
         }
+        if stuck and bool(getattr(context, 'hint_enable', True)):
+            user['instructions'] = (
+                str(user['instructions'])
+                + ' hint_enable is true and learner_seems_stuck: fill scaffold_hints '
+                '(2–3 short progressive clues) and one reference_answer the learner '
+                'can say. Do NOT pretend you spoke for them; encourage them to try.'
+            )
         data = await _openai_chat_json(
             self.settings,
             messages=[
@@ -568,12 +584,34 @@ class OpenAiLlm:
         )
         fallback = _guided_fallback(context, learner_text)
         text = str(data.get('text') or '').strip() or fallback.text
+        hints_raw = data.get('scaffold_hints') or data.get('hints') or []
+        if isinstance(hints_raw, str):
+            hints_raw = [hints_raw]
+        scaffold_hints = [
+            str(x).strip() for x in hints_raw if str(x).strip()
+        ][:4]
+        reference_answer = str(
+            data.get('reference_answer') or data.get('reference') or ''
+        ).strip()
+        if stuck and bool(getattr(context, 'hint_enable', True)):
+            if not reference_answer:
+                reference_answer = (
+                    (context.current_english or '').strip()
+                    or (unused[0] if unused else '')
+                )
+            if not scaffold_hints and reference_answer:
+                scaffold_hints = [
+                    'Start with a short sentence about the topic.',
+                    f'Try using a key idea from: {reference_answer[:80]}',
+                ]
         return LlmReply(
             text=text,
             provider=self.name,
             difficulty=str(data.get('difficulty') or context.difficulty),
             corrections=[str(x) for x in (data.get('corrections') or [])][:4],
             diagnosis=_parse_diagnosis(data.get('diagnosis'), learner_text),
+            scaffold_hints=scaffold_hints,
+            reference_answer=reference_answer,
         )
 
 

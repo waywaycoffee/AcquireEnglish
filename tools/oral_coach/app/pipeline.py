@@ -49,6 +49,8 @@ class TurnResult:
     avatar: dict
     providers: dict
     diagnosis: dict[str, str] | None = None
+    scaffold_hints: list[str] | None = None
+    reference_answer: str = ''
 
 
 class OralCoachPipeline:
@@ -314,6 +316,42 @@ class OralCoachPipeline:
             avatar=avatar,
             providers=self.provider_map(),
             diagnosis=reply.diagnosis,
+            scaffold_hints=list(reply.scaffold_hints or []) or None,
+            reference_answer=(reply.reference_answer or '').strip(),
+        )
+
+    async def request_hint(
+        self,
+        session: CoachSession,
+        *,
+        digital_human_id: str | None = None,
+        tts_voice: str | None = None,
+        reply_language: str | None = None,
+        text_only: bool = True,
+    ) -> TurnResult:
+        """卡壳脚手架：不替用户开口，只给渐进提示 + 可选参考句。"""
+        session.context.hint_enable = True
+        draft_id = uuid.uuid4().hex
+        session.drafts[draft_id] = {
+            'audio_path': '',
+            'transcript': "I don't know",
+            'reference': (session.context.current_english or '').strip(),
+            'pronunciation': {
+                'overall': 0.0,
+                'notes': 'hint_request',
+                'provider': 'hint',
+                'word_scores': [],
+                'phonemes': [],
+            },
+        }
+        return await self.confirm_draft(
+            session,
+            draft_id,
+            confirmed_text="I don't know",
+            digital_human_id=digital_human_id,
+            tts_voice=tts_voice,
+            reply_language=reply_language,
+            text_only=text_only,
         )
 
     async def run_turn(

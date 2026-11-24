@@ -93,10 +93,14 @@ class PlayerSubtitleList extends StatefulWidget {
     this.onDictionaryOpened,
     this.onDictionaryClosed,
     this.fragmentsBySentenceStartMs = const <int, List<PlayerSubtitleLine>>{},
+    this.activeDifficultyLabel,
     super.key,
   });
 
   final List<PlayerSubtitleLine> lines;
+
+  /// Dual CEFR · exam-band label for the active cue (e.g. `B1 · 中考`).
+  final String? activeDifficultyLabel;
 
   /// Expandable ASR/Chinese fragments keyed by sentence [PlayerSubtitleLine.startMs].
   final Map<int, List<PlayerSubtitleLine>> fragmentsBySentenceStartMs;
@@ -1265,11 +1269,41 @@ class _PlayerSubtitleListState extends State<PlayerSubtitleList> {
                               borderRadius: BorderRadius.circular(14),
                             ),
                             child: Text(
-                              '正在学习',
+                              (widget.activeDifficultyLabel ?? '').trim().isEmpty
+                                  ? '正在学习'
+                                  : widget.activeDifficultyLabel!.trim(),
                               style: TextStyle(
                                 color: AppDesignTokens.textPrimary,
                                 fontSize: 11,
                                 fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                      if (active &&
+                          dark &&
+                          (widget.activeDifficultyLabel ?? '')
+                              .trim()
+                              .isNotEmpty)
+                        Positioned(
+                          right: 0,
+                          top: 0,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 8,
+                              vertical: 4,
+                            ),
+                            decoration: BoxDecoration(
+                              color: shell.cardActive,
+                              borderRadius: BorderRadius.circular(12),
+                              border: Border.all(color: shell.borderActive),
+                            ),
+                            child: Text(
+                              widget.activeDifficultyLabel!.trim(),
+                              style: TextStyle(
+                                color: shell.textSecondary,
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
                               ),
                             ),
                           ),

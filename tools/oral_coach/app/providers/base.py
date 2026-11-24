@@ -25,6 +25,8 @@ class VideoContext:
     scenario_prompt: str = ''
     # Live camera / photo scene the learner is showing the tutor.
     scene_description: str = ''
+    # When True, stuck / 卡壳 turns may return scaffold hints (not spoken for user).
+    hint_enable: bool = True
 
     def as_public_dict(self) -> dict[str, Any]:
         return {
@@ -43,6 +45,7 @@ class VideoContext:
             'scenario_goal': self.scenario_goal,
             'scenario_prompt': self.scenario_prompt,
             'scene_description': self.scene_description,
+            'hint_enable': bool(self.hint_enable),
         }
 
     def topic_blurb(self) -> str:
@@ -118,6 +121,9 @@ class LlmReply:
     # When learner used Chinese / mixed / awkward English:
     # source (original), literal_en, idiomatic_en, tip.
     diagnosis: dict[str, str] | None = None
+    # Scaffold for 卡壳 (hint_enable): graded hints, not spoken for the learner.
+    scaffold_hints: list[str] = field(default_factory=list)
+    reference_answer: str = ''
 
 
 @dataclass

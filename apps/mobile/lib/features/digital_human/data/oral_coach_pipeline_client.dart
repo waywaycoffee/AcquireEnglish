@@ -245,6 +245,30 @@ class OralCoachPipelineClient {
     return (url: url, provider: '${body['provider'] ?? ''}');
   }
 
+  Future<OralCoachTurnResult> requestHint({
+    required OralCoachSession session,
+    String? digitalHumanId,
+    String? ttsVoice,
+    String replyLanguage = 'en',
+    bool textOnly = true,
+  }) async {
+    final Response<dynamic> response = await _dio.post<dynamic>(
+      '${session.baseUrl}/api/sessions/${session.id}/hint',
+      data: <String, dynamic>{
+        if ((digitalHumanId ?? '').trim().isNotEmpty)
+          'digital_human_id': digitalHumanId!.trim(),
+        if ((ttsVoice ?? '').trim().isNotEmpty) 'tts_voice': ttsVoice!.trim(),
+        'reply_language': replyLanguage,
+        'text_only': textOnly,
+      },
+      options: Options(
+        sendTimeout: const Duration(seconds: 60),
+        receiveTimeout: const Duration(seconds: 90),
+      ),
+    );
+    return OralCoachTurnResult.fromJson(_asMap(response.data), session.baseUrl);
+  }
+
   Future<OralCoachTurnResult> turn({
     required OralCoachSession session,
     required String audioPath,
@@ -304,6 +328,7 @@ class OralCoachVideoContext {
     this.scenarioGoal = '',
     this.scenarioPrompt = '',
     this.sceneDescription = '',
+    this.hintEnable = true,
   });
 
   final String courseTitle;
@@ -335,6 +360,9 @@ class OralCoachVideoContext {
   /// Live camera/photo scene description for real-world conversation.
   final String sceneDescription;
 
+  /// When true, stuck / 卡壳 may return scaffold hints + reference answer.
+  final bool hintEnable;
+
   Map<String, Object?> toJson() => <String, Object?>{
     'course_title': courseTitle,
     'episode_title': episodeTitle,
@@ -357,6 +385,7 @@ class OralCoachVideoContext {
       'scenario_prompt': scenarioPrompt.trim(),
     if (sceneDescription.trim().isNotEmpty)
       'scene_description': sceneDescription.trim(),
+    'hint_enable': hintEnable,
   };
 }
 
@@ -400,6 +429,8 @@ class OralCoachTurnResult {
     required this.livetalkingUrl,
     required this.providers,
     this.diagnosis,
+    this.scaffoldHints = const <String>[],
+    this.referenceAnswer = '',
   });
 
   factory OralCoachTurnResult.fromJson(
@@ -458,6 +489,18 @@ class OralCoachTurnResult {
     if (diagnosis == null && transcriptLooksChineseHeavy(transcript)) {
       diagnosis = OralExpressionDiagnosis.fallback(source: transcript);
     }
+    final List<String> scaffoldHints = <String>[];
+    final Object? rawHints = raw['scaffold_hints'];
+    if (rawHints is List) {
+      for (final Object? item in rawHints) {
+        final String text = '$item'.trim();
+        if (text.isNotEmpty) {
+          scaffoldHints.add(text);
+        }
+      }
+    }
+    final String referenceAnswer =
+        '${raw['reference_answer'] ?? raw['reference'] ?? ''}'.trim();
     final Object? overall = pron['overall'];
     return OralCoachTurnResult(
       transcript: transcript,
@@ -474,6 +517,8 @@ class OralCoachTurnResult {
       livetalkingUrl: '${avatar['livetalking_url'] ?? ''}',
       providers: providers,
       diagnosis: diagnosis,
+      scaffoldHints: scaffoldHints,
+      referenceAnswer: referenceAnswer,
     );
   }
 
@@ -489,6 +534,8 @@ class OralCoachTurnResult {
   final String livetalkingUrl;
   final Map<String, String> providers;
   final OralExpressionDiagnosis? diagnosis;
+  final List<String> scaffoldHints;
+  final String referenceAnswer;
 
   String get scoreLabel {
     final int pct = (pronunciationOverall * 100).round().clamp(0, 100);

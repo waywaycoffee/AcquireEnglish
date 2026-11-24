@@ -114,7 +114,10 @@ import 'widgets/study_loop_sheet.dart';
 import 'widgets/study_mode_tabs.dart';
 import 'widgets/study_plan_bar.dart';
 import 'widgets/study_practice_tab.dart';
+import '../../digital_human/data/digital_human_catalog.dart';
 import '../../digital_human/presentation/study_oral_coach_tab.dart';
+import '../../library/domain/video_difficulty.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
 import 'widgets/study_shadowing_tab.dart';
 import 'widgets/study_shell_tokens.dart';
 import 'widgets/study_top_bar.dart';
@@ -311,6 +314,7 @@ class PadPortraitPlayerScreenState
   HardsubMosaicBand _hardsubMosaicBand = const HardsubMosaicBand();
   int _subtitleLocateEpoch = 0;
   bool _oralCoachOpen = false;
+  Offset _coachOrbOffset = const Offset(14, 120);
   bool _pausedForLookup = false;
   bool _blindListening = false;
   StudyLoopSettings _loopSettings = const StudyLoopSettings();
@@ -3688,7 +3692,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       body: AppLoadingOverlay(
         isLoading: _isBootstrapping,
         message: '正在打开课程...',
-        child: Column(
+        child: Stack(
+          fit: StackFit.expand,
+          children: <Widget>[
+            Column(
           children: <Widget>[
             StudyTopBar(
               videoOptions: course == null || episode == null
@@ -3985,8 +3992,104 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                   : null,
             ),
           ],
-          ),
+            ),
+            if (!bingeMode && !_isFullscreenOpen)
+              Positioned(
+                right: _coachOrbOffset.dx,
+                bottom: _coachOrbOffset.dy,
+                child: GestureDetector(
+                  onPanUpdate: (DragUpdateDetails d) {
+                    setState(() {
+                      _coachOrbOffset = Offset(
+                        (_coachOrbOffset.dx - d.delta.dx).clamp(8, 280),
+                        (_coachOrbOffset.dy - d.delta.dy).clamp(80, 640),
+                      );
+                    });
+                  },
+                  onTap: () => unawaited(
+                    _openOralCoach(courseContext, activeLine),
+                  ),
+                  child: Material(
+                    color: Colors.transparent,
+                    elevation: 6,
+                    shape: const CircleBorder(),
+                    child: Container(
+                      width: 58,
+                      height: 58,
+                      decoration: BoxDecoration(
+                        shape: BoxShape.circle,
+                        border: Border.all(
+                          color: Colors.white.withValues(alpha: 0.95),
+                          width: 2.5,
+                        ),
+                        boxShadow: <BoxShadow>[
+                          BoxShadow(
+                            color: AppDesignTokens.brandGreenDark.withValues(
+                              alpha: 0.35,
+                            ),
+                            blurRadius: 12,
+                            offset: const Offset(0, 4),
+                          ),
+                        ],
+                      ),
+                      clipBehavior: Clip.antiAlias,
+                      child: Builder(
+                        builder: (BuildContext context) {
+                          final DigitalHumanPersona persona =
+                              settings.selectedDigitalHuman;
+                          return Stack(
+                            fit: StackFit.expand,
+                            children: <Widget>[
+                              Image.asset(
+                                persona.assetPath,
+                                fit: BoxFit.cover,
+                                errorBuilder: (_, __, ___) => ColoredBox(
+                                  color: AppDesignTokens.brandGreenDark,
+                                  child: Center(
+                                    child: Text(
+                                      persona.displayName.isNotEmpty
+                                          ? persona.displayName[0]
+                                          : '?',
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontWeight: FontWeight.w800,
+                                        fontSize: 20,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ),
+                              Align(
+                                alignment: Alignment.bottomCenter,
+                                child: Container(
+                                  width: double.infinity,
+                                  padding: const EdgeInsets.only(
+                                    bottom: 2,
+                                    top: 1,
+                                  ),
+                                  color: Colors.black.withValues(alpha: 0.45),
+                                  child: const Text(
+                                    '问我',
+                                    textAlign: TextAlign.center,
+                                    style: TextStyle(
+                                      color: Colors.white,
+                                      fontSize: 10,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                            ],
+                          );
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+          ],
         ),
+      ),
       ),
     );
   }
@@ -4024,16 +4127,53 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         episodeId: courseContext.episode?.id ?? widget.episodeId,
         // Close the loop: video line → scenario speak → later review weak items.
         initialScenarioId: 'video_line',
+        hintEnable: true,
+        embedded: true,
       );
-      await Navigator.of(context).push<void>(
-        MaterialPageRoute<void>(
-          fullscreenDialog: true,
-          builder: (BuildContext context) => Scaffold(
-            backgroundColor: const Color(0xFF14102A),
-            appBar: AppBar(title: const Text('英语口语')),
-            body: SafeArea(top: false, child: coach),
-          ),
-        ),
+      // In-player companion sheet — keep the video page underneath.
+      final double sheetHeight = MediaQuery.sizeOf(context).height * 0.78;
+      await showModalBottomSheet<void>(
+        context: context,
+        isScrollControlled: true,
+        useSafeArea: true,
+        showDragHandle: true,
+        backgroundColor: AppDesignTokens.appWhite,
+        builder: (BuildContext sheetContext) {
+          return SizedBox(
+            height: sheetHeight,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 0, 8, 8),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: Text(
+                          '口语数字人',
+                          style: TextStyle(
+                            color: AppDesignTokens.textPrimary,
+                            fontSize: 16,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                      ),
+                      IconButton(
+                        tooltip: '关闭',
+                        onPressed: () => Navigator.pop(sheetContext),
+                        icon: Icon(
+                          Icons.close_rounded,
+                          color: AppDesignTokens.textSecondary,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Expanded(child: coach),
+              ],
+            ),
+          );
+        },
       );
     } finally {
       _oralCoachOpen = false;
@@ -4136,6 +4276,19 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final bool englishGenBusy = _isEnglishSubtitleGenerationBusy();
     final ({String text, double? value, String preview})? englishGenUi =
         englishGenBusy ? _englishGenerationProgressUi() : null;
+    final ReadingFrequencyLexicon? freqLexicon =
+        ref.watch(readingFrequencyLexiconProvider).asData?.value;
+    final String? activeDifficultyLabel = () {
+      final String en = activeLine.english.trim();
+      if (en.isEmpty || freqLexicon == null || freqLexicon.topWords.isEmpty) {
+        return null;
+      }
+      final VideoDifficultyEstimate estimate = estimateSentenceDifficulty(
+        englishText: en,
+        topFrequencyWords: freqLexicon.topWords,
+      );
+      return dualDifficultyLabel(estimate.cefr);
+    }();
     switch (_studyTab) {
       case StudyModeTab.subtitles:
         if (state.hasLines) {
@@ -4143,6 +4296,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             episodeId: widget.episodeId,
             lines: state.lines,
             activeIndex: state.activeLineIndex,
+            activeDifficultyLabel: activeDifficultyLabel,
             timelineFollowEpoch: state.timelineFollowEpoch,
             locateEpoch: _subtitleLocateEpoch,
             subtitleMode: state.subtitleMode,
@@ -5838,7 +5992,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     if (added) {
       ref.read(learningActivityProvider.notifier).recordSentenceSaved();
     }
-    _showMessage(added ? '已收藏到句子库' : '未能收藏该句子');
+    _showMessage(added ? '已加入知识卡，进入复习队列' : '未能收藏该句子');
   }
 
   void _handleCollectWord(
