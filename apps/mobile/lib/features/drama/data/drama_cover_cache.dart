@@ -8,6 +8,7 @@ import 'package:image/image.dart' as img;
 import 'package:path_provider/path_provider.dart';
 
 import '../../../constants/endpoints.dart';
+import '../../library/presentation/library_mock_data.dart';
 import '../domain/drama_catalog.dart';
 
 /// Device-side poster cache for curated drama shelf.
@@ -104,6 +105,23 @@ File? _localHit(String entryId, Directory dir) {
     }
   }
   return null;
+}
+
+/// Best sync cover for a library course that matches the curated drama shelf.
+///
+/// Prefers a local `Documents/drama_covers` hit; otherwise the absolute ECS URL
+/// so home「最近看过」can paint immediately even before download finishes.
+String? dramaCoverForCourseSync(LibraryCourseData course) {
+  final DramaCatalogEntry? entry = catalogEntryForCourse(course);
+  if (entry == null) {
+    return null;
+  }
+  final String? local = cachedDramaCoverPathSync(entry.id);
+  if (local != null && local.trim().isNotEmpty) {
+    return local;
+  }
+  final String remote = resolveDramaCoverRemoteUrl(entry.coverUrl ?? entry.id);
+  return remote.isEmpty ? null : remote;
 }
 
 /// Instant local path when already cached (sync, for first paint).

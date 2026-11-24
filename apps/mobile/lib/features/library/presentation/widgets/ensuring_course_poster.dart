@@ -49,22 +49,22 @@ class _EnsuringCoursePosterState extends ConsumerState<EnsuringCoursePoster> {
     required LibraryCourseData course,
     LibraryEpisodeItem? episode,
   }) {
+    if (_fetchedCover != null &&
+        (isDisplayableCover(_fetchedCover!) ||
+            _fetchedCover!.startsWith('http'))) {
+      return _fetchedCover!;
+    }
     final String catalog = displayCoverForCourse(
       course: course,
       episode: episode,
     );
-    if (isDisplayableCover(catalog)) {
+    if (isDisplayableCover(catalog) || catalog.startsWith('http')) {
       return catalog;
     }
-    final DramaCatalogEntry? drama = catalogEntryForCourse(course);
-    if (drama != null) {
-      final String? local = cachedDramaCoverPathSync(drama.id);
-      if (local != null && isDisplayableCover(local)) {
-        return local;
-      }
-    }
-    if (_fetchedCover != null && isDisplayableCover(_fetchedCover!)) {
-      return _fetchedCover!;
+    final String? drama = dramaCoverForCourseSync(course);
+    if (drama != null &&
+        (isDisplayableCover(drama) || drama.startsWith('http'))) {
+      return drama;
     }
     return catalog;
   }

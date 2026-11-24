@@ -4,6 +4,8 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../../drama/data/drama_cover_cache.dart';
+import '../../../drama/domain/drama_catalog.dart';
 import '../../../import_course/data/bilibili_import_service.dart';
 import '../../../import_course/domain/bilibili_import.dart';
 import '../../../import_course/presentation/course_import_entry.dart';
@@ -108,7 +110,14 @@ String _heroCoverPath(LibraryCourseData? course, LibraryEpisodeItem? episode) {
   if (_isUsableCoverPath(courseCover)) {
     return courseCover;
   }
-  return courseCover.isNotEmpty ? courseCover : episodeCover;
+  if (course != null) {
+    final String? drama = dramaCoverForCourseSync(course);
+    if (drama != null && _isUsableCoverPath(drama)) {
+      return drama;
+    }
+  }
+  // Never hand `assets/img/app_icon.png` to the poster — it paints as blank.
+  return '';
 }
 
 String? _bilibiliSource(
@@ -188,6 +197,25 @@ class _VideoPreviewState extends ConsumerState<_VideoPreview> {
     if (_isUsableCoverPath(existing) && mounted) {
       // Show remote URL immediately while we pin a local copy.
       setState(() => _fetchedCover = existing);
+    }
+    final LibraryCourseData? course = widget.course;
+    if (course != null) {
+      final entry = catalogEntryForCourse(course);
+      if (entry != null) {
+        try {
+          final String? path = await ensureDramaCoverCached(entry);
+          if (mounted && path != null && path.isNotEmpty) {
+            setState(() => _fetchedCover = path);
+            try {
+              await ref.read(libraryCatalogProvider.notifier).updateCourseCover(
+                    courseId: course.id,
+                    coverImage: path,
+                  );
+            } catch (_) {}
+          }
+        } catch (_) {}
+        return;
+      }
     }
     if (!_isBilibiliCourse(widget.course)) {
       return;

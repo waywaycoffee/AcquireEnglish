@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../../constants/endpoints.dart';
 import 'cover_image_provider.dart';
 
 class CoverImage extends StatelessWidget {
@@ -22,12 +23,9 @@ class CoverImage extends StatelessWidget {
     final ImageProvider<Object>? provider = _isRemote(normalized)
         ? NetworkImage(
             normalized,
-            headers: const <String, String>{
-              'Referer': 'https://www.bilibili.com',
-              'User-Agent':
-                  'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 '
-                  '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
-            },
+            // Only attach Bilibili Referer for bilibili CDNs — ECS drama
+            // covers (/media/misc/drama-covers) reject foreign Referer.
+            headers: _remoteHeadersFor(normalized),
           )
         : coverImageProviderForPath(normalized);
     if (provider == null) {
@@ -79,6 +77,26 @@ class CoverImage extends StatelessWidget {
     return value.startsWith('http://') || value.startsWith('https://');
   }
 
+  Map<String, String> _remoteHeadersFor(String url) {
+    final String lower = url.toLowerCase();
+    final bool bilibili = lower.contains('bilibili') ||
+        lower.contains('hdslb.com') ||
+        lower.contains('biliimg');
+    if (!bilibili) {
+      return const <String, String>{
+        'User-Agent':
+            'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 '
+            '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+      };
+    }
+    return const <String, String>{
+      'Referer': 'https://www.bilibili.com',
+      'User-Agent':
+          'Mozilla/5.0 (Linux; Android 13) AppleWebKit/537.36 '
+          '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36',
+    };
+  }
+
   String _normalizeRemote(String value) {
     final String trimmed = value.trim();
     if (trimmed.startsWith('//')) {
@@ -86,6 +104,12 @@ class CoverImage extends StatelessWidget {
     }
     if (trimmed.startsWith('http://')) {
       return 'https://${trimmed.substring('http://'.length)}';
+    }
+    // Relative ECS media paths (drama covers) → absolute API host URL.
+    if (trimmed.startsWith('/media/')) {
+      final String base = Endpoints.normalizeBaseUrl(Endpoints.baseUrl)
+          .replaceAll(RegExp(r'/$'), '');
+      return '$base$trimmed';
     }
     return trimmed;
   }

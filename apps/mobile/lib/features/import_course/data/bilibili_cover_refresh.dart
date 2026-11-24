@@ -3,6 +3,7 @@ import 'dart:io';
 
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../drama/data/drama_cover_cache.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../settings/presentation/settings_provider.dart';
@@ -37,10 +38,17 @@ bool isDisplayableCover(String cover) {
   if (value.startsWith('http://') || value.startsWith('https://')) {
     return true;
   }
+  // Relative ECS drama-cover paths stored before absolute URL heal.
+  if (value.startsWith('/media/misc/drama-covers/')) {
+    return true;
+  }
   return File(value).existsSync();
 }
 
 /// Prefer given episode, then any episode with a real poster, then course.
+///
+/// Curated US-drama (Friends etc.) fall back to local drama_covers / ECS URL
+/// when the catalog still holds `assets/img/app_icon.png` placeholders.
 String displayCoverForCourse({
   required LibraryCourseData course,
   LibraryEpisodeItem? episode,
@@ -58,6 +66,15 @@ String displayCoverForCourse({
   final String courseCover = course.coverImage.trim();
   if (isDisplayableCover(courseCover)) {
     return courseCover;
+  }
+  final String? drama = dramaCoverForCourseSync(course);
+  if (drama != null && isDisplayableCover(drama)) {
+    return drama;
+  }
+  // Remote ECS drama URL is displayable via NetworkImage even before download.
+  if (drama != null &&
+      (drama.startsWith('http://') || drama.startsWith('https://'))) {
+    return drama;
   }
   return '';
 }

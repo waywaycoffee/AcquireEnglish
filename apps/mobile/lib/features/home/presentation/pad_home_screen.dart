@@ -878,9 +878,11 @@ class _RecentCourseCard extends StatelessWidget {
         child: Stack(
           fit: StackFit.expand,
           children: <Widget>[
-            EnsuringCoursePoster(
-              course: course,
-              borderRadius: BorderRadius.circular(24),
+            Positioned.fill(
+              child: EnsuringCoursePoster(
+                course: course,
+                borderRadius: BorderRadius.circular(24),
+              ),
             ),
             const DecoratedBox(
               decoration: BoxDecoration(

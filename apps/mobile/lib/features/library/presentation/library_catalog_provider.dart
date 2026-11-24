@@ -15,7 +15,9 @@ import '../../words/presentation/word_book_provider.dart';
 import '../../learning_modules/american_ipa_course.dart';
 import '../../learning_modules/british_ipa_course.dart';
 import '../../learning_modules/phonics_nessy_course.dart';
+import '../../drama/data/drama_cover_cache.dart';
 import '../../drama/domain/drama_course.dart';
+import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_multipage.dart';
 import '../../import_course/domain/bilibili_import.dart';
@@ -73,7 +75,10 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
     }
 
     final List<LibraryCourseData> saved = pruneSubsumedDramaFlats(
-      _decodeCourses(stored).map(_healInternalIdTitles).toList(growable: false),
+      _decodeCourses(stored)
+          .map(_healInternalIdTitles)
+          .map(_healDramaPlaceholderCover)
+          .toList(growable: false),
     );
     return <LibraryCourseData>[
       for (final LibraryCourseData course in baseCatalog)
@@ -95,6 +100,31 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       return course;
     }
     return course.copyWith(title: healed);
+  }
+
+  /// Netdisk drama imports still ship `assets/img/app_icon.png` as cover —
+  /// swap in curated Friends/etc. posters so home「最近看过」is not blank.
+  LibraryCourseData _healDramaPlaceholderCover(LibraryCourseData course) {
+    final bool coursePlaceholder = isPlaceholderCover(course.coverImage);
+    if (!coursePlaceholder && isDisplayableCover(course.coverImage)) {
+      return course;
+    }
+    final String? drama = dramaCoverForCourseSync(course);
+    if (drama == null || drama.trim().isEmpty) {
+      return course;
+    }
+    return course.copyWith(
+      coverImage: drama,
+      episodes: course.episodes
+          .map((LibraryEpisodeItem episode) {
+            if (!isPlaceholderCover(episode.coverImage) &&
+                isDisplayableCover(episode.coverImage)) {
+              return episode;
+            }
+            return episode.copyWith(coverImage: drama);
+          })
+          .toList(growable: false),
+    );
   }
 
   LibraryCourseData _withBuiltInDisplayOverrides(
