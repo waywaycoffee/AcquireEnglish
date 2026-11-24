@@ -169,6 +169,31 @@ Future<bool> _subtitleFileHasLanguage(
   if (trimmed == null) {
     return false;
   }
+  // Netdisk / personal import softsubs are auth-gated API URLs. [File] cannot
+  // see them; the player materializes to disk. Treat matching /srt/{lang} as
+  // present so we do not false-trigger「云端字幕未就绪」+ ASR.
+  final String lower = trimmed.toLowerCase();
+  if (lower.contains('/api/imports/') && lower.contains('/srt/')) {
+    if (requireEnglish) {
+      return lower.contains('/srt/en');
+    }
+    return lower.contains('/srt/zh');
+  }
+  if (isRemoteSubtitlePath(trimmed) &&
+      (lower.startsWith('http://') || lower.startsWith('https://'))) {
+    // Signed CDN softsub URL — presence already means the course published it.
+    if (requireEnglish) {
+      return lower.contains('en.srt') ||
+          lower.contains('/en.') ||
+          lower.contains('lang=en') ||
+          lower.contains('/srt/en');
+    }
+    return lower.contains('zh.srt') ||
+        lower.contains('/zh.') ||
+        lower.contains('lang=zh') ||
+        lower.contains('/srt/zh') ||
+        lower.contains('cn.srt');
+  }
   try {
     final File file = File(trimmed);
     if (!file.existsSync() || file.lengthSync() < 16) {
@@ -571,14 +596,29 @@ Future<void> enqueueSubtitleCompletionForEpisode({
   // English still missing → wait for cloud pack; do not queue on-device ASR.
   if (plan.needEnglish) {
     if (!cloudQueued && needCloudAsr) {
-      SubtitleCompletionStatusHub.instance.reportProgress(
-        episodeId,
-        '云端字幕未就绪，请稍后下拉刷新',
-        status: SubtitleCompletionStatus.failed,
-        needEnglish: plan.needEnglish,
-        needChinese: plan.needChinese,
-      );
-      SubtitleCompletionStatusHub.instance.notifyChanged();
+      // Bilibili-only ECS GPU path. Netdisk / local softsubs have no sharedIds —
+      // never show「云端字幕未就绪」for them (false alarm when API SRT already exists).
+      if (sharedIds != null) {
+        SubtitleCompletionStatusHub.instance.reportProgress(
+          episodeId,
+          '云端字幕未就绪，请稍后下拉刷新',
+          status: SubtitleCompletionStatus.failed,
+          needEnglish: plan.needEnglish,
+          needChinese: plan.needChinese,
+        );
+        SubtitleCompletionStatusHub.instance.notifyChanged();
+      } else if (isUsableSubtitlePath(enPath) || isUsableSubtitlePath(zhPath)) {
+        SubtitleCompletionStatusHub.instance.reportProgress(
+          episodeId,
+          '字幕已加载',
+          status: SubtitleCompletionStatus.done,
+          needEnglish: false,
+          needChinese: false,
+        );
+        CloudSubtitleJobTracker.instance.clear(episodeId);
+        await store.markDone(episodeId);
+        SubtitleCompletionStatusHub.instance.notifyChanged();
+      }
     }
     return;
   }

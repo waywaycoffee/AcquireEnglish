@@ -399,12 +399,43 @@ class PadPortraitPlayerScreenState
           setState(() => _englishFillInFlight = false);
         }
         if (fill.isActive || fill.isFailed) {
+          final bool linesHaveEnglish = state.lines.isNotEmpty &&
+              state.lines
+                      .where(
+                        (PlayerSubtitleLine l) =>
+                            looksEnglish(l.english) && !looksChinese(l.english),
+                      )
+                      .length *
+                  2 >=
+              state.lines.length;
           final bool linesHaveChinese = state.lines.isNotEmpty &&
               state.lines
                       .where((PlayerSubtitleLine l) => looksChinese(l.chinese))
                       .length *
                   2 >=
               state.lines.length;
+          // Softsubs already on screen — drop stale「云端字幕未就绪」chip.
+          if (fill.isFailed &&
+              (linesHaveEnglish || linesHaveChinese) &&
+              (fill.displayLabel.contains('云端字幕未就绪') ||
+                  fill.displayLabel.contains('请稍后下拉刷新'))) {
+            SubtitleCompletionStatusHub.instance.reportProgress(
+              widget.episodeId,
+              '字幕已加载',
+              status: SubtitleCompletionStatus.done,
+              needEnglish: false,
+              needChinese: false,
+            );
+            CloudSubtitleJobTracker.instance.clear(widget.episodeId);
+            setState(() {
+              _englishFillInFlight = false;
+              _bilingualPipelineLabel = null;
+              _bilingualPipelineProgress = null;
+              _bilingualPhase = BilingualPipelinePhase.completed;
+              _bilingualShowAiComplete = false;
+            });
+            return;
+          }
           // Softsub/display Chinese already present — never keep「翻译中文」UI.
           if (fill.needChinese && linesHaveChinese && !fill.isFailed) {
             unawaited(_settleChineseFillIfAlreadyPresent());
