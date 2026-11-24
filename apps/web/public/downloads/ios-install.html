@@ -11,29 +11,40 @@
       a { color:#93c5fd; }
       .card { background:#121a2b; border:1px solid #243044; border-radius:16px; padding:20px; margin:16px 0; }
       code { color:#dbeafe; }
+      .btn { display:inline-block; margin:8px 8px 0 0; padding:10px 16px; border-radius:10px; background:#2563eb; color:#fff; text-decoration:none; font-weight:600; }
+      .btn.ghost { background:transparent; border:1px solid #3b82f6; color:#93c5fd; }
     </style>
   </head>
   <body>
     <main>
       <h1>iOS 内测安装说明</h1>
-      <p>Android 安装包已可下载。iOS IPA 正在等待本机 Xcode 登录苹果开发者账号并生成 <code>com.acquire.english</code> 描述文件后导出。</p>
+      <p>
+        当前包：<code>com.acquire.english</code> · v0.2.249 (267) · Team <code>BZQNU93J84</code>
+      </p>
       <div class="card">
-        <h2>当前状态</h2>
+        <h2>推荐：TestFlight / App Store Connect</h2>
+        <p>
+          官网提供的 <code>.ipa</code> 为 <strong>App Store</strong> 导出包，需上传到 App Store Connect 后通过 TestFlight 安装（可覆盖约 1 万名外测用户）。
+        </p>
+        <a class="btn" href="/downloads/AcquireEnglish-ios-latest.ipa">下载 App Store IPA</a>
+      </div>
+      <div class="card">
+        <h2>Ad Hoc（仅已登记 UDID 的设备）</h2>
+        <p>
+          若你的 iPhone UDID 已在开发者后台登记，可下载 Ad Hoc 包，用 Finder / Apple Configurator / AltStore 等方式安装。
+          未登记设备无法安装 Ad Hoc。
+        </p>
+        <a class="btn ghost" href="/downloads/AcquireEnglish-ios-adhoc-latest.ipa">下载 Ad Hoc IPA</a>
+      </div>
+      <div class="card">
+        <h2>注意</h2>
         <ul>
-          <li>证书已就绪：Apple Distribution / Development（Team <code>BZQNU93J84</code>）</li>
-          <li>工程 Team / Pods / iOS 15 最低版本已对齐</li>
-          <li>阻塞：Xcode 未登录 Apple ID，无法自动创建 Provisioning Profile</li>
+          <li>个人/公司账号网页无法像 Android 那样任意设备直接安装。</li>
+          <li>公开内测请优先走 TestFlight。</li>
+          <li>问题反馈：<a href="mailto:support@curlhairai.com">support@curlhairai.com</a></li>
         </ul>
       </div>
-      <div class="card">
-        <h2>需要你本地完成的一步</h2>
-        <ol>
-          <li>打开 Xcode → Settings → Accounts，登录 <code>13923110986@139.com</code>（或持有 Team BZQNU93J84 的账号）</li>
-          <li>确认 App ID <code>com.acquire.english</code> 已创建</li>
-          <li>回复「继续打 iOS」，即可导出 IPA 并挂到本页</li>
-        </ol>
-      </div>
-      <p><a href="/download.html">← 返回下载页</a> · <a href="/downloads/AcquireEnglish-android-latest.apk">先下 Android APK</a></p>
+      <p><a href="/download.html">← 返回下载页</a> · <a href="/downloads/AcquireEnglish-android-latest.apk">Android APK</a></p>
     </main>
   </body>
 </html>

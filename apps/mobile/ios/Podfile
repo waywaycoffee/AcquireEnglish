@@ -29,8 +29,9 @@ flutter_ios_podfile_setup
 target 'Runner' do
   use_frameworks!
 
-  # Bypass CocoaPods CDN/jsDelivr SSL outages for binary SDKs.
-  pod 'WebRTC-SDK', :podspec => '/Users/way/ae-ios-vendor/podspecs/WebRTC-SDK.podspec'
+  # Bypass CocoaPods CDN/jsDelivr SSL outages for WeChat SDK.
+  # WebRTC comes from SPM (flutter_webrtc); do not also pod WebRTC-SDK or archive
+  # fails with "Multiple commands produce WebRTC.framework".
   pod 'WechatOpenSDK-XCFramework', :podspec => '/Users/way/ae-ios-vendor/podspecs/WechatOpenSDK-XCFramework.podspec'
 
   flutter_install_all_ios_pods File.dirname(File.realpath(__FILE__))
