@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.config import settings
 from app.models import PublishedNetdiskSeries, UserLinkCourse
 from app.schemas import CourseOut
 from app.services.netdisk_series import (
@@ -58,6 +59,9 @@ async def course_out_for_published(
             tags.append(extra)
     payload["tags"] = tags
     payload["description"] = f"{title} · {len(payload.get('lessons') or [])} 集 · 正版授权公开片单"
+    base = (settings.media_public_base or "").rstrip("/")
+    if base and pub.slug:
+        payload["coverUrl"] = f"{base}/media/misc/drama-covers/{pub.slug}.jpg"
     return CourseOut.model_validate(payload)
 
 

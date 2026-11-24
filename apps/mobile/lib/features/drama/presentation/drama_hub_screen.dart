@@ -62,13 +62,22 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       });
     }
 
+    // Poster tap selects any drama (including curated/public-series).
     LibraryCourseData? selected;
-    if (importedShelf.isNotEmpty) {
-      selected = importedShelf.cast<LibraryCourseData?>().firstWhere(
-            (LibraryCourseData? c) => c?.id == _selectedCourseId,
-            orElse: () => importedShelf.first,
-          );
+    if (_selectedCourseId != null) {
+      for (final LibraryCourseData c in dramas) {
+        if (c.id == _selectedCourseId) {
+          selected = c;
+          break;
+        }
+      }
     }
+    selected ??= importedCourseForCatalogEntry(
+          kDramaCatalog.first,
+          dramas,
+        ) ??
+        (importedShelf.isNotEmpty ? importedShelf.first : null) ??
+        (dramas.isNotEmpty ? dramas.first : null);
 
     int masteredEps = 0;
     int totalEps = 0;
@@ -92,7 +101,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       children: <Widget>[
         if (!widget.embedded) ...<Widget>[
           Text(
-            '精选片单先看到剧名；正片在你的网盘。导入含字幕的季集文件夹后即可精学。',
+            '点海报打开剧集；正版公开片单全员可学，也可从网盘导入自有授权资源。',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppDesignTokens.textSecondary,
                   height: 1.4,
@@ -104,7 +113,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
             children: <Widget>[
               Expanded(
                 child: Text(
-                  '精选片单 · 正片走网盘导入（不上 ECS 整季）',
+                  '精选片单 · 点海报打开剧集',
                   style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: AppDesignTokens.textSecondary,
                         height: 1.35,
@@ -129,7 +138,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
         ),
         const SizedBox(height: 8),
         SizedBox(
-          height: 168,
+          height: 176,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
             itemCount: kDramaCatalog.length,
@@ -141,6 +150,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
               return _CatalogPosterCard(
                 entry: entry,
                 owned: owned != null,
+                selected: selected?.id == owned?.id && owned != null,
                 episodeCount: owned?.episodes.length ?? 0,
                 onTap: () => _onCatalogTap(entry, owned),
               );
@@ -149,9 +159,73 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
         ),
         const SizedBox(height: 16),
         const EpisodeStageLegend(),
-        const SizedBox(height: 8),
+        if (selected != null) ...<Widget>[
+          const SizedBox(height: 12),
+          Text(
+            '${libraryCourseDisplayTitle(selected)}  ·  '
+            '${selected.episodes.length} 集',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppDesignTokens.textPrimary,
+                ),
+          ),
+          const SizedBox(height: 8),
+          SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Row(
+              children: <Widget>[
+                for (final _DramaFilter f in _DramaFilter.values)
+                  Padding(
+                    padding: const EdgeInsets.only(right: 8),
+                    child: ChoiceChip(
+                      label: Text(_filterLabel(f)),
+                      selected: _filter == f,
+                      onSelected: (_) => setState(() => _filter = f),
+                    ),
+                  ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          ..._filteredEpisodes(selected, progressMap).map(
+            (LibraryEpisodeItem ep) {
+              final EpisodeStudyProgress p =
+                  episodeProgressOf(progressMap, ep.id);
+              return Card(
+                color: AppDesignTokens.appWhite,
+                margin: const EdgeInsets.only(bottom: 8),
+                child: ListTile(
+                  title: Text(
+                    ep.title,
+                    style: TextStyle(color: AppDesignTokens.textPrimary),
+                  ),
+                  subtitle: Padding(
+                    padding: const EdgeInsets.only(top: 8),
+                    child: EpisodeStageDots(stage: p.stage),
+                  ),
+                  trailing: Icon(
+                    Icons.chevron_right,
+                    color: AppDesignTokens.textSecondary,
+                  ),
+                  onTap: () {
+                    context.pushNamed(
+                      'player',
+                      pathParameters: <String, String>{
+                        'episodeId': ep.id,
+                      },
+                      queryParameters: const <String, String>{
+                        'plan': 'drama',
+                      },
+                    );
+                  },
+                ),
+              );
+            },
+          ),
+        ],
+        const SizedBox(height: 16),
         Text(
-          '我的已导入  ·  完全掌握 $masteredEps / $totalEps 集'
+          '其它已导入  ·  完全掌握 $masteredEps / $totalEps 集'
           '${totalEps == 0 ? '' : ' (${(masteredEps * 100 / totalEps).round()}%)'}',
           style: Theme.of(context).textTheme.titleSmall?.copyWith(
                 fontWeight: FontWeight.w800,
@@ -168,8 +242,8 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                 children: <Widget>[
                   Text(
                     dramas.isEmpty
-                        ? '还没有导入季集。打开上方片单，或从网盘导入整季文件夹（含 .en.srt / .zh.srt）。'
-                        : '精选片单里的剧已汇入上方海报，点海报即可学习；其它自建导入会出现在这里。',
+                        ? '还没有可学剧集。等待公开片单同步，或从网盘导入整季文件夹（含字幕）。'
+                        : '精选片单点海报即可选集；这里只列未收录进精选的自建导入。',
                     style: TextStyle(color: AppDesignTokens.textPrimary),
                   ),
                   const SizedBox(height: 12),
@@ -188,9 +262,13 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
           )
         else ...<Widget>[
           DropdownButtonFormField<String>(
-            value: selected?.id,
+            value: importedShelf.any(
+              (LibraryCourseData c) => c.id == selected?.id,
+            )
+                ? selected!.id
+                : importedShelf.first.id,
             decoration: InputDecoration(
-              labelText: '剧集 / 季',
+              labelText: '自建导入',
               border: const OutlineInputBorder(),
               labelStyle: TextStyle(color: AppDesignTokens.textSecondary),
             ),
@@ -211,60 +289,6 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
               setState(() => _selectedCourseId = id);
             },
           ),
-          const SizedBox(height: 12),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: <Widget>[
-                for (final _DramaFilter f in _DramaFilter.values)
-                  Padding(
-                    padding: const EdgeInsets.only(right: 8),
-                    child: ChoiceChip(
-                      label: Text(_filterLabel(f)),
-                      selected: _filter == f,
-                      onSelected: (_) => setState(() => _filter = f),
-                    ),
-                  ),
-              ],
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (selected != null)
-            ..._filteredEpisodes(selected, progressMap).map(
-              (LibraryEpisodeItem ep) {
-                final EpisodeStudyProgress p =
-                    episodeProgressOf(progressMap, ep.id);
-                return Card(
-                  color: AppDesignTokens.appWhite,
-                  margin: const EdgeInsets.only(bottom: 8),
-                  child: ListTile(
-                    title: Text(
-                      ep.title,
-                      style: TextStyle(color: AppDesignTokens.textPrimary),
-                    ),
-                    subtitle: Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: EpisodeStageDots(stage: p.stage),
-                    ),
-                    trailing: Icon(
-                      Icons.chevron_right,
-                      color: AppDesignTokens.textSecondary,
-                    ),
-                    onTap: () {
-                      context.pushNamed(
-                        'player',
-                        pathParameters: <String, String>{
-                          'episodeId': ep.id,
-                        },
-                        queryParameters: const <String, String>{
-                          'plan': 'drama',
-                        },
-                      );
-                    },
-                  ),
-                );
-              },
-            ),
         ],
       ],
     );
@@ -293,7 +317,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
     DramaCatalogEntry entry,
     LibraryCourseData? owned,
   ) async {
-    if (owned != null) {
+    if (owned != null && owned.episodes.isNotEmpty) {
       setState(() => _selectedCourseId = owned.id);
       return;
     }
@@ -327,8 +351,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                 const SizedBox(height: 12),
                 Text(
                   '${entry.blurb}\n\n'
-                  '正片不存放在服务器。请把该剧季集（含英/中字幕）放到百度网盘可见目录后导入，'
-                  '导入成功会出现在下方「我的已导入」。',
+                  '当前账号还没有这套剧。可下拉刷新同步公开片单，或从网盘导入自有授权资源。',
                   style: TextStyle(
                     color: AppDesignTokens.textPrimary,
                     height: 1.45,
@@ -413,18 +436,21 @@ class _CatalogPosterCard extends StatelessWidget {
   const _CatalogPosterCard({
     required this.entry,
     required this.owned,
+    required this.selected,
     required this.episodeCount,
     required this.onTap,
   });
 
   final DramaCatalogEntry entry;
   final bool owned;
+  final bool selected;
   final int episodeCount;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
     final Color accent = Color(entry.accent);
+    final String? cover = entry.coverUrl?.trim();
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -434,58 +460,91 @@ class _CatalogPosterCard extends StatelessWidget {
           width: 118,
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(14),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: <Color>[
-                accent,
-                Color.lerp(accent, Colors.black, 0.45)!,
-              ],
+            border: Border.all(
+              color: selected
+                  ? AppDesignTokens.primaryBlueDark
+                  : AppDesignTokens.borderGray,
+              width: selected ? 2 : 1,
             ),
-            border: Border.all(color: AppDesignTokens.borderGray),
           ),
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(13),
+            child: Stack(
+              fit: StackFit.expand,
               children: <Widget>[
-                Text(
-                  entry.titleZh,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 15,
-                    height: 1.2,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  entry.titleEn,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    color: Colors.white.withValues(alpha: 0.82),
-                    fontSize: 11,
-                    height: 1.2,
-                  ),
-                ),
-                const Spacer(),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                if (cover != null && cover.isNotEmpty)
+                  Image.network(
+                    cover,
+                    fit: BoxFit.cover,
+                    errorBuilder: (_, __, ___) => ColoredBox(color: accent),
+                    loadingBuilder: (
+                      BuildContext context,
+                      Widget child,
+                      ImageChunkEvent? progress,
+                    ) {
+                      if (progress == null) return child;
+                      return ColoredBox(
+                        color: accent,
+                        child: const Center(
+                          child: SizedBox(
+                            width: 22,
+                            height: 22,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          ),
+                        ),
+                      );
+                    },
+                  )
+                else
+                  ColoredBox(color: accent),
+                DecoratedBox(
                   decoration: BoxDecoration(
-                    color: Colors.black.withValues(alpha: 0.35),
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    owned ? '已导入 · $episodeCount 集' : '点此导入',
-                    style: const TextStyle(
-                      color: Colors.white,
-                      fontSize: 11,
-                      fontWeight: FontWeight.w600,
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: <Color>[
+                        Colors.black.withValues(alpha: 0.05),
+                        Colors.black.withValues(alpha: 0.78),
+                      ],
                     ),
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(10, 12, 10, 10),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: <Widget>[
+                      Text(
+                        entry.titleZh,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontWeight: FontWeight.w800,
+                          fontSize: 15,
+                          height: 1.2,
+                        ),
+                      ),
+                      const Spacer(),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 8,
+                          vertical: 4,
+                        ),
+                        decoration: BoxDecoration(
+                          color: Colors.black.withValues(alpha: 0.45),
+                          borderRadius: BorderRadius.circular(999),
+                        ),
+                        child: Text(
+                          owned ? '可学 · $episodeCount 集' : '未开通',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 11,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ],
