@@ -1451,6 +1451,36 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
+  /// Library search bar: direct Bilibili keyword search.
+  Future<List<AcquireDailyFeedItemDto>> searchBilibiliVideos(
+    String query, {
+    int limit = 12,
+  }) async {
+    final String q = query.trim();
+    if (q.isEmpty) return const <AcquireDailyFeedItemDto>[];
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.bilibiliSearch,
+      queryParameters: <String, dynamic>{
+        'q': q,
+        'limit': limit.clamp(1, 20),
+      },
+      options: Options(
+        receiveTimeout: const Duration(seconds: 14),
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(AcquireDailyFeedItemDto.fromJson)
+        .where(
+          (AcquireDailyFeedItemDto item) =>
+              item.bvid.isNotEmpty && item.watchUrl.isNotEmpty,
+        )
+        .toList(growable: false);
+  }
+
   /// Community 「全英可逛」: English-audio-first Bilibili browse (not library).
   Future<List<AcquireDailyFeedItemDto>> englishBrowseFeed({String? query}) async {
     final Response<dynamic> response = await _dio.get(

@@ -11,9 +11,11 @@ import '../../import_course/data/bilibili_collection_download.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/data/bilibili_episode_cover_backfill.dart';
 import '../../import_course/data/bilibili_import_service.dart';
+import '../../import_course/data/bilibili_open_or_import.dart';
 import '../../import_course/data/direct_video_collection_download.dart';
 import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/domain/bilibili_import.dart';
+import '../../shared/presentation/media/cover_image.dart';
 import '../../drama/domain/drama_course.dart';
 import '../../drama/presentation/drama_hub_screen.dart';
 import '../../membership/domain/free_trial_seeds.dart';
@@ -110,6 +112,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   String query = '';
   bool editMode = false;
   bool showScrollToTop = false;
+  Timer? _biliSearchDebounce;
+  bool _biliSearching = false;
+  String _biliSearchFor = '';
+  List<AcquireDailyFeedItemDto> _biliHits = const <AcquireDailyFeedItemDto>[];
+  String? _biliSearchError;
   LibraryCourseData selectedCourse = emptyLibraryCourse;
   String selectedEpisodeId = '';
   String episodeSort = '自然排序';
@@ -145,6 +152,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     queryController = TextEditingController()
       ..addListener(() {
         setState(() {});
+        _scheduleBilibiliSearch(queryController.text);
       });
     listScrollController = ScrollController()
       ..addListener(() {
@@ -197,11 +205,63 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   @override
   void dispose() {
+    _biliSearchDebounce?.cancel();
     transcriptReaderSession.dispose();
     importFlowController.dispose();
     queryController.dispose();
     listScrollController.dispose();
     super.dispose();
+  }
+
+  void _scheduleBilibiliSearch(String raw) {
+    final String q = raw.trim();
+    _biliSearchDebounce?.cancel();
+    if (q.isEmpty) {
+      setState(() {
+        _biliHits = const <AcquireDailyFeedItemDto>[];
+        _biliSearching = false;
+        _biliSearchFor = '';
+        _biliSearchError = null;
+      });
+      return;
+    }
+    _biliSearchDebounce = Timer(const Duration(milliseconds: 450), () {
+      unawaited(_runBilibiliSearch(q));
+    });
+  }
+
+  Future<void> _runBilibiliSearch(String q) async {
+    if (!mounted) return;
+    setState(() {
+      _biliSearching = true;
+      _biliSearchFor = q;
+      _biliSearchError = null;
+    });
+    try {
+      final List<AcquireDailyFeedItemDto> hits =
+          await ref.read(acquireApiClientProvider).searchBilibiliVideos(q);
+      if (!mounted || _biliSearchFor != q) return;
+      setState(() {
+        _biliHits = hits;
+        _biliSearching = false;
+      });
+    } catch (error) {
+      if (!mounted || _biliSearchFor != q) return;
+      setState(() {
+        _biliHits = const <AcquireDailyFeedItemDto>[];
+        _biliSearching = false;
+        _biliSearchError = 'B站搜索暂不可用';
+      });
+    }
+  }
+
+  Future<void> _openBilibiliSearchHit(AcquireDailyFeedItemDto hit) async {
+    await openBilibiliLearningOrImport(
+      context,
+      ref,
+      watchUrl: hit.watchUrl,
+      startImportImmediately: true,
+    );
   }
 
   Future<void> _openTranscriptReader(
@@ -1330,7 +1390,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                     onSubmitted: (_) => _applySearch(),
                     textInputAction: TextInputAction.search,
                     decoration: InputDecoration(
-                      hintText: '搜索课程、剧集、分类或来源...',
+                      hintText: '搜索本地课程，或直接搜 B站视频…',
                       hintStyle: TextStyle(
                         fontWeight: FontWeight.w600,
                         color: AppDesignTokens.textSecondary,
@@ -1503,17 +1563,30 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   const SizedBox(height: 14),
                   Text(
                     episodeHitCount > 0
-                        ? '找到 ${filteredCourses.length} 门课程，其中 $episodeHitCount 门命中剧集'
-                        : '找到 ${filteredCourses.length} 门课程',
+                        ? '本地：${filteredCourses.length} 门课程（$episodeHitCount 门命中剧集）'
+                        : '本地：${filteredCourses.length} 门课程',
                     style: TextStyle(
                       fontSize: 13,
                       fontWeight: FontWeight.w700,
                       color: AppDesignTokens.textSecondary,
                     ),
                   ),
+                  const SizedBox(height: 12),
+                  _BilibiliSearchResults(
+                    query: query,
+                    searching: _biliSearching,
+                    error: _biliSearchError,
+                    hits: _biliHits,
+                    onOpen: _openBilibiliSearchHit,
+                  ),
                 ],
                 const SizedBox(height: 24),
-                if (filteredCourses.isEmpty)
+                if (filteredCourses.isEmpty && !hasActiveQuery)
+                  const _EmptyLibraryState(query: '')
+                else if (filteredCourses.isEmpty &&
+                    hasActiveQuery &&
+                    !_biliSearching &&
+                    _biliHits.isEmpty)
                   _EmptyLibraryState(query: query)
                 else if (viewMode == LibraryCourseViewMode.grid ||
                     viewMode == LibraryCourseViewMode.compact)
@@ -2637,16 +2710,171 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _applySearch() {
+    final String next = queryController.text;
     setState(() {
-      query = queryController.text;
+      query = next;
     });
+    _scheduleBilibiliSearch(next);
   }
 
   void _clearSearch() {
     queryController.clear();
     setState(() {
       query = '';
+      _biliHits = const <AcquireDailyFeedItemDto>[];
+      _biliSearching = false;
+      _biliSearchFor = '';
+      _biliSearchError = null;
     });
+  }
+}
+
+class _BilibiliSearchResults extends StatelessWidget {
+  const _BilibiliSearchResults({
+    required this.query,
+    required this.searching,
+    required this.hits,
+    required this.onOpen,
+    this.error,
+  });
+
+  final String query;
+  final bool searching;
+  final String? error;
+  final List<AcquireDailyFeedItemDto> hits;
+  final Future<void> Function(AcquireDailyFeedItemDto hit) onOpen;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Row(
+          children: <Widget>[
+            Text(
+              'B站搜索',
+              style: TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w900,
+                color: AppDesignTokens.textPrimary,
+              ),
+            ),
+            const SizedBox(width: 8),
+            if (searching)
+              const SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              )
+            else
+              Text(
+                hits.isEmpty ? '无结果' : '${hits.length} 条',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w700,
+                  color: AppDesignTokens.textSecondary,
+                ),
+              ),
+          ],
+        ),
+        const SizedBox(height: 4),
+        Text(
+          '点条目即可导入并学习「$query」相关视频',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w600,
+            color: AppDesignTokens.textSecondary,
+          ),
+        ),
+        if (error != null) ...<Widget>[
+          const SizedBox(height: 8),
+          Text(
+            error!,
+            style: const TextStyle(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: Color(0xFFB42318),
+            ),
+          ),
+        ],
+        if (hits.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 10),
+          for (final AcquireDailyFeedItemDto hit in hits)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Material(
+                color: AppDesignTokens.appWhite,
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () => unawaited(onOpen(hit)),
+                  child: Padding(
+                    padding: const EdgeInsets.all(10),
+                    child: Row(
+                      children: <Widget>[
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: SizedBox(
+                            width: 96,
+                            height: 64,
+                            child: (hit.coverUrl ?? '').trim().isEmpty
+                                ? ColoredBox(
+                                    color: AppDesignTokens.borderGray,
+                                    child: Icon(
+                                      Icons.play_circle_outline,
+                                      color: AppDesignTokens.textSecondary,
+                                    ),
+                                  )
+                                : CoverImage(
+                                    path: hit.coverUrl!,
+                                    fit: BoxFit.cover,
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                hit.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w800,
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                [
+                                  if (hit.author.trim().isNotEmpty) hit.author,
+                                  hit.bvid,
+                                ].join(' · '),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppDesignTokens.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Icon(
+                          Icons.download_rounded,
+                          color: AppDesignTokens.primaryBlueDark,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
   }
 }
 
@@ -2682,7 +2910,7 @@ class _EmptyLibraryState extends StatelessWidget {
           const SizedBox(height: 10),
           Text(
             hasQuery
-                ? '试试课程名、剧集标题、分类或来源关键词；也可以直接导入新视频。'
+                ? '本地库没有匹配项。上方 B站搜索若有结果，可直接点开导入；也可换个关键词。'
                 : '先导入你自己的视频和字幕资源，再开始精听。',
             style: TextStyle(
               fontSize: 14,

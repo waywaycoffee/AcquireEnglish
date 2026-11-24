@@ -21,6 +21,7 @@ from app.bilibili_search import (
     list_bilibili_creator_videos,
     search_bilibili_videos,
 )
+from app.config import settings
 from app.database import get_db
 from app.deps import get_current_user, get_current_user_optional
 from app.followed_creators import parse_followed_creators
@@ -334,3 +335,63 @@ async def english_browse_feed(
     # Hard preference: verified English first; pending only as filler.
     preferred = english + pending
     return preferred[:ENGLISH_BROWSE_MAX]
+
+
+@router.get("/bilibili-search", response_model=list[DailyFeedItemOut])
+async def bilibili_keyword_search(
+    q: str = Query(..., min_length=1, max_length=80),
+    limit: int = Query(12, ge=1, le=20),
+    user: User | None = Depends(get_current_user_optional),
+    db: AsyncSession = Depends(get_db),
+) -> list[DailyFeedItemOut]:
+    """Direct Bilibili video search for the library search bar.
+
+    Unlike ``/english-browse``, this uses the query as typed (no forced
+    English-native keyword remix) so learners can find any B站 video.
+    """
+    keyword = q.strip()
+    if not keyword:
+        return []
+    cookie: str | None = None
+    already_imported: set[str] = set()
+    if user is not None:
+        pref_result = await db.execute(
+            select(UserPreference).where(UserPreference.user_id == user.id)
+        )
+        pref = pref_result.scalar_one_or_none()
+        cookie = (pref.bilibili_cookie if pref else None) or None
+        imported_result = await db.execute(
+            select(UserLinkCourse.external_id).where(
+                UserLinkCourse.user_id == user.id,
+                UserLinkCourse.source == "bilibili",
+            )
+        )
+        already_imported = {
+            str(ext) for ext in imported_result.scalars().all() if ext
+        }
+    if not cookie:
+        cookie = (settings.bilibili_cookie or "").strip() or None
+
+    try:
+        hits = await asyncio.wait_for(
+            search_bilibili_videos(
+                keyword,
+                matched_tag="search",
+                cookie=cookie,
+                limit=limit,
+            ),
+            timeout=10,
+        )
+    except Exception:
+        return []
+
+    out: list[DailyFeedItemOut] = []
+    seen: set[str] = set()
+    for hit in hits:
+        if hit.bvid in seen or hit.bvid in already_imported:
+            continue
+        seen.add(hit.bvid)
+        out.append(_hit_to_item(hit, reason="search"))
+        if len(out) >= limit:
+            break
+    return out
