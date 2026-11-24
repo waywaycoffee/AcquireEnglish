@@ -40,6 +40,18 @@ class YoutubeBrowseScreen extends ConsumerStatefulWidget {
 }
 
 class _YoutubeBrowseScreenState extends ConsumerState<YoutubeBrowseScreen> {
+  String? _openingVideoId;
+
+  Future<void> _openVideo(AcquireDailyFeedItemDto item) async {
+    if (_openingVideoId != null) return;
+    setState(() => _openingVideoId = item.bvid);
+    try {
+      await importYoutubeVideoById(context, ref, videoId: item.bvid, level: _level);
+    } finally {
+      if (mounted) setState(() => _openingVideoId = null);
+    }
+  }
+
   final TextEditingController _query = TextEditingController();
   late String _level;
   bool _discovering = false;
@@ -195,14 +207,9 @@ class _YoutubeBrowseScreenState extends ConsumerState<YoutubeBrowseScreen> {
             borderRadius: BorderRadius.circular(16),
             child: InkWell(
               borderRadius: BorderRadius.circular(16),
-              onTap: () => unawaited(
-                importYoutubeVideoById(
-                  context,
-                  ref,
-                  videoId: item.bvid,
-                  level: _level,
-                ),
-              ),
+              onTap: _openingVideoId == null
+                  ? () => unawaited(_openVideo(item))
+                  : null,
               child: Padding(
                 padding: const EdgeInsets.all(10),
                 child: Row(
@@ -240,7 +247,7 @@ class _YoutubeBrowseScreenState extends ConsumerState<YoutubeBrowseScreen> {
                             <String>[
                               if (item.author.isNotEmpty) item.author,
                               if (duration.isNotEmpty) duration,
-                              '英语教育',
+                              _openingVideoId == item.bvid ? '正在打开…' : '英语教育',
                             ].join(' · '),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,

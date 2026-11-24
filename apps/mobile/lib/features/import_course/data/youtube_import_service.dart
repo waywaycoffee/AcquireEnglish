@@ -90,6 +90,21 @@ class YoutubeImportService {
     }
   }
 
+  Future<String> resolvePlaybackUrl(String videoId) async {
+    final yt = YoutubeExplode();
+    try {
+      final manifest = await yt.videos.streamsClient.getManifest(videoId);
+      final streams = manifest.muxed
+          .where((stream) => stream.container == StreamContainer.mp4)
+          .toList()
+        ..sort((a, b) => b.videoResolution.compareTo(a.videoResolution));
+      if (streams.isEmpty) throw StateError('该 YouTube 视频没有可用的合并音视频流');
+      return streams.first.url.toString();
+    } finally {
+      yt.close();
+    }
+  }
+
   /// Download a progressive muxed stream for local playback / Whisper ASR.
   Future<String?> downloadLocalVideo(String videoId) async {
     final YoutubeExplode yt = YoutubeExplode();

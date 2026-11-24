@@ -1,17 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../membership/domain/module_access.dart';
-import '../../subtitle_completion/subtitle_completion_enqueue.dart';
-import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../sync/presentation/user_assets_provider.dart';
 import '../domain/youtube_import.dart';
-import 'bilibili_episode_prepare.dart';
 import 'youtube_import_service.dart';
 
-/// Import a YouTube video by id (requires working YouTube access / VPN).
+/// Open an existing YouTube lesson or import it and open the player.
 Future<bool> importYoutubeVideoById(
   BuildContext context,
   WidgetRef ref, {
@@ -31,16 +29,20 @@ Future<bool> importYoutubeVideoById(
 
   final YoutubeImportService service = const YoutubeImportService();
   try {
-    YoutubeImportResult meta = await service.fetch(id);
+    final existing = ref.read(libraryCatalogProvider).where(
+      (course) => course.id == 'youtube-$id',
+    ).firstOrNull;
+    if (existing != null && existing.episodes.isNotEmpty) {
+      if (context.mounted) context.push('/episodes/${existing.episodes.first.id}');
+      return true;
+    }
+    final YoutubeImportResult meta = await service.fetch(id).timeout(
+      const Duration(seconds: 25),
+    );
+    if (!context.mounted) return false;
     final String courseId = 'youtube-${meta.videoId}';
     final bool hasEn = meta.enSubtitlePath != null;
     final bool hasZh = meta.cnSubtitlePath != null;
-    if (!hasEn || !hasZh) {
-      final String? local = await service.downloadLocalVideo(meta.videoId);
-      if (local != null) {
-        meta = meta.copyWith(localVideoPath: local);
-      }
-    }
     final String videoAsset = meta.localVideoPath ?? meta.watchUrl;
     final LibraryCourseData course = LibraryCourseData(
       id: courseId,
@@ -97,37 +99,10 @@ Future<bool> importYoutubeVideoById(
     final bool ok = await ref
         .read(libraryCatalogProvider.notifier)
         .importCourse(course, unlimitedPersonalLibrary: unlimited);
-    final bool canLocalAsr = course.episodes.any(
-      (LibraryEpisodeItem ep) => isUsableLocalVideoPath(ep.videoAsset),
-    );
-    if (ok && (!hasEn || !hasZh) && canLocalAsr) {
-      await enqueueSubtitleCompletionForCourse(course: course);
-      SubtitleCompletionScheduler.instance.kick(delay: Duration.zero);
-    }
     if (!context.mounted) return ok;
-    final String subtitleHint;
-    if (hasEn && hasZh) {
-      subtitleHint = '中英字幕已就绪。';
-    } else if (!canLocalAsr) {
-      subtitleHint = !hasEn && !hasZh
-          ? '缺中英字幕；未能下载本地视频，请稍后重试补全。'
-          : (!hasEn ? '缺英文字幕；未能下载本地视频。' : '缺中文字幕；未能下载本地视频。');
-    } else {
-      subtitleHint = !hasEn && !hasZh
-          ? '缺中英字幕，已下载并开始后台 ASR 补全。'
-          : (!hasEn
-              ? '缺英文字幕，已下载并开始后台 ASR 补全。'
-              : '缺中文字幕，已下载并开始后台 ASR 补全。');
+    if (ok) {
+      context.push('/episodes/$courseId-01');
     }
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(
-          ok
-              ? '已加入书库。$subtitleHint'
-              : '该书库中已有此 YouTube 课程',
-        ),
-      ),
-    );
     return ok;
   } catch (e) {
     if (context.mounted) {

@@ -21,6 +21,8 @@ import '../../daily_review/data/memory_item_store.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
 import '../domain/episode_clip_due.dart';
+import '../../import_course/data/youtube_import_service.dart';
+import '../../import_course/domain/youtube_import.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_import_service.dart';
 import '../../import_course/data/bilibili_multipage.dart';
@@ -1622,6 +1624,11 @@ class PadPortraitPlayerScreenState
         trimmed.isNotEmpty &&
         !trimmed.startsWith('http://') &&
         !trimmed.startsWith('https://');
+    final youtubeId = looksLocal ? null : YoutubeImport.extractVideoId(trimmed);
+    if (youtubeId != null) {
+      final uri = await const YoutubeImportService().resolvePlaybackUrl(youtubeId);
+      return (uri: uri, headers: null);
+    }
     if (looksLocal) {
       final File local = File(trimmed);
       if (local.existsSync() && local.lengthSync() > 64 * 1024) {
@@ -1636,6 +1643,13 @@ class PadPortraitPlayerScreenState
       courses: ref.read(libraryCatalogProvider),
       episodeId: widget.episodeId,
     );
+    if (looksLocal) {
+      final youtubeId = YoutubeImport.extractVideoId(resource.episode?.sourceUrl ?? '');
+      if (youtubeId != null) {
+        final uri = await const YoutubeImportService().resolvePlaybackUrl(youtubeId);
+        return (uri: uri, headers: null);
+      }
+    }
     final String? biliSource =
         bilibiliSourceForEpisode(
           course: resource.course,
