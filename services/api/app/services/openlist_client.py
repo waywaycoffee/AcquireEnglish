@@ -80,7 +80,12 @@ def driver_for(provider: str) -> str:
     raise OpenListError(f"不支持的网盘：{provider}")
 
 
-def addition_for(provider: str, credential: str) -> str:
+def addition_for(
+    provider: str,
+    credential: str,
+    *,
+    access_token: str = "",
+) -> str:
     cred = credential.strip()
     if provider == "quark":
         return json.dumps(
@@ -141,6 +146,8 @@ def addition_for(provider: str, credential: str) -> str:
     addition: dict[str, Any] = {
         **baidu_common,
         "refresh_token": cred,
+        # Always set so OpenList does not keep a previous passport's token.
+        "AccessToken": (access_token or "").strip(),
         # Own AppKey tokens must not go through OpenList online renew API.
         "use_online_api": False,
     }
@@ -217,6 +224,7 @@ class OpenListClient:
         mount_path: str,
         provider: str,
         credential: str,
+        access_token: str = "",
         order: int = 0,
     ) -> int:
         payload = {
@@ -225,7 +233,9 @@ class OpenListClient:
             "driver": driver_for(provider),
             "cache_expiration": 30,
             "status": "work",
-            "addition": addition_for(provider, credential),
+            "addition": addition_for(
+                provider, credential, access_token=access_token
+            ),
             "remark": f"acquireenglish:{provider}",
             "web_proxy": False,
             "webdav_policy": "302_redirect",
@@ -247,6 +257,7 @@ class OpenListClient:
         mount_path: str,
         provider: str,
         credential: str,
+        access_token: str = "",
         order: int = 0,
     ) -> None:
         payload = {
@@ -256,7 +267,9 @@ class OpenListClient:
             "driver": driver_for(provider),
             "cache_expiration": 30,
             "status": "work",
-            "addition": addition_for(provider, credential),
+            "addition": addition_for(
+                provider, credential, access_token=access_token
+            ),
             "remark": f"acquireenglish:{provider}",
             "web_proxy": False,
             "webdav_policy": "302_redirect",
@@ -271,9 +284,35 @@ class OpenListClient:
         provider: str,
         credential: str,
         storage_id: int | None = None,
+        access_token: str = "",
         order: int = 0,
+        replace_existing: bool = False,
     ) -> int:
-        """Prefer update when mount_path already exists (avoids UNIQUE constraint)."""
+        """Create or update storage. ``replace_existing`` deletes mount first."""
+        if replace_existing:
+            if storage_id is not None:
+                try:
+                    await self.delete_storage(storage_id)
+                except OpenListError:
+                    pass
+            try:
+                await self.delete_storage_by_mount(mount_path)
+            except OpenListError:
+                pass
+            try:
+                return await self.create_storage(
+                    mount_path=mount_path,
+                    provider=provider,
+                    credential=credential,
+                    access_token=access_token,
+                    order=order,
+                )
+            except OpenListError as exc:
+                detail = str(exc).lower()
+                if "unique" not in detail and "constraint" not in detail and "2067" not in detail:
+                    raise
+                # Race: fall through to update path below.
+
         existing_id = storage_id
         if existing_id is None:
             found = await self.find_storage_by_mount(mount_path)
@@ -286,11 +325,11 @@ class OpenListClient:
                     mount_path=mount_path,
                     provider=provider,
                     credential=credential,
+                    access_token=access_token,
                     order=order,
                 )
                 return existing_id
             except OpenListError:
-                # Stale id — fall through to create / rematch by path.
                 found = await self.find_storage_by_mount(mount_path)
                 if found and found.get("id") is not None:
                     existing_id = int(found["id"])
@@ -299,6 +338,7 @@ class OpenListClient:
                         mount_path=mount_path,
                         provider=provider,
                         credential=credential,
+                        access_token=access_token,
                         order=order,
                     )
                     return existing_id
@@ -307,6 +347,7 @@ class OpenListClient:
                 mount_path=mount_path,
                 provider=provider,
                 credential=credential,
+                access_token=access_token,
                 order=order,
             )
         except OpenListError as exc:
@@ -320,6 +361,7 @@ class OpenListClient:
                         mount_path=mount_path,
                         provider=provider,
                         credential=credential,
+                        access_token=access_token,
                         order=order,
                     )
                     return sid

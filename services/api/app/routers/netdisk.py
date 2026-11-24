@@ -290,6 +290,8 @@ async def _upsert_binding(
     user_id: int,
     provider: Provider,
     credential: str,
+    access_token: str = "",
+    replace_mount: bool = False,
 ) -> UserNetdiskBinding:
     mount = _mount_for(user_id, provider)
     client = OpenListClient()
@@ -300,12 +302,15 @@ async def _upsert_binding(
         )
     )
     row = result.scalar_one_or_none()
-    # Reuse OpenList row by mount_path when re-binding after unbind left an orphan.
+    # OAuth rebind: delete+recreate so OpenList cannot keep a stale AccessToken
+    # from the previous Baidu passport on the same mount_path.
     storage_id = await client.create_or_update_storage(
         mount_path=mount,
         provider=provider,
         credential=credential,
+        access_token=access_token,
         storage_id=None if row is None else row.openlist_storage_id,
+        replace_existing=replace_mount or bool(access_token),
     )
     if row is None:
         row = UserNetdiskBinding(
@@ -399,21 +404,27 @@ async def baidu_oauth_callback(
     account_hint = ""
     try:
         tokens = await baidu_oauth.exchange_code_for_tokens(code)
-        row = await _upsert_binding(
+        # Identity from Baidu OAuth token itself — proves which passport authorized.
+        oauth_info = await baidu_oauth.fetch_uinfo(tokens.get("access_token") or "")
+        await _upsert_binding(
             db=db,
             user_id=user_id,
             provider="baidu",
             credential=tokens["refresh_token"],
+            access_token=str(tokens.get("access_token") or ""),
+            replace_mount=True,
         )
-        try:
-            info = await OpenListClient().baidu_account_info(row.openlist_mount_path)
-            if info:
-                name = str(info.get("baidu_name") or info.get("netdisk_name") or "").strip()
-                vip = "会员" if info.get("is_vip") else "非会员"
-                if name:
-                    account_hint = f"当前绑定百度账号：{name}（{vip}）。若不对请回 App 解绑后换号重授。"
-        except Exception:  # noqa: BLE001
-            account_hint = ""
+        if oauth_info:
+            name = str(
+                oauth_info.get("baidu_name") or oauth_info.get("netdisk_name") or ""
+            ).strip()
+            vip = "会员" if oauth_info.get("is_vip") else "非会员"
+            if name:
+                account_hint = (
+                    f"百度本次授权身份：{name}（{vip}）。"
+                    f"这是百度返回的登录身份，不是爱快缓存。"
+                    f"若不是目标昵称，请无痕窗口用「用户名+密码」重授（勿扫码、勿手机号短信）。"
+                )
     except OpenListError as exc:
         return _oauth_result_html(ok=False, message=f"挂载网盘失败：{exc}")
     except Exception as exc:  # noqa: BLE001

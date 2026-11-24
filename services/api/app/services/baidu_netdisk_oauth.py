@@ -119,3 +119,29 @@ async def exchange_code_for_tokens(code: str) -> dict[str, Any]:
         "expires_in": int(data.get("expires_in") or 0),
         "scope": str(data.get("scope") or ""),
     }
+
+
+async def fetch_uinfo(access_token: str) -> dict[str, Any] | None:
+    """Identity for the OAuth access_token itself (not OpenList cache)."""
+    token = (access_token or "").strip()
+    if not token:
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=15.0, follow_redirects=True) as client:
+            resp = await client.get(
+                "https://pan.baidu.com/rest/2.0/xpan/nas",
+                params={"method": "uinfo", "access_token": token},
+            )
+            data = resp.json()
+    except Exception:  # noqa: BLE001
+        return None
+    if not isinstance(data, dict) or int(data.get("errno") or 0) != 0:
+        return None
+    vip = int(data.get("vip_type") or 0)
+    return {
+        "baidu_name": str(data.get("baidu_name") or "").strip(),
+        "netdisk_name": str(data.get("netdisk_name") or "").strip(),
+        "uk": data.get("uk"),
+        "vip_type": vip,
+        "is_vip": vip > 0,
+    }
