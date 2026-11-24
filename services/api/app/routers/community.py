@@ -57,6 +57,8 @@ PostKind = Literal[
 LeaderboardMetric = Literal[
     "study_today",
     "study_week",
+    "study_month",
+    "study_year",
     "vocab",
     "video_count",
     "video_seconds",
@@ -64,6 +66,7 @@ LeaderboardMetric = Literal[
     "vocab_seconds",
     "vocab_learned",
 ]
+LeaderboardPeriod = Literal["day", "month", "year"]
 PkStatus = Literal["pending", "completed", "declined"]
 
 _DAY_RE = re.compile(r"^\d{4}-\d{2}-\d{2}$")
@@ -1076,15 +1079,35 @@ async def upsert_study_stats(
     )
 
 
+def _star_metric_value(row: UserStudyStatsDaily, metric: str) -> int:
+    if metric == "video_count":
+        return int(row.video_count or 0)
+    if metric == "video_seconds":
+        return int(row.video_seconds or 0)
+    if metric == "reading_seconds":
+        return int(row.reading_seconds or 0)
+    if metric == "vocab_seconds":
+        return int(row.vocab_seconds or 0)
+    if metric == "vocab_learned":
+        return int(row.vocab_learned_count or 0)
+    if metric in ("study_today", "study_week", "study_month", "study_year"):
+        return int(row.study_seconds or 0)
+    return 0
+
+
 @router.get("/leaderboard", response_model=list[LeaderboardEntryOut])
 async def leaderboard(
     metric: LeaderboardMetric = "study_week",
+    period: LeaderboardPeriod = Query(default="day"),
     limit: int = Query(default=30, ge=1, le=100),
     db: AsyncSession = Depends(get_db),
     user: User = Depends(get_current_user),
 ) -> list[LeaderboardEntryOut]:
-    today = date.today().isoformat()
-    week_start = (date.today() - timedelta(days=6)).isoformat()
+    today_d = date.today()
+    today = today_d.isoformat()
+    week_start = (today_d - timedelta(days=6)).isoformat()
+    month_start = today_d.replace(day=1).isoformat()
+    year_start = today_d.replace(month=1, day=1).isoformat()
 
     visible_ids = {
         p.user_id
@@ -1105,39 +1128,79 @@ async def leaderboard(
         visible_ids.add(uid)
 
     scores: dict[int, int] = defaultdict(int)
-    today_star_metrics = {
+    star_metrics = {
         "video_count",
         "video_seconds",
         "reading_seconds",
         "vocab_seconds",
         "vocab_learned",
     }
-    if metric == "study_today" or metric in today_star_metrics:
+    if metric == "study_today":
         rows = (
             await db.execute(
                 select(UserStudyStatsDaily).where(UserStudyStatsDaily.day == today)
             )
         ).scalars().all()
         for row in rows:
-            if row.user_id not in visible_ids:
-                continue
-            if metric == "study_today":
+            if row.user_id in visible_ids:
                 scores[row.user_id] = int(row.study_seconds or 0)
-            elif metric == "video_count":
-                scores[row.user_id] = int(row.video_count or 0)
-            elif metric == "video_seconds":
-                scores[row.user_id] = int(row.video_seconds or 0)
-            elif metric == "reading_seconds":
-                scores[row.user_id] = int(row.reading_seconds or 0)
-            elif metric == "vocab_seconds":
-                scores[row.user_id] = int(row.vocab_seconds or 0)
-            else:  # vocab_learned
-                scores[row.user_id] = int(row.vocab_learned_count or 0)
+    elif metric in star_metrics:
+        # day / month / year aggregate for 学习之星 boards
+        if period == "month":
+            day_from = month_start
+        elif period == "year":
+            day_from = year_start
+        else:
+            day_from = today
+        if period == "day":
+            rows = (
+                await db.execute(
+                    select(UserStudyStatsDaily).where(
+                        UserStudyStatsDaily.day == today
+                    )
+                )
+            ).scalars().all()
+            for row in rows:
+                if row.user_id in visible_ids:
+                    scores[row.user_id] = _star_metric_value(row, metric)
+        else:
+            rows = (
+                await db.execute(
+                    select(UserStudyStatsDaily).where(
+                        UserStudyStatsDaily.day >= day_from
+                    )
+                )
+            ).scalars().all()
+            for row in rows:
+                if row.user_id in visible_ids:
+                    scores[row.user_id] += _star_metric_value(row, metric)
     elif metric == "study_week":
         rows = (
             await db.execute(
                 select(UserStudyStatsDaily).where(
                     UserStudyStatsDaily.day >= week_start
+                )
+            )
+        ).scalars().all()
+        for row in rows:
+            if row.user_id in visible_ids:
+                scores[row.user_id] += int(row.study_seconds or 0)
+    elif metric == "study_month":
+        rows = (
+            await db.execute(
+                select(UserStudyStatsDaily).where(
+                    UserStudyStatsDaily.day >= month_start
+                )
+            )
+        ).scalars().all()
+        for row in rows:
+            if row.user_id in visible_ids:
+                scores[row.user_id] += int(row.study_seconds or 0)
+    elif metric == "study_year":
+        rows = (
+            await db.execute(
+                select(UserStudyStatsDaily).where(
+                    UserStudyStatsDaily.day >= year_start
                 )
             )
         ).scalars().all()

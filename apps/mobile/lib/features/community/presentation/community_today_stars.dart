@@ -6,16 +6,23 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/community_models.dart';
 
-const List<(String metric, String label, String unit)> kTodayStarBoards =
-    <(String, String, String)>[
-  ('video_count', '看视频最多', '集'),
-  ('video_seconds', '看视频最久', '时长'),
-  ('reading_seconds', '阅读最久', '时长'),
-  ('vocab_seconds', '背单词最久', '时长'),
-  ('vocab_learned', '背单词最多', '词'),
+const List<(String metric, String label)> kStarBoards =
+    <(String, String)>[
+  ('video_count', '看视频最多'),
+  ('video_seconds', '看视频最久'),
+  ('reading_seconds', '阅读最久'),
+  ('vocab_seconds', '背单词最久'),
+  ('vocab_learned', '背单词最多'),
 ];
 
-/// 「今日学习之星」— multi-metric today leaderboards.
+const List<(String period, String label)> kStarPeriods =
+    <(String, String)>[
+  ('day', '日榜'),
+  ('month', '月榜'),
+  ('year', '年榜'),
+];
+
+/// 学习之星 — day / month / year multi-metric leaderboards.
 class CommunityTodayStars extends ConsumerStatefulWidget {
   const CommunityTodayStars({super.key, this.embedded = true});
 
@@ -27,30 +34,36 @@ class CommunityTodayStars extends ConsumerStatefulWidget {
 }
 
 class _CommunityTodayStarsState extends ConsumerState<CommunityTodayStars> {
-  String _metric = kTodayStarBoards.first.$1;
+  String _metric = kStarBoards.first.$1;
+  String _period = 'day';
   late Future<List<LeaderboardEntryDto>> _future;
 
   @override
   void initState() {
     super.initState();
-    _future = _load(_metric);
+    _future = _load();
   }
 
-  Future<List<LeaderboardEntryDto>> _load(String metric) async {
+  Future<List<LeaderboardEntryDto>> _load() async {
     if (!ref.read(authSessionProvider).isLoggedIn) {
       return const <LeaderboardEntryDto>[];
     }
-    return ref
-        .read(acquireApiClientProvider)
-        .communityLeaderboard(metric: metric);
+    return ref.read(acquireApiClientProvider).communityLeaderboard(
+          metric: _metric,
+          period: _period,
+        );
   }
 
-  void _select(String metric) {
-    if (metric == _metric) return;
-    setState(() {
-      _metric = metric;
-      _future = _load(metric);
-    });
+  void _reload() {
+    setState(() => _future = _load());
+  }
+
+  String get _title {
+    return switch (_period) {
+      'month' => '本月学习之星',
+      'year' => '本年学习之星',
+      _ => '今日学习之星',
+    };
   }
 
   String _formatValue(String metric, int value) {
@@ -72,7 +85,7 @@ class _CommunityTodayStarsState extends ConsumerState<CommunityTodayStars> {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Text(
-          '今日学习之星',
+          _title,
           style: TextStyle(
             fontWeight: FontWeight.w900,
             fontSize: widget.embedded ? 16 : 18,
@@ -81,7 +94,7 @@ class _CommunityTodayStarsState extends ConsumerState<CommunityTodayStars> {
         ),
         const SizedBox(height: 6),
         Text(
-          '看视频最多 / 最久 · 阅读最久 · 背单词最久 / 最多',
+          '日榜 / 月榜 / 年榜 · 看视频 · 阅读 · 背单词',
           style: TextStyle(
             fontSize: 12,
             fontWeight: FontWeight.w600,
@@ -93,15 +106,37 @@ class _CommunityTodayStarsState extends ConsumerState<CommunityTodayStars> {
           scrollDirection: Axis.horizontal,
           child: Row(
             children: <Widget>[
-              for (final (String metric, String label, String _)
-                  in kTodayStarBoards)
+              for (final (String period, String label) in kStarPeriods)
+                Padding(
+                  padding: const EdgeInsets.only(right: 8),
+                  child: ChoiceChip(
+                    label: Text(label),
+                    selected: _period == period,
+                    onSelected: (bool selected) {
+                      if (!selected || _period == period) return;
+                      _period = period;
+                      _reload();
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+        const SizedBox(height: 8),
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            children: <Widget>[
+              for (final (String metric, String label) in kStarBoards)
                 Padding(
                   padding: const EdgeInsets.only(right: 8),
                   child: ChoiceChip(
                     label: Text(label),
                     selected: _metric == metric,
                     onSelected: (bool selected) {
-                      if (selected) _select(metric);
+                      if (!selected || _metric == metric) return;
+                      _metric = metric;
+                      _reload();
                     },
                   ),
                 ),
@@ -118,7 +153,7 @@ class _CommunityTodayStarsState extends ConsumerState<CommunityTodayStars> {
               border: Border.all(color: AppDesignTokens.borderGray),
             ),
             child: Text(
-              '登录后可查看今日学习之星排行榜',
+              '登录后可查看学习之星排行榜',
               style: TextStyle(
                 color: AppDesignTokens.textSecondary,
                 fontWeight: FontWeight.w600,
@@ -155,7 +190,7 @@ class _CommunityTodayStarsState extends ConsumerState<CommunityTodayStars> {
                     border: Border.all(color: AppDesignTokens.borderGray),
                   ),
                   child: Text(
-                    '今日还没有人上榜。学习一会儿后时长与个数会自动上报。',
+                    '这段时间还没有人上榜。学习一会儿后会自动上报。',
                     style: TextStyle(
                       color: AppDesignTokens.textSecondary,
                       fontWeight: FontWeight.w600,

@@ -4069,10 +4069,14 @@ class AcquireApiClient {
 
   Future<List<LeaderboardEntryDto>> communityLeaderboard({
     String metric = 'study_week',
+    String period = 'day',
   }) async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.communityLeaderboard,
-      queryParameters: <String, dynamic>{'metric': metric},
+      queryParameters: <String, dynamic>{
+        'metric': metric,
+        if (period.isNotEmpty) 'period': period,
+      },
       options: _noCache,
     );
     return (response.data as List<dynamic>)

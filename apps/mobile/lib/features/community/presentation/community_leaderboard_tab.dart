@@ -62,11 +62,19 @@ class CommunityLeaderboardTab extends ConsumerWidget {
           segments: const <ButtonSegment<String>>[
             ButtonSegment<String>(
               value: 'study_today',
-              label: Text('今日时长'),
+              label: Text('今日'),
             ),
             ButtonSegment<String>(
               value: 'study_week',
-              label: Text('本周时长'),
+              label: Text('本周'),
+            ),
+            ButtonSegment<String>(
+              value: 'study_month',
+              label: Text('本月'),
+            ),
+            ButtonSegment<String>(
+              value: 'study_year',
+              label: Text('本年'),
             ),
             ButtonSegment<String>(
               value: 'vocab',
