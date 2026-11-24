@@ -157,7 +157,15 @@ Future<NetdiskMediaPurgeResult> purgeStaleNetdiskMedia({
       continue;
     }
     final String path = e.path;
+    // Keep in-progress downloads; only drop abandoned .part older than TTL.
     if (path.endsWith('.part')) {
+      int lastMs = 0;
+      try {
+        lastMs = e.lastModifiedSync().millisecondsSinceEpoch;
+      } catch (_) {}
+      if (lastMs > cutoff) {
+        continue;
+      }
       try {
         final int len = e.lengthSync();
         await e.delete();
@@ -259,8 +267,16 @@ Future<({String uri, Map<String, String>? headers})> resolveNetdiskPlayableMedia
 Future<({String uri, Map<String, String>? headers})>
     prepareNetdiskEpisodeForSmoothPlayback({
   required String playUrl,
+  String? preferredLocalPath,
   void Function(double? progress, String message)? onProgress,
 }) async {
+  final String preferred = (preferredLocalPath ?? '').trim();
+  if (isUsableLocalVideoPath(preferred)) {
+    final File local = File(preferred);
+    unawaited(touchNetdiskMediaAccess(local));
+    onProgress?.call(1, '使用已缓存本集');
+    return (uri: preferred, headers: null);
+  }
   final int? importId = parseNetdiskImportIdFromUrl(playUrl);
   if (importId != null) {
     final File? cached = await findCachedNetdiskMedia(importId);
@@ -283,13 +299,20 @@ Future<({String uri, Map<String, String>? headers})>
     );
     onProgress?.call(1, '本集已就绪');
     return (uri: local.path, headers: null);
-  } catch (_) {
-    onProgress?.call(null, '下载未完成，改用在线缓冲…');
+  } catch (e) {
+    // Incomplete download kept as .part — try stream so user can still watch;
+    // next open resumes the .part.
+    final String msg = '$e';
+    onProgress?.call(
+      null,
+      msg.contains('下载未完成') ? '下载未完成，下次续传；先在线缓冲…' : '下载未完成，改用在线缓冲…',
+    );
     return resolveNetdiskPlayableMedia(playUrl);
   }
 }
 
 final Set<String> _prefetchInFlightPlayUrls = <String>{};
+final Map<String, Future<File>> _netdiskDownloadsInFlight = <String, Future<File>>{};
 
 /// Warm the next episode while the current one plays from local cache.
 void prefetchNetdiskPlayUrl(String? playUrl) {
@@ -311,6 +334,9 @@ void prefetchNetdiskPlayUrl(String? playUrl) {
 }
 
 /// Download one episode into netdisk_media/{importId}.mkv for smooth local play.
+///
+/// Resumes `.part` via HTTP Range when possible, and dedupes concurrent opens
+/// of the same episode so closing/reopening does not wipe progress.
 Future<File> cacheNetdiskEpisodeLocally({
   required String playUrl,
   void Function(double? progress)? onProgress,
@@ -318,6 +344,34 @@ Future<File> cacheNetdiskEpisodeLocally({
   final int? importId = parseNetdiskImportIdFromUrl(playUrl);
   final String idKey = importId?.toString() ??
       playUrl.hashCode.toRadixString(16);
+  final Future<File>? existingJob = _netdiskDownloadsInFlight[idKey];
+  if (existingJob != null) {
+    final File shared = await existingJob;
+    onProgress?.call(1);
+    return shared;
+  }
+  final Future<File> job = _cacheNetdiskEpisodeLocallyImpl(
+    playUrl: playUrl,
+    importId: importId,
+    idKey: idKey,
+    onProgress: onProgress,
+  );
+  _netdiskDownloadsInFlight[idKey] = job;
+  try {
+    return await job;
+  } finally {
+    if (identical(_netdiskDownloadsInFlight[idKey], job)) {
+      _netdiskDownloadsInFlight.remove(idKey);
+    }
+  }
+}
+
+Future<File> _cacheNetdiskEpisodeLocallyImpl({
+  required String playUrl,
+  required int? importId,
+  required String idKey,
+  void Function(double? progress)? onProgress,
+}) async {
   final File? existing =
       importId == null ? null : await findCachedNetdiskMedia(importId);
   if (existing != null) {
@@ -328,10 +382,13 @@ Future<File> cacheNetdiskEpisodeLocally({
   final Directory dir = await netdiskMediaDirectory();
   await dir.create(recursive: true);
   final File out = File('${dir.path}/$idKey.mkv');
-  final File temp = File('${out.path}.part');
-  if (temp.existsSync()) {
-    await temp.delete();
+  if (out.existsSync() && out.lengthSync() > 64 * 1024) {
+    await touchNetdiskMediaAccess(out);
+    onProgress?.call(1);
+    return out;
   }
+  final File temp = File('${out.path}.part');
+  final String url = absoluteNetdiskPlayUrl(playUrl);
   final Dio dio = Dio(
     BaseOptions(
       connectTimeout: const Duration(seconds: 30),
@@ -339,30 +396,102 @@ Future<File> cacheNetdiskEpisodeLocally({
       followRedirects: true,
       maxRedirects: 10,
       headers: <String, dynamic>{...kNetdiskStreamHeaders},
+      validateStatus: (int? s) => s != null && (s == 200 || s == 206),
     ),
   );
-  int lastPercent = -1;
-  await dio.download(
-    absoluteNetdiskPlayUrl(playUrl),
-    temp.path,
-    onReceiveProgress: (int received, int total) {
-      if (total <= 0) {
-        onProgress?.call(null);
-        return;
+
+  int? expectedTotal;
+  try {
+    final Response<void> head = await dio.head<void>(url);
+    expectedTotal = int.tryParse(
+      head.headers.value(Headers.contentLengthHeader) ?? '',
+    );
+  } catch (_) {}
+
+  int offset = temp.existsSync() ? temp.lengthSync() : 0;
+  if (expectedTotal != null &&
+      expectedTotal > 64 * 1024 &&
+      offset >= expectedTotal) {
+    if (out.existsSync()) {
+      await out.delete();
+    }
+    await temp.rename(out.path);
+    await touchNetdiskMediaAccess(out);
+    onProgress?.call(1);
+    return out;
+  }
+
+  // Server ignored / rejected Range → restart clean.
+  // Important: on resume we ONLY accept 206. A 200 + append would corrupt .part.
+  for (int attempt = 0; attempt < 2; attempt++) {
+    final bool resume = offset > 0;
+    int lastPercent = -1;
+    try {
+      await dio.download(
+        url,
+        temp.path,
+        options: Options(
+          headers: <String, dynamic>{
+            ...kNetdiskStreamHeaders,
+            if (resume) 'Range': 'bytes=$offset-',
+          },
+          validateStatus: (int? s) {
+            if (s == null) return false;
+            if (resume) return s == 206;
+            return s == 200 || s == 206;
+          },
+        ),
+        deleteOnError: false,
+        fileAccessMode:
+            resume ? FileAccessMode.append : FileAccessMode.write,
+        onReceiveProgress: (int received, int total) {
+          final int got = offset + received;
+          final int? full = expectedTotal ??
+              (total > 0 ? (resume ? offset + total : total) : null);
+          if (full == null || full <= 0) {
+            onProgress?.call(null);
+            return;
+          }
+          final int percent = ((got / full) * 100).floor().clamp(0, 100);
+          if (percent == lastPercent) {
+            return;
+          }
+          lastPercent = percent;
+          onProgress?.call((got / full).clamp(0.0, 1.0));
+        },
+      );
+      break;
+    } on DioException catch (e) {
+      final int? code = e.response?.statusCode;
+      if (resume &&
+          (code == 200 ||
+              code == 416 ||
+              code == 501 ||
+              e.type == DioExceptionType.badResponse)) {
+        try {
+          if (temp.existsSync()) {
+            await temp.delete();
+          }
+        } catch (_) {}
+        offset = 0;
+        continue;
       }
-      final int percent = ((received / total) * 100).floor();
-      if (percent == lastPercent) {
-        return;
-      }
-      lastPercent = percent;
-      onProgress?.call((received / total).clamp(0.0, 1.0));
-    },
-  );
+      // Keep .part on cancel / network drop so reopen can resume.
+      rethrow;
+    }
+  }
+
   if (!temp.existsSync() || temp.lengthSync() < 64 * 1024) {
     if (temp.existsSync()) {
       await temp.delete();
     }
     throw StateError('下载文件过小或失败');
+  }
+  if (expectedTotal != null &&
+      expectedTotal > 64 * 1024 &&
+      temp.lengthSync() + 1024 < expectedTotal) {
+    // Incomplete — keep .part for next resume; do not rename.
+    throw StateError('下载未完成，已保存进度，下次继续');
   }
   if (out.existsSync()) {
     await out.delete();
@@ -726,60 +855,11 @@ Future<File> _downloadPlayUrlToCache({
   required String idKey,
   void Function(double? progress)? onProgress,
 }) async {
-  final Directory docs = await getApplicationDocumentsDirectory();
-  final Directory dir = Directory('${docs.path}/netdisk_media');
-  await dir.create(recursive: true);
-  final String safe = idKey.replaceAll(RegExp(r'[\\/:*?"<>|]+'), '_');
-  final File out = File('${dir.path}/$safe.mp4');
-  if (out.existsSync() && out.lengthSync() > 64 * 1024) {
-    onProgress?.call(1);
-    return out;
-  }
-  final File temp = File('${out.path}.part');
-  if (temp.existsSync()) {
-    await temp.delete();
-  }
-
-  final Dio dio = Dio(
-    BaseOptions(
-      connectTimeout: const Duration(seconds: 30),
-      receiveTimeout: const Duration(hours: 2),
-      followRedirects: true,
-      maxRedirects: 8,
-      headers: <String, dynamic>{
-        'User-Agent': 'pan.baidu.com',
-        'Referer': 'https://pan.baidu.com/',
-      },
-    ),
+  // Same resume / in-flight path as playback prepare (netdisk_media/{importId}.mkv).
+  // idKey retained for call-site compatibility; cache key is import id from URL.
+  assert(idKey.isNotEmpty);
+  return cacheNetdiskEpisodeLocally(
+    playUrl: playUrl,
+    onProgress: onProgress,
   );
-
-  int lastPercent = -1;
-  await dio.download(
-    playUrl,
-    temp.path,
-    onReceiveProgress: (int received, int total) {
-      if (total <= 0) {
-        onProgress?.call(null);
-        return;
-      }
-      final int percent = ((received / total) * 100).floor();
-      if (percent == lastPercent) {
-        return;
-      }
-      lastPercent = percent;
-      onProgress?.call((received / total).clamp(0.0, 1.0));
-    },
-  );
-  if (!temp.existsSync() || temp.lengthSync() < 64 * 1024) {
-    if (temp.existsSync()) {
-      await temp.delete();
-    }
-    throw StateError('下载文件过小或失败');
-  }
-  if (out.existsSync()) {
-    await out.delete();
-  }
-  await temp.rename(out.path);
-  onProgress?.call(1);
-  return out;
 }

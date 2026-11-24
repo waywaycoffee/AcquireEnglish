@@ -1463,9 +1463,14 @@ class PadLandscapePlayerScreenState
       }
     }
     if (isNetdiskPlayUrl(trimmed)) {
+      final PlayerCourseLookupResult lookup = resolvePlayerCourseForEpisode(
+        courses: ref.read(libraryCatalogProvider),
+        episodeId: widget.episodeId,
+      );
       final ({String uri, Map<String, String>? headers}) resolved =
           await prepareNetdiskEpisodeForSmoothPlayback(
         playUrl: trimmed,
+        preferredLocalPath: lookup.episode?.videoAsset,
         onProgress: onProgress,
       );
       if (!(resolved.uri.startsWith('http://') ||

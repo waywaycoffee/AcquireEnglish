@@ -1780,7 +1780,30 @@ bool _isLocalSoftsubFile(String? path) {
   }
 }
 
-/// Prefer on-disk softsubs over cloud `/api/imports` after catalog sync.
+final RegExp _importIdAssetRe = RegExp(
+  r'/api/(?:imports|netdisk/play)/(\d+)',
+  caseSensitive: false,
+);
+
+int? _importIdFromEpisodeAssets(LibraryEpisodeItem episode) {
+  for (final String? raw in <String?>[
+    episode.videoAsset,
+    episode.sourceUrl,
+    episode.enSubtitleAsset,
+    episode.cnSubtitleAsset,
+  ]) {
+    final String value = (raw ?? '').trim();
+    if (value.isEmpty) continue;
+    final Match? m = _importIdAssetRe.firstMatch(value);
+    if (m != null) {
+      final int? id = int.tryParse(m.group(1)!);
+      if (id != null) return id;
+    }
+  }
+  return null;
+}
+
+/// Prefer on-disk softsubs / netdisk_media videos after catalog sync.
 LibraryCourseData _preserveLocalSoftsubPaths(
   LibraryCourseData cloud,
   LibraryCourseData? previous,
@@ -1791,10 +1814,25 @@ LibraryCourseData _preserveLocalSoftsubPaths(
   final Map<String, LibraryEpisodeItem> prevById = <String, LibraryEpisodeItem>{
     for (final LibraryEpisodeItem e in previous.episodes) e.id: e,
   };
+  // public-series-* episode ids differ from netdisk-series-*; match by import id.
+  final Map<int, LibraryEpisodeItem> prevByImportId =
+      <int, LibraryEpisodeItem>{};
+  for (final LibraryEpisodeItem e in previous.episodes) {
+    final int? id = _importIdFromEpisodeAssets(e);
+    if (id != null && isUsableLocalVideoPath(e.videoAsset)) {
+      prevByImportId.putIfAbsent(id, () => e);
+    }
+  }
   final List<LibraryEpisodeItem> episodes = cloud.episodes.map((
     LibraryEpisodeItem ep,
   ) {
-    final LibraryEpisodeItem? prev = prevById[ep.id];
+    LibraryEpisodeItem? prev = prevById[ep.id];
+    if (prev == null) {
+      final int? id = _importIdFromEpisodeAssets(ep);
+      if (id != null) {
+        prev = prevByImportId[id];
+      }
+    }
     if (prev == null) {
       return ep;
     }
@@ -1804,7 +1842,7 @@ LibraryCourseData _preserveLocalSoftsubPaths(
     final String? zh = _isLocalSoftsubFile(prev.cnSubtitleAsset)
         ? prev.cnSubtitleAsset
         : ep.cnSubtitleAsset;
-    final String? video = _isLocalSoftsubFile(prev.videoAsset)
+    final String? video = isUsableLocalVideoPath(prev.videoAsset)
         ? prev.videoAsset
         : ep.videoAsset;
     if (en == ep.enSubtitleAsset &&
