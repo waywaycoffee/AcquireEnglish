@@ -16,6 +16,7 @@ import 'adventure_ui.dart';
 import 'community_provider.dart';
 import 'community_feed_tab.dart';
 import 'community_social_screen.dart';
+import 'english_browse_screen.dart';
 
 class CommunityHotTab extends ConsumerStatefulWidget {
   const CommunityHotTab({super.key});
@@ -97,6 +98,71 @@ class _CommunityHotTabState extends ConsumerState<CommunityHotTab> {
             physics: const AlwaysScrollableScrollPhysics(),
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 32),
             children: <Widget>[
+              Material(
+                color: const Color(0xFF0F172A),
+                borderRadius: BorderRadius.circular(16),
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(16),
+                  onTap: () {
+                    Navigator.of(context).push<void>(
+                      MaterialPageRoute<void>(
+                        builder: (_) => const EnglishBrowseScreen(),
+                      ),
+                    );
+                  },
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 14, 16, 14),
+                    child: Row(
+                      children: <Widget>[
+                        Container(
+                          width: 42,
+                          height: 42,
+                          decoration: BoxDecoration(
+                            color: AppDesignTokens.brandGreen.withValues(
+                              alpha: 0.2,
+                            ),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: const Icon(
+                            Icons.travel_explore_rounded,
+                            color: AppDesignTokens.brandGreen,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        const Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                '全英可逛',
+                                style: TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.w900,
+                                  fontSize: 16,
+                                ),
+                              ),
+                              SizedBox(height: 2),
+                              Text(
+                                '浏览英语原声 B 站视频，点封面即可试看导入',
+                                style: TextStyle(
+                                  color: Color(0xFF94A3B8),
+                                  fontWeight: FontWeight.w600,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        const Icon(
+                          Icons.chevron_right_rounded,
+                          color: Colors.white70,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 18),
               Row(children: <Widget>[
                 const Expanded(child: Text('网盘学习资源',
                     style: TextStyle(fontWeight: FontWeight.w900, fontSize: 18))),

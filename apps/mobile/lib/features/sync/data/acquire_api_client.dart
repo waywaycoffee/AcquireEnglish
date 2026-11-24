@@ -1438,6 +1438,30 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
+  /// Community 「全英可逛」: English-audio-first Bilibili browse (not library).
+  Future<List<AcquireDailyFeedItemDto>> englishBrowseFeed({String? query}) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.englishBrowseFeed,
+      queryParameters: <String, dynamic>{
+        if (query != null && query.trim().isNotEmpty) 'q': query.trim(),
+      },
+      options: Options(
+        // Optional auth — guests can browse; cookie used when signed in.
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
+      ),
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(AcquireDailyFeedItemDto.fromJson)
+        .where(
+          (AcquireDailyFeedItemDto item) =>
+              item.bvid.isNotEmpty && item.watchUrl.isNotEmpty,
+        )
+        .toList(growable: false);
+  }
+
   Future<List<FollowedCreatorDto>> listFollowedCreators() async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.creatorsFollowed,
