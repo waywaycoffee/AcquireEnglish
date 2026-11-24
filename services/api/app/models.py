@@ -1620,3 +1620,28 @@ class ProductFeedback(Base):
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
+
+class UserAuthSession(Base):
+    """Active login terminal for an account (max N concurrent devices)."""
+
+    __tablename__ = "user_auth_sessions"
+    __table_args__ = (
+        UniqueConstraint("user_id", "device_id", name="uq_user_auth_device"),
+        Index("idx_user_auth_sessions_user_seen", "user_id", "last_seen_at"),
+    )
+
+    id: Mapped[str] = mapped_column(String(36), primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    device_id: Mapped[str] = mapped_column(String(128), index=True)
+    device_label: Mapped[str] = mapped_column(String(120), default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), index=True
+    )
+    revoked_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True, index=True
+    )

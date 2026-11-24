@@ -49,8 +49,12 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
     final List<LibraryCourseData> catalog = ref.watch(libraryCatalogProvider);
     final Map<String, EpisodeStudyProgress> progressMap =
         ref.watch(episodeStudyProgressProvider);
-    final List<LibraryCourseData> dramas =
-        catalog.where(looksLikeDramaCourse).toList();
+    final List<LibraryCourseData> dramas = pruneSubsumedDramaFlats(
+      catalog.where(looksLikeDramaCourse).toList(growable: false),
+    );
+    // Curated posters own 绝望主妇 etc.; keep「我的已导入」for custom packs only.
+    final List<LibraryCourseData> importedShelf =
+        dramasOutsideCuratedShelf(dramas);
     if (!_syncedDue && dramas.isNotEmpty) {
       _syncedDue = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -59,10 +63,10 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
     }
 
     LibraryCourseData? selected;
-    if (dramas.isNotEmpty) {
-      selected = dramas.cast<LibraryCourseData?>().firstWhere(
+    if (importedShelf.isNotEmpty) {
+      selected = importedShelf.cast<LibraryCourseData?>().firstWhere(
             (LibraryCourseData? c) => c?.id == _selectedCourseId,
-            orElse: () => dramas.first,
+            orElse: () => importedShelf.first,
           );
     }
 
@@ -155,7 +159,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
               ),
         ),
         const SizedBox(height: 12),
-        if (dramas.isEmpty)
+        if (importedShelf.isEmpty)
           Card(
             color: AppDesignTokens.appWhite,
             child: Padding(
@@ -163,7 +167,9 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
               child: Column(
                 children: <Widget>[
                   Text(
-                    '还没有导入季集。打开上方片单，或从网盘导入整季文件夹（含 .en.srt / .zh.srt）。',
+                    dramas.isEmpty
+                        ? '还没有导入季集。打开上方片单，或从网盘导入整季文件夹（含 .en.srt / .zh.srt）。'
+                        : '精选片单里的剧已汇入上方海报，点海报即可学习；其它自建导入会出现在这里。',
                     style: TextStyle(color: AppDesignTokens.textPrimary),
                   ),
                   const SizedBox(height: 12),
@@ -190,7 +196,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
             ),
             dropdownColor: AppDesignTokens.appWhite,
             items: <DropdownMenuItem<String>>[
-              for (final LibraryCourseData c in dramas)
+              for (final LibraryCourseData c in importedShelf)
                 DropdownMenuItem<String>(
                   value: c.id,
                   child: Text(

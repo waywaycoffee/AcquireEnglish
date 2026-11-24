@@ -9,11 +9,15 @@ class UserCreate(BaseModel):
     display_name: str | None = Field(default=None, max_length=120)
     # Email verification code from /auth/email/send
     code: str = Field(min_length=4, max_length=8)
+    device_id: str | None = Field(default=None, max_length=128)
+    device_label: str | None = Field(default=None, max_length=120)
 
 
 class UserLogin(BaseModel):
     email: EmailStr
     password: str
+    device_id: str | None = Field(default=None, max_length=128)
+    device_label: str | None = Field(default=None, max_length=120)
 
 
 class UserOut(BaseModel):
@@ -60,6 +64,8 @@ class SmsSendOut(BaseModel):
 class SmsLoginIn(BaseModel):
     phone: str = Field(min_length=8, max_length=20)
     code: str = Field(min_length=4, max_length=8)
+    device_id: str | None = Field(default=None, max_length=128)
+    device_label: str | None = Field(default=None, max_length=120)
 
 
 class EmailSendIn(BaseModel):
@@ -77,6 +83,19 @@ class EmailSendOut(BaseModel):
 class WechatLoginIn(BaseModel):
     code: str = Field(min_length=2, max_length=128)
     nickname: str | None = Field(default=None, max_length=120)
+    device_id: str | None = Field(default=None, max_length=128)
+    device_label: str | None = Field(default=None, max_length=120)
+
+
+class AuthSessionOut(BaseModel):
+    id: str
+    device_id: str
+    device_label: str
+    created_at: datetime | None = None
+    last_seen_at: datetime | None = None
+    current: bool = False
+
+    model_config = {"from_attributes": True}
 
 
 class SubtitlesOut(BaseModel):

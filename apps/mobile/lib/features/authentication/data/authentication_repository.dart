@@ -5,6 +5,7 @@ import '../../sync/data/acquire_api_client.dart';
 import '../domain/login_response.dart';
 import '../domain/register_response.dart';
 import '../presentation/auth_session.dart';
+import 'device_identity.dart';
 
 part 'authentication_repository.g.dart';
 
@@ -57,6 +58,13 @@ class HttpAuthRepository implements AuthenticationRepository {
     );
   }
 
+  Future<({String deviceId, String deviceLabel})> _deviceMeta() async {
+    return (
+      deviceId: await resolveAcquireDeviceId(),
+      deviceLabel: acquireDeviceLabel(),
+    );
+  }
+
   String _dioMessage(DioException e, String fallback) {
     final Object? detail = e.response?.data;
     if (detail is Map && detail['detail'] != null) {
@@ -71,9 +79,12 @@ class HttpAuthRepository implements AuthenticationRepository {
   @override
   Future<LoginResponse> login(String email, String password) async {
     try {
+      final ({String deviceId, String deviceLabel}) device = await _deviceMeta();
       final AcquireTokenResult result = await _api.login(
         email: email,
         password: password,
+        deviceId: device.deviceId,
+        deviceLabel: device.deviceLabel,
       );
       return _signInFromToken(result);
     } on DioException catch (e) {
@@ -95,11 +106,14 @@ class HttpAuthRepository implements AuthenticationRepository {
     String? displayName,
   }) async {
     try {
+      final ({String deviceId, String deviceLabel}) device = await _deviceMeta();
       final AcquireTokenResult result = await _api.register(
         email: email,
         password: password,
         code: code,
         displayName: displayName,
+        deviceId: device.deviceId,
+        deviceLabel: device.deviceLabel,
       );
       await _session.signIn(
         accessToken: result.accessToken,
@@ -142,9 +156,12 @@ class HttpAuthRepository implements AuthenticationRepository {
     required String code,
   }) async {
     try {
+      final ({String deviceId, String deviceLabel}) device = await _deviceMeta();
       final AcquireTokenResult result = await _api.loginWithSms(
         phone: phone,
         code: code,
+        deviceId: device.deviceId,
+        deviceLabel: device.deviceLabel,
       );
       return _signInFromToken(result);
     } on DioException catch (e) {
@@ -161,9 +178,12 @@ class HttpAuthRepository implements AuthenticationRepository {
     String? nickname,
   }) async {
     try {
+      final ({String deviceId, String deviceLabel}) device = await _deviceMeta();
       final AcquireTokenResult result = await _api.loginWithWechat(
         code: code,
         nickname: nickname,
+        deviceId: device.deviceId,
+        deviceLabel: device.deviceLabel,
       );
       return _signInFromToken(result);
     } on DioException catch (e) {

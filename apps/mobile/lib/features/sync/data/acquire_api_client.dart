@@ -1302,10 +1302,18 @@ class AcquireApiClient {
   Future<AcquireTokenResult> login({
     required String email,
     required String password,
+    String? deviceId,
+    String? deviceLabel,
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.login,
-      data: <String, String>{'email': email, 'password': password},
+      data: <String, dynamic>{
+        'email': email,
+        'password': password,
+        if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
+        if (deviceLabel != null && deviceLabel.isNotEmpty)
+          'device_label': deviceLabel,
+      },
     );
     return AcquireTokenResult.fromJson(response.data as Map<String, dynamic>);
   }
@@ -1315,6 +1323,8 @@ class AcquireApiClient {
     required String password,
     required String code,
     String? displayName,
+    String? deviceId,
+    String? deviceLabel,
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.register,
@@ -1323,6 +1333,9 @@ class AcquireApiClient {
         'password': password,
         'code': code,
         if (displayName != null) 'display_name': displayName,
+        if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
+        if (deviceLabel != null && deviceLabel.isNotEmpty)
+          'device_label': deviceLabel,
       },
     );
     return AcquireTokenResult.fromJson(response.data as Map<String, dynamic>);
@@ -1351,10 +1364,18 @@ class AcquireApiClient {
   Future<AcquireTokenResult> loginWithSms({
     required String phone,
     required String code,
+    String? deviceId,
+    String? deviceLabel,
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.smsLogin,
-      data: <String, String>{'phone': phone, 'code': code},
+      data: <String, dynamic>{
+        'phone': phone,
+        'code': code,
+        if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
+        if (deviceLabel != null && deviceLabel.isNotEmpty)
+          'device_label': deviceLabel,
+      },
     );
     return AcquireTokenResult.fromJson(response.data as Map<String, dynamic>);
   }
@@ -1362,6 +1383,8 @@ class AcquireApiClient {
   Future<AcquireTokenResult> loginWithWechat({
     required String code,
     String? nickname,
+    String? deviceId,
+    String? deviceLabel,
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.wechatLogin,
@@ -1369,6 +1392,9 @@ class AcquireApiClient {
         'code': code,
         if (nickname != null && nickname.trim().isNotEmpty)
           'nickname': nickname.trim(),
+        if (deviceId != null && deviceId.isNotEmpty) 'device_id': deviceId,
+        if (deviceLabel != null && deviceLabel.isNotEmpty)
+          'device_label': deviceLabel,
       },
     );
     return AcquireTokenResult.fromJson(response.data as Map<String, dynamic>);

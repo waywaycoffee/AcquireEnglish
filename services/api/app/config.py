@@ -12,6 +12,8 @@ class Settings(BaseSettings):
     app_name: str = "AcquireEnglish API"
     secret_key: str = "dev-change-me-acquire-english"
     access_token_expire_minutes: int = 60 * 24 * 7
+    # Max concurrent login terminals per account (oldest kicked on overflow).
+    max_auth_sessions_per_user: int = 4
     database_url: str = "sqlite+aiosqlite:///./acquire_english.db"
     # Comma-separated origins, or "*" for any (mobile Dio ignores CORS).
     cors_origins: str = "https://acquireenglish.curlhairai.com,http://localhost:5173,http://127.0.0.1:5173"

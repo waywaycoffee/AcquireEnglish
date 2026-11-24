@@ -4,9 +4,10 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
 from app.database import get_db
-from app.deps import get_current_user
+from app.deps import bearer, get_current_user
 from app.models import User
 from app.schemas import (
+    AuthSessionOut,
     EmailSendIn,
     EmailSendOut,
     SmsLoginIn,
@@ -18,7 +19,18 @@ from app.schemas import (
     UserOut,
     WechatLoginIn,
 )
-from app.security import create_access_token, hash_password, verify_password
+from app.security import (
+    create_access_token,
+    decode_access_token_full,
+    hash_password,
+    verify_password,
+)
+from app.services.auth_sessions import (
+    issue_auth_session,
+    list_auth_sessions,
+    revoke_auth_session,
+)
+from fastapi.security import HTTPAuthorizationCredentials
 from app.services.email_auth import (
     deliver_email_code,
     email_mock_enabled,
@@ -45,9 +57,22 @@ from app.services.wechat_auth import (
 router = APIRouter(prefix="/auth", tags=["auth"])
 
 
-def _token_for(user: User, *, is_new_user: bool = False) -> TokenOut:
+async def _token_for(
+    db: AsyncSession,
+    user: User,
+    *,
+    is_new_user: bool = False,
+    device_id: str | None = None,
+    device_label: str | None = None,
+) -> TokenOut:
+    session = await issue_auth_session(
+        db,
+        user_id=user.id,
+        device_id=device_id,
+        device_label=device_label,
+    )
     return TokenOut(
-        access_token=create_access_token(user.email),
+        access_token=create_access_token(user.email, session_id=session.id),
         user=UserOut.from_user(user),
         is_new_user=is_new_user,
     )
@@ -135,7 +160,13 @@ async def register(payload: UserCreate, db: AsyncSession = Depends(get_db)) -> T
     await db.commit()
     await db.refresh(user)
     await _after_auth_success(db, user, is_new=True)
-    return _token_for(user, is_new_user=True)
+    return await _token_for(
+        db,
+        user,
+        is_new_user=True,
+        device_id=payload.device_id,
+        device_label=payload.device_label,
+    )
 
 
 @router.post("/login", response_model=TokenOut)
@@ -145,7 +176,12 @@ async def login(payload: UserLogin, db: AsyncSession = Depends(get_db)) -> Token
     if user is None or not verify_password(payload.password, user.hashed_password):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid email or password")
     await _after_auth_success(db, user, is_new=False)
-    return _token_for(user)
+    return await _token_for(
+        db,
+        user,
+        device_id=payload.device_id,
+        device_label=payload.device_label,
+    )
 
 
 @router.post("/sms/send", response_model=SmsSendOut)
@@ -199,7 +235,13 @@ async def sms_login(payload: SmsLoginIn, db: AsyncSession = Depends(get_db)) -> 
         await db.commit()
         await db.refresh(user)
     await _after_auth_success(db, user, is_new=is_new)
-    return _token_for(user, is_new_user=is_new)
+    return await _token_for(
+        db,
+        user,
+        is_new_user=is_new,
+        device_id=payload.device_id,
+        device_label=payload.device_label,
+    )
 
 
 @router.post("/wechat/login", response_model=TokenOut)
@@ -248,9 +290,50 @@ async def wechat_login(payload: WechatLoginIn, db: AsyncSession = Depends(get_db
             await db.commit()
             await db.refresh(user)
     await _after_auth_success(db, user, is_new=is_new)
-    return _token_for(user, is_new_user=is_new)
+    return await _token_for(
+        db,
+        user,
+        is_new_user=is_new,
+        device_id=payload.device_id,
+        device_label=payload.device_label,
+    )
 
 
 @router.get("/me", response_model=UserOut)
 async def me(user: User = Depends(get_current_user)) -> UserOut:
     return UserOut.from_user(user)
+
+
+@router.get("/sessions", response_model=list[AuthSessionOut])
+async def sessions(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+    credentials: HTTPAuthorizationCredentials | None = Depends(bearer),
+) -> list[AuthSessionOut]:
+    current_sid = None
+    if credentials is not None and credentials.scheme.lower() == "bearer":
+        _, current_sid = decode_access_token_full(credentials.credentials)
+    rows = await list_auth_sessions(db, user_id=user.id)
+    return [
+        AuthSessionOut(
+            id=row.id,
+            device_id=row.device_id,
+            device_label=row.device_label or "",
+            created_at=row.created_at,
+            last_seen_at=row.last_seen_at,
+            current=bool(current_sid and row.id == current_sid),
+        )
+        for row in rows
+    ]
+
+
+@router.delete("/sessions/{session_id}")
+async def delete_session(
+    session_id: str,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, bool]:
+    ok = await revoke_auth_session(db, user_id=user.id, session_id=session_id)
+    if not ok:
+        raise HTTPException(status_code=404, detail="会话不存在")
+    return {"ok": True}

@@ -6,7 +6,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.config import settings
 from app.database import get_db
 from app.models import User
-from app.security import decode_access_token
+from app.security import decode_access_token_full
 
 bearer = HTTPBearer(auto_error=False)
 
@@ -17,11 +17,22 @@ async def get_current_user_optional(
 ) -> User | None:
     if credentials is None or credentials.scheme.lower() != "bearer":
         return None
-    email = decode_access_token(credentials.credentials)
+    email, session_id = decode_access_token_full(credentials.credentials)
     if not email:
         return None
     result = await db.execute(select(User).where(User.email == email))
-    return result.scalar_one_or_none()
+    user = result.scalar_one_or_none()
+    if user is None:
+        return None
+    if session_id:
+        from app.services.auth_sessions import touch_auth_session
+
+        session = await touch_auth_session(
+            db, session_id=session_id, user_id=user.id
+        )
+        if session is None:
+            return None
+    return user
 
 
 async def get_current_user(
@@ -30,7 +41,10 @@ async def get_current_user(
 ) -> User:
     user = await get_current_user_optional(credentials=credentials, db=db)
     if user is None:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Not authenticated",
+        )
     return user
 
 

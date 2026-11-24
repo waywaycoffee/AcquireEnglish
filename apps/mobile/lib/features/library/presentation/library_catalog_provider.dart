@@ -15,6 +15,7 @@ import '../../words/presentation/word_book_provider.dart';
 import '../../learning_modules/american_ipa_course.dart';
 import '../../learning_modules/british_ipa_course.dart';
 import '../../learning_modules/phonics_nessy_course.dart';
+import '../../drama/domain/drama_course.dart';
 import '../../import_course/data/bilibili_episode_prepare.dart';
 import '../../import_course/data/bilibili_multipage.dart';
 import '../../import_course/domain/bilibili_import.dart';
@@ -71,9 +72,9 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
       return baseCatalog;
     }
 
-    final List<LibraryCourseData> saved = _decodeCourses(stored)
-        .map(_healInternalIdTitles)
-        .toList(growable: false);
+    final List<LibraryCourseData> saved = pruneSubsumedDramaFlats(
+      _decodeCourses(stored).map(_healInternalIdTitles).toList(growable: false),
+    );
     return <LibraryCourseData>[
       for (final LibraryCourseData course in baseCatalog)
         _withBuiltInDisplayOverrides(
@@ -277,7 +278,11 @@ class LibraryCatalogNotifier extends Notifier<List<LibraryCourseData>> {
               _preserveLocalSoftsubPaths(cloud, previousById[cloud.id]),
         )
         .toList(growable: false);
-    state = <LibraryCourseData>[...mergedCloud, ...localOnly, ...youtube];
+    // Collapse stale flat link-* netdisk tiles under netdisk-series / curated.
+    final List<LibraryCourseData> combined = pruneSubsumedDramaFlats(
+      <LibraryCourseData>[...mergedCloud, ...localOnly, ...youtube],
+    );
+    state = combined;
     await _persistImportedCourses();
   }
 
