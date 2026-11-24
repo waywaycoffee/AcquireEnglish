@@ -235,6 +235,9 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   }
 
   Future<void> _loadDir({String? pushName}) async {
+    // Ignore double-taps while a listing is in flight; concurrent pushes
+    // duplicate path segments (…/Foo/Foo) and Baidu returns object-not-found.
+    if (_busy) return;
     setState(() {
       _busy = true;
       _error = null;
@@ -719,6 +722,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                                         ),
                                   onTap: () {
                                     if (isDir) {
+                                      if (_busy || name.isEmpty) return;
                                       unawaited(_loadDir(pushName: name));
                                       return;
                                     }

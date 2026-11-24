@@ -482,7 +482,14 @@ async def list_netdisk(
     try:
         content_rows = await OpenListClient().fs_list_all(full)
     except OpenListError as exc:
-        raise HTTPException(502, f"列目录失败：{exc}") from exc
+        detail = str(exc)
+        lowered = detail.lower()
+        if "object not found" in lowered or "not found" in lowered:
+            raise HTTPException(
+                404,
+                "目录不存在或无权访问，请返回上一级再试",
+            ) from exc
+        raise HTTPException(502, f"列目录失败：{detail}") from exc
 
     entries: list[NetdiskEntryOut] = []
     for item in content_rows:
