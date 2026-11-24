@@ -303,6 +303,7 @@ class SubtitleCompletionStatusState {
   SubtitleCompletionCourseUi? forCourse({
     required String courseId,
     required Iterable<String> episodeIds,
+    Map<String, String> episodeNumbers = const <String, String>{},
   }) {
     final Set<String> ids = episodeIds.toSet();
     if (ids.isEmpty) {
@@ -361,20 +362,27 @@ class SubtitleCompletionStatusState {
       }
       return running ?? pending ?? sharedReady;
     }();
-    final String liveFocus = (focus?.label ?? activeLabel ?? '').trim();
+    final String liveFocus = (focus?.label ??
+        (focus?.episodeId == activeEpisodeId ? activeLabel : null) ?? '').trim();
     final String focusLabel = liveFocus.isNotEmpty
         ? liveFocus
         : (focus?.displayLabel ?? '');
+    final String? number = episodeNumbers[focus?.episodeId];
+    final String episodePrefix = number == null || number.isEmpty
+        ? ''
+        : '第 $number 集 · ';
     final String message;
-    if (running != null ||
+    if (focusLabel == kSubtitleSharedCacheLookupLabel) {
+      message = '${episodePrefix}正在查公共字幕库…';
+    } else if (running != null ||
         (focus != null && focus.status == SubtitleCompletionStatus.running)) {
       message = active > 1
-          ? '补字幕中（排队 $active 集，已完成 $done 集）：$focusLabel'
-          : '补字幕中：$focusLabel';
+          ? '补字幕中（$active 集待处理，已完成 $done 集）：$episodePrefix$focusLabel'
+          : '补字幕中：$episodePrefix$focusLabel';
     } else if (pending != null || (focus != null && focus.isActive)) {
       message = active > 1
-          ? '排队补字幕（$active 集待处理，已完成 $done 集）：$focusLabel'
-          : '排队补字幕：$focusLabel';
+          ? '排队补字幕（$active 集待处理，已完成 $done 集）：$episodePrefix$focusLabel'
+          : '排队补字幕：$episodePrefix$focusLabel';
     } else if (failedJob != null) {
       message = failed > 1 ? '$failed 集字幕补全失败，可点重试' : failedJob.displayLabel;
     } else if (sharedReady != null) {
@@ -579,11 +587,15 @@ class SubtitleCompletionStatusNotifier
         if (track.jobId.trim().isNotEmpty) {
           job = await api.getSharedSubtitleJob(track.jobId);
         }
+        if (CloudSubtitleJobTracker.instance.forEpisode(track.episodeId) != track) {
+          continue;
+        }
         job ??= await api.enqueueSharedSubtitleJob(
           bvid: track.bvid,
           page: track.page,
         );
-        if (job == null) {
+        if (job == null ||
+            CloudSubtitleJobTracker.instance.forEpisode(track.episodeId) != track) {
           continue;
         }
         final String label = labelForGpuSubtitleJobState(

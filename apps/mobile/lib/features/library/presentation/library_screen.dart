@@ -748,6 +748,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                               episodeIds: selectedCourse.episodes.map(
                                 (LibraryEpisodeItem e) => e.id,
                               ),
+                              episodeNumbers: {
+                                for (final episode in selectedCourse.episodes)
+                                  episode.id: episode.numberStr,
+                              },
                             );
                         final bool showDownload =
                             progress != null &&

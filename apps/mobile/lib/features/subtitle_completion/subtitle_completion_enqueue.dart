@@ -429,7 +429,8 @@ Future<void> enqueueSubtitleCompletionForEpisode({
         needEnglish: false,
         needChinese: false,
       );
-      // Drop stuck ASR/translate jobs for this episode — cloud already has both.
+      // Ignore previously tracked work once this episode has both tracks.
+      CloudSubtitleJobTracker.instance.clear(episodeId);
       await store.markDone(episodeId);
     }
     return;
