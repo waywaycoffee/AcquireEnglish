@@ -2725,110 +2725,140 @@ class _SubtitlePlaceholder extends StatelessWidget {
         ? shell.textMuted
         : const Color(0xFF9AA69E);
 
-    return Center(
-      child: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: <Widget>[
-            Icon(icon, size: 34, color: iconColor),
-            const SizedBox(height: 12),
-            Text(
-              title,
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.w800,
-                color: titleColor,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              body,
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 14, height: 1.5, color: bodyColor),
-            ),
-            if (showAiGenerateSubtitles) ...<Widget>[
-              const SizedBox(height: 14),
-              if (!generatingAiSubtitles &&
-                  (errorText?.isNotEmpty ?? false)) ...<Widget>[
-                SizedBox(
-                  width: 320,
-                  child: Text(
-                    '识别失败：$errorText',
-                    maxLines: 3,
-                    overflow: TextOverflow.ellipsis,
-                    textAlign: TextAlign.center,
-                    style: const TextStyle(
-                      fontSize: 13,
-                      height: 1.45,
-                      color: Color(0xFFFF6B6B),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 10),
-              ],
-              if (generatingAiSubtitles) ...<Widget>[
-                SizedBox(
-                  width: 240,
-                  child: LinearProgressIndicator(
-                    value: progressValue,
-                    color: shell.accent,
-                    backgroundColor: shell.progressTrack,
-                  ),
-                ),
-                const SizedBox(height: 10),
+    // Phone study pane is short; progress + preview + CTA used to overflow
+    // by ~26px (yellow/black stripes). Scroll + compact generating layout.
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        final bool tight = constraints.hasBoundedHeight &&
+            constraints.maxHeight < 280;
+        final bool generating = generatingAiSubtitles;
+        final double minHeight = constraints.hasBoundedHeight
+            ? constraints.maxHeight
+            : 0;
+        return SingleChildScrollView(
+          padding: EdgeInsets.symmetric(
+            horizontal: 20,
+            vertical: tight ? 10 : 16,
+          ),
+          child: ConstrainedBox(
+            constraints: BoxConstraints(minHeight: minHeight),
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                if (!generating || !tight)
+                  Icon(icon, size: tight ? 28 : 34, color: iconColor),
+                if (!generating || !tight) SizedBox(height: tight ? 8 : 12),
                 Text(
-                  progressText ?? '云端正在生成字幕…',
+                  title,
+                  textAlign: TextAlign.center,
                   style: TextStyle(
-                    fontSize: 13,
-                    fontWeight: FontWeight.w700,
+                    fontSize: tight ? 16 : 18,
+                    fontWeight: FontWeight.w800,
                     color: titleColor,
                   ),
                 ),
-                const SizedBox(height: 8),
-                SizedBox(
-                  width: 300,
-                  height: 44,
-                  child: Text(
-                    previewText?.isNotEmpty ?? false
-                        ? previewText!
-                        : '排队识别中，完成后会出现可跟读字幕',
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
+                if (!generating) ...<Widget>[
+                  SizedBox(height: tight ? 6 : 8),
+                  Text(
+                    body,
                     textAlign: TextAlign.center,
                     style: TextStyle(
-                      fontSize: 13,
+                      fontSize: 14,
                       height: 1.45,
                       color: bodyColor,
                     ),
                   ),
-                ),
-                const SizedBox(height: 10),
+                ],
+                if (showAiGenerateSubtitles) ...<Widget>[
+                  SizedBox(height: tight ? 10 : 14),
+                  if (!generating &&
+                      (errorText?.isNotEmpty ?? false)) ...<Widget>[
+                    SizedBox(
+                      width: 320,
+                      child: Text(
+                        '识别失败：$errorText',
+                        maxLines: 3,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                          fontSize: 13,
+                          height: 1.45,
+                          color: Color(0xFFFF6B6B),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                  ],
+                  if (generating) ...<Widget>[
+                    SizedBox(
+                      width: 240,
+                      child: LinearProgressIndicator(
+                        value: progressValue,
+                        color: shell.accent,
+                        backgroundColor: shell.progressTrack,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      progressText ?? '云端正在生成字幕…',
+                      textAlign: TextAlign.center,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w700,
+                        color: titleColor,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    SizedBox(
+                      width: 300,
+                      child: Text(
+                        previewText?.isNotEmpty ?? false
+                            ? previewText!
+                            : '排队识别中，完成后会出现可跟读字幕',
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 13,
+                          height: 1.4,
+                          color: bodyColor,
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                  ],
+                  FilledButton.icon(
+                    key: const ValueKey<String>('study-asr-generate'),
+                    onPressed:
+                        generating ? null : onGenerateAiSubtitles,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: shell.accent,
+                      foregroundColor: Colors.white,
+                      padding: EdgeInsets.symmetric(
+                        horizontal: 18,
+                        vertical: tight ? 10 : 14,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    icon: Icon(
+                      generating
+                          ? Icons.hourglass_top_rounded
+                          : Icons.mic_rounded,
+                    ),
+                    label: Text(
+                      generating ? '正在语音识别生成字幕...' : '语音识别生成字幕',
+                      style: const TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
               ],
-              FilledButton.icon(
-                key: const ValueKey<String>('study-asr-generate'),
-                onPressed: generatingAiSubtitles ? null : onGenerateAiSubtitles,
-                style: FilledButton.styleFrom(
-                  backgroundColor: shell.accent,
-                  foregroundColor: Colors.white,
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 18,
-                    vertical: 14,
-                  ),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(14),
-                  ),
-                ),
-                icon: const Icon(Icons.mic_rounded),
-                label: Text(
-                  generatingAiSubtitles ? '正在语音识别生成字幕...' : '语音识别生成字幕',
-                  style: const TextStyle(fontWeight: FontWeight.w700),
-                ),
-              ),
-            ],
-          ],
-        ),
-      ),
+            ),
+          ),
+        );
+      },
     );
   }
 }
