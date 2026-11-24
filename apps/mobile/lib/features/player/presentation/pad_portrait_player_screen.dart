@@ -4000,7 +4000,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         return StudyDictationTab(
           line: dictationLine,
           hasLine: usingQueue || state.hasLines,
-          isPlaying: state.isPlaying,
           queue: queue,
           queueIndex: usingQueue
               ? _dictationQueueIndex.clamp(0, queue.length - 1)
@@ -4029,12 +4028,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
               _dictationQueueIndex = 0;
             });
             _showMessage('已清空听写队列');
-          },
-          onReplay: () {
-            if (state.speed != '0.8×') {
-              _handleSpeedSelected('0.8×');
-            }
-            _handleReplayLine();
           },
           onPrevious: () {
             if (usingQueue && _dictationQueueIndex > 0) {

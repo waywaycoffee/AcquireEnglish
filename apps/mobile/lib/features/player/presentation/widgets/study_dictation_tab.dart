@@ -10,8 +10,6 @@ class StudyDictationTab extends StatefulWidget {
   const StudyDictationTab({
     required this.line,
     required this.hasLine,
-    required this.isPlaying,
-    required this.onReplay,
     required this.onPrevious,
     required this.onNext,
     required this.onMarkDifficult,
@@ -28,8 +26,6 @@ class StudyDictationTab extends StatefulWidget {
 
   final PlayerSubtitleLine line;
   final bool hasLine;
-  final bool isPlaying;
-  final VoidCallback onReplay;
   final VoidCallback onPrevious;
   final VoidCallback onNext;
   final VoidCallback onMarkDifficult;
@@ -301,43 +297,7 @@ class _StudyDictationTabState extends State<StudyDictationTab> {
                 color: shell.textSecondary,
               ),
             ),
-            const SizedBox(width: 8),
-            Column(
-              children: <Widget>[
-                Material(
-                  color: shell.accent,
-                  shape: const CircleBorder(),
-                  elevation: 4,
-                  shadowColor: shell.playGlow,
-                  child: InkWell(
-                    key: const ValueKey<String>('dictation-play-audio'),
-                    customBorder: const CircleBorder(),
-                    onTap: widget.onReplay,
-                    child: SizedBox(
-                      width: 72,
-                      height: 72,
-                      child: Icon(
-                        widget.isPlaying
-                            ? Icons.pause_rounded
-                            : Icons.volume_up_rounded,
-                        color: shell.accentOn,
-                        size: 34,
-                      ),
-                    ),
-                  ),
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '点击播放音频',
-                  style: TextStyle(
-                    color: shell.textMuted,
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(width: 8),
+            const SizedBox(width: 16),
             IconButton(
               tooltip: '下一句',
               onPressed: widget.onNext,

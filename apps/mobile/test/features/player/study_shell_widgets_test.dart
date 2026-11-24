@@ -309,8 +309,6 @@ void main() {
           body: StudyDictationTab(
             line: line,
             hasLine: true,
-            isPlaying: false,
-            onReplay: () {},
             onPrevious: () {},
             onNext: () {},
             onAddToQueue: () => addTaps += 1,
@@ -363,7 +361,7 @@ void main() {
     );
 
     expect(find.text('检查答案'), findsOneWidget);
-    expect(find.text('点击播放音频'), findsOneWidget);
+    expect(find.byKey(const ValueKey<String>('dictation-play-audio')), findsNothing);
   });
 
   test('DictationQueueItem.buildId is stable', () {
