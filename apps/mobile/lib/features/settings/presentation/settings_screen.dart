@@ -28,6 +28,7 @@ import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import 'ai_subtitle_management_screen.dart';
 import 'app_update_provider.dart';
+import 'invite_promo_sheet.dart';
 import '../../home/presentation/widgets/theme_widget.dart';
 import 'bilibili_login_sheet.dart';
 import 'cloud_subtitle_library_screen.dart';
@@ -160,6 +161,12 @@ class SettingsScreen extends ConsumerWidget {
                       );
                     }
                   },
+                ),
+                _ActionRow(
+                  title: '我的推广二维码',
+                  description: '专属邀请码；查看成功注册用户数与推广积分。',
+                  icon: Icons.qr_code_2_rounded,
+                  onTap: () => showInvitePromoSheet(context, ref),
                 ),
                 _ActionRow(
                   title: '试用资产 / 陪练额度',

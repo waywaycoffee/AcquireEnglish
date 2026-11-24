@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../avatar/presentation/avatar_preview.dart';
 import '../../avatar/presentation/avatar_provider.dart';
 import '../../avatar/presentation/avatar_shop_screen.dart';
+import '../../settings/presentation/invite_promo_sheet.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../data/community_models.dart';
 import 'adventure_ui.dart';
@@ -138,6 +139,15 @@ class CommunityMeTab extends ConsumerWidget {
               builder: (_) => const StudyPlayScreen(),
             ),
           ),
+        ),
+        const SizedBox(height: 12),
+        QuestFeedCard(
+          title: '我的推广二维码',
+          meta: '专属邀请码 · 成功注册用户数与推广积分',
+          badge: '推广',
+          accent: AppDesignTokens.primaryBlueDark,
+          showPlayChevron: false,
+          onPlay: () => showInvitePromoSheet(context, ref),
         ),
         const SizedBox(height: 12),
         QuestFeedCard(

@@ -45,8 +45,12 @@ class PointsBalanceOut(BaseModel):
 
 class InviteCodeOut(BaseModel):
     invite_code: str
+    download_url: str
     download_url_android: str
     download_url_ios: str
+    successful_registrations: int = 0
+    points_earned_from_referrals: int = 0
+    pro_weeks_earned: int = 0
     referral_points: int = REFERRAL_POINTS
     referral_pro_days: int = REFERRAL_PRO_DAYS
 
@@ -102,10 +106,28 @@ async def get_invite_code(
 ) -> InviteCodeOut:
     code = await _ensure_invite_code(db, user)
     base = "https://acquireenglish.curlhairai.com/download"
+    rows = list(
+        (
+            await db.execute(
+                select(ReferralInstall).where(
+                    ReferralInstall.referrer_user_id == user.id
+                )
+            )
+        )
+        .scalars()
+        .all()
+    )
+    success = len(rows)
+    points_earned = sum(int(r.points_awarded or 0) for r in rows)
+    pro_days = sum(int(r.pro_days_awarded or 0) for r in rows)
     return InviteCodeOut(
         invite_code=code,
+        download_url=f"{base}?ref={code}",
         download_url_android=f"{base}?ref={code}&os=android",
         download_url_ios=f"{base}?ref={code}&os=ios",
+        successful_registrations=success,
+        points_earned_from_referrals=points_earned,
+        pro_weeks_earned=pro_days // REFERRAL_PRO_DAYS,
     )
 
 
