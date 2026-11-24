@@ -201,16 +201,16 @@ class AdaptivePlacementEngine {
     if (idx > 0) absorb(bands[idx - 1]);
     if (idx >= 0 && idx + 1 < bands.length) absorb(bands[idx + 1]);
     for (final PlacementBandPool band in bands) {
-      if (pool.length >= 6) break;
+      if (pool.length >= 8) break;
       absorb(band);
     }
-    final List<String> distractors = pool.where((String d) => d != correct).toList()
-      ..shuffle(_random);
-    final List<String> choices = <String>[
-      correct,
-      ...distractors.take(3),
-    ]..shuffle(_random);
-    return choices;
+    return buildPlacementChoices(
+          correctDefinition: correct,
+          candidateDefinitions: pool,
+          maxChoices: kPlacementMaxChoices,
+          random: _random,
+        ) ??
+        <String>[];
   }
 }
 
