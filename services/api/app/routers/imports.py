@@ -221,14 +221,18 @@ async def get_import_srt(
     db: AsyncSession = Depends(get_db),
 ) -> Response:
     result = await db.execute(
-        select(UserLinkCourse).where(
-            UserLinkCourse.id == import_id,
-            UserLinkCourse.user_id == user.id,
-        )
+        select(UserLinkCourse).where(UserLinkCourse.id == import_id)
     )
     row = result.scalar_one_or_none()
     if row is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Import not found")
+    if row.user_id != user.id:
+        from app.services.published_series import is_import_in_published_series
+
+        if not await is_import_in_published_series(db, import_id):
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Import not found"
+            )
     body = row.subtitle_en_srt if lang == "en" else row.subtitle_zh_srt
     if not body:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Subtitle not found")

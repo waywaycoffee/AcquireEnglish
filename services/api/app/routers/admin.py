@@ -816,3 +816,85 @@ async def commerce_events_peek(
             for r in rows
         ]
     }
+
+
+class PublishSeriesBody(BaseModel):
+    publisher_user_id: int
+    series_key: str = Field(min_length=4, max_length=64)
+    slug: str = Field(min_length=2, max_length=64)
+    title: str | None = Field(default=None, max_length=512)
+    license_note: str = Field(default="", max_length=2000)
+    status: str = Field(default="published", pattern="^(pending|published|rejected)$")
+
+
+@router.get("/published-series")
+async def admin_list_published_series(
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    from app.models import PublishedNetdiskSeries
+
+    rows = (
+        await db.execute(
+            select(PublishedNetdiskSeries).order_by(PublishedNetdiskSeries.id.desc())
+        )
+    ).scalars().all()
+    return {
+        "items": [
+            {
+                "id": r.id,
+                "slug": r.slug,
+                "title": r.title,
+                "publisher_user_id": r.publisher_user_id,
+                "series_key": r.series_key,
+                "status": r.status,
+                "license_note": r.license_note,
+                "course_id": f"public-series-{r.slug}",
+                "reviewed_at": _iso(r.reviewed_at),
+                "reviewed_by": r.reviewed_by,
+            }
+            for r in rows
+        ]
+    }
+
+
+@router.post("/published-series")
+async def admin_publish_series(
+    body: PublishSeriesBody,
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    from app.services.published_series import upsert_published_series
+
+    try:
+        pub = await upsert_published_series(
+            db,
+            publisher_user_id=body.publisher_user_id,
+            series_key=body.series_key.strip(),
+            slug=body.slug,
+            title=body.title,
+            license_note=body.license_note,
+            reviewed_by="admin",
+            status=body.status,
+        )
+    except ValueError as exc:
+        code = str(exc)
+        if code == "series_not_found":
+            raise HTTPException(404, "series not found for publisher") from exc
+        if code == "slug_taken":
+            raise HTTPException(409, "slug already taken") from exc
+        raise HTTPException(400, code) from exc
+    _audit_log.warning(
+        "admin published series slug=%s publisher=%s key=%s",
+        pub.slug,
+        pub.publisher_user_id,
+        pub.series_key,
+    )
+    return {
+        "ok": True,
+        "id": pub.id,
+        "slug": pub.slug,
+        "course_id": f"public-series-{pub.slug}",
+        "status": pub.status,
+        "title": pub.title,
+    }

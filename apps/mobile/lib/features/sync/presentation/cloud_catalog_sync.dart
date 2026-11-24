@@ -27,10 +27,15 @@ Future<void> syncCloudCatalogAndFeed(
         .where(
           (AcquireCourseDto c) =>
               c.id.startsWith('netdisk-series-') ||
+              c.id.startsWith('public-series-') ||
               !c.id.startsWith('link-') ||
               c.tags.any(
                 (String tag) =>
-                    tag.endsWith('_netdisk') || tag == 'netdisk' || tag == 'series',
+                    tag.endsWith('_netdisk') ||
+                    tag == 'netdisk' ||
+                    tag == 'series' ||
+                    tag == 'public' ||
+                    tag == 'licensed',
               ),
         )
         .map(mapAcquireCourseToLibrary)

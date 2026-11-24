@@ -19,6 +19,7 @@ bool _looksLikeNetdiskCourse(LibraryCourseData course) {
 /// Heuristic: netdisk season packs and drama-like titles belong on the 美剧 tab.
 bool looksLikeDramaCourse(LibraryCourseData course) {
   if (course.id.startsWith('netdisk-series-')) return true;
+  if (course.id.startsWith('public-series-')) return true;
   if (_looksLikeNetdiskCourse(course) && course.episodes.length > 1) {
     return true;
   }

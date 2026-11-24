@@ -410,7 +410,8 @@ final Set<String> _inFlightCourseIds = <String>{};
 
 bool isNetdiskCourse(LibraryCourseData course) {
   final String category = course.category.trim().toLowerCase();
-  if (course.id.startsWith('netdisk-series-')) {
+  if (course.id.startsWith('netdisk-series-') ||
+      course.id.startsWith('public-series-')) {
     return true;
   }
   if (category.endsWith('_netdisk') || category == 'netdisk') {

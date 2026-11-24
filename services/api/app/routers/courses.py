@@ -14,6 +14,12 @@ from app.services.netdisk_series import (
     curated_title_from_path,
     to_series_course_out,
 )
+from app.services.published_series import (
+    course_out_for_published,
+    get_published_by_slug,
+    list_published_course_outs,
+    personal_titles_for_dedupe,
+)
 
 router = APIRouter(prefix="/courses", tags=["courses"])
 
@@ -61,16 +67,35 @@ async def _user_link_courses(db: AsyncSession, user: User) -> list[CourseOut]:
     return out
 
 
+def _merge_catalog(
+    *,
+    personal: list[CourseOut],
+    published: list[CourseOut],
+    builtin: list[CourseOut],
+) -> list[CourseOut]:
+    owned_titles = personal_titles_for_dedupe(personal)
+    public_kept: list[CourseOut] = []
+    for course in published:
+        zh = getattr(course, "titleZh", None) or ""
+        title = (zh or course.title or "").strip().lower()
+        if title and title in owned_titles:
+            continue
+        public_kept.append(course)
+    return [*personal, *public_kept, *builtin]
+
+
 @router.get("", response_model=list[CourseOut])
 async def list_courses(
     user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ) -> list[CourseOut]:
     catalog = load_courses()
+    published = await list_published_course_outs(db)
     if user is None:
-        return catalog
+        # Guests still see licensed public shelf metadata + play URLs.
+        return _merge_catalog(personal=[], published=published, builtin=catalog)
     imported = await _user_link_courses(db, user)
-    return [*imported, *catalog]
+    return _merge_catalog(personal=imported, published=published, builtin=catalog)
 
 
 @router.get("/{course_id}", response_model=CourseOut)
@@ -79,6 +104,20 @@ async def course_detail(
     user: User | None = Depends(get_current_user_optional),
     db: AsyncSession = Depends(get_db),
 ) -> CourseOut:
+    if course_id.startswith("public-series-"):
+        slug = course_id.removeprefix("public-series-")
+        pub = await get_published_by_slug(db, slug)
+        if pub is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+            )
+        course = await course_out_for_published(db, pub)
+        if course is None:
+            raise HTTPException(
+                status_code=status.HTTP_404_NOT_FOUND, detail="Course not found"
+            )
+        return course
+
     if course_id.startswith("netdisk-series-") and user is not None:
         series_key = course_id.removeprefix("netdisk-series-")
         result = await db.execute(

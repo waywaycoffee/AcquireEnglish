@@ -26,6 +26,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_product_feedback_columns(conn)
     await _ensure_user_invite_code_column(conn)
     await _ensure_study_stats_star_columns(conn)
+    await _ensure_published_netdisk_series_table(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -413,3 +414,72 @@ async def _ensure_study_stats_star_columns(conn: AsyncConnection) -> None:
             await conn.execute(
                 text(f"ALTER TABLE user_study_stats_daily ADD COLUMN {name} {ddl}")
             )
+
+
+async def _ensure_published_netdisk_series_table(conn: AsyncConnection) -> None:
+    """CREATE TABLE IF NOT EXISTS for licensed public drama shelf."""
+    existing = await _existing_columns(conn, "published_netdisk_series")
+    if existing is not None:
+        return
+    dialect = _dialect_name(conn)
+    if dialect == "sqlite":
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS published_netdisk_series (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    slug VARCHAR(64) NOT NULL,
+                    title VARCHAR(512) DEFAULT '',
+                    publisher_user_id INTEGER NOT NULL,
+                    series_key VARCHAR(64) NOT NULL,
+                    status VARCHAR(16) DEFAULT 'published',
+                    license_note TEXT DEFAULT '',
+                    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    reviewed_at TIMESTAMP,
+                    reviewed_by VARCHAR(120),
+                    UNIQUE (slug),
+                    UNIQUE (publisher_user_id, series_key)
+                )
+                """
+            )
+        )
+    else:
+        await conn.execute(
+            text(
+                """
+                CREATE TABLE IF NOT EXISTS published_netdisk_series (
+                    id SERIAL PRIMARY KEY,
+                    slug VARCHAR(64) NOT NULL,
+                    title VARCHAR(512) DEFAULT '',
+                    publisher_user_id INTEGER NOT NULL REFERENCES users(id) ON DELETE CASCADE,
+                    series_key VARCHAR(64) NOT NULL,
+                    status VARCHAR(16) DEFAULT 'published',
+                    license_note TEXT DEFAULT '',
+                    created_at TIMESTAMPTZ DEFAULT NOW(),
+                    reviewed_at TIMESTAMPTZ,
+                    reviewed_by VARCHAR(120),
+                    CONSTRAINT uq_published_netdisk_slug UNIQUE (slug),
+                    CONSTRAINT uq_published_netdisk_publisher_key
+                        UNIQUE (publisher_user_id, series_key)
+                )
+                """
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS idx_published_netdisk_status "
+                "ON published_netdisk_series (status)"
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_published_netdisk_series_slug "
+                "ON published_netdisk_series (slug)"
+            )
+        )
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_published_netdisk_series_key "
+                "ON published_netdisk_series (series_key)"
+            )
+        )

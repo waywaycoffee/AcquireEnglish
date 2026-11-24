@@ -1645,3 +1645,33 @@ class UserAuthSession(Base):
     revoked_at: Mapped[datetime | None] = mapped_column(
         DateTime(timezone=True), nullable=True, index=True
     )
+
+class PublishedNetdiskSeries(Base):
+    """Licensed netdisk series approved for all authenticated learners."""
+
+    __tablename__ = "published_netdisk_series"
+    __table_args__ = (
+        UniqueConstraint("slug", name="uq_published_netdisk_slug"),
+        UniqueConstraint(
+            "publisher_user_id", "series_key", name="uq_published_netdisk_publisher_key"
+        ),
+        Index("idx_published_netdisk_status", "status"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, autoincrement=True)
+    slug: Mapped[str] = mapped_column(String(64), index=True)
+    title: Mapped[str] = mapped_column(String(512), default="")
+    publisher_user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    series_key: Mapped[str] = mapped_column(String(64), index=True)
+    # pending | published | rejected
+    status: Mapped[str] = mapped_column(String(16), default="published", index=True)
+    license_note: Mapped[str] = mapped_column(Text, default="")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    reviewed_at: Mapped[datetime | None] = mapped_column(
+        DateTime(timezone=True), nullable=True
+    )
+    reviewed_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
