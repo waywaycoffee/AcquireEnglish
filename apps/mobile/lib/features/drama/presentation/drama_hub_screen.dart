@@ -62,7 +62,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       });
     }
 
-    // Poster tap selects any drama (including curated/public-series).
+    // Only show episodes after the user taps a poster (or picks 自建导入).
     LibraryCourseData? selected;
     if (_selectedCourseId != null) {
       for (final LibraryCourseData c in dramas) {
@@ -72,12 +72,6 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
         }
       }
     }
-    selected ??= importedCourseForCatalogEntry(
-          kDramaCatalog.first,
-          dramas,
-        ) ??
-        (importedShelf.isNotEmpty ? importedShelf.first : null) ??
-        (dramas.isNotEmpty ? dramas.first : null);
 
     int masteredEps = 0;
     int totalEps = 0;
@@ -159,8 +153,22 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
         ),
         const SizedBox(height: 16),
         const EpisodeStageLegend(),
-        if (selected != null) ...<Widget>[
-          const SizedBox(height: 12),
+        const SizedBox(height: 12),
+        if (selected == null)
+          Card(
+            color: AppDesignTokens.appWhite,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                '点上方海报展开对应剧集；点另一张海报会切换到那一套。',
+                style: TextStyle(
+                  color: AppDesignTokens.textSecondary,
+                  height: 1.4,
+                ),
+              ),
+            ),
+          )
+        else ...<Widget>[
           Text(
             '${libraryCourseDisplayTitle(selected)}  ·  '
             '${selected.episodes.length} 集',
@@ -223,50 +231,27 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
             },
           ),
         ],
-        const SizedBox(height: 16),
-        Text(
-          '其它已导入  ·  完全掌握 $masteredEps / $totalEps 集'
-          '${totalEps == 0 ? '' : ' (${(masteredEps * 100 / totalEps).round()}%)'}',
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.w800,
-                color: AppDesignTokens.textPrimary,
-              ),
-        ),
-        const SizedBox(height: 12),
-        if (importedShelf.isEmpty)
-          Card(
-            color: AppDesignTokens.appWhite,
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                children: <Widget>[
-                  Text(
-                    dramas.isEmpty
-                        ? '还没有可学剧集。等待公开片单同步，或从网盘导入整季文件夹（含字幕）。'
-                        : '精选片单点海报即可选集；这里只列未收录进精选的自建导入。',
-                    style: TextStyle(color: AppDesignTokens.textPrimary),
-                  ),
-                  const SizedBox(height: 12),
-                  FilledButton.icon(
-                    onPressed: () => showNetdiskImportSheet(context, ref),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppDesignTokens.primaryBlueDark,
-                      foregroundColor: AppDesignTokens.onAccent,
-                    ),
-                    icon: const Icon(Icons.folder_open),
-                    label: const Text('网盘导入'),
-                  ),
-                ],
-              ),
-            ),
-          )
-        else ...<Widget>[
+        if (importedShelf.isNotEmpty) ...<Widget>[
+          const SizedBox(height: 16),
+          Text(
+            '其它已导入  ·  共 $masteredEps / $totalEps 集已掌握'
+            '${totalEps == 0 ? '' : ''}',
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                  fontWeight: FontWeight.w800,
+                  color: AppDesignTokens.textPrimary,
+                ),
+          ),
+          const SizedBox(height: 8),
           DropdownButtonFormField<String>(
             value: importedShelf.any(
-              (LibraryCourseData c) => c.id == selected?.id,
+              (LibraryCourseData c) => c.id == _selectedCourseId,
             )
-                ? selected!.id
-                : importedShelf.first.id,
+                ? _selectedCourseId
+                : null,
+            hint: Text(
+              '选择自建导入…',
+              style: TextStyle(color: AppDesignTokens.textSecondary),
+            ),
             decoration: InputDecoration(
               labelText: '自建导入',
               border: const OutlineInputBorder(),
