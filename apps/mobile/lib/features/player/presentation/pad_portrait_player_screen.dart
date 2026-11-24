@@ -285,6 +285,7 @@ class PadPortraitPlayerScreenState
   double? _bilingualPipelineProgress;
   bool _bilingualShowAiComplete = false;
   bool _englishFillInFlight = false;
+  bool _submittingAiEnglish = false;
   AsrSubtitleCancellationToken? _englishFillCancellationToken;
   Timer? _ocrPersistDebounce;
   List<PlayerSubtitleLine>? _pendingOcrPersistLines;
@@ -2466,12 +2467,6 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         fillLabel.contains('云端') ||
         fillLabel.contains('识别') ||
         fillLabel.contains('ASR');
-    if (fill.isFailed &&
-        (englishishLabel ||
-            (fill.lastError ?? '').contains('云端') ||
-            (fill.lastError ?? '').contains('等待云端'))) {
-      return true;
-    }
     if (!fill.isActive) {
       return false;
     }
@@ -2480,24 +2475,52 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         _linesMissingEnglish(state.lines);
   }
 
-  /// Bottom「AI英文」: show progress / fill gaps — never clear while busy.
+  bool get _aiEnglishActionDisabled =>
+      _isBootstrapping || _submittingAiEnglish || _isEnglishSubtitleGenerationBusy();
+
   Future<void> _handleAiEnglishAction() async {
-    if (!mounted) {
-      return;
+    if (!mounted || _aiEnglishActionDisabled) return;
+    setState(() => _submittingAiEnglish = true);
+    try {
+      if (!state.hasLines) {
+        final available = await _ensureOfficialReferenceSubtitles();
+        if (!mounted) return;
+        if (available.isNotEmpty) {
+          setState(() => state.replaceLines(available));
+          _showMessage('已加载 B 站软字幕');
+          return;
+        }
+      }
+      if (!state.hasLines || _linesMissingEnglish(state.lines)) {
+        if (state.hasLines) {
+          final bool confirmed =
+              await showDialog<bool>(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('生成英文字幕？'),
+                  content: const Text('本集已有字幕。确认后开始生成英文字幕。'),
+                  actions: [
+                    TextButton(
+                      onPressed: () => Navigator.of(context).pop(false),
+                      child: const Text('取消'),
+                    ),
+                    FilledButton(
+                      onPressed: () => Navigator.of(context).pop(true),
+                      child: const Text('开始生成'),
+                    ),
+                  ],
+                ),
+              ) ??
+              false;
+          if (!confirmed || !mounted) return;
+        }
+        await _restartEnglishFillFromChineseAndOcr();
+      } else {
+        await _handleResetEpisodeSubtitles(SubtitleResetSide.english);
+      }
+    } finally {
+      if (mounted) setState(() => _submittingAiEnglish = false);
     }
-    if (_isEnglishSubtitleGenerationBusy() ||
-        _bilingualPipelineProgress != null ||
-        CloudSubtitleJobTracker.instance.forEpisode(widget.episodeId) != null) {
-      _showMessage(_englishGenerationBusyMessage());
-      _ensureEnglishGenerationProgressVisible();
-      return;
-    }
-    if (!state.hasLines || _linesMissingEnglish(state.lines)) {
-      await _restartEnglishFillFromChineseAndOcr();
-      return;
-    }
-    // English already present and idle → explicit destructive re-recognize.
-    await _handleResetEpisodeSubtitles(SubtitleResetSide.english);
   }
 
   String _englishGenerationBusyMessage() {
@@ -3757,6 +3780,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 });
               },
               onRerecognizeEnglish: () => unawaited(_handleAiEnglishAction()),
+              englishSubtitleBusy: _aiEnglishActionDisabled,
               onRerecognizeChinese: !_generatingAiSubtitles
                   ? () => unawaited(
                       _handleResetEpisodeSubtitles(SubtitleResetSide.chinese),
@@ -3968,7 +3992,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             isPlaying: state.isPlaying,
             onTogglePlaying: _handleTogglePlaying,
             onPronounce: _stopVideo,
-            onRerecognizeEnglish: () => unawaited(_handleAiEnglishAction()),
+            onRerecognizeEnglish: _aiEnglishActionDisabled
+                ? null
+                : () => unawaited(_handleAiEnglishAction()),
             onRerecognizeChinese: !_generatingAiSubtitles
                 ? () => unawaited(
                     _handleResetEpisodeSubtitles(SubtitleResetSide.chinese),
@@ -4827,12 +4853,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       _showMessage('当前视频不可用');
       return;
     }
-    // Chinese softsubs with missing English: fill via queue/cloud — do not
-    // wipe progress and restart ASR on every tap.
-    if (!forceRegenerate &&
-        state.hasLines &&
-        _linesMissingEnglish(state.lines)) {
-      await _restartEnglishFillFromChineseAndOcr();
+    if (!forceRegenerate && state.hasLines) {
+      await _handleAiEnglishAction();
       return;
     }
     await _bilingualPipeline?.cancel();
@@ -4864,6 +4886,13 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     try {
       final List<PlayerSubtitleLine> referenceLines =
           speechOnly ? const <PlayerSubtitleLine>[] : await _ensureOfficialReferenceSubtitles();
+      if (!forceRegenerate && referenceLines.isNotEmpty) {
+        if (mounted) {
+          setState(() => state.replaceLines(referenceLines));
+          _showMessage('已加载 B 站软字幕');
+        }
+        return;
+      }
       final bool hasOfficialEnglish = usableReferenceSubtitles(
         referenceLines,
       ).isNotEmpty;
@@ -5049,12 +5078,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
               ),
         );
       }
-      if (!hasEn) {
-        return existing;
-      }
-      final List<PlayerSubtitleLine> englishLines = await loadSubtitleLines(
-        enPath,
-      );
+      final List<PlayerSubtitleLine> englishLines = hasEn
+          ? await loadSubtitleLines(enPath)
+          : const <PlayerSubtitleLine>[];
       List<PlayerSubtitleLine> chineseLines = const <PlayerSubtitleLine>[];
       if (hasZh) {
         chineseLines = await loadSubtitleLines(zhPath);
@@ -5063,7 +5089,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         englishLines: englishLines,
         chineseLines: chineseLines,
       );
-      final List<PlayerSubtitleLine> usable = usableReferenceSubtitles(merged);
+      final List<PlayerSubtitleLine> usable = !hasEn
+          ? merged.where((line) => looksChinese(line.chinese)).toList()
+          : usableReferenceSubtitles(merged);
       if (usable.isEmpty) {
         return existing;
       }
@@ -5196,20 +5224,38 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       courses: ref.read(libraryCatalogProvider),
       episodeId: widget.episodeId,
     );
-    await enqueueSubtitleCompletionForEpisode(
-      episodeId: widget.episodeId,
-      videoPath: _videoAsset ?? resource.videoAsset,
-      zhSubtitlePath: resource.chineseSubtitleAsset,
-      enSubtitlePath: resource.englishSubtitleAsset,
-      sourceUrl: resource.episode?.sourceUrl,
-      course: resource.course,
-      episode: resource.episode,
-      chip: SubtitleFillChip.english,
-      bilibiliCookieHeader: ref
-          .read(learningSettingsProvider)
-          .resolvedBilibiliCookieHeader,
-    );
-    if (!mounted) {
+    try {
+      await enqueueSubtitleCompletionForEpisode(
+        episodeId: widget.episodeId,
+        videoPath: _videoAsset ?? resource.videoAsset,
+        zhSubtitlePath: resource.chineseSubtitleAsset,
+        enSubtitlePath: resource.englishSubtitleAsset,
+        sourceUrl: resource.episode?.sourceUrl,
+        course: resource.course,
+        episode: resource.episode,
+        chip: SubtitleFillChip.english,
+        bilibiliCookieHeader: ref
+            .read(learningSettingsProvider)
+            .resolvedBilibiliCookieHeader,
+      );
+      if (!mounted) return;
+      await ref.read(subtitleCompletionStatusProvider.notifier).refresh();
+    } catch (_) {
+      if (!mounted) return;
+    }
+    if (!mounted) return;
+    final job = ref.read(subtitleCompletionStatusProvider).forEpisode(widget.episodeId);
+    if (job?.isActive != true &&
+        CloudSubtitleJobTracker.instance.forEpisode(widget.episodeId) == null) {
+      setState(() {
+        _englishFillInFlight = false;
+        _bilingualPhase = BilingualPipelinePhase.idle;
+        _bilingualPipelineProgress = null;
+        _bilingualPipelineLabel = job?.isFailed == true ? job?.displayLabel : null;
+      });
+      if (job?.status != SubtitleCompletionStatus.done) {
+        _showMessage('英文字幕任务未启动，请稍后重试');
+      }
       return;
     }
     _ensureEnglishGenerationProgressVisible();
@@ -5395,7 +5441,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           _showMessage('已清空中文，正在用英文字幕重新翻译');
           break;
         case SubtitleResetSide.english:
-          await resetEpisodeEnglishSubtitles(
+          final bool submitted = await resetEpisodeEnglishSubtitles(
             catalog: catalog,
             course: course,
             episode: episode,
@@ -5403,6 +5449,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
             fallbackChineseLines: state.lines,
           );
           if (!mounted) {
+            return;
+          }
+          if (!submitted) {
+            _showMessage('英文字幕任务未启动，请确认本集已下载后重试');
             return;
           }
           setState(() {

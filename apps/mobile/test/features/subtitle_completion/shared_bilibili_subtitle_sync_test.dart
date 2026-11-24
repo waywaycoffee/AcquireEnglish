@@ -317,6 +317,28 @@ void main() {
     expect(writtenEn.readAsStringSync(), contains('Hello world'));
   });
 
+  test('automatic Bilibili fill keeps a usable Chinese softsub', () async {
+    final video = _fakeVideo(temp, 'existing.mp4');
+    final zh = File('${temp.path}/official.zh.srt')
+      ..writeAsStringSync(buildSampleChineseSrt(cues: 8));
+    final api = _FakeSharedApi(null);
+
+    await enqueueSubtitleCompletionForEpisode(
+      episodeId: 'ep-official-zh',
+      videoPath: video.path,
+      zhSubtitlePath: zh.path,
+      sourceUrl: 'https://www.bilibili.com/video/BV1CS4y1v7sQ',
+      queue: queue,
+      appSupportDirectory: () async => temp,
+      documentsDirectory: () async => docs,
+      sharedSubtitleApi: api,
+      networkFetchOfficial: false,
+    );
+
+    expect(api.enqueueCalls, 0);
+    expect(await queue.loadJobs(), isEmpty);
+  });
+
   test('enqueue pushes cloud generation when shared lookup misses', () async {
     final File video = _fakeVideo(temp, 'miss.mp4');
     final _FakeSharedApi api = _FakeSharedApi(null);

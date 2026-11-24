@@ -59,6 +59,40 @@ void main() {
     expect(selected, StudyModeTab.wordCards);
   });
 
+  testWidgets('AI English is disabled while subtitles are generating', (
+    WidgetTester tester,
+  ) async {
+    var calls = 0;
+    Future<void> showControls({required bool busy}) => tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          body: StudyBottomControls(
+            subtitleMode: '双语',
+            speed: '1.0×',
+            isPlaying: false,
+            isLooping: false,
+            position: Duration.zero,
+            duration: const Duration(minutes: 1),
+            onSelectSubtitleMode: (_) {},
+            onCycleSpeed: () {},
+            onTogglePlaying: () {},
+            onOpenLoopSheet: () {},
+            onOpenOralCoach: () {},
+            onRerecognizeEnglish: () => calls++,
+            englishSubtitleBusy: busy,
+          ),
+        ),
+      ),
+    );
+
+    await showControls(busy: true);
+    await tester.tap(find.text('英文生成中'), warnIfMissed: false);
+    expect(calls, 0);
+    await showControls(busy: false);
+    await tester.tap(find.text('AI英文'));
+    expect(calls, 1);
+  });
+
   testWidgets('StudyBottomControls fires subtitle mode loop and oral coach', (
     WidgetTester tester,
   ) async {

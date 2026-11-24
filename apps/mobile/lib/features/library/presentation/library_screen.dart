@@ -1879,7 +1879,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               title: const Text('重新导入本课程字幕？'),
               content: const Text(
                 '将清除本课程语音识别生成的字幕，重新挂上 B 站官方软字幕；'
-                '缺英文/中文的分集再在后台补全。视频文件不会删除。',
+                '已有可用软字幕的分集会直接使用。没有可复用字幕的分集才会尝试补全。视频文件会保留。',
               ),
               actions: <Widget>[
                 TextButton(
@@ -1910,7 +1910,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         return;
       }
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('已重新导入 $n 集字幕，缺侧正在后台补全')),
+        SnackBar(content: Text('已处理 $n 集字幕，已有软字幕的分集可直接使用')),
       );
       unawaited(ref.read(subtitleCompletionStatusProvider.notifier).refresh());
     } catch (e) {

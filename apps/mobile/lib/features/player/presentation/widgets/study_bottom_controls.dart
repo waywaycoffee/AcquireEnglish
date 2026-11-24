@@ -23,6 +23,7 @@ class StudyBottomControls extends StatelessWidget {
     this.onToggleFullscreen,
     this.onLocateCurrent,
     this.onRerecognizeEnglish,
+    this.englishSubtitleBusy = false,
     this.onRerecognizeChinese,
     this.hardsubMosaicEnabled = false,
     this.onToggleHardsubMosaic,
@@ -49,6 +50,7 @@ class StudyBottomControls extends StatelessWidget {
   /// Replaces the old bottom-left「倍速 / 超清 / 双语」text cluster.
   final VoidCallback? onLocateCurrent;
   final VoidCallback? onRerecognizeEnglish;
+  final bool englishSubtitleBusy;
   final VoidCallback? onRerecognizeChinese;
 
   /// Bottom「遮」toggle for burned-in subtitle mosaic (drag-resize stays on video).
@@ -336,9 +338,11 @@ class StudyBottomControls extends StatelessWidget {
                               key: const ValueKey<String>(
                                 'study-chip-rerecognize-en',
                               ),
-                              label: 'AI英文',
+                              label: englishSubtitleBusy ? '英文生成中' : 'AI英文',
                               color: colors.textSecondary,
-                              onPressed: onRerecognizeEnglish!,
+                              onPressed: englishSubtitleBusy
+                                  ? null
+                                  : onRerecognizeEnglish,
                             ),
                           if (onRerecognizeChinese != null)
                             _BottomTextAction(
@@ -415,7 +419,7 @@ class _BottomTextAction extends StatelessWidget {
 
   final String label;
   final Color color;
-  final VoidCallback onPressed;
+  final VoidCallback? onPressed;
   final String? tooltip;
 
   @override

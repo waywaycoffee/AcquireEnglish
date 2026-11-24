@@ -339,6 +339,13 @@ Future<void> enqueueSubtitleCompletionForEpisode({
     enPath = null;
   }
 
+  final bool preserveExistingBilibiliTrack =
+      sourceKey != null &&
+      !force &&
+      chip == null &&
+      (await _subtitleFileHasLanguage(enPath, requireEnglish: true) ||
+          await _subtitleFileHasLanguage(zhPath, requireEnglish: false));
+
   // Shared community cache: after official softsubs, before cloud / local ASR.
   // Language-aware: a wrong-language file on disk still counts as missing so
   // cloud bilingual packs are pulled before Whisper/translate.
@@ -433,6 +440,21 @@ Future<void> enqueueSubtitleCompletionForEpisode({
       CloudSubtitleJobTracker.instance.clear(episodeId);
       await store.markDone(episodeId);
     }
+    return;
+  }
+  if (preserveExistingBilibiliTrack) {
+    SubtitleCompletionStatusHub.instance.reportSharedApplied(
+      episodeId: episodeId,
+      enPath: enPath,
+      zhPath: zhPath,
+    );
+    SubtitleCompletionStatusHub.instance.reportProgress(
+      episodeId,
+      '字幕已加载',
+      status: SubtitleCompletionStatus.done,
+      needEnglish: false,
+      needChinese: false,
+    );
     return;
   }
   if (usedSharedCache) {
