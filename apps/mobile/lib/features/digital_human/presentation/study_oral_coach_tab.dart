@@ -4302,71 +4302,24 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 ),
               ),
             ),
-          )
-        else
-          Listener(
-            key: const ValueKey<String>('study-oral-coach-mic-legacy'),
-            behavior: HitTestBehavior.opaque,
-            onPointerDown: _busy ? null : (_) => unawaited(_onHoldStart()),
-            onPointerUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
-            onPointerCancel: _busy ? null : (_) => unawaited(_onHoldEnd()),
-            child: AnimatedBuilder(
-              animation: _orbPulse,
-              builder: (BuildContext context, Widget? child) {
-                final double t = _recordingActive
-                    ? 0.55 + _orbPulse.value * 0.45
-                    : 0.35 + _orbPulse.value * 0.25;
-                return Container(
-                  width: 60,
-                  height: 60,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    gradient: RadialGradient(
-                      colors: <Color>[
-                        Color.lerp(
-                              const Color(0xFF9B7CFF),
-                              const Color(0xFFE8DEFF),
-                              t,
-                            ) ??
-                            const Color(0xFFB9A6FF),
-                        const Color(0xFF5B3FD4),
-                        const Color(0xFF2A1B6A),
-                      ],
-                      stops: const <double>[0, 0.55, 1],
-                    ),
-                    boxShadow: <BoxShadow>[
-                      BoxShadow(
-                        color: const Color(
-                          0xFF8B6CFF,
-                        ).withValues(alpha: 0.25 + t * 0.35),
-                        blurRadius: 28 + t * 18,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Icon(
-                    _recordingActive
-                        ? Icons.graphic_eq_rounded
-                        : Icons.mic_none_rounded,
-                    color: Colors.white.withValues(alpha: 0.92),
-                    size: 32,
-                  ),
-                );
-              },
+          ),
+        if (_voicePlaybackLabel case final String label)
+          Padding(
+            padding: const EdgeInsets.only(top: 4),
+            child: Text(
+              label,
+              style: const TextStyle(color: Colors.white70, fontSize: 11),
             ),
           ),
-        const SizedBox(height: 6),
-        if (_voicePlaybackLabel case final String label)
-          Text(
-            label,
-            style: const TextStyle(color: Colors.white70, fontSize: 11),
-          ),
-        Text(
-          orbHint,
-          style: TextStyle(
-            color: Colors.white.withValues(alpha: 0.78),
-            fontSize: 13,
-            fontWeight: FontWeight.w600,
+        Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Text(
+            orbHint,
+            style: TextStyle(
+              color: Colors.white.withValues(alpha: 0.78),
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
           ),
         ),
         Padding(
@@ -4394,19 +4347,25 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 icon: Icons.record_voice_over_outlined,
                 onTap: _busy ? null : _chooseEnglishVoice,
               ),
-              _DockRoundButton(
-                label: _recordingActive ? '停止' : '说话',
-                icon: _recordingActive
-                    ? Icons.stop_rounded
-                    : Icons.mic_rounded,
-                active: _recordingActive,
-                onTap: _busy
-                    ? null
-                    : () => unawaited(
-                          _recordingActive
-                              ? _stopRecordingAndSend()
-                              : _onHoldStart(),
-                        ),
+              // Bottom dock is the only mic; center orb was removed as duplicate.
+              Listener(
+                key: const ValueKey<String>('study-oral-coach-mic-legacy'),
+                behavior: HitTestBehavior.opaque,
+                onPointerDown:
+                    _busy ? null : (_) => unawaited(_onHoldStart()),
+                onPointerUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
+                onPointerCancel:
+                    _busy ? null : (_) => unawaited(_onHoldEnd()),
+                child: _DockRoundButton(
+                  label: _recordingActive
+                      ? '松开'
+                      : (_pendingResay != null ? '再说' : '说话'),
+                  icon: _recordingActive
+                      ? Icons.graphic_eq_rounded
+                      : Icons.mic_rounded,
+                  active: _recordingActive,
+                  onTap: null,
+                ),
               ),
               _DockRoundButton(
                 label: '结束',
