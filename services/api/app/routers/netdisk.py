@@ -31,6 +31,7 @@ from app.services.netdisk_series import (
     series_key_for,
     to_series_course_out,
 )
+from app.services.netdisk_embedded_subs import extract_embedded_softsubs
 from app.services.netdisk_sidecars import load_sidecars_for_video
 from app.services.openlist_client import (
     OpenListClient,
@@ -248,6 +249,18 @@ async def _upsert_video_link(
             link.subtitle_en_srt = sidecars["en"]
         if sidecars.get("zh"):
             link.subtitle_zh_srt = sidecars["zh"]
+        # Fill gaps from MKV/MP4 embedded text softsubs (skip PGS/VobSub bitmap).
+        need_en = not (link.subtitle_en_srt or "").strip()
+        need_zh = not (link.subtitle_zh_srt or "").strip()
+        if need_en or need_zh:
+            try:
+                embedded = await extract_embedded_softsubs(client, path)
+            except Exception:  # noqa: BLE001
+                embedded = {}
+            if need_en and embedded.get("en"):
+                link.subtitle_en_srt = embedded["en"]
+            if need_zh and embedded.get("zh"):
+                link.subtitle_zh_srt = embedded["zh"]
 
     await db.flush()
     course_id = (
@@ -807,7 +820,7 @@ async def _run_series_import_job(
                     ok=ok_n,
                     failed=failed_n,
                     current=name,
-                    message=f"写入中 {i}/{total} · {name}",
+                    message=f"写入中 {i}/{total} · 外挂/内嵌字幕 · {name}",
                 )
                 # Yield so concurrent GET /import-jobs can run between files.
                 await asyncio.sleep(0)
