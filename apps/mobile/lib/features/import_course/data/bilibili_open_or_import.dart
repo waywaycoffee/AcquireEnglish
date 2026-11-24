@@ -145,8 +145,7 @@ Future<String?> openBilibiliLearningOrImport(
     if (pushPlayer) {
       context.pushNamed(
         SGRoute.player.name,
-        pathParameters: <String, String>{'episodeId': hit.course.episodes.first.id},
-        queryParameters: const {'preview': '1'},
+        pathParameters: <String, String>{'episodeId': hit.episode.id},
       );
     }
     return hit.episode.id;
@@ -167,7 +166,6 @@ Future<String?> openBilibiliLearningOrImport(
     context.pushNamed(
       SGRoute.player.name,
       pathParameters: <String, String>{'episodeId': episodeId},
-      queryParameters: const {'preview': '1'},
     );
   }
   return episodeId;

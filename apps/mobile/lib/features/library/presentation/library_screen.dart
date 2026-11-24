@@ -6,7 +6,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
 
-import '../../authentication/presentation/auth_session.dart';
 import '../../../router/app_router.dart';
 import '../../import_course/data/youtube_import_actions.dart';
 import '../../import_course/data/bilibili_collection_download.dart';
@@ -2111,11 +2110,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       pathParameters: <String, String>{'episodeId': item.id},
       queryParameters: <String, String>{
         'courseId': course.id,
-        if (onlineCourse &&
-            !isBilibiliCollectionReservationReady(
-              ref.read(authSessionProvider).email, course.id,
-            ) &&
-            !item.hasEnglishSubtitles && !item.hasChineseSubtitles)
+        if (course.id.startsWith('youtube-') &&
+            !item.hasEnglishSubtitles &&
+            !item.hasChineseSubtitles)
           'preview': '1',
         'autoplay': '1',
         if (prefersNetdiskLandscapePlayback(course)) 'fullscreen': '1',

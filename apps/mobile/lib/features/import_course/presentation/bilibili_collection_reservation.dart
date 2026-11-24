@@ -22,13 +22,6 @@ import '../domain/bilibili_import.dart';
 String _reservationKey(String email, String courseId) =>
     'bilibili-reservation:$email:$courseId';
 
-bool isBilibiliCollectionReservationReady(String email, String courseId) =>
-    Hive.isBoxOpen('prefs') &&
-    Hive.box<String>(
-          'prefs',
-        ).get('${_reservationKey(email, courseId)}:ready') ==
-        '1';
-
 class BilibiliCollectionReservation extends ConsumerStatefulWidget {
   const BilibiliCollectionReservation({required this.source, super.key});
 
@@ -97,14 +90,21 @@ class _BilibiliCollectionReservationState
         ids.map(ref.read(acquireApiClientProvider).getSharedSubtitleJob),
       );
       if (!mounted || key != _key(_course)) return;
-      final ready = jobs.every((job) => job?.state == 'completed');
+      final hasRejectedEpisodes = Hive.box<String>(
+        'prefs',
+      ).containsKey('$key:rejected');
+      final ready =
+          !hasRejectedEpisodes &&
+          jobs.every((job) => job?.state == 'completed');
       if (ready) {
         await Hive.box<String>('prefs').put('$key:ready', '1');
       }
       if (!mounted || key != _key(_course)) return;
       setState(() {
         _ready = ready;
-        _requested = !jobs.any((job) => job?.isTerminalFailure ?? false);
+        _requested =
+            !hasRejectedEpisodes &&
+            !jobs.any((job) => job?.isTerminalFailure ?? false);
       });
     } finally {
       _checking = false;
@@ -148,7 +148,12 @@ class _BilibiliCollectionReservationState
       final next = int.tryParse(prefs.get('$key:next') ?? '') ?? 0;
       final ids = <String>{...prefs.get(key)?.split(',') ?? const <String>[]}
         ..remove('');
+      final rejected = <String>{
+        ...prefs.get('$key:rejected')?.split(',') ?? const <String>[],
+      }..remove('');
       if (next == 0) {
+        rejected.clear();
+        await prefs.delete('$key:rejected');
         ids.clear();
         await prefs.delete(key);
         await prefs.delete('$key:ready');
@@ -157,61 +162,84 @@ class _BilibiliCollectionReservationState
       for (var index = next; index < course.episodes.length; index++) {
         if (!mounted || key != _key(_course)) return;
         final episode = course.episodes[index];
-        final source = bilibiliSourceForEpisode(
-          course: course,
-          episode: episode,
-          videoAsset: episode.videoAsset,
-        );
-        if (source == null)
-          throw FormatException('第 ${episode.numberStr} 集缺少链接');
-        final identity = resolveBilibiliSharedSubtitleIds(
-          course: course,
-          episode: episode,
-          sourceUrl: source,
-        );
-        final bvid =
-            identity?.bvid ?? (await service.resolveIds(source))?['bvid'];
-        if (bvid == null)
-          throw FormatException('第 ${episode.numberStr} 集链接无法识别');
-        final page = identity?.page ?? BilibiliImport.extractPage(source) ?? 1;
-        final pack = await api.getSharedBilibiliSubtitle(
-          bvid: bvid,
-          page: page,
-        );
-        final String english = pack?.subtitleEnSrt.trim() ?? '';
-        if (english.isEmpty || (pack?.subtitleZhSrt ?? '').trim().isEmpty) {
-          if (!mounted || key != _key(_course)) return;
-          final job = english.isEmpty
-              ? await api.enqueueSharedSubtitleJob(
-                  bvid: bvid,
-                  page: page,
-                  reportErrors: true,
-                )
-              : await api.enqueueSharedSubtitleTranslateJob(
-                  bvid: bvid,
-                  page: page,
-                  subtitleEnSrt: english,
-                  title: episode.title,
-                  durationSec: pack?.durationSec,
-                  reportErrors: true,
-                );
-          if (job == null || job.id.isEmpty || job.isTerminalFailure) {
-            throw FormatException('第 ${episode.numberStr} 集字幕预约未提交，请重试');
+        try {
+          final source = bilibiliSourceForEpisode(
+            course: course,
+            episode: episode,
+            videoAsset: episode.videoAsset,
+          );
+          if (source == null)
+            throw FormatException('第 ${episode.numberStr} 集缺少链接');
+          final identity = resolveBilibiliSharedSubtitleIds(
+            course: course,
+            episode: episode,
+            sourceUrl: source,
+          );
+          final bvid =
+              identity?.bvid ?? (await service.resolveIds(source))?['bvid'];
+          if (bvid == null)
+            throw FormatException('第 ${episode.numberStr} 集链接无法识别');
+          final page =
+              identity?.page ?? BilibiliImport.extractPage(source) ?? 1;
+          final pack = await api.getSharedBilibiliSubtitle(
+            bvid: bvid,
+            page: page,
+          );
+          final String english = pack?.subtitleEnSrt.trim() ?? '';
+          if (english.isEmpty || (pack?.subtitleZhSrt ?? '').trim().isEmpty) {
+            if (!mounted || key != _key(_course)) return;
+            final job = english.isEmpty
+                ? await api.enqueueSharedSubtitleJob(
+                    bvid: bvid,
+                    page: page,
+                    reportErrors: true,
+                  )
+                : await api.enqueueSharedSubtitleTranslateJob(
+                    bvid: bvid,
+                    page: page,
+                    subtitleEnSrt: english,
+                    title: episode.title,
+                    durationSec: pack?.durationSec,
+                    reportErrors: true,
+                  );
+            if (job == null || job.id.isEmpty || job.isTerminalFailure) {
+              throw FormatException('第 ${episode.numberStr} 集字幕预约未提交，请重试');
+            }
+            ids.add(job.id);
+            await prefs.put(key, ids.join(','));
           }
-          ids.add(job.id);
-          await prefs.put(key, ids.join(','));
+        } on FormatException {
+          rejected.add(episode.numberStr);
+        } on DioException catch (error) {
+          final response = error.response;
+          final detail = response?.data;
+          final message = detail is Map ? detail['detail'] : null;
+          if (response?.statusCode != 422 ||
+              (message is String && message.startsWith('bvid_page_cap:'))) {
+            rethrow;
+          }
+          rejected.add(episode.numberStr);
+        }
+        if (rejected.isNotEmpty) {
+          await prefs.put('$key:rejected', rejected.join(','));
         }
         await prefs.put('$key:next', '${index + 1}');
       }
       await prefs.delete('$key:next');
-      if (ids.isEmpty) await prefs.put('$key:ready', '1');
+      if (ids.isEmpty && rejected.isEmpty) {
+        await prefs.put('$key:ready', '1');
+      }
       if (!mounted || key != _key(_course)) return;
       setState(() {
         _waitingForCapacity = false;
-        _requested = true;
-        _ready = ids.isEmpty;
+        _requested = rejected.isEmpty;
+        _ready = ids.isEmpty && rejected.isEmpty;
       });
-      _message(ids.isEmpty ? '公共字幕已齐，可以进入合集' : '已预约，工作站正在准备缺失的字幕');
+      if (rejected.isNotEmpty) {
+        _message('第 ${rejected.join('、')} 集字幕预约未提交，其他集可照常学习');
+      } else {
+        _message(ids.isEmpty ? '公共字幕已齐，可以进入合集' : '已预约，工作站正在准备缺失的字幕');
+      }
     } on DioException catch (error) {
       if (!mounted) return;
       final Object? response = error.response?.data;
