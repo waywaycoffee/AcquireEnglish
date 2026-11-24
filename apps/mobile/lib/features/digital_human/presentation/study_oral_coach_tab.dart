@@ -256,10 +256,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   int _duplexSecondsAccrued = 0;
   int? _duplexMinutesLeftToday;
 
+  /// Show atlas frame 8 (thumbs-up / smile) — last night's gesture sheet.
   void _encourageLearner() {
-    if (!mounted || !_started || _coachEncouraging) return;
+    if (!mounted || !_started) return;
+    _coachGestureTimer?.cancel();
     setState(() => _coachEncouraging = true);
-    _coachGestureTimer = Timer(const Duration(milliseconds: 1300), () {
+    _coachGestureTimer = Timer(const Duration(milliseconds: 1800), () {
       if (mounted) setState(() => _coachEncouraging = false);
     });
   }
@@ -1486,6 +1488,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       if (mounted && gen == _speakGen) {
         setState(() => _coachSpeaking = false);
+        // After speech, flash the encouraging pose from the gesture atlas.
+        _encourageLearner();
       }
     }
   }
@@ -3565,16 +3569,27 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           ? _status
                           : (_started ? '按住麦克风说话' : '按住麦克风开始对话'))));
     final bool avatarSpeaking = _coachSpeaking || _duplexAgentSpeaking;
-    final bool avatarListening = _recordingActive || _duplexLearnerSpeaking;
+    final bool avatarThinking = _busy || (_duplexLive && _duplexThinking);
+    // Hold-to-talk OR idle waiting → listening pose (atlas cell 6).
+    final bool avatarListening = _recordingActive ||
+        _duplexLearnerSpeaking ||
+        (_started &&
+            !avatarSpeaking &&
+            !avatarThinking &&
+            !_coachEncouraging);
     final bool useCartoonLips =
         settings.cartoonDigitalHuman && persona.hasCartoonAtlas;
-    final String stageLabel = avatarSpeaking
-        ? (useCartoonLips ? '数字人唇形…' : '外教在说…')
-        : (avatarListening
-              ? '外教在听…'
-              : (useCartoonLips
-                    ? '${persona.displayName} · 数字人唇形'
-                    : persona.displayName));
+    final String stageLabel = _coachEncouraging
+        ? '加油！'
+        : (avatarSpeaking
+              ? (useCartoonLips ? '数字人唇形…' : '外教在说…')
+              : (avatarThinking
+                    ? '外教思考中…'
+                    : (avatarListening
+                          ? (_recordingActive ? '外教在听…' : '外教在等你…')
+                          : (useCartoonLips
+                                ? '${persona.displayName} · 数字人'
+                                : persona.displayName))));
     // Scheme 2: local cartoon atlas. LiveTalking only if cartoon is off.
     final Widget? liveVideo =
         (!useCartoonLips &&
@@ -3600,7 +3615,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           // Show atlas as soon as the oral stage opens (not only after start).
           spriteAsset: useCartoonLips ? persona.cartoonAssetPath : null,
           encouraging: _coachEncouraging,
-          thinking: _busy || (_duplexLive && _duplexThinking),
+          thinking: avatarThinking,
           displayName: persona.displayName,
           liveVideo: liveVideo,
           mouth: !avatarSpeaking
