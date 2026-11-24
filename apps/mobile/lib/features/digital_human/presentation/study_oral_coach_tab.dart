@@ -1199,39 +1199,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       await _pauseArticlePodcast();
       return;
     }
-    if (_podcastIndex < _podcastLines.length) {
-      await _playArticlePodcast();
-      return;
-    }
-    final single = await showModalBottomSheet<bool>(
-      context: context,
-      builder: (sheetContext) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.record_voice_over_outlined),
-              title: const Text('引导对话（推荐）'),
-              subtitle: const Text('讲一点 → 提问 → 等你开口，再说下一段'),
-              onTap: () => Navigator.pop(sheetContext, true),
-            ),
-            ListTile(
-              leading: const Icon(Icons.people_outline),
-              title: const Text('双声部引导'),
-              subtitle: const Text('两位主持轮流讲解并邀请你回答'),
-              onTap: () => Navigator.pop(sheetContext, false),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (!mounted || single == null) return;
-    if (_podcastSingleHost != single) {
+    // Self-play + guide: always single-host dialogue guide — no mode picker.
+    if (!_podcastSingleHost) {
       _podcastLines = const <PodcastGuideSegment>[];
       _podcastOffset = Duration.zero;
       _podcastIndex = 0;
       _podcastDisplayedThrough = -1;
-      _podcastSingleHost = single;
+      _podcastSingleHost = true;
     }
     await _playArticlePodcast();
   }
@@ -1352,7 +1326,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     setState(() {
       _podcastPlaying = false;
       _podcastPausedForQuestion = forQuestion;
-      _status = '已暂停文章播客';
+      _status = '已暂停引导对话';
     });
     await _interruptCoachSpeech();
   }
@@ -1563,7 +1537,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_busy || _historyLoading || _started) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
     _preferChineseReply = false;
-    if (_isGuidedTutorLesson && !_podcastPausedForQuestion && !_podcastPlaying) {
+    // With article/video material: auto-start guided 口播 (no user mode pick).
+    if (widget.articleExcerpt.trim().isNotEmpty) {
       setState(() {
         _started = true;
         _roundStartBubble = _bubbles.length;
@@ -1572,16 +1547,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _questUtterances = 0;
         _roundPronScores.clear();
         _error = null;
-        _tutorStep = TutorLessonStep.intro;
-        _tutorShadowIndex = 0;
-        _tutorDialogueTurns = 0;
-        _tutorStepScores.clear();
-        _tutorCorrections.clear();
-        _tutorFocusLine = '';
-        _tutorCoachQuestion = '';
-        _tutorOverallScore = null;
-        _tutorFsrsWritten = false;
-        _status = '六步外教课 · 开场';
+        _podcastSingleHost = true;
+        _status = '正在准备引导对话…';
       });
       _armSessionClock();
       _idlePromptCount = 0;
@@ -1590,7 +1557,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       if (_usesVoicePipeline(settings)) {
         unawaited(_ensurePipelineSession(settings).catchError((Object _) {}));
       }
-      unawaited(_runTutorStep());
+      if (_duplexLive || _liveKit.room != null) {
+        unawaited(_stopDuplexMeter(flush: true));
+        unawaited(_liveKit.disconnect());
+        _duplexLive = false;
+      }
+      unawaited(_playArticlePodcast());
       return;
     }
     final String? opening = _podcastPausedForQuestion || _podcastPlaying
@@ -3692,8 +3664,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     avatar: Icon(_podcastPlaying ? Icons.pause : Icons.headphones),
                     label: Text(
                       _podcastPlaying
-                          ? '暂停播客'
-                          : (widget.episodeId != null ? '视频播客' : '文章播客'),
+                          ? '暂停引导'
+                          : (_podcastPausedForQuestion ||
+                                  _podcastIndex > 0 ||
+                                  _podcastLines.isNotEmpty
+                              ? '继续引导'
+                              : '引导对话'),
                     ),
                     onPressed: () => unawaited(_openArticlePodcast()),
                   ),
