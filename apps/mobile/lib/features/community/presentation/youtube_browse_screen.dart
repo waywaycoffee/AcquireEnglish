@@ -9,6 +9,7 @@ import '../../import_course/data/youtube_import_actions.dart';
 import '../../import_course/presentation/youtube_import_sheet.dart';
 import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../shared/presentation/widgets/youtube_brand_icon.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import 'youtube_browse_provider.dart';
@@ -411,12 +412,27 @@ class _YoutubeBrowseScreenState extends ConsumerState<YoutubeBrowseScreen> {
                         : const Icon(Icons.travel_explore_rounded),
                     label: Text(_discovering ? '发现中…' : '用梯子刷新今日发现'),
                   ),
-                  OutlinedButton.icon(
+                  FilledButton.icon(
                     onPressed: () => unawaited(
                       showYoutubeImportSheet(context, ref),
                     ),
-                    icon: const Icon(Icons.link_rounded),
-                    label: const Text('粘贴链接导入'),
+                    style: FilledButton.styleFrom(
+                      backgroundColor: YoutubeBrandIcon.brandRed,
+                      foregroundColor: Colors.white,
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 14,
+                        vertical: 12,
+                      ),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                    ),
+                    icon: const YoutubeBrandIcon(size: 20),
+                    label: const Text(
+                      '粘贴链接导入',
+                      style: TextStyle(fontWeight: FontWeight.w800),
+                    ),
                   ),
                 ],
               ),

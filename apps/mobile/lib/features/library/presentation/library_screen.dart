@@ -1619,7 +1619,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 if (shelfTab == LibraryShelfTab.bilibili) ...<Widget>[
                   // Keep import actions on their own full-width row so B站 is
                   // never clipped by the phone's right edge. Same entry as 首页.
-                  CourseImportActionButtons(enabled: !editMode),
+                  CourseImportActionButtons(
+                    enabled: !editMode,
+                    showYoutube: false,
+                  ),
                   if (!editMode) ...<Widget>[
                     const SizedBox(height: 18),
                     Material(

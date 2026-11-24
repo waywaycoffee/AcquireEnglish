@@ -7,6 +7,7 @@ import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../membership/domain/module_access.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
+import '../../shared/presentation/widgets/youtube_brand_icon.dart';
 import '../../subtitle_completion/subtitle_completion_enqueue.dart';
 import '../../subtitle_completion/subtitle_completion_scheduler.dart';
 import '../../sync/presentation/user_assets_provider.dart';
@@ -178,17 +179,25 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
       mainAxisSize: MainAxisSize.min,
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
-        const Text(
-          '导入 YouTube 链接',
-          style: TextStyle(
-            color: StudyShellTokens.textPrimary,
-            fontSize: 18,
-            fontWeight: FontWeight.w800,
-          ),
+        const Row(
+          children: <Widget>[
+            YoutubeBrandIcon(size: 28),
+            SizedBox(width: 10),
+            Expanded(
+              child: Text(
+                '导入 YouTube 链接',
+                style: TextStyle(
+                  color: StudyShellTokens.textPrimary,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+          ],
         ),
         const SizedBox(height: 8),
         const Text(
-          '粘贴链接后自动拉取标题与字幕轴；无字幕则进入学习页用 ASR。',
+          '粘贴链接后自动拉取标题与字幕轴；无字幕则进入学习页用 ASR。需可用梯子。',
           style: TextStyle(color: StudyShellTokens.textSecondary),
         ),
         const SizedBox(height: 12),
@@ -198,6 +207,11 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
           decoration: const InputDecoration(
             hintText: 'https://www.youtube.com/watch?v=...',
             hintStyle: TextStyle(color: StudyShellTokens.textMuted),
+            prefixIcon: Padding(
+              padding: EdgeInsets.only(left: 12, right: 4),
+              child: YoutubeBrandIcon(size: 22),
+            ),
+            prefixIconConstraints: BoxConstraints(minWidth: 40, minHeight: 24),
           ),
         ),
         if (_error != null) ...<Widget>[
@@ -205,12 +219,24 @@ class _YoutubeImportFormState extends ConsumerState<_YoutubeImportForm> {
           Text(_error!, style: const TextStyle(color: Colors.redAccent)),
         ],
         const SizedBox(height: 12),
-        FilledButton(
+        FilledButton.icon(
           onPressed: _busy ? null : _submit,
           style: FilledButton.styleFrom(
-            backgroundColor: StudyShellTokens.accent,
+            backgroundColor: YoutubeBrandIcon.brandRed,
+            foregroundColor: Colors.white,
+            padding: const EdgeInsets.symmetric(vertical: 14),
           ),
-          child: Text(_busy ? '拉取中…' : '加入书库'),
+          icon: _busy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(
+                    strokeWidth: 2,
+                    color: Colors.white,
+                  ),
+                )
+              : const YoutubeBrandIcon(size: 20),
+          label: Text(_busy ? '拉取中…' : '加入书库'),
         ),
       ],
     );
