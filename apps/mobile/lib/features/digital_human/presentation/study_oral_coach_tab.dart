@@ -1562,9 +1562,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       unawaited(_runTutorStep());
       return;
     }
-    final String? opening = _bubbles.isEmpty
-        ? _openingCoachPrompt(settings.selectedDigitalHuman.displayName)
-        : null;
+    final String? opening = _podcastPausedForQuestion || _podcastPlaying
+        ? null
+        : _openingCoachPrompt(settings.selectedDigitalHuman.displayName);
     setState(() {
       _started = true;
       _roundStartBubble = _bubbles.length;
@@ -1596,7 +1596,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       unawaited(_liveKit.disconnect());
       _duplexLive = false;
     }
-    if (opening != null && !_podcastPausedForQuestion && !_podcastPlaying) {
+    if (opening != null) {
       unawaited(_speakCoach(opening, settings));
     }
   }
@@ -3659,7 +3659,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   top: 16,
                   child: ActionChip(
                     avatar: Icon(_podcastPlaying ? Icons.pause : Icons.headphones),
-                    label: Text(_podcastPlaying ? '暂停播客' : '文章播客'),
+                    label: Text(
+                      _podcastPlaying
+                          ? '暂停播客'
+                          : (widget.episodeId != null ? '视频播客' : '文章播客'),
+                    ),
                     onPressed: () => unawaited(_openArticlePodcast()),
                   ),
                 ),
