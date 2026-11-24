@@ -1355,6 +1355,10 @@ class _StudyShadowingTabState extends ConsumerState<StudyShadowingTab> {
                 ),
               ],
               if (_assessment != null) ...<Widget>[
+                if (_assessment!.shadowingTip() case final String tip) ...[
+                  Text(tip),
+                  const SizedBox(height: 8),
+                ],
                 Text('发音评分：${_assessment!.scoreForReference(widget.line.english) ?? "—"}分'),
                 Text(
                   '准确度 ${_assessment!.accuracy?.round() ?? "—"} · 流利度 ${_assessment!.fluency?.round() ?? "—"} · 完整度 ${_assessment!.completion?.round() ?? "—"}',

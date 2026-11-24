@@ -60,6 +60,7 @@ import '../../words/data/offline_word_dictionary.dart';
 import '../../words/data/vocab_card_enrichment_service.dart';
 import '../../reading/data/reading_gloss.dart';
 import '../../words/presentation/learned_vocabulary_provider.dart';
+import '../../words/presentation/estimated_vocabulary_provider.dart';
 import '../../words/presentation/learner_level_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../data/dictation_queue_provider.dart';
@@ -3157,13 +3158,23 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     _stopVideo();
     _showMessage('AI 正在处理字幕…');
     try {
+      final int? vocabularyEstimate = ref.read(estimatedVocabularyProvider);
       final List<PlayerSubtitleLine> replacement = await resegmentSubtitles(
         source: source,
         merge: count > 1,
+        level: vocabularyEstimate != null && vocabularyEstimate < 250
+            ? ShadowingSegmentationLevel.l0
+            : ShadowingSegmentationLevel.fromCefr(
+                ref.read(adaptiveLearnerCefrProvider),
+              ),
         settings: ref.read(learningSettingsProvider),
         formatTime: _formatTimestamp,
       );
       if (!mounted || !identical(snapshot, state.lines)) return;
+      if (identical(replacement, source)) {
+        _showMessage('本句已符合当前级别的跟读长度');
+        return;
+      }
       final List<PlayerSubtitleLine> next = List<PlayerSubtitleLine>.of(snapshot)
         ..replaceRange(index, index + count, replacement);
       await persistManualSubtitleEdits(

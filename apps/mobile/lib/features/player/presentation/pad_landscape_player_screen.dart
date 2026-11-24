@@ -68,6 +68,8 @@ import 'pronunciation_target_selection.dart';
 import 'subtitle_display_mode.dart';
 import 'subtitle_file_persist.dart';
 import 'subtitle_reference_review.dart';
+import '../../words/presentation/estimated_vocabulary_provider.dart';
+import '../../words/presentation/learner_level_provider.dart';
 import 'ai_subtitle_resegment.dart';
 import 'subtitle_sentence_merge.dart';
 import 'subtitle_word_alignment.dart';
@@ -2628,13 +2630,23 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     _stopVideo();
     _showMessage('AI 正在处理字幕…');
     try {
+      final int? vocabularyEstimate = ref.read(estimatedVocabularyProvider);
       final List<PlayerSubtitleLine> replacement = await resegmentSubtitles(
         source: source,
         merge: count > 1,
+        level: vocabularyEstimate != null && vocabularyEstimate < 250
+            ? ShadowingSegmentationLevel.l0
+            : ShadowingSegmentationLevel.fromCefr(
+                ref.read(adaptiveLearnerCefrProvider),
+              ),
         settings: ref.read(learningSettingsProvider),
         formatTime: _formatTimestamp,
       );
       if (!mounted || !identical(snapshot, state.lines)) return;
+      if (identical(replacement, source)) {
+        _showMessage('本句已符合当前级别的跟读长度');
+        return;
+      }
       final List<PlayerSubtitleLine> next = List<PlayerSubtitleLine>.of(snapshot)
         ..replaceRange(index, index + count, replacement);
       await _persistCompletedBilingualSubtitles(next);

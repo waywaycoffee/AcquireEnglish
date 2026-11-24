@@ -163,6 +163,28 @@ class PronunciationAssessmentResult {
     return errors;
   }
 
+  /// Phrase one practice suggestion using only the assessment evidence.
+  String? shadowingTip() {
+    final PronunciationWordResult? issue = words
+        .where((word) => word.isShadowingError && word.referenceWord.trim().isNotEmpty)
+        .firstOrNull;
+    if (issue != null) {
+      final String word = issue.referenceWord.trim();
+      return switch (issue.matchTag) {
+        2 => '这次漏读了「$word」。先听一遍原声，再把这个词连进整句。',
+        3 => '「$word」读得和原句不一致。重听这一小段，再跟读一遍。',
+        _ => '「$word」的发音还可以练一练。先跟原声读这个词，再读整句。',
+      };
+    }
+    if (fluency != null && fluency! < 0.7) {
+      return '再听一遍原声，留意哪里停顿。先分成短段跟读，再连起来。';
+    }
+    if (words.isNotEmpty && fluency != null && fluency! >= 0.85) {
+      return '这句读得比较流畅。可以再跟原声读一遍，听听重音是否一致。';
+    }
+    return null;
+  }
+
   static PronunciationAssessmentResult? tryParse(Object? raw) {
     if (raw is! Map) return null;
     final Map<String, Object?> value = <String, Object?>{
