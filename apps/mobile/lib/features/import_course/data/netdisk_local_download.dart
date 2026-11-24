@@ -116,6 +116,62 @@ Future<({String uri, Map<String, String>? headers})> resolveNetdiskPlayableMedia
   return (uri: startUrl, headers: kNetdiskStreamHeaders);
 }
 
+/// Drama MKV over Baidu progressive HTTP stutters and often blacks out video.
+/// Prefer a full local file before playback; fall back to CDN stream on failure.
+Future<({String uri, Map<String, String>? headers})>
+    prepareNetdiskEpisodeForSmoothPlayback({
+  required String playUrl,
+  void Function(double? progress, String message)? onProgress,
+}) async {
+  final int? importId = parseNetdiskImportIdFromUrl(playUrl);
+  if (importId != null) {
+    final File? cached = await findCachedNetdiskMedia(importId);
+    if (cached != null) {
+      onProgress?.call(1, '使用已缓存本集');
+      return (uri: cached.path, headers: null);
+    }
+  }
+  onProgress?.call(0, '正在下载本集以流畅播放…');
+  try {
+    final File local = await cacheNetdiskEpisodeLocally(
+      playUrl: playUrl,
+      onProgress: (double? p) {
+        if (p == null) {
+          onProgress?.call(null, '正在下载本集…');
+        } else {
+          onProgress?.call(p, '正在下载本集 ${(p * 100).round()}%…');
+        }
+      },
+    );
+    onProgress?.call(1, '本集已就绪');
+    return (uri: local.path, headers: null);
+  } catch (_) {
+    onProgress?.call(null, '下载未完成，改用在线缓冲…');
+    return resolveNetdiskPlayableMedia(playUrl);
+  }
+}
+
+final Set<String> _prefetchInFlightPlayUrls = <String>{};
+
+/// Warm the next episode while the current one plays from local cache.
+void prefetchNetdiskPlayUrl(String? playUrl) {
+  final String trimmed = (playUrl ?? '').trim();
+  if (!isNetdiskPlayUrl(trimmed)) {
+    return;
+  }
+  if (!_prefetchInFlightPlayUrls.add(trimmed)) {
+    return;
+  }
+  unawaited(() async {
+    try {
+      await cacheNetdiskEpisodeLocally(playUrl: trimmed);
+    } catch (_) {
+    } finally {
+      _prefetchInFlightPlayUrls.remove(trimmed);
+    }
+  }());
+}
+
 /// Download one episode into netdisk_media/{importId}.mkv for smooth local play.
 Future<File> cacheNetdiskEpisodeLocally({
   required String playUrl,

@@ -62,7 +62,9 @@ Future<void> suppressPlayerSoftSubtitles(Player player) async {
 Player createStudyVideoPlayer({bool largeNetworkBuffer = false}) {
   return Player(
     configuration: PlayerConfiguration(
-      bufferSize: largeNetworkBuffer ? 64 * 1024 * 1024 : 32 * 1024 * 1024,
+      // 96MB demuxer cache for netdisk/B站 progressive streams; local files
+      // keep the default 32MB so we do not over-allocate on every lesson.
+      bufferSize: largeNetworkBuffer ? 96 * 1024 * 1024 : 32 * 1024 * 1024,
     ),
   );
 }

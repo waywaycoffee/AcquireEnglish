@@ -2111,7 +2111,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         );
       } else if (netdiskStream) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('正在通过网盘直链在线播放')),
+          const SnackBar(content: Text('美剧将先下载本集再播，保证横屏流畅')),
         );
       }
       await context.pushNamed<void>(

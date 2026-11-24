@@ -267,6 +267,9 @@ class PadPortraitPlayerScreenState
   bool _didAutoOpenFullscreen = false;
   bool _isFullscreenOpen = false;
   final ValueNotifier<int> _fullscreenStudyRevision = ValueNotifier<int>(0);
+  /// Fullscreen route freezes constructor args; bump this so videoReady/surface
+  /// (and loading/error text) stay live — otherwise landscape stays black.
+  final ValueNotifier<int> _fullscreenVideoRevision = ValueNotifier<int>(0);
   bool _pronunciationDialogActive = false;
   bool _generatingAiSubtitles = false;
   AsrSubtitleCancellationToken? _aiSubtitleCancellationToken;
@@ -507,7 +510,15 @@ class PadPortraitPlayerScreenState
     unawaited(_disposeVideo().whenComplete(_releaseGraphicsCache));
     _transcriptReaderSession.dispose();
     _fullscreenStudyRevision.dispose();
+    _fullscreenVideoRevision.dispose();
     super.dispose();
+  }
+
+  void _notifyFullscreenVideoHost() {
+    if (!_isFullscreenOpen) {
+      return;
+    }
+    _fullscreenVideoRevision.value++;
   }
 
   void _syncIdleSchedulerWithPlayback(bool isPlaying) {
@@ -1650,11 +1661,13 @@ class PadPortraitPlayerScreenState
                       }
                     : null),
           ).timeout(
-            Duration(minutes: isBilibili ? 8 : (isNetdiskStream ? 3 : 1)),
+            Duration(minutes: isBilibili ? 8 : (isNetdiskStream ? 45 : 1)),
             onTimeout: () => throw StateError(
               isBilibili
                   ? '缓存 B 站视频超时，请检查网络后重试'
-                  : (isNetdiskStream ? '网盘视频连接超时，可点「先下后学」后离线播' : '视频加载超时'),
+                  : (isNetdiskStream
+                      ? '本集下载超时，请检查网络后重试或点「先下后学」'
+                      : '视频加载超时'),
             ),
           );
       if (!mounted || !identical(_videoPlayer, player)) return;
@@ -1710,32 +1723,6 @@ class PadPortraitPlayerScreenState
       } else {
         await player.pause();
       }
-      // Warm local cache for this episode so next open is instant.
-      if (isNetdiskStream &&
-          !playingLocalFile &&
-          isNetdiskPlayUrl(_videoAsset)) {
-        unawaited(() async {
-          try {
-            final File local = await cacheNetdiskEpisodeLocally(
-              playUrl: _videoAsset!,
-            );
-            if (!mounted) return;
-            final PlayerCourseLookupResult res = resolvePlayerCourseForEpisode(
-              courses: ref.read(libraryCatalogProvider),
-              episodeId: widget.episodeId,
-            );
-            final String? courseId = res.course?.id;
-            final String? episodeId = res.episode?.id;
-            if (courseId == null || episodeId == null) return;
-            await ref.read(libraryCatalogProvider.notifier).updateEpisodeLocalMedia(
-                  courseId: courseId,
-                  episodeId: episodeId,
-                  videoAsset: local.path,
-                  videoMissing: false,
-                );
-          } catch (_) {}
-        }());
-      }
       _videoPosition = player.state.position;
       if (!mounted || !identical(_videoPlayer, player)) return;
       _attachVideoListeners(player);
@@ -1753,6 +1740,10 @@ class PadPortraitPlayerScreenState
           state.isPlaying = true;
         }
       });
+      _notifyFullscreenVideoHost();
+      if (isNetdiskStream) {
+        _prefetchNextNetdiskEpisode();
+      }
       final bool hasEmbeddedEnglish = embeddedTracks.any(
         (SubtitleTrack track) =>
             track.language == 'eng' || track.language == 'en',
@@ -1782,6 +1773,7 @@ class PadPortraitPlayerScreenState
         _videoLoading = false;
         _videoErrorText = _videoLoadErrorMessage(error, _videoAsset);
       });
+      _notifyFullscreenVideoHost();
       _applyPlaybackMode();
       unawaited(_ensureImportTimeSubtitleCompletion());
     }
@@ -1807,15 +1799,34 @@ class PadPortraitPlayerScreenState
         return (uri: trimmed, headers: null);
       }
     }
-    // Netdisk signed play URL → local cache or Baidu CDN with pan UA.
+    // Netdisk: download current episode first for smooth local play; stream only
+    // as fallback. Progressive MKV over Baidu is the main stutter/black source.
     if (isNetdiskPlayUrl(trimmed)) {
-      onProgress?.call(null, '正在解析网盘直链…');
       final ({String uri, Map<String, String>? headers}) resolved =
-          await resolveNetdiskPlayableMedia(trimmed);
+          await prepareNetdiskEpisodeForSmoothPlayback(
+        playUrl: trimmed,
+        onProgress: onProgress,
+      );
       if (!(resolved.uri.startsWith('http://') ||
           resolved.uri.startsWith('https://'))) {
         if (mounted) {
           setState(() => _videoAsset = resolved.uri);
+        }
+        final PlayerCourseLookupResult res = resolvePlayerCourseForEpisode(
+          courses: ref.read(libraryCatalogProvider),
+          episodeId: widget.episodeId,
+        );
+        final String? courseId = res.course?.id;
+        final String? episodeId = res.episode?.id;
+        if (courseId != null && episodeId != null) {
+          unawaited(
+            ref.read(libraryCatalogProvider.notifier).updateEpisodeLocalMedia(
+                  courseId: courseId,
+                  episodeId: episodeId,
+                  videoAsset: resolved.uri,
+                  videoMissing: false,
+                ),
+          );
         }
       }
       return resolved;
@@ -3532,7 +3543,11 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
   Widget build(BuildContext context) {
     if (_isFullscreenOpen) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _isFullscreenOpen) _fullscreenStudyRevision.value++;
+        if (!mounted || !_isFullscreenOpen) {
+          return;
+        }
+        _fullscreenStudyRevision.value++;
+        _fullscreenVideoRevision.value++;
       });
     }
     final ThemeMode themeMode = ref.watch(themeLogicProvider).themeMode;
@@ -3585,9 +3600,12 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
         (_videoAsset?.isNotEmpty ?? false) && !_usingAiSubtitles;
     final bool landscapeFirst = widget.autoOpenFullscreen ||
         prefersNetdiskLandscapePlayback(course);
+    // Wait until video is ready (or failed) so landscape does not open on a
+    // frozen videoReady=false black surface while audio already plays.
     if (landscapeFirst &&
         !_didAutoOpenFullscreen &&
-        !_isBootstrapping) {
+        !_isBootstrapping &&
+        (_videoReady || (_videoErrorText != null && !_videoLoading))) {
       _didAutoOpenFullscreen = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!mounted) {
@@ -6151,9 +6169,37 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     });
   }
 
+  void _prefetchNextNetdiskEpisode() {
+    final PlayerCourseLookupResult res = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    final LibraryCourseData? course = res.course;
+    final LibraryEpisodeItem? episode = res.episode;
+    if (course == null ||
+        episode == null ||
+        !isNetdiskCourse(course) ||
+        course.episodes.length < 2) {
+      return;
+    }
+    final int index = course.episodes.indexWhere(
+      (LibraryEpisodeItem e) => e.id == episode.id,
+    );
+    if (index < 0 || index + 1 >= course.episodes.length) {
+      return;
+    }
+    final LibraryEpisodeItem next = course.episodes[index + 1];
+    final String? playUrl = next.videoAsset?.trim().isNotEmpty == true
+        ? next.videoAsset
+        : next.sourceUrl;
+    if (isUsableLocalVideoPath(playUrl)) {
+      return;
+    }
+    prefetchNetdiskPlayUrl(playUrl);
+  }
+
   Future<void> _handleOpenFullscreen(List<LibraryEpisodeItem> episodes) async {
     if (_isFullscreenOpen) return;
-    final Widget? fullscreenVideoSurface = _buildVideoSurface();
     final bool highlightWords = ref
         .read(learningSettingsProvider)
         .highlightWords;
@@ -6186,86 +6232,92 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     try {
       nextEpisodeId = await Navigator.of(context).push<String>(
         MaterialPageRoute<String>(
-          builder: (BuildContext context) => PlayerFullscreenVideoScreen(
-            playerState: state,
-            studyPanelBuilder: (_) => _buildFullscreenStudyPanel(
-              courseContext,
-              savedVocabularyWords,
-              learnedVocabularyWords,
-              keyVocabularyWords,
-              chunkHighlighter,
-            ),
-            highlightWords: highlightWords,
-            subtitleLetterCase: ref
-                .read(learningSettingsProvider)
-                .subtitleLetterCase,
-            subtitleWordHighlightStyle: subtitleWordHighlightStyle,
-            subtitleWordHighlightBorderWidth: subtitleWordHighlightBorderWidth,
-            savedVocabularyWords: savedVocabularyWords,
-            learnedVocabularyWords: learnedVocabularyWords,
-            keyVocabularyWords: keyVocabularyWords,
-            chunkHighlighter: chunkHighlighter,
-            isMuted: _isMuted,
-            volumeLevel: _volumeLevel,
-            onTogglePlaying: _handleTogglePlaying,
-            onPreviousLine: _handlePreviousLine,
-            onReplayLine: _handleReplayLine,
-            onNextLine: _handleNextLine,
-            onSeekBackward: () => _handleSeekBySeconds(-10),
-            onSeekForward: () => _handleSeekBySeconds(10),
-            onSelectLine: _goToLine,
-            onSeek: _handleSeek,
-            onSpeedSelected: _handleSpeedSelected,
-            onSelectSubtitleMode: _handleSetSubtitleMode,
-            onSelectSubtitleLetterCase: _usingAiSubtitles
-                ? ref
-                      .read(learningSettingsProvider.notifier)
-                      .setSubtitleLetterCase
-                : null,
-            embeddedSubtitleTracks: _embeddedSubtitleTracks,
-            selectedEmbeddedSubtitleId: _selectedEmbeddedSubtitleId,
-            onSelectEmbeddedSubtitle: _handleSelectEmbeddedSubtitle,
-            onToggleShadowing: _handleToggleShadowing,
-            onToggleLoop: _handleToggleLoop,
-            onToggleMuted: _handleToggleMuted,
-            onVolumeChanged: _handleVolumeChanged,
-            onSubtitleLookupOpen: _stopVideo,
-            onCollectWord: (String word) =>
-                _handleCollectWord(word, courseContext),
-            onCollectWordAtTime: (String word, String time) =>
-                _handleCollectWord(word, courseContext, time),
-            onFavoriteWord: _handleFavoriteWord,
-            onBookmarkLine: (int index) =>
-                _handleBookmarkLine(index, courseContext),
-            isLineBookmarked: _isLineBookmarked,
-            onLoopFromLine: _handleLoopFromLine,
-            onDictationLine: _handleDictationLine,
-            onAiExplain: _handleAiExplain,
-            onRegenerateAiLine: _usingAiSubtitles
-                ? _handleRegenerateAiLine
-                : null,
-            onEditEnglishLine: _editEnglishLine,
-            onEditSubtitleLine: _editSubtitleLine,
-            onResegment: _resegmentSubtitleLines,
-            onEditLineNote: _editLineNote,
-            lineNotesByStartMs: _lineNotesByStartMs,
-            fontScale: ref.read(learningSettingsProvider).fontScale,
-            fontSize: ref.read(learningSettingsProvider).fontSize,
-            onSelectFontSize: ref
-                .read(learningSettingsProvider.notifier)
-                .setFontSize,
-            episodes: episodes,
-            activeEpisodeId: widget.episodeId,
-            videoSource: _videoAsset,
-            onAssessTarget: _openPronunciationAssessment,
-            onExit: () => Navigator.of(context).maybePop(),
-            videoSurface: fullscreenVideoSurface,
-            videoAspectRatio: _videoAspectRatio,
-            videoReady: _videoReady,
-            videoLoading: _videoLoading,
-            videoDuration: _videoDuration,
-            videoErrorText: _videoErrorText,
-            paintSubtitlesOnVideo: false,
+          builder: (BuildContext context) => ValueListenableBuilder<int>(
+            valueListenable: _fullscreenVideoRevision,
+            builder: (BuildContext context, int _, Widget? child) {
+              return PlayerFullscreenVideoScreen(
+                playerState: state,
+                studyPanelBuilder: (_) => _buildFullscreenStudyPanel(
+                  courseContext,
+                  savedVocabularyWords,
+                  learnedVocabularyWords,
+                  keyVocabularyWords,
+                  chunkHighlighter,
+                ),
+                highlightWords: highlightWords,
+                subtitleLetterCase: ref
+                    .read(learningSettingsProvider)
+                    .subtitleLetterCase,
+                subtitleWordHighlightStyle: subtitleWordHighlightStyle,
+                subtitleWordHighlightBorderWidth:
+                    subtitleWordHighlightBorderWidth,
+                savedVocabularyWords: savedVocabularyWords,
+                learnedVocabularyWords: learnedVocabularyWords,
+                keyVocabularyWords: keyVocabularyWords,
+                chunkHighlighter: chunkHighlighter,
+                isMuted: _isMuted,
+                volumeLevel: _volumeLevel,
+                onTogglePlaying: _handleTogglePlaying,
+                onPreviousLine: _handlePreviousLine,
+                onReplayLine: _handleReplayLine,
+                onNextLine: _handleNextLine,
+                onSeekBackward: () => _handleSeekBySeconds(-10),
+                onSeekForward: () => _handleSeekBySeconds(10),
+                onSelectLine: _goToLine,
+                onSeek: _handleSeek,
+                onSpeedSelected: _handleSpeedSelected,
+                onSelectSubtitleMode: _handleSetSubtitleMode,
+                onSelectSubtitleLetterCase: _usingAiSubtitles
+                    ? ref
+                          .read(learningSettingsProvider.notifier)
+                          .setSubtitleLetterCase
+                    : null,
+                embeddedSubtitleTracks: _embeddedSubtitleTracks,
+                selectedEmbeddedSubtitleId: _selectedEmbeddedSubtitleId,
+                onSelectEmbeddedSubtitle: _handleSelectEmbeddedSubtitle,
+                onToggleShadowing: _handleToggleShadowing,
+                onToggleLoop: _handleToggleLoop,
+                onToggleMuted: _handleToggleMuted,
+                onVolumeChanged: _handleVolumeChanged,
+                onSubtitleLookupOpen: _stopVideo,
+                onCollectWord: (String word) =>
+                    _handleCollectWord(word, courseContext),
+                onCollectWordAtTime: (String word, String time) =>
+                    _handleCollectWord(word, courseContext, time),
+                onFavoriteWord: _handleFavoriteWord,
+                onBookmarkLine: (int index) =>
+                    _handleBookmarkLine(index, courseContext),
+                isLineBookmarked: _isLineBookmarked,
+                onLoopFromLine: _handleLoopFromLine,
+                onDictationLine: _handleDictationLine,
+                onAiExplain: _handleAiExplain,
+                onRegenerateAiLine: _usingAiSubtitles
+                    ? _handleRegenerateAiLine
+                    : null,
+                onEditEnglishLine: _editEnglishLine,
+                onEditSubtitleLine: _editSubtitleLine,
+                onResegment: _resegmentSubtitleLines,
+                onEditLineNote: _editLineNote,
+                lineNotesByStartMs: _lineNotesByStartMs,
+                fontScale: ref.read(learningSettingsProvider).fontScale,
+                fontSize: ref.read(learningSettingsProvider).fontSize,
+                onSelectFontSize: ref
+                    .read(learningSettingsProvider.notifier)
+                    .setFontSize,
+                episodes: episodes,
+                activeEpisodeId: widget.episodeId,
+                videoSource: _videoAsset,
+                onAssessTarget: _openPronunciationAssessment,
+                onExit: () => Navigator.of(context).maybePop(),
+                videoSurface: _buildVideoSurface(),
+                videoAspectRatio: _videoAspectRatio,
+                videoReady: _videoReady,
+                videoLoading: _videoLoading,
+                videoDuration: _videoDuration,
+                videoErrorText: _videoErrorText,
+                paintSubtitlesOnVideo: false,
+              );
+            },
           ),
         ),
       );
