@@ -269,6 +269,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   bool _podcastPausedForQuestion = false;
   int _podcastGeneration = 0;
   int _podcastIndex = 0;
+  int _podcastDisplayedThrough = -1;
   Duration _podcastOffset = Duration.zero;
   List<String> _podcastLines = const <String>[];
 
@@ -1228,6 +1229,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _podcastLines = const [];
       _podcastOffset = Duration.zero;
       _podcastIndex = 0;
+      _podcastDisplayedThrough = -1;
       _podcastSingleHost = single;
     }
     await _playArticlePodcast();
@@ -1266,13 +1268,26 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           ],
         ];
       }
-      if (_podcastIndex == _podcastLines.length) _podcastIndex = 0;
+      if (_podcastIndex == _podcastLines.length) {
+        _podcastIndex = 0;
+        _podcastDisplayedThrough = -1;
+      }
       setState(() => _status = '正在播放文章播客。按住麦克风可提问');
       while (mounted && generation == _podcastGeneration &&
           _podcastIndex < _podcastLines.length) {
         final text = _podcastLines[_podcastIndex];
         final host = _podcastIndex.isEven;
         final persona = settings.selectedDigitalHuman;
+        if (_podcastIndex > _podcastDisplayedThrough) {
+          setState(() {
+            _bubbles.add(_ChatBubble(
+              role: 'coach',
+              text: '${_podcastSingleHost ? persona.displayName : (host ? '主持人' : '嘉宾')} · $text',
+            ));
+            _podcastDisplayedThrough = _podcastIndex;
+          });
+          _scrollChatToEnd();
+        }
         final result = await _pipelineClient.synthesizeSpeechWithProvider(
           rawBaseUrl: settings.oralCoachPipelineUrl,
           text: text,
@@ -1291,14 +1306,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         if (!mounted || generation != _podcastGeneration) return;
         if (!played) throw StateError('播客音频暂不可用');
         setState(() {
-          _bubbles.add(_ChatBubble(
-            role: 'coach',
-            text: '${_podcastSingleHost ? persona.displayName : (host ? '主持人' : '嘉宾')} · $text',
-          ));
           _podcastIndex++;
           _podcastOffset = Duration.zero;
         });
-        _scrollChatToEnd();
       }
       if (mounted && generation == _podcastGeneration) {
         setState(() => _status = '本段播客已播完');
