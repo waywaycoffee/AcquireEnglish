@@ -4261,6 +4261,50 @@ class AcquireApiClient {
         .toList(growable: false);
   }
 
+  Future<List<HotTodayItemDto>> communityHotToday({
+    String contentType = 'all',
+    String? day,
+    int limit = 30,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.communityHotToday,
+      queryParameters: <String, dynamic>{
+        'content_type': contentType,
+        if (day != null && day.isNotEmpty) 'day': day,
+        'limit': limit.clamp(1, 80),
+      },
+      options: _noCache,
+    );
+    return (response.data as List<dynamic>)
+        .cast<Map<String, dynamic>>()
+        .map(HotTodayItemDto.fromJson)
+        .toList(growable: false);
+  }
+
+  Future<void> reportCommunityContentEngage({
+    required String day,
+    required String contentType,
+    required String contentKey,
+    String title = '',
+    String coverUrl = '',
+    String openUrl = '',
+    String source = 'import',
+  }) async {
+    await _dio.post(
+      Endpoints.communityContentEngage,
+      data: <String, dynamic>{
+        'day': day,
+        'content_type': contentType,
+        'content_key': contentKey,
+        if (title.trim().isNotEmpty) 'title': title.trim(),
+        if (coverUrl.trim().isNotEmpty) 'cover_url': coverUrl.trim(),
+        if (openUrl.trim().isNotEmpty) 'open_url': openUrl.trim(),
+        'source': source,
+      },
+      options: _noCache,
+    );
+  }
+
   Future<CommunityProfileDto> getCommunityProfile() async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.communityMe,

@@ -22,6 +22,7 @@ from app.followed_creators import parse_followed_creators
 from app.models import (
     ChallengePostStat,
     CommunityComment,
+    CommunityContentEngage,
     CommunityMaterialPack,
     CommunityPost,
     CommunityPostLike,
@@ -448,6 +449,28 @@ class HotShareOut(BaseModel):
     link_cover: str | None = None
     share_count: int
     latest_body: str | None = None
+
+
+class ContentEngageIn(BaseModel):
+    day: str = Field(min_length=10, max_length=10)
+    content_type: Literal["video", "book"] = "video"
+    content_key: str = Field(min_length=1, max_length=256)
+    title: str = Field(default="", max_length=300)
+    cover_url: str = Field(default="", max_length=1024)
+    open_url: str = Field(default="", max_length=1024)
+    source: str = Field(default="import", max_length=32)
+
+
+class HotTodayItemOut(BaseModel):
+    rank: int
+    content_type: str
+    content_key: str
+    title: str
+    cover_url: str = ""
+    open_url: str = ""
+    source: str = "import"
+    learner_count: int
+    sample_learners: list[str] = Field(default_factory=list)
 
 
 class HotCreatorOut(BaseModel):
@@ -1255,6 +1278,130 @@ async def hot_shares(
         buckets.values(), key=lambda b: int(b["share_count"]), reverse=True
     )[:limit]
     return [HotShareOut(**row) for row in ranked]
+
+
+@router.post("/content-engage")
+async def report_content_engage(
+    payload: ContentEngageIn,
+    db: AsyncSession = Depends(get_db),
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    if not _DAY_RE.match(payload.day):
+        raise HTTPException(status_code=400, detail="day must be YYYY-MM-DD")
+    key = payload.content_key.strip()[:256]
+    if not key:
+        raise HTTPException(status_code=400, detail="content_key required")
+    title = (payload.title or "").strip()[:300]
+    cover = (payload.cover_url or "").strip()[:1024]
+    open_url = (payload.open_url or "").strip()[:1024]
+    source = (payload.source or "import").strip()[:32] or "import"
+    row = (
+        await db.execute(
+            select(CommunityContentEngage).where(
+                CommunityContentEngage.user_id == user.id,
+                CommunityContentEngage.day == payload.day,
+                CommunityContentEngage.content_key == key,
+            )
+        )
+    ).scalar_one_or_none()
+    if row is None:
+        row = CommunityContentEngage(
+            user_id=user.id,
+            day=payload.day,
+            content_type=payload.content_type,
+            content_key=key,
+            title=title,
+            cover_url=cover,
+            open_url=open_url,
+            source=source,
+        )
+        db.add(row)
+    else:
+        row.content_type = payload.content_type
+        if title:
+            row.title = title
+        if cover:
+            row.cover_url = cover
+        if open_url:
+            row.open_url = open_url
+        if source:
+            row.source = source
+    await db.commit()
+    return {"ok": True, "content_key": key}
+
+
+@router.get("/hot-today", response_model=list[HotTodayItemOut])
+async def hot_today(
+    content_type: Literal["video", "book", "all"] = "all",
+    day: str | None = Query(default=None),
+    limit: int = Query(default=30, ge=1, le=80),
+    db: AsyncSession = Depends(get_db),
+    user: User | None = Depends(get_current_user_optional),
+) -> list[HotTodayItemOut]:
+    _ = user
+    target_day = day if day and _DAY_RE.match(day) else date.today().isoformat()
+    stmt = select(CommunityContentEngage).where(
+        CommunityContentEngage.day == target_day
+    )
+    if content_type in ("video", "book"):
+        stmt = stmt.where(CommunityContentEngage.content_type == content_type)
+    rows = list((await db.execute(stmt)).scalars().all())
+    buckets: dict[str, dict[str, Any]] = {}
+    learner_names: dict[str, list[str]] = defaultdict(list)
+    user_ids = {r.user_id for r in rows}
+    users = {
+        u.id: u
+        for u in (
+            await db.execute(select(User).where(User.id.in_(user_ids or {-1})))
+        )
+        .scalars()
+        .all()
+    }
+    for row in rows:
+        key = row.content_key
+        bucket = buckets.get(key)
+        if bucket is None:
+            buckets[key] = {
+                "content_type": row.content_type,
+                "content_key": key,
+                "title": row.title or key,
+                "cover_url": row.cover_url or "",
+                "open_url": row.open_url or "",
+                "source": row.source or "import",
+                "learner_ids": {row.user_id},
+            }
+        else:
+            bucket["learner_ids"].add(row.user_id)
+            if not bucket.get("title") and row.title:
+                bucket["title"] = row.title
+            if not bucket.get("cover_url") and row.cover_url:
+                bucket["cover_url"] = row.cover_url
+            if not bucket.get("open_url") and row.open_url:
+                bucket["open_url"] = row.open_url
+        name = _public_name(users[row.user_id]) if row.user_id in users else ""
+        if name and name not in learner_names[key] and len(learner_names[key]) < 3:
+            learner_names[key].append(name)
+    ranked = sorted(
+        buckets.values(),
+        key=lambda b: len(b["learner_ids"]),
+        reverse=True,
+    )[:limit]
+    out: list[HotTodayItemOut] = []
+    for idx, bucket in enumerate(ranked, start=1):
+        out.append(
+            HotTodayItemOut(
+                rank=idx,
+                content_type=str(bucket["content_type"]),
+                content_key=str(bucket["content_key"]),
+                title=str(bucket["title"]),
+                cover_url=str(bucket.get("cover_url") or ""),
+                open_url=str(bucket.get("open_url") or ""),
+                source=str(bucket.get("source") or "import"),
+                learner_count=len(bucket["learner_ids"]),
+                sample_learners=learner_names.get(str(bucket["content_key"]), []),
+            )
+        )
+    return out
 
 
 @router.get("/hot-creators", response_model=list[HotCreatorOut])

@@ -54,6 +54,8 @@ class Endpoints {
   static const String communitySimilarUsers = 'api/community/similar-users';
   static const String communityHotShares = 'api/community/hot-shares';
   static const String communityHotCreators = 'api/community/hot-creators';
+  static const String communityHotToday = 'api/community/hot-today';
+  static const String communityContentEngage = 'api/community/content-engage';
   static const String communityMe = 'api/community/me';
   static const String communityPk = 'api/community/pk';
   static const String communityPkMine = 'api/community/pk/mine';

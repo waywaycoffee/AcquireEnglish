@@ -6,8 +6,10 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../daily_path/presentation/today_path_provider.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/schedule_device_cloud_sync.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../domain/reading_doc.dart';
@@ -314,6 +316,7 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
     ref
         .read(learningActivityProvider.notifier)
         .recordArticleRead(articleKey: docId);
+    unawaited(_reportReadingEngage(docId));
     // Daily reading task: opening / any progress is enough (no need to finish).
     try {
       await ref.read(todayPathProvider.notifier).markDone('reading-continue');
@@ -348,7 +351,24 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
     ref
         .read(learningActivityProvider.notifier)
         .recordArticleRead(articleKey: docId);
+    unawaited(_reportReadingEngage(docId));
     await _persistProgress();
+  }
+
+  Future<void> _reportReadingEngage(String docId) async {
+    if (!ref.read(authSessionProvider).isLoggedIn) return;
+    final ReadingDoc? doc = state.docById(docId);
+    try {
+      await ref.read(acquireApiClientProvider).reportCommunityContentEngage(
+            day: DateTime.now().toIso8601String().substring(0, 10),
+            contentType: 'book',
+            contentKey: docId,
+            title: doc?.title ?? docId,
+            coverUrl: doc?.coverUrl ?? '',
+            openUrl: '',
+            source: 'reading',
+          );
+    } catch (_) {}
   }
 
   /// Apply merged cloud user docs + progress (builtin list unchanged).

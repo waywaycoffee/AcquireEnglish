@@ -1066,6 +1066,29 @@ class PadPortraitPlayerScreenState
           ref
               .read(learningActivityProvider.notifier)
               .recordVideoWatched(videoKey: videoKey);
+          final AuthSessionState auth = ref.read(authSessionProvider);
+          if (auth.isLoggedIn) {
+            final LibraryEpisodeItem? ep = resource.episode;
+            final String? sourceUrl = ep?.sourceUrl;
+            final bool isBili = sourceUrl != null &&
+                (sourceUrl.contains('bilibili.com') ||
+                    sourceUrl.contains('b23.tv'));
+            unawaited(() async {
+              try {
+                await ref.read(acquireApiClientProvider).reportCommunityContentEngage(
+                      day: DateTime.now().toIso8601String().substring(0, 10),
+                      contentType: 'video',
+                      contentKey: videoKey,
+                      title: ep?.title ?? resource.course?.title ?? videoKey,
+                      coverUrl: ep?.coverImage ??
+                          resource.course?.coverImage ??
+                          '',
+                      openUrl: sourceUrl ?? '',
+                      source: isBili ? 'bilibili' : 'import',
+                    );
+              } catch (_) {}
+            }());
+          }
         }
         if (widget.videoPlanActivity == 'coach') {
           if (state.lines.any((line) => line.english.trim().isNotEmpty)) {
@@ -3573,8 +3596,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                             }
                             if (tab == StudyModeTab.subtitles) {
                               _studyPlanStep = StudyPlanStep.intensive;
-                            } else if (tab == StudyModeTab.dictation ||
-                                tab == StudyModeTab.practice) {
+                            } else if (tab == StudyModeTab.dictation) {
+                              _studyPlanStep = StudyPlanStep.output;
+                              _studyPlanDone.add(StudyPlanStep.intensive);
+                            } else if (tab == StudyModeTab.practice) {
                               _studyPlanStep = StudyPlanStep.output;
                               _studyPlanDone.add(StudyPlanStep.intensive);
                             } else if (tab == StudyModeTab.wordCards) {

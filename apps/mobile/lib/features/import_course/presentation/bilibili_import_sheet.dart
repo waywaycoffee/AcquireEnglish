@@ -169,6 +169,41 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
             sourceOrigin: 'official',
           ),
         );
+        // B站资源自动共享到社区，他人可直接点开。
+        unawaited(() async {
+          try {
+            final AcquireApiClient api = ref.read(acquireApiClientProvider);
+            await api.createCommunityPost(
+              kind: 'share_bilibili',
+              title: importedEpisode.title.trim().isEmpty
+                  ? course.title
+                  : importedEpisode.title,
+              body: 'B站学习资源 · 自动共享',
+              linkUrl: meta.watchUrl,
+              linkTitle: importedEpisode.title.trim().isEmpty
+                  ? course.title
+                  : importedEpisode.title,
+              linkCover: importedEpisode.coverImage.isNotEmpty
+                  ? importedEpisode.coverImage
+                  : course.coverImage,
+            );
+            final String day =
+                DateTime.now().toIso8601String().substring(0, 10);
+            await api.reportCommunityContentEngage(
+              day: day,
+              contentType: 'video',
+              contentKey: 'bilibili:${meta.idKey}',
+              title: importedEpisode.title.trim().isEmpty
+                  ? course.title
+                  : importedEpisode.title,
+              coverUrl: importedEpisode.coverImage.isNotEmpty
+                  ? importedEpisode.coverImage
+                  : course.coverImage,
+              openUrl: meta.watchUrl,
+              source: 'bilibili',
+            );
+          } catch (_) {}
+        }());
       }
       // 试看/点推荐：只下载当前这一集。整部合集请点视频列表旁的下载按钮。
       final String hint = bilibiliImportSuccessHint(meta);

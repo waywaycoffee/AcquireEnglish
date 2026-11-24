@@ -283,3 +283,39 @@ class CommunityHotNotifier extends AsyncNotifier<CommunityHotBundle> {
     state = await AsyncValue.guard(build);
   }
 }
+
+class CommunityPopularBundle {
+  const CommunityPopularBundle({
+    required this.videos,
+    required this.books,
+  });
+
+  final List<HotTodayItemDto> videos;
+  final List<HotTodayItemDto> books;
+}
+
+final AsyncNotifierProvider<CommunityPopularNotifier, CommunityPopularBundle>
+communityPopularProvider =
+    AsyncNotifierProvider<CommunityPopularNotifier, CommunityPopularBundle>(
+      CommunityPopularNotifier.new,
+    );
+
+class CommunityPopularNotifier extends AsyncNotifier<CommunityPopularBundle> {
+  @override
+  Future<CommunityPopularBundle> build() async {
+    ref.watch(authSessionProvider.select((AuthSessionState s) => s.isLoggedIn));
+    final AcquireApiClient api = ref.read(acquireApiClientProvider);
+    final List<List<HotTodayItemDto>> parts = await Future.wait(
+      <Future<List<HotTodayItemDto>>>[
+        api.communityHotToday(contentType: 'video', limit: 40),
+        api.communityHotToday(contentType: 'book', limit: 40),
+      ],
+    );
+    return CommunityPopularBundle(videos: parts[0], books: parts[1]);
+  }
+
+  Future<void> refresh() async {
+    state = const AsyncLoading<CommunityPopularBundle>();
+    state = await AsyncValue.guard(build);
+  }
+}

@@ -247,6 +247,50 @@ class HotShareDto {
   final String? latestBody;
 }
 
+class HotTodayItemDto {
+  const HotTodayItemDto({
+    required this.rank,
+    required this.contentType,
+    required this.contentKey,
+    required this.title,
+    required this.learnerCount,
+    this.coverUrl = '',
+    this.openUrl = '',
+    this.source = 'import',
+    this.sampleLearners = const <String>[],
+  });
+
+  factory HotTodayItemDto.fromJson(Map<String, dynamic> json) =>
+      HotTodayItemDto(
+        rank: (json['rank'] as num?)?.toInt() ?? 0,
+        contentType: (json['content_type'] as String?) ?? 'video',
+        contentKey: (json['content_key'] as String?) ?? '',
+        title: (json['title'] as String?) ?? '',
+        coverUrl: (json['cover_url'] as String?) ?? '',
+        openUrl: (json['open_url'] as String?) ?? '',
+        source: (json['source'] as String?) ?? 'import',
+        learnerCount: (json['learner_count'] as num?)?.toInt() ?? 0,
+        sampleLearners:
+            ((json['sample_learners'] as List<dynamic>?) ?? <dynamic>[])
+                .map((dynamic e) => e.toString())
+                .where((String s) => s.isNotEmpty)
+                .toList(growable: false),
+      );
+
+  final int rank;
+  final String contentType;
+  final String contentKey;
+  final String title;
+  final String coverUrl;
+  final String openUrl;
+  final String source;
+  final int learnerCount;
+  final List<String> sampleLearners;
+
+  bool get isVideo => contentType == 'video';
+  bool get isBook => contentType == 'book';
+}
+
 class HotCreatorDto {
   const HotCreatorDto({
     required this.source,

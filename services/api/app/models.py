@@ -556,6 +556,39 @@ class CommunityPostLike(Base):
     )
 
 
+class CommunityContentEngage(Base):
+    """One row per user/day/content — powers community 「热门」 rankings."""
+
+    __tablename__ = "community_content_engages"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id",
+            "day",
+            "content_key",
+            name="uq_content_engage_user_day_key",
+        ),
+        Index("idx_content_engage_day_type", "day", "content_type"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    # YYYY-MM-DD (client local calendar day).
+    day: Mapped[str] = mapped_column(String(10), index=True)
+    # video | book
+    content_type: Mapped[str] = mapped_column(String(16), index=True)
+    content_key: Mapped[str] = mapped_column(String(256), index=True)
+    title: Mapped[str] = mapped_column(String(300), default="")
+    cover_url: Mapped[str] = mapped_column(String(1024), default="")
+    open_url: Mapped[str] = mapped_column(String(1024), default="")
+    # bilibili | import | netdisk | upload | reading
+    source: Mapped[str] = mapped_column(String(32), default="import")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
 class UserStudyStatsDaily(Base):
     """Per-user daily study seconds + vocab snapshot for leaderboards."""
 
