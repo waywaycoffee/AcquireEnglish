@@ -1,0 +1,36 @@
+---
+description: New Flutter UI must ship dark+light tokens; default match dark pages
+alwaysApply: true
+---
+
+# UI: dark + light, dark by default
+
+AcquireEnglish Flutter UI is **dark-first**. New screens, sheets, dialogs, and cards must support both themes via `AppDesignTokens` (and Material `Theme.of(context)`), never hardcode a light-only canvas.
+
+## Required
+
+1. **Both themes**: every new surface must look correct in dark and light (use `AppDesignTokens.appWhite` / `softWhite` / `textPrimary` / `textSecondary` / `borderGray` / soft status colors).
+2. **Default appearance**: match existing dark pages (`softWhite` canvas, `appWhite` cards). Do not ship a white modal onto a dark shell.
+3. **Sheets / dialogs**: `showModalBottomSheet` / `showDialog` must set `backgroundColor` to `AppDesignTokens.appWhite` (or `softWhite`), not `Colors.white`.
+4. **No orphan light UI**: never use `Colors.white`, `#FFF`, or light-only mint/danger chips without a dark branch.
+5. **Verify**: after adding a screen, mentally check dark mode first (status bar + sheet + text contrast), then light.
+
+## Bad vs good
+
+```dart
+// ❌ BAD — white sheet while app tokens are dark
+showModalBottomSheet(
+  backgroundColor: Colors.white,
+  builder: (_) => Text('网盘导入', style: TextStyle(color: AppDesignTokens.textPrimary)),
+);
+
+// ✅ GOOD
+showModalBottomSheet(
+  backgroundColor: AppDesignTokens.appWhite,
+  builder: (_) => Text('网盘导入', style: TextStyle(color: AppDesignTokens.textPrimary)),
+);
+```
+
+## Scope
+
+Applies to all new/changed UI under `apps/mobile/lib/**`. When fixing legacy white sheets found during a task, retoken them in the same change when touched.
