@@ -97,3 +97,9 @@ yarn.lock
 # Large Whisper weights (fetch via tools/download_whisper_models.sh)
 assets/whisper/*.bin
 assets/whisper/*.part
+
+# Release signing
+android/key.properties
+android/keystore/
+*.jks
+*.keystore

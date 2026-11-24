@@ -1,4 +1,4 @@
-﻿#include "Release.xcconfig"
+#include "Release.xcconfig"
 BUNDLE_ID = com.acquire.english.staging
 APP_DISPLAY_NAME = AcquireEnglish Staging
 APP_NAME = AcquireEnglishStaging

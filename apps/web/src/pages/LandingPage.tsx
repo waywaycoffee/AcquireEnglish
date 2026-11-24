@@ -136,11 +136,11 @@ export default function LandingPage() {
               再用数字人口语外教围绕字幕练习表达。适合想把「看得懂」变成「说得出」的学习者。
             </p>
             <div className="landing-cta">
-              <a className="btn" href="#shots">
-                查看应用界面
+              <a className="btn" href="/download.html">
+                下载内测安装包
               </a>
-              <a className="btn ghost" href="#info">
-                应用详情
+              <a className="btn ghost" href="#shots">
+                查看应用界面
               </a>
             </div>
           </div>
@@ -231,7 +231,10 @@ export default function LandingPage() {
             </div>
             <div>
               <dt>上架状态</dt>
-              <dd>开发中 / 未上架应用市场（可通过官网了解产品详情）</dd>
+              <dd>
+                内测中（未上架应用市场）·{" "}
+                <a href="/download.html">下载 Android / iOS 安装包</a>
+              </dd>
             </div>
             <div>
               <dt>官网</dt>

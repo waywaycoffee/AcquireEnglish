@@ -1,4 +1,4 @@
-﻿#include "Debug.xcconfig"
+#include "Debug.xcconfig"
 BUNDLE_ID = com.acquire.english
 APP_DISPLAY_NAME = AcquireEnglish
 APP_NAME = AcquireEnglish
