@@ -494,12 +494,17 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
     }
     if (!mounted) return;
 
-    final OralCoachDraftResult draft = await _pipeline.createDraft(
+    final DigitalHumanPersona persona = settings.selectedDigitalHuman;
+    final OralCoachTurnResult turn = await _pipeline.turn(
       session: session,
       audioPath: audioPath,
+      digitalHumanId: persona.id,
+      ttsVoice: readingCoachVoiceForPersona(persona),
+      replyLanguage: 'zh',
+      textOnly: true,
     );
     if (!mounted) return;
-    final String confirmed = draft.transcript.trim();
+    final String confirmed = turn.transcript.trim();
     if (confirmed.isEmpty) {
       setState(() {
         _busy = false;
@@ -507,10 +512,9 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
       });
       return;
     }
-    await _confirmAndReply(
+    await _applyTurnReply(
       settings: settings,
-      session: session,
-      draftId: draft.draftId,
+      turn: turn,
       confirmed: confirmed,
     );
   }
@@ -628,6 +632,30 @@ class _ReadingCoachAskSheetState extends ConsumerState<ReadingCoachAskSheet> {
       textOnly: true,
     );
     if (!mounted) return;
+    await _applyTurnReply(
+      settings: settings,
+      turn: turn,
+      confirmed: confirmed,
+      showUserMessage: false, // already appended above when needed
+      alreadyShowedUser: showUserMessage,
+    );
+  }
+
+  Future<void> _applyTurnReply({
+    required LearningSettingsState settings,
+    required OralCoachTurnResult turn,
+    required String confirmed,
+    bool showUserMessage = true,
+    bool alreadyShowedUser = false,
+  }) async {
+    if (showUserMessage && !alreadyShowedUser) {
+      setState(() {
+        _bubbles.add(_ChatBubble(role: 'user', text: confirmed));
+        _busy = true;
+        _status = '外教思考中…';
+      });
+      _scrollToEnd();
+    }
     final String reply = turn.coachText.trim().isNotEmpty
         ? turn.coachText.trim()
         : turn.avatarText.trim();

@@ -269,10 +269,17 @@ class OralCoachPipelineClient {
     return OralCoachTurnResult.fromJson(_asMap(response.data), session.baseUrl);
   }
 
+  /// One-shot ASR + LLM (optional TTS). Prefer over [createDraft]+[confirmDraft]
+  /// for hold-to-talk free chat — saves one phone↔ECS round trip.
   Future<OralCoachTurnResult> turn({
     required OralCoachSession session,
     required String audioPath,
     String? referenceText,
+    String? confirmedText,
+    String? digitalHumanId,
+    String? ttsVoice,
+    String? replyLanguage,
+    bool textOnly = true,
   }) async {
     final File file = File(audioPath);
     if (!file.existsSync()) {
@@ -284,6 +291,14 @@ class OralCoachPipelineClient {
     final FormData form = FormData.fromMap(<String, dynamic>{
       if ((referenceText ?? '').trim().isNotEmpty)
         'reference_text': referenceText!.trim(),
+      if ((confirmedText ?? '').trim().isNotEmpty)
+        'confirmed_text': confirmedText!.trim(),
+      if ((digitalHumanId ?? '').trim().isNotEmpty)
+        'digital_human_id': digitalHumanId!.trim(),
+      if ((ttsVoice ?? '').trim().isNotEmpty) 'tts_voice': ttsVoice!.trim(),
+      if ((replyLanguage ?? '').trim().isNotEmpty)
+        'reply_language': replyLanguage!.trim(),
+      'text_only': textOnly ? 'true' : 'false',
       'file': await MultipartFile.fromFile(audioPath, filename: name),
     });
     final Response<dynamic> response = await _dio.post<dynamic>(

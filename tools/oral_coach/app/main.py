@@ -388,9 +388,14 @@ async def turn(
     file: UploadFile = File(...),
     reference_text: str | None = Form(default=None),
     confirmed_text: str | None = Form(default=None),
+    digital_human_id: str | None = Form(default=None),
+    tts_voice: str | None = Form(default=None),
+    reply_language: str | None = Form(default=None),
+    text_only: str | None = Form(default='true'),
 ) -> dict[str, Any]:
-    """One-shot turn (auto-confirm). Prefer /draft + /confirm."""
+    """One-shot ASR + LLM (optional TTS) — fewer phone↔ECS round trips than draft+confirm."""
     session = _require_session(sid)
+    text_only_flag = str(text_only or 'true').strip().lower() in {'1', 'true', 'yes', 'on'}
     try:
         stored = await _store_upload(sid, file)
         result = await pipeline.run_turn(
@@ -399,6 +404,10 @@ async def turn(
             reference_override=reference_text,
             confirmed_text=confirmed_text,
             skip_confirm=True,
+            digital_human_id=digital_human_id,
+            tts_voice=tts_voice,
+            reply_language=reply_language,
+            text_only=text_only_flag,
         )
         return _turn_payload(result)
     except HTTPException:

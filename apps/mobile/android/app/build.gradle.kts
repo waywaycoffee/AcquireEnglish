@@ -42,6 +42,18 @@ android {
     }
 
     signingConfigs {
+        // Shared team debug keystore (this Mac is the source of truth).
+        // Other machines: copy android/keystore/team-debug.keystore from this PC
+        // (file is gitignored). Fallback: local ~/.android/debug.keystore.
+        getByName("debug") {
+            val teamDebug = rootProject.file("keystore/team-debug.keystore")
+            if (teamDebug.isFile) {
+                storeFile = teamDebug
+                storePassword = "android"
+                keyAlias = "androiddebugkey"
+                keyPassword = "android"
+            }
+        }
         create("release") {
             if (keystorePropertiesFile.exists()) {
                 keyAlias = keystoreProperties["keyAlias"] as String

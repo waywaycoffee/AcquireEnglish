@@ -2284,30 +2284,26 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _clearBusy('点麦克风继续说');
       return;
     }
-    // Free talk: no subtitle-line reference — coach discusses the theme.
-    final OralCoachDraftResult draft = await _pipelineClient.createDraft(
-      session: session,
-      audioPath: audioPath,
-    );
-    if (!mounted || !identical(_session, session)) {
-      _clearBusy('点麦克风继续说');
-      return;
-    }
-    final String confirmed = draft.transcript.trim();
-    if (!mounted || !_started || !identical(_session, session)) {
-      _clearBusy('点麦克风继续说');
-      return;
-    }
-    if (confirmed.isEmpty || confirmed == '(empty)') {
-      setState(() {
-        _busy = false;
-        _status = '点麦克风重新录音';
-      });
-      return;
-    }
 
     final OralExpressionDiagnosis? pending = _pendingResay;
     if (pending != null) {
+      // Resay path still needs draft text before rewriting the confirm prompt.
+      final OralCoachDraftResult draft = await _pipelineClient.createDraft(
+        session: session,
+        audioPath: audioPath,
+      );
+      if (!mounted || !identical(_session, session)) {
+        _clearBusy('点麦克风继续说');
+        return;
+      }
+      final String confirmed = draft.transcript.trim();
+      if (confirmed.isEmpty || confirmed == '(empty)') {
+        setState(() {
+          _busy = false;
+          _status = '点麦克风重新录音';
+        });
+        return;
+      }
       await _completePendingResay(
         settings: settings,
         session: session,
@@ -2318,6 +2314,33 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       return;
     }
 
+    // One-shot /turn: ASR + LLM in a single phone↔ECS round trip.
+    setState(() {
+      _busy = true;
+      _status = '识别并思考中…';
+    });
+    final DigitalHumanPersona persona = settings.selectedDigitalHuman;
+    final OralCoachTurnResult turn = await _pipelineClient.turn(
+      session: session,
+      audioPath: audioPath,
+      digitalHumanId: persona.id,
+      ttsVoice: _coachVoice(persona),
+      replyLanguage: _preferChineseReply ? 'zh' : 'en',
+      textOnly: true,
+    );
+    if (!mounted || !identical(_session, session)) {
+      _clearBusy('点麦克风继续说');
+      return;
+    }
+    final String confirmed = turn.transcript.trim();
+    if (confirmed.isEmpty || confirmed == '(empty)') {
+      setState(() {
+        _busy = false;
+        _status = '点麦克风重新录音';
+      });
+      return;
+    }
+
     _updateReplyLanguageFromLearner(confirmed);
     setState(() {
       _busy = true;
@@ -2325,16 +2348,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       _bubbles.add(_ChatBubble(role: 'user', text: confirmed));
     });
     _scrollChatToEnd();
-    final DigitalHumanPersona persona = settings.selectedDigitalHuman;
-    final OralCoachTurnResult turn = await _pipelineClient.confirmDraft(
-      session: session,
-      draftId: draft.draftId,
-      confirmedText: confirmed,
-      digitalHumanId: persona.id,
-      ttsVoice: _coachVoice(persona),
-      replyLanguage: _preferChineseReply ? 'zh' : 'en',
-      textOnly: true,
-    );
     if (!mounted || !identical(_session, session)) return;
     widget.onConfirmedLearnerTurn?.call(confirmed);
     _encourageLearner();

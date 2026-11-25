@@ -264,11 +264,17 @@ class OralCoachPipeline:
             phonemes=list(pron_dict.get('phonemes') or []),
         )
         session.context.difficulty = session.difficulty
+        # Hot path: never block confirm/turn on another LLM call for topics.
+        # Prefer existing topics; otherwise fill heuristics synchronously.
         if not session.context.talk_topics:
             try:
-                await self.ensure_talk_topics(session, count=8)
+                from .providers.llm import heuristic_talk_topics
+
+                session.context.talk_topics = heuristic_talk_topics(
+                    session.context, count=8
+                )
             except Exception:
-                pass
+                session.context.talk_topics = []
         reply = await self.llm.coach_turn(
             context=session.context,
             learner_text=transcript,
@@ -362,11 +368,23 @@ class OralCoachPipeline:
         reference_override: str | None = None,
         confirmed_text: str | None = None,
         skip_confirm: bool = False,
+        digital_human_id: str | None = None,
+        tts_voice: str | None = None,
+        reply_language: str | None = None,
+        text_only: bool = True,
     ) -> TurnResult:
-        """Legacy one-shot turn. Prefer create_draft + confirm_draft."""
+        """One-shot ASR + LLM (optional TTS). Prefer this over draft+confirm RTTs."""
         del skip_confirm  # kept for API compatibility with older clients
         draft = await self.create_draft(
             session, audio_path, reference_override=reference_override
         )
         text = confirmed_text if confirmed_text is not None else draft.transcript
-        return await self.confirm_draft(session, draft.draft_id, confirmed_text=text)
+        return await self.confirm_draft(
+            session,
+            draft.draft_id,
+            confirmed_text=text,
+            digital_human_id=digital_human_id,
+            tts_voice=tts_voice,
+            reply_language=reply_language,
+            text_only=text_only,
+        )
