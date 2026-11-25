@@ -145,6 +145,43 @@ h3 { margin: 0 0 10px; font-size: 15px; }
   gap: 12px;
 }
 .search { display: grid; grid-template-columns: 1fr auto; gap: 8px; }
+.usage-toolbar {
+  display: grid;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+.usage-filter {
+  grid-template-columns: auto 1fr auto;
+  align-items: end;
+}
+.usage-filter label {
+  display: grid;
+  gap: 6px;
+  font-size: 12px;
+}
+.usage-filter input[type="date"] {
+  min-width: 160px;
+  padding: 8px 10px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: var(--card);
+  color: var(--text);
+}
+.usage-presets {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+.usage-day-row {
+  cursor: pointer;
+}
+.usage-day-row:hover {
+  background: var(--accent-soft);
+}
+@media (max-width: 900px) {
+  .usage-filter { grid-template-columns: 1fr; }
+}
 .users-hint {
   margin: 0;
   padding: 0 16px 12px;

@@ -65,6 +65,31 @@
   const examAssetsState = { status: "pending" };
   const commerceState = { status: "", kind: "", offset: 0, limit: 40 };
   const communityState = { offset: 0, limit: 40, total: 0, q: "", status: "" };
+  const usageState = { days: 30, day: "" };
+
+  function chinaTodayYmd() {
+    // Admin ops day follows Asia/Shanghai, independent of browser TZ.
+    return new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Asia/Shanghai",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+  }
+
+  function usageQuery() {
+    if (usageState.day) {
+      return `day=${encodeURIComponent(usageState.day)}`;
+    }
+    return `days=${encodeURIComponent(String(usageState.days || 30))}`;
+  }
+
+  function usageWindowLabel() {
+    if (usageState.day) {
+      return `单日 ${usageState.day}（上海时区）`;
+    }
+    return `近 ${usageState.days || 30} 天（上海时区）`;
+  }
 
   async function api(path, options = {}) {
     const headers = Object.assign(
@@ -1163,9 +1188,10 @@
   }
 
   async function loadUsage() {
+    const q = usageQuery();
     const [summary, pnl, platform] = await Promise.all([
-      api("/usage/summary?days=30"),
-      api("/usage/pnl?days=30"),
+      api(`/usage/summary?${q}`),
+      api(`/usage/pnl?${q}`),
       api("/usage/platform").catch((e) => ({ ok: false, error: e.message, keys: [] })),
     ]);
     const platSum = (platform && platform.summary) || {};
@@ -1177,9 +1203,27 @@
     const labelsZh = (platform && platform.module_labels_zh) || {};
     const sfm = ((aliyun.products || {}).sfm || {});
     const gpuLedger = (summary && summary.gpu) || {};
+    const byDay = summary.by_day || [];
+    const maxDayTokens = Math.max(1, ...byDay.map((d) => Number(d.tokens) || 0));
     const moduleLabel = (m) => labelsZh[m] || (m && m !== "unknown" ? m : "未标注模块");
     const el = $("panel-usage");
+    const dayValue = usageState.day || "";
     el.innerHTML = `
+      <div class="toolbar usage-toolbar">
+        <form id="usageFilterForm" class="search usage-filter">
+          <label class="muted">按天查询
+            <input id="usageDayInput" type="date" value="${escapeHtml(dayValue)}" />
+          </label>
+          <div class="usage-presets">
+            <button type="button" class="btn ghost usage-preset" data-day="today">今天</button>
+            <button type="button" class="btn ghost usage-preset" data-days="7">近7天</button>
+            <button type="button" class="btn ghost usage-preset" data-days="30">近30天</button>
+            <button type="button" class="btn ghost usage-preset" data-days="90">近90天</button>
+          </div>
+          <button type="submit" class="btn">查询</button>
+        </form>
+        <div class="note-box">当前窗口：${escapeHtml(usageWindowLabel())}</div>
+      </div>
       <div class="kpi-row">
         <div class="stat"><span class="muted">Token 总量</span><strong>${num(summary.tokens)}</strong></div>
         <div class="stat"><span class="muted">估算成本</span><strong>${money(summary.cost_cny)}</strong></div>
@@ -1377,8 +1421,37 @@
             gpu.note || gpuLedger.note || ""
           )}</div>
         </div>
+        <div class="dash-card full">
+          <h3>按天 Token 消耗（Asia/Shanghai）</h3>
+          <div class="table-wrap"><table>
+            <thead><tr><th>日期</th><th>事件</th><th>Tokens</th><th>成本 CNY</th><th>占比</th></tr></thead>
+            <tbody>
+              ${
+                byDay
+                  .slice()
+                  .reverse()
+                  .map((d) => {
+                    const tokens = Number(d.tokens) || 0;
+                    const pct = Math.round((tokens / maxDayTokens) * 100);
+                    return `<tr class="usage-day-row" data-day="${escapeHtml(d.day)}" tabindex="0">
+                      <td><strong>${escapeHtml(d.day)}</strong></td>
+                      <td>${num(d.events)}</td>
+                      <td>${num(tokens)}</td>
+                      <td>${money(d.cost_cny)}</td>
+                      <td><div class="bar-track"><div class="bar-fill" style="width:${pct}%"></div></div></td>
+                    </tr>`;
+                  })
+                  .join("") ||
+                `<tr><td colspan="5" class="muted">该时间窗口暂无用量</td></tr>`
+              }
+            </tbody>
+          </table></div>
+          <div class="note-box">点击某一天可切换到单日明细。当前合计 Tokens ${num(
+            summary.tokens
+          )} · 成本 ${money(summary.cost_cny)}</div>
+        </div>
         <div class="dash-card">
-          <h3>损益（30 日）</h3>
+          <h3>损益（${escapeHtml(usageWindowLabel())}）</h3>
           <div class="bars">
             <div class="bar-row"><span>收入</span><div class="bar-track"><div class="bar-fill" style="width:100%"></div></div><strong>${money(pnl.revenue_cny)}</strong></div>
             <div class="bar-row"><span>平台成本</span><div class="bar-track"><div class="bar-fill" style="width:${Math.min(
@@ -1468,6 +1541,44 @@
           <div class="note-box">${escapeHtml(summary.note || "")}</div>
         </div>
       </div>`;
+    const form = $("usageFilterForm");
+    if (form) {
+      form.addEventListener("submit", (ev) => {
+        ev.preventDefault();
+        const picked = ($("usageDayInput")?.value || "").trim();
+        usageState.day = picked;
+        if (picked) usageState.days = 1;
+        loadUsage().catch((e) => alert(e.message));
+      });
+    }
+    el.querySelectorAll(".usage-preset").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        if (btn.dataset.day === "today") {
+          usageState.day = chinaTodayYmd();
+          usageState.days = 1;
+        } else {
+          usageState.day = "";
+          usageState.days = Number(btn.dataset.days) || 30;
+        }
+        loadUsage().catch((e) => alert(e.message));
+      });
+    });
+    el.querySelectorAll(".usage-day-row").forEach((row) => {
+      const openDay = () => {
+        const day = (row.dataset.day || "").trim();
+        if (!day) return;
+        usageState.day = day;
+        usageState.days = 1;
+        loadUsage().catch((e) => alert(e.message));
+      };
+      row.addEventListener("click", openDay);
+      row.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          openDay();
+        }
+      });
+    });
     el.querySelectorAll(".usage-user-row").forEach((row) => {
       const openUser = () => {
         const userId = Number(row.dataset.id);

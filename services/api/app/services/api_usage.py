@@ -5,8 +5,9 @@ from __future__ import annotations
 import hashlib
 import json
 import os
-from datetime import datetime, timedelta, timezone
+from datetime import date, datetime, timedelta, timezone
 from typing import Any
+from zoneinfo import ZoneInfo
 
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -15,6 +16,20 @@ from app.config import settings
 from app.models import ApiUsageEvent, Order, User
 
 USD_TO_CNY = 7.2
+_OPS_TZ = ZoneInfo("Asia/Shanghai")
+
+
+def china_day_bounds(day: date | str) -> tuple[datetime, datetime]:
+    """Return UTC [start, end) covering one Asia/Shanghai calendar day."""
+    if isinstance(day, str):
+        day = date.fromisoformat(day.strip())
+    start_local = datetime(day.year, day.month, day.day, tzinfo=_OPS_TZ)
+    end_local = start_local + timedelta(days=1)
+    return start_local.astimezone(timezone.utc), end_local.astimezone(timezone.utc)
+
+
+def _china_today() -> date:
+    return datetime.now(tz=_OPS_TZ).date()
 
 # Default App-module tags when callers omit `module`.
 _KIND_TO_MODULE = {
@@ -266,11 +281,127 @@ def _since_days(days: int | None) -> datetime | None:
     return datetime.now(tz=timezone.utc) - timedelta(days=int(days))
 
 
-async def usage_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str, Any]:
+def _usage_time_filters(
+    *,
+    days: int | None = 30,
+    day: str | None = None,
+) -> tuple[list[Any], dict[str, Any]]:
+    """Build created_at filters. Prefer a single China day when ``day`` is set."""
+    meta: dict[str, Any] = {
+        "day_timezone": "Asia/Shanghai",
+        "day": None,
+        "days": days,
+        "range_start": None,
+        "range_end": None,
+    }
+    filters: list[Any] = []
+    if day:
+        start, end = china_day_bounds(day)
+        filters.append(ApiUsageEvent.created_at >= start)
+        filters.append(ApiUsageEvent.created_at < end)
+        meta["day"] = date.fromisoformat(day.strip()).isoformat()
+        meta["days"] = 1
+        meta["range_start"] = start.isoformat()
+        meta["range_end"] = end.isoformat()
+        return filters, meta
     since = _since_days(days)
-    filters = []
     if since is not None:
         filters.append(ApiUsageEvent.created_at >= since)
+        meta["range_start"] = since.isoformat()
+    return filters, meta
+
+
+async def usage_by_day(
+    db: AsyncSession,
+    *,
+    days: int = 30,
+    day: str | None = None,
+) -> dict[str, Any]:
+    """Token / cost series bucketed by Asia/Shanghai calendar day."""
+    if day:
+        start, end = china_day_bounds(day)
+        day_list = [date.fromisoformat(day.strip())]
+    else:
+        n = max(1, min(int(days or 30), 365))
+        today = _china_today()
+        day_list = [today - timedelta(days=i) for i in range(n - 1, -1, -1)]
+        start, _ = china_day_bounds(day_list[0])
+        _, end = china_day_bounds(day_list[-1])
+
+    rows = (
+        await db.execute(
+            select(
+                ApiUsageEvent.created_at,
+                ApiUsageEvent.prompt_tokens,
+                ApiUsageEvent.completion_tokens,
+                ApiUsageEvent.cost_cny,
+                ApiUsageEvent.cost_usd,
+            ).where(
+                ApiUsageEvent.created_at >= start,
+                ApiUsageEvent.created_at < end,
+            )
+        )
+    ).all()
+
+    buckets: dict[str, dict[str, Any]] = {
+        d.isoformat(): {
+            "day": d.isoformat(),
+            "events": 0,
+            "prompt_tokens": 0,
+            "completion_tokens": 0,
+            "tokens": 0,
+            "cost_cny": 0.0,
+            "cost_usd": 0.0,
+        }
+        for d in day_list
+    }
+    for created_at, prompt, completion, cost_cny, cost_usd in rows:
+        if created_at is None:
+            continue
+        if created_at.tzinfo is None:
+            created_at = created_at.replace(tzinfo=timezone.utc)
+        key = created_at.astimezone(_OPS_TZ).date().isoformat()
+        slot = buckets.get(key)
+        if slot is None:
+            continue
+        pt = int(prompt or 0)
+        ct = int(completion or 0)
+        slot["events"] += 1
+        slot["prompt_tokens"] += pt
+        slot["completion_tokens"] += ct
+        slot["tokens"] += pt + ct
+        slot["cost_cny"] += float(cost_cny or 0)
+        slot["cost_usd"] += float(cost_usd or 0)
+
+    series = []
+    for d in day_list:
+        item = buckets[d.isoformat()]
+        item["cost_cny"] = round(float(item["cost_cny"]), 4)
+        item["cost_usd"] = round(float(item["cost_usd"]), 6)
+        series.append(item)
+
+    return {
+        "day_timezone": "Asia/Shanghai",
+        "day": day_list[0].isoformat() if day else None,
+        "days": len(day_list),
+        "range_start": start.isoformat(),
+        "range_end": end.isoformat(),
+        "series": series,
+        "totals": {
+            "events": sum(x["events"] for x in series),
+            "tokens": sum(x["tokens"] for x in series),
+            "cost_cny": round(sum(x["cost_cny"] for x in series), 4),
+        },
+    }
+
+
+async def usage_summary(
+    db: AsyncSession,
+    *,
+    days: int | None = 30,
+    day: str | None = None,
+) -> dict[str, Any]:
+    filters, time_meta = _usage_time_filters(days=days, day=day)
 
     def _base():
         stmt = select(
@@ -468,8 +599,14 @@ async def usage_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str,
         "cost_cny": float(un_row[3] or 0),
     }
 
+    by_day = await usage_by_day(db, days=days or 30, day=day)
+
     return {
-        "days": days,
+        "days": time_meta.get("days", days),
+        "day": time_meta.get("day"),
+        "day_timezone": time_meta.get("day_timezone"),
+        "range_start": time_meta.get("range_start"),
+        "range_end": time_meta.get("range_end"),
         "events": int(total[0] or 0),
         "prompt_tokens": int(total[1] or 0),
         "completion_tokens": int(total[2] or 0),
@@ -477,6 +614,7 @@ async def usage_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str,
         "cost_usd": float(total[3] or 0),
         "cost_cny": float(total[4] or 0),
         "audio_seconds": float(total[5] or 0),
+        "by_day": by_day.get("series") or [],
         "by_kind": by_kind,
         "by_module": by_module[:40],
         "gpu": {
@@ -489,7 +627,7 @@ async def usage_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str,
         "by_user": by_user,
         "unattributed": unattributed,
         "fx_usd_cny": USD_TO_CNY,
-        "note": "成本为公开价估算，非账单原件；有 user_id 的事件可归因到具体注册用户，服务端批处理/未登录调用记入「未归因」。",
+        "note": "成本为公开价估算，非账单原件；按 Asia/Shanghai 自然日查询；有 user_id 的事件可归因到具体注册用户，服务端批处理/未登录调用记入「未归因」。",
     }
 
 
@@ -584,15 +722,25 @@ async def usage_daily_monitor(db: AsyncSession) -> dict[str, Any]:
     }
 
 
-async def pnl_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str, Any]:
-    usage = await usage_summary(db, days=days)
-    since = _since_days(days)
+async def pnl_summary(
+    db: AsyncSession,
+    *,
+    days: int | None = 30,
+    day: str | None = None,
+) -> dict[str, Any]:
+    usage = await usage_summary(db, days=days, day=day)
+    filters, time_meta = _usage_time_filters(days=days, day=day)
     order_q = select(
         func.count(Order.id),
         func.coalesce(func.sum(Order.amount_cents), 0),
     ).where(Order.status == "paid")
-    if since is not None:
-        order_q = order_q.where(Order.paid_at >= since)
+    if day:
+        start, end = china_day_bounds(day)
+        order_q = order_q.where(Order.paid_at >= start, Order.paid_at < end)
+    else:
+        since = _since_days(days)
+        if since is not None:
+            order_q = order_q.where(Order.paid_at >= since)
     oc, cents = (await db.execute(order_q)).one()
     revenue_cny = int(cents or 0) / 100.0
     cost_cny = float(usage["cost_cny"] or 0)
@@ -600,11 +748,13 @@ async def pnl_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str, A
     plat_q = select(func.coalesce(func.sum(ApiUsageEvent.cost_cny), 0.0)).where(
         ApiUsageEvent.key_owner == "platform"
     )
-    if since is not None:
-        plat_q = plat_q.where(ApiUsageEvent.created_at >= since)
+    for f in filters:
+        plat_q = plat_q.where(f)
     platform_cost = float((await db.execute(plat_q)).scalar() or 0)
     return {
-        "days": days,
+        "days": time_meta.get("days", days),
+        "day": time_meta.get("day"),
+        "day_timezone": time_meta.get("day_timezone"),
         "orders_paid": int(oc or 0),
         "revenue_cny": revenue_cny,
         "api_cost_cny_all": cost_cny,

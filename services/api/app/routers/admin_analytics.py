@@ -48,10 +48,15 @@ def _day_key(dt: datetime | None) -> str:
 @router.get("/usage/summary")
 async def usage_summary(
     days: int = Query(30, ge=0, le=365),
+    day: str | None = Query(
+        None,
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description="Asia/Shanghai calendar day YYYY-MM-DD; when set, ignores days window",
+    ),
     _: str = Depends(require_admin_token),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    return await usage_svc.usage_summary(db, days=days or None)
+    return await usage_svc.usage_summary(db, days=days or None, day=day)
 
 
 @router.get("/usage/daily")
@@ -63,13 +68,33 @@ async def usage_daily(
     return await usage_svc.usage_daily_monitor(db)
 
 
-@router.get("/usage/pnl")
-async def usage_pnl(
-    days: int = Query(30, ge=0, le=365),
+@router.get("/usage/by-day")
+async def usage_by_day(
+    days: int = Query(30, ge=1, le=365),
+    day: str | None = Query(
+        None,
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description="Single Asia/Shanghai day; when set returns that day only",
+    ),
     _: str = Depends(require_admin_token),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
-    return await usage_svc.pnl_summary(db, days=days or None)
+    """Token consumption series bucketed by Asia/Shanghai calendar day."""
+    return await usage_svc.usage_by_day(db, days=days, day=day)
+
+
+@router.get("/usage/pnl")
+async def usage_pnl(
+    days: int = Query(30, ge=0, le=365),
+    day: str | None = Query(
+        None,
+        pattern=r"^\d{4}-\d{2}-\d{2}$",
+        description="Asia/Shanghai calendar day YYYY-MM-DD",
+    ),
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    return await usage_svc.pnl_summary(db, days=days or None, day=day)
 
 
 @router.get("/usage/platform")
