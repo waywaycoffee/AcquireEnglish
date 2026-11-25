@@ -31,10 +31,16 @@ findLibraryEpisodeForBilibiliInput(
   final int? page = _pageFromInput(cleaned);
 
   for (final LibraryCourseData course in courses) {
+    // Include official series (e.g. oral_core_9000) whose episodes still use
+    // Bilibili watch URLs — they already ship ECS softsubs and must not be
+    // treated as "needs 预约字幕".
     final bool isBili =
         course.category == 'bilibili' ||
         course.sourceLabel.toLowerCase().contains('bilibili') ||
-        course.id.startsWith('bilibili-');
+        course.id.startsWith('bilibili-') ||
+        course.id == 'oral_core_9000' ||
+        course.category == '官方课' ||
+        course.sourceLabel.contains('官方');
     if (!isBili) {
       continue;
     }

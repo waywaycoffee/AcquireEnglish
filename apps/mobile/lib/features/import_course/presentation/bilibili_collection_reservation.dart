@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../daily_path/domain/official_bilibili_softsub_series.dart';
 import '../../library/domain/episode_local_ready.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
@@ -500,10 +501,16 @@ class _BilibiliCollectionReservationState
 
   bool _alreadyHasSubtitles(LibraryCourseData? course) {
     if (course != null) {
-      return courseHasStudySubtitles(course);
+      if (course.id == 'oral_core_9000' || courseHasStudySubtitles(course)) {
+        return true;
+      }
     }
     final String source = widget.source.trim();
     if (source.isEmpty) return false;
+    // Official ECS softsub series (9000句 etc.) — never show 预约字幕.
+    if (sourceLooksLikeOfficialBilibiliSoftsubSeries(source)) {
+      return true;
+    }
     final hit = findLibraryEpisodeForBilibiliInput(
       ref.read(libraryCatalogProvider),
       source,
