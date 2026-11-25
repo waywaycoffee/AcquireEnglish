@@ -229,7 +229,11 @@ async def list_users(
         list_stmt = list_stmt.where(where)
     total = int((await db.execute(count_stmt)).scalar() or 0)
     rows = (
-        await db.execute(list_stmt.order_by(User.id.desc()).offset(offset).limit(limit))
+        await db.execute(
+            list_stmt.order_by(User.created_at.desc(), User.id.desc())
+            .offset(offset)
+            .limit(limit)
+        )
     ).scalars().all()
     user_ids = [u.id for u in rows]
     wallets: dict[int, WalletAccount] = {}

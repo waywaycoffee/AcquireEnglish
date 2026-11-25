@@ -1455,6 +1455,23 @@
     }
   }
 
+  function formatDateTime(value) {
+    if (!value) return "—";
+    try {
+      return new Date(value).toLocaleString("zh-CN", {
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+      });
+    } catch {
+      return String(value);
+    }
+  }
+
   async function loadUsers() {
     const data = await api(
       `/users?q=${encodeURIComponent(state.q)}&limit=${state.limit}&offset=${state.offset}`
@@ -1464,41 +1481,56 @@
     if (!data.items.length) {
       list.innerHTML = `<div class="empty" style="min-height:120px">没有匹配用户</div>`;
     } else {
-      list.innerHTML = data.items
-        .map((u) => {
-          const active = u.id === state.selectedId ? "active" : "";
-          const name = u.display_name || u.email || `用户 ${u.id}`;
-          const assetBits = [
-            `资产 ${u.asset_count ?? 0}`,
-            `导入 ${u.link_courses ?? 0}`,
-            `考试 ${u.exam_assets ?? 0}`,
-            `OCR ${u.ocr_books ?? 0}`,
-            `字幕 ${u.shared_subtitles ?? 0}`,
-          ].join(" · ");
-          return `<button class="user-item ${active}" data-id="${u.id}" type="button">
-            <div class="title">${escapeHtml(name)}</div>
-            <div class="meta">#${u.id} · ${escapeHtml(u.email || "")}${
-            u.phone ? " · " + escapeHtml(u.phone) : ""
-          }</div>
-            <div class="meta">钱包 ${u.wallet_credits ?? "—"} · 积分 ${u.points_balance ?? 0}</div>
-            <div class="meta">${escapeHtml(assetBits)}</div>
-            <div class="meta">服务器占用 ${formatBytes(u.storage_bytes)}</div>
-          </button>`;
-        })
-        .join("");
-      list.querySelectorAll(".user-item").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          state.selectedId = Number(btn.dataset.id);
-          list.querySelectorAll(".user-item").forEach((b) => {
-            b.classList.toggle("active", Number(b.dataset.id) === state.selectedId);
-          });
-          loadDetail(state.selectedId);
+      list.innerHTML = `<div class="table-wrap user-table-wrap"><table class="user-table">
+        <thead>
+          <tr>
+            <th>ID</th>
+            <th>昵称</th>
+            <th>邮箱</th>
+            <th>手机</th>
+            <th>微信</th>
+            <th>注册时间</th>
+            <th>钱包/积分</th>
+          </tr>
+        </thead>
+        <tbody>
+          ${data.items
+            .map((u) => {
+              const active = u.id === state.selectedId ? "active" : "";
+              const name = u.display_name || "—";
+              return `<tr class="user-row ${active}" data-id="${u.id}" tabindex="0">
+                <td>${u.id}</td>
+                <td>${escapeHtml(name)}</td>
+                <td>${escapeHtml(u.email || "—")}</td>
+                <td>${escapeHtml(u.phone || "—")}</td>
+                <td>${u.wechat_bound ? "已绑定" : "—"}</td>
+                <td>${escapeHtml(formatDateTime(u.created_at))}</td>
+                <td>${u.wallet_credits ?? "—"} / ${u.points_balance ?? 0}</td>
+              </tr>`;
+            })
+            .join("")}
+        </tbody>
+      </table></div>`;
+      const selectUser = (userId) => {
+        state.selectedId = userId;
+        list.querySelectorAll(".user-row").forEach((row) => {
+          row.classList.toggle("active", Number(row.dataset.id) === state.selectedId);
+        });
+        loadDetail(state.selectedId);
+      };
+      list.querySelectorAll(".user-row").forEach((row) => {
+        row.addEventListener("click", () => selectUser(Number(row.dataset.id)));
+        row.addEventListener("keydown", (ev) => {
+          if (ev.key === "Enter" || ev.key === " ") {
+            ev.preventDefault();
+            selectUser(Number(row.dataset.id));
+          }
         });
       });
     }
     const page = Math.floor(state.offset / state.limit) + 1;
     const pages = Math.max(1, Math.ceil(state.total / state.limit));
-    $("pageInfo").textContent = `${page} / ${pages} · 共 ${state.total}`;
+    $("pageInfo").textContent = `${page} / ${pages} · 共 ${state.total} 名注册用户`;
     $("prevPage").disabled = state.offset <= 0;
     $("nextPage").disabled = state.offset + state.limit >= state.total;
   }

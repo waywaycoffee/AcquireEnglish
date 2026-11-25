@@ -158,15 +158,16 @@
     </section>
     <section id="panel-users" class="tab-panel hidden">
       <section id="statsRow" class="stats"></section>
-      <div class="layout">
-        <aside class="panel">
+      <div class="layout users-layout">
+        <aside class="panel users-roster">
           <div class="panel-head">
-            <h2>用户</h2>
+            <h2>注册用户表</h2>
             <form id="searchForm" class="search">
               <input id="searchInput" type="search" placeholder="邮箱 / 手机 / 昵称 / ID" />
               <button class="btn primary" type="submit">搜索</button>
             </form>
           </div>
+          <p class="muted users-hint">按注册时间倒序；点击一行查看该用户资产与会员操作。</p>
           <div id="userList" class="user-list"></div>
           <div class="pager">
             <button id="prevPage" class="btn ghost" type="button">上一页</button>
