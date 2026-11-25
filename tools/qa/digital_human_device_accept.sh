@@ -327,19 +327,30 @@ screenshot() {
 }
 
 dump_ui() {
-  adb_cmd shell rm -f "$UI_XML_DEVICE" >/dev/null 2>&1 || true
-  if ! adb_cmd shell uiautomator dump "$UI_XML_DEVICE" >/dev/null 2>&1; then
-    # Fallback path used by some devices
+  # Flutter continuous animation often makes plain `uiautomator dump` fail with
+  # "could not get idle state". Retry + compressed + short settle helps.
+  local attempt=0
+  local out=""
+  adb_cmd shell rm -f "$UI_XML_DEVICE" /sdcard/window_dump.xml >/dev/null 2>&1 || true
+  while (( attempt < 3 )); do
+    attempt=$((attempt + 1))
+    sleep 0.4
+    out="$(adb_cmd shell uiautomator dump --compressed "$UI_XML_DEVICE" 2>&1 || true)"
+    if adb_cmd pull "$UI_XML_DEVICE" "$UI_XML" >/dev/null 2>&1 && [[ -s "$UI_XML" ]]; then
+      return 0
+    fi
+    out="$(adb_cmd shell uiautomator dump "$UI_XML_DEVICE" 2>&1 || true)"
+    if adb_cmd pull "$UI_XML_DEVICE" "$UI_XML" >/dev/null 2>&1 && [[ -s "$UI_XML" ]]; then
+      return 0
+    fi
+    # Default path on some OEMs
     adb_cmd shell uiautomator dump >/dev/null 2>&1 || true
-  fi
-  if adb_cmd pull "$UI_XML_DEVICE" "$UI_XML" >/dev/null 2>&1; then
-    :
-  elif adb_cmd pull /sdcard/window_dump.xml "$UI_XML" >/dev/null 2>&1; then
-    :
-  else
-    return 1
-  fi
-  [[ -s "$UI_XML" ]]
+    if adb_cmd pull /sdcard/window_dump.xml "$UI_XML" >/dev/null 2>&1 && [[ -s "$UI_XML" ]]; then
+      return 0
+    fi
+  done
+  log "uiautomator dump 仍失败（Flutter idle）: ${out//$'\n'/ }"
+  return 1
 }
 
 ui_has_text() {
@@ -428,31 +439,92 @@ navigate_to_oral_coach() {
 
   # Bottom nav 口语
   if tap_text "口语"; then
-    sleep 2
-    dump_ui || true
-    screenshot "03_oral_tab" || true
-    if ui_has_text "数字人口语" || ui_has_text "数字人" || ui_has_text "说话" \
-      || ui_has_text "场景" || ui_has_text "音色" || ui_has_text "英语口语闲聊"; then
-      record PASS B-entry "已进入口语/数字人页（底栏「口语」）" "route≈/digital-human"
-      return 0
+    :
+  else
+    # Coordinate fallback for 5-tab bars. Prod home is often
+    # 学习/视频/阅读/口语/社区 → 口语 = 4th (≈70% width). Older builds used
+    # 视频/阅读/口语/社区/对战 → 口语 = 3rd (center). Try both.
+    local size w h cy
+    size="$(adb_cmd shell wm size 2>/dev/null | tr -d '\r' | awk -F': ' '/Physical size/{print $2}')"
+    w="${size%x*}"; h="${size#*x}"
+    if [[ -n "$w" && -n "$h" ]]; then
+      cy=$((h * 96 / 100))
+      log "dump 不可用，依次点底栏候选「口语」坐标 (${w}x${h})"
+      adb_cmd shell input keyevent KEYCODE_BACK >/dev/null 2>&1 || true
+      sleep 0.4
+      for cx in $((w * 70 / 100)) $((w / 2)) $((w * 78 / 100)); do
+        adb_cmd shell input tap "$cx" "$cy" >/dev/null 2>&1 || true
+        sleep 1.6
+        dump_ui || true
+        if ui_has_text "数字人口语" || ui_has_text "换教练" || ui_has_text "卡壳" \
+          || ui_has_text "英语口语闲聊" || ui_has_text "说话"; then
+          break
+        fi
+      done
     fi
-    # Still on tab but content loading / empty material picker
-    if ui_has_text "口语"; then
-      record PASS B-entry "已点到「口语」底栏（界面文案未完全命中）" "请对照截图 03_oral_tab.png"
-      return 0
-    fi
+  fi
+  sleep 1.2
+  dump_ui || true
+  screenshot "03_oral_tab" || true
+  if ui_has_text "数字人口语" || ui_has_text "数字人" || ui_has_text "说话" \
+    || ui_has_text "场景" || ui_has_text "音色" || ui_has_text "英语口语闲聊" \
+    || ui_has_text "卡壳" || ui_has_text "换教练"; then
+    record PASS B-entry "已进入口语/数字人页（底栏「口语」）" "route≈/digital-human"
+    return 0
+  fi
+  # Soft pass only when screenshot likely shows coach (filename always exists after shot)
+  if [[ -f "$ART_DIR/03_oral_tab.png" ]] && dump_ui && (ui_has_text "口语" || ui_has_text "说话" || ui_has_text "换教练"); then
+    record PASS B-entry "已点到「口语」底栏（dump 弱/对照截图）" "请对照截图 03_oral_tab.png"
+    return 0
   fi
 
   record MANUAL B-entry "未能自动导航到口语教练" "fallback：登录后点底栏「口语」，或播放器「问我」"
   return 2
 }
 
+ensure_app_foreground() {
+  local fg
+  fg="$(adb_cmd shell dumpsys activity activities 2>/dev/null | tr -d '\r' | grep -E 'mResumedActivity|topResumedActivity' | head -n2 || true)"
+  if printf '%s' "$fg" | grep -q "$PKG_PROD"; then
+    return 0
+  fi
+  log "前台已离开 $PKG_PROD，重新拉起并点「口语」"
+  adb_cmd shell am start -n "$PKG_PROD/.MainActivity" >/dev/null 2>&1 || \
+    adb_cmd shell monkey -p "$PKG_PROD" -c android.intent.category.LAUNCHER 1 >/dev/null 2>&1 || true
+  sleep 2.5
+  local size w h cx cy
+  size="$(adb_cmd shell wm size 2>/dev/null | tr -d '\r' | awk -F': ' '/Physical size/{print $2}')"
+  w="${size%x*}"; h="${size#*x}"
+  if [[ -n "$w" && -n "$h" ]]; then
+    cy=$((h * 96 / 100))
+    # Prefer 4th-of-5 tab (口语 on 学习/视频/阅读/口语/社区)
+    for cx in $((w * 70 / 100)) $((w / 2)); do
+      adb_cmd shell input tap "$cx" "$cy" >/dev/null 2>&1 || true
+      sleep 1.4
+    done
+  fi
+}
+
 assert_coach_ui() {
-  dump_ui || {
-    record FAIL C-sheet "uiautomator dump 失败" ""
-    return 1
-  }
+  ensure_app_foreground
+  # Screenshot first — dump retries can lose foreground on some OEMs.
   screenshot "04_coach_ui" || true
+
+  local dumped=0
+  if dump_ui; then
+    dumped=1
+    # If dump is launcher chrome, re-enter oral and dump once more.
+    if ui_has_text "爱快英语" && ui_has_text "搜索" && ! ui_has_text "数字人口语"; then
+      record INFO C-dump "dump 像桌面，尝试重新进入口语页" ""
+      ensure_app_foreground
+      screenshot "04b_coach_ui_retry" || true
+      dump_ui && dumped=1 || dumped=0
+    fi
+  else
+    # Flutter lip-sync / LiveTalking keeps the a11y tree busy — do not hard-fail
+    # the whole run; screenshots + logcat still give real-device evidence.
+    record MANUAL C-dump "uiautomator dump 失败（Flutter 动画/idle）" "对照 04_coach_ui.png 目视验收"
+  fi
 
   # Crash / ANR smell
   local tomb
@@ -464,22 +536,22 @@ assert_coach_ui() {
   fi
 
   # Avatar / stage — Flutter often does not expose asset names; use chrome text.
-  if ui_has_text "数字人口语" || ui_has_text "数字人" || ui_has_text "英语口语闲聊" \
-    || ui_has_text "选择场景" || ui_has_text "场景"; then
+  if [[ "$dumped" -eq 1 ]] && (ui_has_text "数字人口语" || ui_has_text "数字人" || ui_has_text "英语口语闲聊" \
+    || ui_has_text "选择场景" || ui_has_text "场景" || ui_has_text "换教练"); then
     record PASS C-avatar "教练舞台相关文案可见（卡通阶段弱断言）" "完整口型需人工看截图"
   else
     record MANUAL C-avatar "未能从 UI dump 断言卡通数字人舞台" "请打开 04_coach_ui.png 目视确认 atlas/头像"
   fi
 
   # Mic / hold-to-talk — labels 说话 / 松开 / 再说 (ValueKey study-oral-coach-mic-legacy not in dump)
-  if ui_has_text "说话" || ui_has_text "松开" || ui_has_text "再说" || ui_has_text "按住说话"; then
+  if [[ "$dumped" -eq 1 ]] && (ui_has_text "说话" || ui_has_text "松开" || ui_has_text "再说" || ui_has_text "按住说话"); then
     record PASS D-mic "按住说话控件文案可见" "代码 ValueKey=study-oral-coach-mic-legacy"
   else
     record MANUAL D-mic "未在 dump 中看到「说话」等麦克风文案" "可能需先选场景/素材；对照截图与 ValueKey"
   fi
 
   # 卡壳 — only when hintEnable (player sheet true; standalone default true)
-  if ui_has_text "卡壳"; then
+  if [[ "$dumped" -eq 1 ]] && ui_has_text "卡壳"; then
     record PASS E-hint "「卡壳」按钮可见（hintEnable 路径）" ""
   else
     record MANUAL E-hint "当前页未见「卡壳」" "embedded 播放器 sheet + hintEnable=true 时应出现；或会话 UI 未展开 dock"
