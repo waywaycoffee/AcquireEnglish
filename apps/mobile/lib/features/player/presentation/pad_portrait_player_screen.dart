@@ -34,6 +34,7 @@ import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/data/subtitle_source_policy.dart';
 import '../../import_course/domain/bilibili_import.dart';
 import 'hardsub_asr_repair.dart';
+import '../../library/domain/episode_local_ready.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
@@ -1783,11 +1784,9 @@ class PadPortraitPlayerScreenState
       if (isNetdiskStream) {
         _prefetchNextNetdiskEpisode();
       }
-      final bool hasEmbeddedEnglish = embeddedTracks.any(
-        (SubtitleTrack track) =>
-            track.language == 'eng' || track.language == 'en',
-      );
-      if (_referenceSubtitleLines.isEmpty && hasEmbeddedEnglish) {
+      final bool hasEmbeddedSoft = embeddedTracks.isNotEmpty;
+      if ((!state.hasLines || _referenceSubtitleLines.isEmpty) &&
+          hasEmbeddedSoft) {
         unawaited(_loadEmbeddedReferenceAndCachedAiSubtitles(embeddedTracks));
       } else if ((!state.hasLines || _linesMissingEnglish(state.lines)) &&
           !state.lines.any(
@@ -2132,8 +2131,24 @@ class PadPortraitPlayerScreenState
           videoPath: videoPath,
           tracks: tracks,
         );
-    if (!mounted || lines.isEmpty || _referenceSubtitleLines.isNotEmpty) return;
-    setState(() => _referenceSubtitleLines = lines);
+    if (!mounted || lines.isEmpty) return;
+    final bool fillPanel = !state.hasLines;
+    setState(() {
+      if (_referenceSubtitleLines.isEmpty) {
+        _referenceSubtitleLines = lines;
+      }
+      // Soft embedded tracks should drive the study list (shadowing / follow).
+      if (fillPanel) {
+        final int positionMs = state.positionMs;
+        state
+          ..loadLines(lines)
+          ..seekToMilliseconds(positionMs);
+        _hasOfficialEnglish = lines.any(
+          (PlayerSubtitleLine line) => isReliableOcrEnglish(line.english),
+        );
+        _usingAiSubtitles = false;
+      }
+    });
   }
 
   Future<void> _loadEmbeddedReferenceAndCachedAiSubtitles(
@@ -3802,19 +3817,25 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       onPressed: () => unawaited(_downloadCurrentOnlineEpisode(course, episode)),
                       child: const Text('下载本集到本地'),
                     ),
-                  if (course.episodes.length > 1 && isMultiEpisodeBilibiliCourse(course))
+                  if (course.episodes.length > 1 &&
+                      !courseHasAllLocalVideos(course) &&
+                      isMultiEpisodeBilibiliCourse(course))
                     TextButton(
                       onPressed: () => unawaited(downloadBilibiliCollectionForWatchUrl(
                         context, ref, watchUrl: episode.sourceUrl ?? episode.videoAsset ?? '',
                       )),
                       child: const Text('下载全部合集'),
                     ),
-                  if (course.id.startsWith('youtube-') && course.episodes.length > 1)
+                  if (course.id.startsWith('youtube-') &&
+                      course.episodes.length > 1 &&
+                      !courseHasAllLocalVideos(course))
                     TextButton(
                       onPressed: () => unawaited(downloadYoutubeCollection(context, ref, course)),
                       child: const Text('下载全部合集'),
                     ),
-                  if (widget.onlinePreview)
+                  if (widget.onlinePreview &&
+                      !episodeHasStudySubtitles(episode) &&
+                      !courseHasStudySubtitles(course))
                     Text(course.episodes.length > 1
                         ? '在线播放试看 · 可预约字幕'
                         : '在线播放 · 可预约字幕'),

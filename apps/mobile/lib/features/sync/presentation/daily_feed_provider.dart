@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../words/presentation/learner_level_provider.dart';
 import '../data/acquire_api_client.dart';
 
 const String _prefsKey = 'learning_preferences_v1';
@@ -126,7 +127,16 @@ class DailyFeedNotifier extends Notifier<List<AcquireDailyFeedItemDto>> {
       final String account = _account;
       final String day = _localDay(DateTime.now());
       final AcquireApiClient api = ref.read(acquireApiClientProvider);
-      final List<AcquireDailyFeedItemDto> feed = await api.dailyFeed(date: day);
+      final String prefsLevel =
+          ref.read(learningPreferencesProvider).level.trim();
+      final String adaptive = ref.read(adaptiveLearnerCefrProvider).trim();
+      // Prefer live adaptive CEFR so feed keywords stay near i+1.
+      final String level =
+          adaptive.isNotEmpty ? adaptive : (prefsLevel.isNotEmpty ? prefsLevel : 'A2');
+      final List<AcquireDailyFeedItemDto> feed = await api.dailyFeed(
+        date: day,
+        level: level,
+      );
       if (_account != account) return;
       final List<AcquireDailyFeedItemDto> usable =
           feed.where(_isUsableRecommendation).toList(growable: false);

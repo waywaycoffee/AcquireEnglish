@@ -1419,11 +1419,9 @@ class PadLandscapePlayerScreenState
       if (isNetdiskStream) {
         _prefetchNextNetdiskEpisode();
       }
-      final bool hasEmbeddedEnglish = embeddedTracks.any(
-        (SubtitleTrack track) =>
-            track.language == 'eng' || track.language == 'en',
-      );
-      if (_referenceSubtitleLines.isEmpty && hasEmbeddedEnglish) {
+      final bool hasEmbeddedSoft = embeddedTracks.isNotEmpty;
+      if ((!state.hasLines || _referenceSubtitleLines.isEmpty) &&
+          hasEmbeddedSoft) {
         unawaited(_loadEmbeddedReferenceAndCachedAiSubtitles(embeddedTracks));
       } else if ((!state.hasLines || _linesMissingEnglish(state.lines)) &&
           !state.lines.any(
@@ -2390,8 +2388,23 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           videoPath: videoPath,
           tracks: tracks,
         );
-    if (!mounted || lines.isEmpty || _referenceSubtitleLines.isNotEmpty) return;
-    setState(() => _referenceSubtitleLines = lines);
+    if (!mounted || lines.isEmpty) return;
+    final bool fillPanel = !state.hasLines;
+    setState(() {
+      if (_referenceSubtitleLines.isEmpty) {
+        _referenceSubtitleLines = lines;
+      }
+      if (fillPanel) {
+        final int positionMs = state.positionMs;
+        state
+          ..loadLines(lines)
+          ..seekToMilliseconds(positionMs);
+        _hasOfficialEnglish = lines.any(
+          (PlayerSubtitleLine line) => isReliableOcrEnglish(line.english),
+        );
+        _usingAiSubtitles = false;
+      }
+    });
   }
 
   Future<void> _loadEmbeddedReferenceAndCachedAiSubtitles(

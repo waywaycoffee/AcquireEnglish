@@ -52,8 +52,9 @@ class SubtitleSourceDecision {
 
 /// Shared subtitle-source policy for import, player open, and completion queue.
 abstract final class SubtitleSourcePolicy {
+  // Do not match「内嵌字幕」— that usually means soft embedded tracks, not burn-in.
   static final RegExp hardsubHintPattern = RegExp(
-    r'中英字幕|双语字幕|硬字幕|双语|英语学习|字幕版|内嵌字幕|硬字幕版',
+    r'中英字幕|双语字幕|硬字幕|双语|英语学习|字幕版|硬字幕版|烧录字幕',
   );
 
   static bool isHardsubHint({

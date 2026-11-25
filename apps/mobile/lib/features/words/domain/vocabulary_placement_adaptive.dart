@@ -3,18 +3,21 @@ import 'dart:math' as math;
 import 'vocabulary_placement_estimate.dart';
 
 /// Map prefs / CEFR chips → starting recognition vocabulary size.
+///
+/// Conservative priors: self-reported CEFR often overshoots; the test must
+/// climb with evidence rather than inherit an inflated ceiling.
 int startingVocabEstimateForLevel(String? level) {
   final String key = (level ?? '').trim().toUpperCase();
   return switch (key) {
     '零基础' || 'ZERO' || 'BEGINNER' => 300,
     '学龄前' || 'PRESCHOOL' || 'KIDS' => 500,
-    'A1' => 900,
-    'A2' => 1400,
-    'B1' => 2500,
-    'B2' => 4800,
-    'C1' => 8500,
-    'C2' => 15000,
-    _ => 2000,
+    'A1' => 800,
+    'A2' => 1200,
+    'B1' => 2200,
+    'B2' => 3800,
+    'C1' => 6000,
+    'C2' => 10000,
+    _ => 1600,
   };
 }
 
@@ -67,34 +70,79 @@ class AdaptivePlacementEngine {
   AdaptivePlacementEngine({
     required this.bands,
     required int startingEstimate,
-    this.maxQuestions = 12,
+    this.maxQuestions = 16,
     math.Random? random,
   }) : estimate = startingEstimate
             .clamp(kPlacementEstimateMin, kPlacementEstimateMax)
             .toDouble(),
+       _startEstimate = startingEstimate
+           .clamp(kPlacementEstimateMin, kPlacementEstimateMax)
+           .toDouble(),
        _random = random ?? math.Random();
 
   final List<PlacementBandPool> bands;
   final int maxQuestions;
   final math.Random _random;
+  final double _startEstimate;
 
   double estimate;
   int asked = 0;
   final Set<String> _usedWords = <String>{};
   double? _prevEstimate;
 
-  bool get isComplete =>
-      asked >= maxQuestions ||
-      (asked >= 8 && _movedLittle) ||
-      _availableCount == 0;
+  /// Highest frequency-rank correctly answered (rarer = higher rank).
+  int? maxCorrectRank;
 
-  int get finalEstimate => estimateVocabFromPlacementScore(estimate);
+  /// Lowest rank missed (easy miss is strong negative evidence).
+  int? minIncorrectRank;
+
+  /// How many items were asked near/above the live estimate (stretch probes).
+  int stretchProbes = 0;
+
+  /// Consecutive corrects that were clearly below the live estimate.
+  int easyCorrectStreak = 0;
+
+  bool get isComplete {
+    if (_availableCount == 0) return true;
+    if (asked >= maxQuestions) return true;
+    // Need enough items + at least two stretch probes before early stop.
+    if (asked >= 10 && stretchProbes >= 2 && _movedLittle) return true;
+    // Stabilized with a miss: can stop a bit earlier.
+    if (asked >= 8 &&
+        stretchProbes >= 2 &&
+        minIncorrectRank != null &&
+        _movedLittle) {
+      return true;
+    }
+    return false;
+  }
+
+  int get finalEstimate {
+    double value = estimate;
+    // Never report far above the hardest word the learner actually knew.
+    final int? proven = maxCorrectRank;
+    if (proven != null) {
+      value = math.min(value, proven * 1.28);
+    } else {
+      // Zero corrects → stay near the conservative floor of the start.
+      value = math.min(value, math.max(300, _startEstimate * 0.55));
+    }
+    // Without stretch probes, high self-report priors stay unvalidated.
+    if (stretchProbes < 2 && proven != null) {
+      value = math.min(value, proven * 1.18);
+    }
+    // If they never missed but also never cleared hard stretch items, trim.
+    if (minIncorrectRank == null && stretchProbes < 3 && proven != null) {
+      value = math.min(value, math.max(proven * 1.12, proven + 400.0));
+    }
+    return estimateVocabFromPlacementScore(value);
+  }
 
   bool get _movedLittle {
     final double? prev = _prevEstimate;
     if (prev == null) return false;
     final double delta = (estimate - prev).abs();
-    return delta < math.max(120, estimate * 0.04);
+    return delta < math.max(150, estimate * 0.035);
   }
 
   int get _availableCount {
@@ -115,7 +163,20 @@ class AdaptivePlacementEngine {
         .where((item) => !_usedWords.contains(item.word.toLowerCase()))
         .toList(growable: false);
     if (candidates.isEmpty) return null;
-    final item = candidates[_random.nextInt(candidates.length)];
+    // Prefer rarer items inside the band when stretching.
+    candidates.sort((a, b) => a.rank.compareTo(b.rank));
+    final ({String word, int rank, String definitionCn}) item;
+    if (_shouldForceStretch && candidates.length > 1) {
+      final int from = (candidates.length * 0.45).floor().clamp(
+        0,
+        candidates.length - 1,
+      );
+      final List<({String word, int rank, String definitionCn})> hardSlice =
+          candidates.sublist(from);
+      item = hardSlice[_random.nextInt(hardSlice.length)];
+    } else {
+      item = candidates[_random.nextInt(candidates.length)];
+    }
     final List<String> choices = _buildChoices(
       correct: item.definitionCn,
       preferred: band,
@@ -138,23 +199,46 @@ class AdaptivePlacementEngine {
     _usedWords.add(question.word.toLowerCase());
     _prevEstimate = estimate;
     asked += 1;
+    final bool isStretch = question.rank >= estimate * 0.9;
+    if (isStretch) {
+      stretchProbes += 1;
+    }
+
     if (correct) {
-      if (question.rank >= estimate) {
-        // Harder word known → push estimate up toward / past that rank.
-        final double target = question.rank * 1.12;
-        estimate += (target - estimate) * 0.55;
+      maxCorrectRank = maxCorrectRank == null
+          ? question.rank
+          : math.max(maxCorrectRank!, question.rank);
+      if (question.rank >= estimate * 0.9) {
+        easyCorrectStreak = 0;
+        // Informative correct: climb toward / past that rank.
+        final double target = question.rank * 1.18;
+        estimate += (target - estimate) * 0.5;
+      } else if (question.rank < estimate * 0.55) {
+        // Too easy for the claimed level — shrink the unvalidated prior,
+        // but keep enough headroom so later stretch probes still run.
+        easyCorrectStreak += 1;
+        final double evidenceCeiling = question.rank * 1.65;
+        estimate = estimate * 0.9 + evidenceCeiling * 0.1;
+        if (easyCorrectStreak >= 3) {
+          final double softFloor = math.max(evidenceCeiling * 2.0, estimate * 0.78);
+          estimate = math.min(estimate, softFloor);
+        }
       } else {
-        // Easy word known → tiny confidence bump only (never pull down).
-        estimate *= 1.02;
+        easyCorrectStreak = 0;
+        estimate *= 1.015;
       }
     } else {
-      if (question.rank <= estimate * 1.25) {
-        // Missed a word at/below current level → drop.
-        final double target = question.rank * 0.55;
-        estimate += (target - estimate) * 0.6;
+      easyCorrectStreak = 0;
+      minIncorrectRank = minIncorrectRank == null
+          ? question.rank
+          : math.min(minIncorrectRank!, question.rank);
+      if (question.rank <= estimate * 1.2) {
+        // Missed at/below claimed level → drop hard.
+        final double target = question.rank * 0.5;
+        estimate += (target - estimate) * 0.65;
       } else {
-        // Missed a stretch word → mild drop.
-        estimate *= 0.97;
+        // Missed a stretch word → mild drop, keep probing.
+        estimate *= 0.94;
       }
     }
     estimate = estimate.clamp(
@@ -163,19 +247,39 @@ class AdaptivePlacementEngine {
     );
   }
 
+  bool get _shouldForceStretch =>
+      asked >= 1 && (asked % 2 == 1 || easyCorrectStreak >= 2);
+
   PlacementBandPool? _pickBandNearEstimate() {
     if (bands.isEmpty) return null;
     PlacementBandPool? best;
     var bestScore = double.infinity;
-    // Prefer bands slightly above current estimate (informative i+1 probes).
-    final double aim = estimate * 1.08;
+    // Stretch aims above the live estimate so hard words actually appear.
+    final double aim = _shouldForceStretch
+        ? estimate * 1.45
+        : estimate * 1.08;
+    final double maxAvailableMid = bands
+        .where(
+          (PlacementBandPool band) => band.items.any(
+            (item) => !_usedWords.contains(item.word.toLowerCase()),
+          ),
+        )
+        .fold<double>(0, (double m, PlacementBandPool b) {
+          return math.max(m, b.midRank.toDouble());
+        });
+    final double clampedAim =
+        maxAvailableMid <= 0 ? aim : math.min(aim, maxAvailableMid);
+
     for (final PlacementBandPool band in bands) {
       final bool hasUnused = band.items.any(
         (item) => !_usedWords.contains(item.word.toLowerCase()),
       );
       if (!hasUnused) continue;
-      final double dist = (band.midRank - aim).abs();
-      final double score = dist + _random.nextDouble() * 80;
+      final double dist = (band.midRank - clampedAim).abs();
+      // Soft preference for bands above estimate when stretching.
+      final double belowPenalty =
+          _shouldForceStretch && band.hi < estimate * 0.85 ? 900 : 0;
+      final double score = dist + belowPenalty + _random.nextDouble() * 60;
       if (score < bestScore) {
         bestScore = score;
         best = band;
@@ -196,7 +300,6 @@ class AdaptivePlacementEngine {
     }
 
     absorb(preferred);
-    // Neighbor bands for distractors when the preferred band is thin.
     final int idx = bands.indexOf(preferred);
     if (idx > 0) absorb(bands[idx - 1]);
     if (idx >= 0 && idx + 1 < bands.length) absorb(bands[idx + 1]);
@@ -216,8 +319,6 @@ class AdaptivePlacementEngine {
 
 /// Parse API `/public-lexicon/placement` payload into band pools.
 List<PlacementBandPool> parsePlacementBands(List<Map<String, dynamic>> raw) {
-  // Keep API order: each row is one frequency band with `size` + `items`.
-  // Reconstruct lo/hi from cumulative sizes when ranks are present.
   final List<PlacementBandPool> out = <PlacementBandPool>[];
   for (final Map<String, dynamic> band in raw) {
     final List<Map<String, dynamic>> items =

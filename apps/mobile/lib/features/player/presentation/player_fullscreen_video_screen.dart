@@ -451,6 +451,21 @@ class _PlayerFullscreenVideoScreenState
                     ),
                   ),
                 ),
+                // Persistent exit-to-portrait control on the video (bottom-right).
+                Positioned(
+                  right: 16,
+                  bottom: 16 + MediaQuery.paddingOf(context).bottom,
+                  child: Material(
+                    color: Colors.black54,
+                    shape: const CircleBorder(),
+                    child: IconButton(
+                      tooltip: '退出横屏',
+                      onPressed: widget.onExit,
+                      icon: const Icon(Icons.fullscreen_exit_rounded),
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
                 AnimatedPositioned(
                   duration: const Duration(milliseconds: 240),
                   curve: Curves.easeOutCubic,

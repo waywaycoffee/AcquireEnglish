@@ -61,7 +61,10 @@ class VocabularyPlacement extends Notifier<PlacementRow> {
     }
   }
 
-  Future<List<PlacementRow>> loadQuestions() => _fetch('placement');
+  Future<List<PlacementRow>> loadQuestions() => _fetch(
+        'placement',
+        parameters: const <String, dynamic>{'per_band': 18},
+      );
 
   Future<void> saveEstimate(int estimate, {bool requireRecommendations = true}) async {
     final String key = _key;

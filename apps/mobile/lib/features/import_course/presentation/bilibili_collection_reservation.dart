@@ -3,11 +3,10 @@ import 'dart:async';
 import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
 
-import '../../../router/app_router.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../library/domain/episode_local_ready.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../settings/presentation/settings_provider.dart';
@@ -15,6 +14,7 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../subtitle_completion/shared_bilibili_subtitle_sync.dart';
 import '../data/bilibili_collection_download.dart';
+import '../data/bilibili_episode_prepare.dart';
 import '../data/bilibili_multipage.dart';
 import '../data/bilibili_import_service.dart';
 import '../data/bilibili_open_or_import.dart';
@@ -498,37 +498,30 @@ class _BilibiliCollectionReservationState
     ).showSnackBar(SnackBar(content: Text(message)));
   }
 
-  Future<void> _onReadyTap() async {
-    final course = _course;
-    if (_isMulti(course) && course != null) {
-      context.push(
-        Uri(
-          path: SGRoute.library.route,
-          queryParameters: {'view': 'detail', 'courseId': course.id},
-        ).toString(),
-      );
-      return;
+  bool _alreadyHasSubtitles(LibraryCourseData? course) {
+    if (course != null) {
+      return courseHasStudySubtitles(course);
     }
     final String source = widget.source.trim();
-    if (source.isEmpty) return;
-    if (YoutubeImport.extractVideoId(source) != null ||
-        (_sourceId()?.startsWith('yt:') ?? false)) {
-      // YouTube open path lives in import helpers; fall through to bilibili open
-      // when the source is already a full watch URL with youtube host.
-    }
-    await openBilibiliLearningOrImport(
-      context,
-      ref,
-      watchUrl: source.startsWith('http') || source.toUpperCase().startsWith('BV')
-          ? source
-          : 'https://www.youtube.com/watch?v=$source',
-      startImportImmediately: true,
+    if (source.isEmpty) return false;
+    final hit = findLibraryEpisodeForBilibiliInput(
+      ref.read(libraryCatalogProvider),
+      source,
     );
+    final LibraryEpisodeItem? episode = hit?.episode;
+    if (episode == null) return false;
+    return episodeHasStudySubtitles(episode) ||
+        isUsableSubtitlePath(episode.enSubtitleAsset) ||
+        isUsableSubtitlePath(episode.cnSubtitleAsset);
   }
 
   @override
   Widget build(BuildContext context) {
-    final bool multi = _isMulti(_course);
+    final LibraryCourseData? course = _course;
+    // Official / server / local softsubs already present → hide CTA entirely.
+    if (_ready || _alreadyHasSubtitles(course)) {
+      return const SizedBox.shrink();
+    }
     return TextButton(
       style: TextButton.styleFrom(
         padding: const EdgeInsets.symmetric(horizontal: 8),
@@ -537,13 +530,9 @@ class _BilibiliCollectionReservationState
       ),
       onPressed: _busy || (_requested && !_ready)
           ? null
-          : _ready
-          ? () => unawaited(_onReadyTap())
           : () => unawaited(_reserve()),
       child: Text(
-        _ready
-            ? (multi ? '进入视频合集' : '字幕已就绪')
-            : _busy
+        _busy
             ? '正在预约字幕…'
             : _waitingForCapacity
             ? '等待字幕队列空位'
@@ -553,9 +542,7 @@ class _BilibiliCollectionReservationState
         style: TextStyle(
           fontWeight: FontWeight.w800,
           fontSize: 12,
-          color: _ready
-              ? AppDesignTokens.brandGreen
-              : _requested
+          color: _requested
               ? AppDesignTokens.textSecondary
               : AppDesignTokens.brandGreen,
         ),

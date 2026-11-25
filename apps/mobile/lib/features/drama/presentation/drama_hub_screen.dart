@@ -253,12 +253,14 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
               final bool canDownload = netdiskPlayUrlForEpisode(ep) != null;
               final bool reserved = isNetdiskDramaEpisodeReserved(ep.id) ||
                   (cache?.isScheduled ?? false);
-              final String downloadLabel = cache?.label ??
-                  (reserved
-                      ? '已预约字幕'
-                      : (canDownload ? '未下载' : ''));
               final bool downloading = cache?.isDownloading ?? false;
               final bool ready = cache?.isReady ?? false;
+              final String downloadLabel = ready
+                  ? ''
+                  : (cache?.label ??
+                      (reserved
+                          ? '已预约字幕'
+                          : (canDownload ? '未下载' : '')));
               final bool showProgressBar = downloading ||
                   (cache?.progress != null &&
                       !ready &&
@@ -284,20 +286,14 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                           Row(
                             children: <Widget>[
                               Icon(
-                                ready
-                                    ? Icons.download_done_rounded
-                                    : (downloading
-                                        ? Icons.downloading_rounded
-                                        : (reserved
-                                            ? Icons.schedule_rounded
-                                            : Icons
-                                                .download_for_offline_outlined)),
+                                downloading
+                                    ? Icons.downloading_rounded
+                                    : (reserved
+                                        ? Icons.schedule_rounded
+                                        : Icons
+                                            .download_for_offline_outlined),
                                 size: 16,
-                                color: ready
-                                    ? (AppDesignTokens.isDark
-                                        ? AppDesignTokens.brandGreen
-                                        : AppDesignTokens.brandGreenDark)
-                                    : AppDesignTokens.primaryBlue,
+                                color: AppDesignTokens.primaryBlue,
                               ),
                               const SizedBox(width: 6),
                               Expanded(
@@ -306,11 +302,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                                   style: TextStyle(
                                     fontSize: 12,
                                     fontWeight: FontWeight.w700,
-                                    color: ready
-                                        ? (AppDesignTokens.isDark
-                                            ? AppDesignTokens.brandGreen
-                                            : AppDesignTokens.brandGreenDark)
-                                        : AppDesignTokens.primaryBlue,
+                                    color: AppDesignTokens.primaryBlue,
                                   ),
                                 ),
                               ),

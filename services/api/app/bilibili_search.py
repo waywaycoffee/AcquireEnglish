@@ -31,15 +31,44 @@ TAG_KEYWORDS: dict[str, str] = {
 }
 
 LEVEL_HINTS: dict[str, str] = {
-    "零基础": "零基础英语 入门",
-    "学龄前": "幼儿英语 启蒙",
-    "A1": "初级英语",
-    "A2": "初级英语",
-    "B1": "中级英语",
-    "B2": "中级英语",
-    "C1": "高级英语",
-    "C2": "高阶英语 原声",
+    "零基础": "零基础英语 入门 简单对话",
+    "学龄前": "幼儿英语 启蒙 简单",
+    # Prefer comprehensible-input phrasing so search leans i+1, not raw interest.
+    "A1": "初级英语 慢速 简单对话 入门",
+    "A2": "初级英语 慢速 日常对话",
+    "B1": "中级英语 清晰发音",
+    "B2": "中级英语 原声访谈",
+    "C1": "高级英语 原声演讲",
+    "C2": "高阶英语 原声 documentary",
 }
+
+# Soft duration ceilings (seconds) for i+1 ranking — shorter first for lower levels.
+LEVEL_DURATION_SOFT_MAX: dict[str, float] = {
+    "零基础": 180,
+    "学龄前": 180,
+    "A1": 300,
+    "A2": 480,
+    "B1": 720,
+    "B2": 900,
+    "C1": 1200,
+    "C2": 1800,
+}
+
+
+def duration_iplus1_score(duration_sec: float | None, level: str) -> float:
+    """Higher is better. Prefer clips near the soft max for the learner's level."""
+    if duration_sec is None or duration_sec <= 0:
+        return 0.0
+    key = (level or "A2").upper() if len(level or "") <= 2 else (level or "A2")
+    soft = LEVEL_DURATION_SOFT_MAX.get(key) or LEVEL_DURATION_SOFT_MAX.get(
+        (level or "A2"), 480
+    )
+    if duration_sec <= soft:
+        # Prefer filling most of the soft window without going over.
+        return 1.0 - abs(duration_sec - soft * 0.65) / soft
+    # Over-length: gentle penalty so long lectures don't dominate beginners.
+    overflow = duration_sec / soft
+    return max(-1.0, 1.0 - overflow)
 
 
 @dataclass(frozen=True)
@@ -56,15 +85,20 @@ class BilibiliSearchHit:
 
 
 def keywords_for_preferences(level: str, tags: list[str]) -> list[tuple[str, str]]:
-    """Return (tag, keyword) pairs used for Bilibili search."""
-    level_hint = LEVEL_HINTS.get((level or "A2").upper(), "英语学习")
+    """Return (tag, keyword) pairs used for Bilibili search.
+
+    Level hint is placed first so Bilibili ranks i+1 difficulty ahead of theme.
+    """
+    raw_level = (level or "A2").strip()
+    level_key = raw_level.upper() if len(raw_level) <= 2 else raw_level
+    level_hint = LEVEL_HINTS.get(level_key) or LEVEL_HINTS.get(raw_level.upper()) or "英语学习"
     cleaned = [str(t).strip().lower() for t in tags if str(t).strip()]
     if not cleaned:
         cleaned = ["slow", "daily"]
     pairs: list[tuple[str, str]] = []
     for tag in cleaned:
         base = TAG_KEYWORDS.get(tag, tag)
-        pairs.append((tag, f"{base} {level_hint}".strip()))
+        pairs.append((tag, f"{level_hint} {base}".strip()))
     return pairs
 
 

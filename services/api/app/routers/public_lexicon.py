@@ -43,7 +43,7 @@ PLACEMENT_ESTIMATE_MAX = 60000
 
 
 @router.get('/placement')
-def placement(per_band: int = Query(default=12, ge=3, le=24)):
+def placement(per_band: int = Query(default=18, ge=3, le=30)):
     """Frequency-band samples for adaptive client-side placement tests."""
     with closing(_connect()) as db:
         return [

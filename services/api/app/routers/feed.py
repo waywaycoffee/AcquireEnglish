@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.bilibili_audio_language import ENGLISH_TAG, UNVERIFIED_TAG, sample_audio_languages
 from app.bilibili_search import (
     LEVEL_HINTS,
+    duration_iplus1_score,
     keywords_for_preferences,
     list_bilibili_creator_videos,
     search_bilibili_videos,
@@ -119,13 +120,17 @@ def _select_per_tag(
 @router.get("/daily", response_model=list[DailyFeedItemOut])
 async def daily_feed(
     day: str | None = Query(default=None, alias="date"),
+    level: str | None = Query(
+        default=None,
+        description="Optional CEFR override from the adaptive learner level (i+1).",
+    ),
     user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ) -> list[DailyFeedItemOut]:
     feed_day = day or date.today().isoformat()
     pref_result = await db.execute(select(UserPreference).where(UserPreference.user_id == user.id))
     pref = pref_result.scalar_one_or_none()
-    level = (pref.level if pref else None) or "A2"
+    level = (level or (pref.level if pref else None) or "A2").strip() or "A2"
     tags = _parse_tags(pref.tags_json if pref else '["slow","daily"]')
     cookie = (pref.bilibili_cookie if pref else None) or None
     followed = parse_followed_creators(
@@ -167,7 +172,13 @@ async def daily_feed(
             seen.add(hit.bvid)
             interest_candidates.append(_hit_to_item(hit, reason="interest"))
 
-    interest_candidates.sort(key=lambda item: _stable_rank(item.bvid, feed_day, user.id))
+    # Prefer i+1 duration fit, then stable day rank (not pure interest noise).
+    interest_candidates.sort(
+        key=lambda item: (
+            -duration_iplus1_score(item.duration_sec, level),
+            _stable_rank(item.bvid, feed_day, user.id),
+        )
+    )
     interest_selected = _select_per_tag(
         interest_candidates,
         per_tag=PER_TAG_LIMIT,

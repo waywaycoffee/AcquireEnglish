@@ -21,6 +21,7 @@ import '../../import_course/domain/bilibili_import.dart';
 import '../../shared/presentation/media/cover_image.dart';
 import '../../drama/domain/drama_course.dart';
 import '../../drama/presentation/drama_hub_screen.dart';
+import '../domain/episode_local_ready.dart';
 import '../../membership/domain/free_trial_seeds.dart';
 import '../../membership/domain/module_access.dart';
 import '../../community/presentation/english_browse_screen.dart';
@@ -3174,8 +3175,11 @@ class _LibraryCourseMatchShell extends StatelessWidget {
                       '')
                 : '')
             .trim();
-    final bool showReserve = reserveSource.isNotEmpty;
+    // Hide「预约字幕」when official/server softsubs are already on the course.
+    final bool showReserve =
+        reserveSource.isNotEmpty && !courseHasStudySubtitles(course);
     final showDownload = onDownloadCollection != null &&
+        !courseHasAllLocalVideos(course) &&
         (isMultiEpisodeBilibiliCourse(course) ||
             (course.id.startsWith('youtube-') && course.episodes.length > 1));
     final showHint = showEpisodeHint && match.matchedByEpisode;

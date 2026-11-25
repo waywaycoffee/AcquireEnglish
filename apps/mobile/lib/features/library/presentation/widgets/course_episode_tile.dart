@@ -88,10 +88,13 @@ class CourseEpisodeTile extends ConsumerWidget {
               (Map<String, NetdiskEpisodeCacheInfo> map) => map[cacheKey],
             ),
           );
+    final bool localReady = cache?.isReady ?? false;
     final bool showDownload = cacheKey != null &&
+        !localReady &&
         (netdiskPlayUrlForEpisode(item) != null || cache != null);
     final bool reserved = isNetdiskDramaEpisodeReserved(item.id) ||
         (cache?.isScheduled ?? false);
+    // Hide download/reserve chrome once the episode is already on disk.
     final String? downloadLabel = !showDownload
         ? null
         : (cache?.label ?? (reserved ? '已预约字幕' : '未下载'));
@@ -111,14 +114,14 @@ class CourseEpisodeTile extends ConsumerWidget {
         studyStage: studyStage,
         downloadLabel: downloadLabel,
         downloadProgress: cache?.progress,
-        downloadReady: cache?.isReady ?? false,
+        downloadReady: false,
         downloadActive: (cache?.isDownloading ?? false) ||
             ((cache?.progress != null) &&
-                !(cache?.isReady ?? false) &&
+                !localReady &&
                 (reserved ||
                     cache?.phase == NetdiskEpisodeCachePhase.partial)),
         onDownloadTap: showDownload &&
-                !(cache?.isReady ?? false) &&
+                !localReady &&
                 !(cache?.isDownloading ?? false)
             ? () {
                 if (reserved) {

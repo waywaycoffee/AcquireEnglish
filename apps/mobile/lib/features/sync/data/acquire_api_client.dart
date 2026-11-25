@@ -1464,11 +1464,15 @@ class AcquireApiClient {
     );
   }
 
-  Future<List<AcquireDailyFeedItemDto>> dailyFeed({String? date}) async {
+  Future<List<AcquireDailyFeedItemDto>> dailyFeed({
+    String? date,
+    String? level,
+  }) async {
     final Response<dynamic> response = await _dio.get(
       Endpoints.dailyFeed,
       queryParameters: <String, dynamic>{
         if (date != null) 'date': date,
+        if (level != null && level.trim().isNotEmpty) 'level': level.trim(),
       },
     );
     return (response.data as List<dynamic>)

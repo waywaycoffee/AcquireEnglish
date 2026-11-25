@@ -8,8 +8,8 @@ from app.bilibili_search import (
 def test_keywords_for_preferences_maps_tags_and_level():
     pairs = keywords_for_preferences("B1", ["slow", "news"])
     assert pairs == [
-        ("slow", "慢速英语 中级英语"),
-        ("news", "英语新闻 VOA 中级英语"),
+        ("slow", "中级英语 清晰发音 慢速英语"),
+        ("news", "中级英语 清晰发音 英语新闻 VOA"),
     ]
 
 
@@ -18,13 +18,13 @@ def test_keywords_for_preferences_maps_theme_tags():
         "A2", ["games", "food", "travel", "vlog", "science", "drama", "sports"]
     )
     assert pairs == [
-        ("games", "英语 游戏 初级英语"),
-        ("food", "英语 美食 初级英语"),
-        ("travel", "英语 旅游 初级英语"),
-        ("vlog", "english vlog 初级英语"),
-        ("science", "科普 英语 初级英语"),
-        ("drama", "英语 美剧 初级英语"),
-        ("sports", "英语 体育 初级英语"),
+        ("games", "初级英语 慢速 日常对话 英语 游戏"),
+        ("food", "初级英语 慢速 日常对话 英语 美食"),
+        ("travel", "初级英语 慢速 日常对话 英语 旅游"),
+        ("vlog", "初级英语 慢速 日常对话 english vlog"),
+        ("science", "初级英语 慢速 日常对话 科普 英语"),
+        ("drama", "初级英语 慢速 日常对话 英语 美剧"),
+        ("sports", "初级英语 慢速 日常对话 英语 体育"),
     ]
 
 
@@ -83,3 +83,4 @@ def test_extract_video_rows_from_flat_wbi_result():
     }
     rows = _extract_video_rows(payload)
     assert rows[0]["bvid"] == "BV1aa411c7mD"
+

@@ -16,11 +16,12 @@ import '../../membership/presentation/welcome_pro_claim_host.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../onboarding/presentation/feature_tour_keys.dart';
 import '../../onboarding/presentation/feature_tour_provider.dart';
-import '../../onboarding/presentation/onboarding_provider.dart';
-import '../../onboarding/presentation/focus_recommendation.dart';
+import '../../onboarding/presentation/onboarding_provider.dart'; // readOnboardingCompletedSync
 import '../../onboarding/data/feature_tour_prefs.dart';
 import '../../player/presentation/learning_resume_provider.dart';
+import '../../reading/data/reading_iplus1.dart';
 import '../../reading/domain/reading_doc.dart';
+import '../../reading/presentation/reading_iplus1_provider.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../../router/app_router.dart';
@@ -176,23 +177,20 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
       return '测词汇量定水平';
     }();
     final readingLibrary = ref.watch(readingLibraryProvider);
-    final FocusRecommendation reading = buildFocusRecommendation(
-      profile: ref.watch(onboardingProvider).copyWith(focusId: 'reading'),
-      prefs: ref.watch(learningPreferencesProvider),
-      courses: const <LibraryCourseData>[],
-      readingDocs: readingLibrary.builtin,
-      activeBook: null,
-    );
-    final Iterable<ReadingDoc> articles = <ReadingDoc>[
-      ...readingLibrary.builtin.where(
-        (ReadingDoc doc) =>
-            reading.route == '/reading/${Uri.encodeComponent(doc.id)}',
-      ),
-      ...readingLibrary.builtin.where(
-        (ReadingDoc doc) =>
-            reading.route != '/reading/${Uri.encodeComponent(doc.id)}',
-      ),
-    ].take(3);
+    final AsyncValue<List<ReadingIPlus1Match>> iPlus1Async =
+        ref.watch(readingIPlus1MatchesProvider);
+    final List<ReadingDoc> articles = () {
+      final List<ReadingDoc> ranked = iPlus1Async.maybeWhen(
+        data: (List<ReadingIPlus1Match> matches) => matches
+            .map((ReadingIPlus1Match m) => m.doc)
+            .take(3)
+            .toList(growable: false),
+        orElse: () => const <ReadingDoc>[],
+      );
+      if (ranked.isNotEmpty) return ranked;
+      // Fallback while lexicon loads: keep a short builtin slice.
+      return readingLibrary.builtin.take(3).toList(growable: false);
+    }();
     final bool dark = Theme.of(context).brightness == Brightness.dark;
     final Color bg = dark ? const Color(0xFF141414) : const Color(0xFFF5F5F5);
     final Color surface = dark ? const Color(0xFF242424) : Colors.white;
@@ -444,7 +442,19 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                           leading: const Icon(Icons.auto_stories_outlined),
                           title: Text(article.displayTitle),
                           subtitle: Text(
-                            '${article.level} · ${article.wordCount} 词',
+                            () {
+                              final ReadingIPlus1Match? match =
+                                  iPlus1Async.asData?.value
+                                      .where(
+                                        (ReadingIPlus1Match m) =>
+                                            m.doc.id == article.id,
+                                      )
+                                      .firstOrNull;
+                              if (match == null) {
+                                return '${article.level} · ${article.wordCount} 词';
+                              }
+                              return '${match.band.labelCn} · ${match.rateLabel} · ${article.wordCount} 词';
+                            }(),
                           ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () => context.push(
