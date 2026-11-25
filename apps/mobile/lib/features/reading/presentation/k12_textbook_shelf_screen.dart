@@ -8,6 +8,7 @@ import '../../exam/domain/exam_registry.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../domain/k12_textbook_catalog.dart';
 import '../domain/reading_doc.dart';
+import 'k12_reading_section.dart';
 import 'reading_book_cover.dart';
 import 'reading_library_provider.dart';
 
@@ -169,6 +170,7 @@ class _K12TextbookShelfScreenState
             ),
           ),
           const SizedBox(height: 12),
+          K12ReadingSection(gradeId: _gradeId),
           if (books.isEmpty)
             Card(
               color: AppDesignTokens.appWhite,

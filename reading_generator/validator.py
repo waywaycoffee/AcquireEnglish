@@ -1,4 +1,5 @@
 # 【validator.py】
+from grades import GRADES
 import csv
 import json
 from pathlib import Path
@@ -29,7 +30,9 @@ def validate_one(data: dict) -> list[str]:
 
     article = data.get("article")
     level = data.get("level")
-    bounds = WORD_LIMITS.get(level) if isinstance(level, str) else None
+    bounds = (GRADES[data["grade_id"]]["bounds"] if data.get("grade_id") in GRADES else WORD_LIMITS.get(level) if isinstance(level, str) else None)
+    if "grade_id" in data and data["grade_id"] not in GRADES:
+        errors.append("grade_id非法")
     if bounds is None:
         errors.append("学段level非法")
     if check_text(article, ("passage",), "article"):

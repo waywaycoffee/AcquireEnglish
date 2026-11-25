@@ -40,3 +40,11 @@ python3 reading_generator/mysql_import.py /path/to/reviewed-json
 ```
 
 每篇文章及其从表数据在同一事务中提交，按约定入库为 `ai_original` 和 `pending`。重复运行导入会新增文章记录。
+
+## 全年级 ECS 主题阅读
+
+`generate_grades.py` 按 `grades.py` 的 12 个年级生成首批各一篇（小学一年级至高三），独立校验篇幅、试题及数字人字段，失败最多重试 6 次，已通过的文件可断点复用。当前主题为原创校园生活材料，不宣称为有新闻来源的实时报道。结构校验不代表人工内容审校。
+
+在 ECS 配置 `K12_OUTPUT_DIR=/opt/acquireenglish/services/api/media/reading/k12` 后运行 `python3 reading_generator/generate_grades.py`。密钥复用 API `.env`，不输出密钥。输出包含 `grade_id`，按年级保存 JSON，原子更新 `catalog.json`，App 的 K12 年级书架按该字段筛选，仅显示通过校验的内容。所有文本从 ECS 下载；本流程不生成或打包音视频。完整题目、词汇、句式与数字人问题保留在 JSON，当前书架打开正文进入现有阅读器。
+
+验证：`python3 -m unittest discover -s reading_generator -p test_grades.py`。
