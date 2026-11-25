@@ -93,8 +93,11 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
-            isMinifyEnabled = true
-            isShrinkResources = true
+            // Hotfix 0.2.252: R8 was stripping ML Kit DI deps and crashing
+            // MlKitInitProvider on every cold start. Keep rules restored below;
+            // minify stays off until a minify-on release is re-validated on device.
+            isMinifyEnabled = false
+            isShrinkResources = false
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
