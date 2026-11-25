@@ -94,6 +94,29 @@
         font-size: 0.92rem;
       }
       nav a { margin-right: 14px; }
+      .fan-group {
+        display: grid;
+        gap: 18px;
+        align-items: center;
+        margin-top: 28px;
+      }
+      @media (min-width: 720px) {
+        .fan-group { grid-template-columns: 1.2fr 240px; }
+      }
+      .fan-group img {
+        width: 100%;
+        max-width: 240px;
+        height: auto;
+        border-radius: 14px;
+        background: #fff;
+        justify-self: center;
+      }
+      .fan-group .cap {
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 8px;
+      }
     </style>
   </head>
   <body>
@@ -111,6 +134,7 @@
         <a href="#shots">界面</a>
         <a href="#flow">流程</a>
         <a href="#info">应用信息</a>
+        <a href="#community">交流群</a>
         <a href="/beta.html">内测公告</a>
         <a href="/privacy.html">隐私政策</a>
         <a href="/terms.html">用户协议</a>
@@ -123,6 +147,25 @@
         爱快英语（Acquire English）基于可理解性输入理论：导入真实视频，完成精听、跟读、配音、听写，
         再用数字人口语外教围绕字幕练习表达。本页用于展示应用服务详情，无需登录即可浏览。
       </p>
+
+      <section id="community" class="card fan-group">
+        <div>
+          <h2 style="margin-top:0">加入「佑佑爸粉丝交流群」</h2>
+          <p class="muted">
+            微信扫右侧二维码进群。作者微信号 <code>youyoufairytale</code>；
+            若二维码过期，加作者微信即可索取新码。
+          </p>
+        </div>
+        <div>
+          <img
+            src="/brand/wechat-fan-group-qr.jpg"
+            alt="佑佑爸粉丝交流群微信二维码"
+            width="240"
+            height="365"
+          />
+          <div class="cap">微信扫一扫加入群聊</div>
+        </div>
+      </section>
 
       <h2 id="features">核心服务</h2>
       <div class="grid">
@@ -184,6 +227,10 @@
           <dd><a href="https://acquireenglish.curlhairai.com/">https://acquireenglish.curlhairai.com/</a></dd>
           <dt>本页（纯静态，推荐审核填写）</dt>
           <dd><a href="https://acquireenglish.curlhairai.com/product.html">https://acquireenglish.curlhairai.com/product.html</a></dd>
+          <dt>微信交流群</dt>
+          <dd><a href="#community">佑佑爸粉丝交流群（扫码加入）</a></dd>
+          <dt>作者微信</dt>
+          <dd>youyoufairytale</dd>
           <dt>联系邮箱</dt>
           <dd><a href="mailto:support@curlhairai.com">support@curlhairai.com</a></dd>
         </dl>
@@ -197,6 +244,10 @@
       <div class="card">
         <h3>需要登录才能看官网吗？</h3>
         <p class="muted">不需要。本页与官网首页均可在未登录状态浏览产品详情。</p>
+      </div>
+      <div class="card">
+        <h3>如何加入交流群？</h3>
+        <p class="muted">本页上方提供「佑佑爸粉丝交流群」二维码，微信扫一扫即可加入；也可加作者微信 youyoufairytale。</p>
       </div>
       <div class="card">
         <h3>支持哪些内容来源？</h3>

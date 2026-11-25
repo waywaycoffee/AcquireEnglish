@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import WechatFanGroupCard from "../components/WechatFanGroupCard";
 
 const FEATURES = [
   {
@@ -88,7 +89,7 @@ const FAQ = [
   },
   {
     q: "如何联系我们？",
-    a: "邮箱 support@curlhairai.com，我们会尽快回复产品与账号相关问题。",
+    a: "可扫码加入「佑佑爸粉丝交流群」；也可加作者微信 youyoufairytale，或发邮件至 support@curlhairai.com。",
   },
 ];
 
@@ -105,6 +106,7 @@ export default function LandingPage() {
           <a href="#shots">界面</a>
           <a href="#flow">流程</a>
           <a href="#info">应用信息</a>
+          <a href="#community">交流群</a>
           <Link to="/beta">内测公告</Link>
           <Link to="/privacy">隐私政策</Link>
           <Link to="/terms">用户协议</Link>
@@ -139,6 +141,9 @@ export default function LandingPage() {
               <a className="btn" href="/download.html">
                 下载内测安装包
               </a>
+              <a className="btn ghost" href="#community">
+                加入微信交流群
+              </a>
               <a className="btn ghost" href="#shots">
                 查看应用界面
               </a>
@@ -156,6 +161,8 @@ export default function LandingPage() {
             </ul>
           </div>
         </section>
+
+        <WechatFanGroupCard />
 
         <section id="features" className="landing-section">
           <h2>核心服务</h2>
@@ -251,6 +258,16 @@ export default function LandingPage() {
                   https://acquireenglish.curlhairai.com/product.html
                 </a>
               </dd>
+            </div>
+            <div>
+              <dt>微信交流群</dt>
+              <dd>
+                <a href="#community">佑佑爸粉丝交流群（扫码加入）</a>
+              </dd>
+            </div>
+            <div>
+              <dt>作者微信</dt>
+              <dd>youyoufairytale</dd>
             </div>
             <div>
               <dt>联系邮箱</dt>

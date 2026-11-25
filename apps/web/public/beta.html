@@ -73,6 +73,28 @@
         font-size: 0.92rem;
       }
       nav { margin: 8px 0 20px; display: flex; flex-wrap: wrap; gap: 12px; font-size: 0.95rem; }
+      .fan-group {
+        display: grid;
+        gap: 18px;
+        align-items: center;
+      }
+      @media (min-width: 720px) {
+        .fan-group { grid-template-columns: 1.2fr 240px; }
+      }
+      .fan-group img {
+        width: 100%;
+        max-width: 240px;
+        height: auto;
+        border-radius: 14px;
+        background: #fff;
+        justify-self: center;
+      }
+      .fan-group .cap {
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        margin: 8px 0 12px;
+      }
     </style>
   </head>
   <body>
@@ -91,6 +113,7 @@
         <a href="/">官网首页</a>
         <a href="/download.html">下载 Android</a>
         <a href="#notice">公告</a>
+        <a href="#community">交流群</a>
         <a href="#rules">内测规则</a>
         <a href="#video">视频功能</a>
         <a href="#disclaimer">免责声明</a>
@@ -109,11 +132,35 @@
         </p>
       </section>
 
+      <section id="community" class="card fan-group">
+        <div>
+          <h2 style="margin-top:0">加入「佑佑爸粉丝交流群」</h2>
+          <p class="muted">
+            微信扫右侧二维码进群报 bug、聊学习。作者微信号 <code>youyoufairytale</code>；
+            若二维码过期，加作者微信即可索取新码。
+          </p>
+          <ul>
+            <li>内测 bug 优先在群里响应</li>
+            <li>学习资源与使用技巧交流</li>
+            <li>注册 ID 也可私信作者开通协助</li>
+          </ul>
+        </div>
+        <div>
+          <img
+            src="/brand/wechat-fan-group-qr.jpg"
+            alt="佑佑爸粉丝交流群微信二维码"
+            width="240"
+            height="365"
+          />
+          <div class="cap">微信扫一扫加入群聊</div>
+        </div>
+      </section>
+
       <section id="rules" class="card">
         <h2>内测须知（App 打开固定弹窗）</h2>
         <ol>
           <li>内测用户请把<strong>注册 ID</strong>通过微信发给作者，作者微信号：<code>youyoufairytale</code>。</li>
-          <li>内测用户可加入「<strong>佑佑爸粉丝交流群</strong>」。有 bug 相关问题，作者都会在群里第一时间解决。</li>
+          <li>内测用户可加入「<strong>佑佑爸粉丝交流群</strong>」——请<a href="#community">扫码进群</a>。有 bug 相关问题，作者都会在群里第一时间解决。</li>
           <li>可提供学习资源（各年级真题试卷、影视资源、电子书、各类教材等），直接在 App <strong>社区</strong>上传；审核通过后可额外赠送 <strong>Pro 会员时长</strong>。</li>
           <li style="color:#fca5a5;font-weight:700">各类英语交流资料不得含有敏感内容。一经发现与国家政策法规不符，立刻永久封号处理。</li>
         </ol>

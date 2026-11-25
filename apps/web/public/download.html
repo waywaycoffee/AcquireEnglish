@@ -66,6 +66,29 @@
       a { color: var(--accent); }
       ul { margin: 0; padding-left: 18px; color: var(--muted); font-size: 14px; }
       li { margin: 6px 0; }
+      .fan-group {
+        display: grid;
+        gap: 18px;
+        margin-top: 16px;
+        align-items: center;
+      }
+      @media (min-width: 720px) {
+        .fan-group { grid-template-columns: 1.2fr 240px; }
+      }
+      .fan-group img {
+        width: 100%;
+        max-width: 240px;
+        height: auto;
+        border-radius: 14px;
+        background: #fff;
+        justify-self: center;
+      }
+      .fan-group .cap {
+        text-align: center;
+        color: var(--muted);
+        font-size: 13px;
+        margin-top: 8px;
+      }
     </style>
   </head>
   <body>
@@ -93,13 +116,37 @@
           <h2>内测须知摘要</h2>
           <ul>
             <li>注册 ID 微信发给作者：<code>youyoufairytale</code></li>
-            <li>可加入「佑佑爸粉丝交流群」报 bug</li>
+            <li>扫下方二维码加入「佑佑爸粉丝交流群」报 bug</li>
             <li>社区上传学习资源，审核通过赠 Pro 时长</li>
             <li>违规敏感内容一经发现永久封号</li>
           </ul>
           <a class="btn ghost" href="/beta.html">阅读完整内测公告</a>
         </section>
       </div>
+
+      <section class="card fan-group" id="community">
+        <div>
+          <h2>佑佑爸粉丝交流群</h2>
+          <p>
+            微信扫右侧二维码进群。作者微信号 <code>youyoufairytale</code>；
+            若二维码过期，加作者微信即可索取新码。
+          </p>
+          <ul>
+            <li>内测 bug 优先在群里响应</li>
+            <li>学习资源与使用技巧交流</li>
+            <li>注册 ID 也可私信作者开通协助</li>
+          </ul>
+        </div>
+        <div>
+          <img
+            src="/brand/wechat-fan-group-qr.jpg"
+            alt="佑佑爸粉丝交流群微信二维码"
+            width="240"
+            height="365"
+          />
+          <div class="cap">微信扫一扫加入群聊</div>
+        </div>
+      </section>
 
       <section class="card" style="margin-top: 16px">
         <h2>安装注意</h2>

@@ -1,4 +1,5 @@
 import { Link } from "react-router-dom";
+import WechatFanGroupCard from "../components/WechatFanGroupCard";
 
 export default function BetaPage() {
   return (
@@ -11,6 +12,7 @@ export default function BetaPage() {
         <nav className="landing-nav-links">
           <Link to="/">官网首页</Link>
           <a href="#notice">公告</a>
+          <a href="#community">交流群</a>
           <a href="#guide">内测说明</a>
           <a href="#video">视频功能</a>
           <a href="#duty">社区共建</a>
@@ -39,6 +41,9 @@ export default function BetaPage() {
               <a className="btn" href="/download.html">
                 下载 Android APK
               </a>
+              <a className="btn ghost" href="#community">
+                扫码加交流群
+              </a>
               <a className="btn ghost" href="#rules">
                 阅读内测规则
               </a>
@@ -56,6 +61,8 @@ export default function BetaPage() {
           </aside>
         </section>
 
+        <WechatFanGroupCard />
+
         <section id="rules" className="landing-section card beta-block">
           <h2>内测须知（App 打开固定弹窗）</h2>
           <ol className="beta-list">
@@ -64,7 +71,8 @@ export default function BetaPage() {
               <code>youyoufairytale</code>。
             </li>
             <li>
-              内测用户可加入「<strong>佑佑爸粉丝交流群</strong>」。有 bug
+              内测用户可加入「<strong>佑佑爸粉丝交流群</strong>」——请
+              <a href="#community">扫码进群</a>。有 bug
               相关问题，作者都会在群里第一时间解决。
             </li>
             <li>

@@ -442,6 +442,49 @@ input {
   margin-top: 56px;
 }
 
+.wechat-fan-group {
+  display: grid;
+  grid-template-columns: minmax(0, 1.2fr) minmax(220px, 280px);
+  gap: 28px;
+  align-items: center;
+  padding: 28px;
+}
+
+.wechat-fan-group-copy h2 {
+  margin: 6px 0 12px;
+}
+
+.wechat-fan-group-qr {
+  margin: 0;
+  text-align: center;
+}
+
+.wechat-fan-group-qr img {
+  width: min(100%, 280px);
+  height: auto;
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.18);
+}
+
+.wechat-fan-group-qr figcaption {
+  margin-top: 10px;
+  font-size: 13px;
+}
+
+@media (max-width: 800px) {
+  .wechat-fan-group {
+    grid-template-columns: 1fr;
+    justify-items: center;
+    text-align: center;
+  }
+
+  .wechat-fan-group .landing-hero-points {
+    text-align: left;
+    display: inline-block;
+  }
+}
+
 .landing-section h2 {
   font-family: var(--font-display);
   font-size: 1.6rem;
