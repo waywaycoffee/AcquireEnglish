@@ -55,7 +55,7 @@ word_list最多3项音标释义准确；long_sentences恰好2项，sentence必�
             data['article']['word_count'] = len(data['article']['passage'].split())
             errors = validate(data, grade_id)
             if errors:
-                feedback = '\n修正这些错误：'+'；'.join(errors)+'\n在此JSON上修正，同步修正题目和原文引用：'+json.dumps(data,ensure_ascii=False)
+                feedback = '\n修正这些错误：'+'；'.join(errors)+'。若正文过长，必须实际删减到目标词数再输出；evidence_quote请复制不含对话引号的原文叙述句，不能自行改写或替换引号。'+'\n在此JSON上修正，同步修正题目和原文引用：'+json.dumps(data,ensure_ascii=False)
                 print(grade_id,number,'RETRY',attempt+1,'；'.join(errors),flush=True)
                 continue
             (ROOT / 'official' / f'{grade_id}_{number:02d}.draft.json').write_text(json.dumps(data,ensure_ascii=False))
