@@ -4,7 +4,8 @@
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AcquireEnglish 运营后台</title>
-  <link rel="stylesheet" href="./styles.css" />
+  <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
+  <link rel="stylesheet" href="./styles.css?v=20261125c" />
 </head>
 <body>
   <div id="loginView" class="shell login-shell hidden">
@@ -133,10 +134,12 @@
               <option value="module">模块</option>
               <option value="credits">学分 / 钱包</option>
             </select>
-            <button class="btn primary" type="submit">筛选</button>
+            <button class="btn primary" type="submit">筛选订单</button>
           </form>
         </div>
         <div id="commerceOverview" class="kpi-row"></div>
+        <div id="commerceTodayUsers" class="section commerce-recent"></div>
+        <div id="commerceAllUsers" class="section commerce-recent"></div>
         <div id="commerceOrdersList" class="table-wrap"></div>
       </div>
     </section>
@@ -183,6 +186,6 @@
     </section>
   </div>
 
-  <script src="./app.js"></script>
+  <script src="./app.js?v=20261125c"></script>
 </body>
 </html>

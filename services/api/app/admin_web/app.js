@@ -532,6 +532,50 @@
     });
   }
 
+  function renderUserRosterTable(rows, emptyText) {
+    return `<div class="table-wrap"><table>
+      <thead><tr><th>ID</th><th>昵称</th><th>邮箱</th><th>手机</th><th>微信</th><th>注册时间</th></tr></thead>
+      <tbody>
+        ${
+          (rows || [])
+            .map(
+              (u) => `<tr class="commerce-user-row" data-id="${u.id}" tabindex="0">
+            <td>${u.id}</td>
+            <td>${escapeHtml(u.display_name || "—")}</td>
+            <td>${escapeHtml(u.email || "—")}</td>
+            <td>${escapeHtml(u.phone || "—")}</td>
+            <td>${u.wechat_bound ? "已绑定" : "—"}</td>
+            <td>${escapeHtml(formatDateTime(u.created_at))}</td>
+          </tr>`
+            )
+            .join("") || `<tr><td colspan="6" class="muted">${escapeHtml(emptyText)}</td></tr>`
+        }
+      </tbody>
+    </table></div>`;
+  }
+
+  function bindCommerceUserRows(root) {
+    if (!root) return;
+    root.querySelectorAll(".commerce-user-row").forEach((row) => {
+      const openUser = () => {
+        const userId = Number(row.dataset.id);
+        if (!userId) return;
+        state.selectedId = userId;
+        setTab("users");
+        loadUsers()
+          .then(() => loadDetail(userId))
+          .catch((e) => alert(e.message));
+      };
+      row.addEventListener("click", openUser);
+      row.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          openUser();
+        }
+      });
+    });
+  }
+
   async function loadCommerce() {
     const [overview, orders] = await Promise.all([
       api("/commerce/overview"),
@@ -544,11 +588,13 @@
     const trial = overview.trial || {};
     const users = overview.users || {};
     const orderStats = overview.orders || {};
+    const todayRows = users.today || [];
+    const allRows = users.all || users.recent || [];
     $("commerceOverview").innerHTML = `
       <div class="stat"><span class="muted">注册用户总数</span><strong>${num(
         users.total
       )}</strong></div>
-      <div class="stat"><span class="muted">今日新注册</span><strong>${num(
+      <div class="stat"><span class="muted">今日新注册（上海时区）</span><strong>${num(
         users.new_today
       )}</strong></div>
       <div class="stat"><span class="muted">近 7 日新注册</span><strong>${num(
@@ -577,30 +623,27 @@
       <div class="stat"><span class="muted">SKU / 积分流水</span><strong>${num(
         Object.keys(overview.skus_by_kind || {}).length
       )} / ${num(overview.points_ledger_rows)}</strong></div>`;
-    const recent = users.recent || [];
-    const recentHtml = `<div class="section commerce-recent">
-      <h3>最近注册用户</h3>
-      <div class="table-wrap"><table>
-        <thead><tr><th>ID</th><th>昵称</th><th>邮箱</th><th>手机</th><th>注册时间</th></tr></thead>
-        <tbody>
-          ${
-            recent
-              .map(
-                (u) => `<tr>
-              <td>${u.id}</td>
-              <td>${escapeHtml(u.display_name || "—")}</td>
-              <td>${escapeHtml(u.email || "—")}</td>
-              <td>${escapeHtml(u.phone || "—")}</td>
-              <td>${escapeHtml(formatDateTime(u.created_at))}</td>
-            </tr>`
-              )
-              .join("") || `<tr><td colspan="5" class="muted">暂无注册用户</td></tr>`
-          }
-        </tbody>
-      </table></div>
-    </div>`;
+
+    const todayEl = $("commerceTodayUsers");
+    if (todayEl) {
+      todayEl.innerHTML = `<h3>今日注册用户（${num(todayRows.length)} 人）</h3>
+        ${renderUserRosterTable(todayRows, "今天还没有新注册用户")}
+        <p class="muted">按 Asia/Shanghai 自然日统计；点击一行可打开该用户资产页。</p>`;
+      bindCommerceUserRows(todayEl);
+    }
+
+    const allEl = $("commerceAllUsers");
+    if (allEl) {
+      allEl.innerHTML = `<h3>系统现有用户列表（最近 ${num(allRows.length)} / 共 ${num(
+        users.total
+      )}）</h3>
+        ${renderUserRosterTable(allRows, "暂无注册用户")}
+        <p class="muted">完整翻页与搜索也可到顶部「用户资产」页。</p>`;
+      bindCommerceUserRows(allEl);
+    }
+
     const items = orders.items || [];
-    $("commerceOrdersList").innerHTML = `${recentHtml}<h3>订单列表</h3><table>
+    $("commerceOrdersList").innerHTML = `<h3>订单列表</h3><table>
       <thead><tr><th>ID</th><th>用户</th><th>状态</th><th>渠道</th><th>金额</th><th>SKU</th><th>时间</th></tr></thead>
       <tbody>
         ${

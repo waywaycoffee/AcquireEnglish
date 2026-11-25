@@ -674,7 +674,18 @@ async def commerce_overview(
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
     now = datetime.now(tz=timezone.utc)
-    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Ops day boundary follows China local calendar (Asia/Shanghai).
+    try:
+        from zoneinfo import ZoneInfo
+
+        cst = ZoneInfo("Asia/Shanghai")
+        day_start = (
+            datetime.now(tz=cst)
+            .replace(hour=0, minute=0, second=0, microsecond=0)
+            .astimezone(timezone.utc)
+        )
+    except Exception:
+        day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
     since_7d = now - timedelta(days=7)
     since_30d = now - timedelta(days=30)
 
@@ -745,8 +756,30 @@ async def commerce_overview(
         or 0
     )
 
+    def _user_row(u: User) -> dict[str, Any]:
+        return {
+            "id": u.id,
+            "display_name": u.display_name,
+            "email": u.email,
+            "phone": u.phone,
+            "wechat_bound": bool(u.wechat_openid),
+            "created_at": _iso(u.created_at),
+        }
+
+    today_users = (
+        await db.execute(
+            select(User)
+            .where(User.created_at >= day_start)
+            .order_by(User.created_at.desc(), User.id.desc())
+            .limit(200)
+        )
+    ).scalars().all()
     recent_users = (
-        await db.execute(select(User).order_by(User.created_at.desc(), User.id.desc()).limit(12))
+        await db.execute(select(User).order_by(User.created_at.desc(), User.id.desc()).limit(30))
+    ).scalars().all()
+    # Full roster snapshot for the membership page (newest first).
+    all_users = (
+        await db.execute(select(User).order_by(User.created_at.desc(), User.id.desc()).limit(200))
     ).scalars().all()
 
     trial_coupons = await _count(
@@ -771,16 +804,10 @@ async def commerce_overview(
             "new_30d": new_users_30d,
             "active_pro": active_pro,
             "new_pro_7d": new_pro_7d,
-            "recent": [
-                {
-                    "id": u.id,
-                    "display_name": u.display_name,
-                    "email": u.email,
-                    "phone": u.phone,
-                    "created_at": _iso(u.created_at),
-                }
-                for u in recent_users
-            ],
+            "day_timezone": "Asia/Shanghai",
+            "today": [_user_row(u) for u in today_users],
+            "recent": [_user_row(u) for u in recent_users],
+            "all": [_user_row(u) for u in all_users],
         },
         "orders": {
             "by_status": orders_by_status,
