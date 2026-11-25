@@ -510,7 +510,10 @@ async def set_user_membership(
         else:
             ends = ends.astimezone(timezone.utc)
         if ends <= now:
-            raise HTTPException(400, "ends_at must be in the future")
+            raise HTTPException(
+                400,
+                f"到期时间必须晚于现在（收到 {ends.isoformat()}，当前 {now.isoformat()}）",
+            )
         row.ends_at = ends
         mode = "absolute"
     else:

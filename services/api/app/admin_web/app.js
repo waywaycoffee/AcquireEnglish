@@ -1941,21 +1941,20 @@
             <label>当前到期
               <input type="text" readonly value="${escapeAttr(proEndsLabel(data))}" />
             </label>
-            <label class="full">指定到期时间（本地时区；填写后优先于天数）
-              <input name="ends_at_local" type="datetime-local" value="${escapeAttr(proEndsLocalValue(data))}" />
-            </label>
-            <label>有效天数
-              <input name="duration_days" type="number" min="1" max="3650" value="30" />
-            </label>
-            <label>天数用法
-              <select name="duration_mode">
-                <option value="set">从今天起算</option>
-                <option value="extend">在现有到期上叠加</option>
+            <label class="full">调整方式
+              <select name="pro_mode" id="proModeSelect">
+                <option value="extend" selected>按天数叠加到现有到期</option>
+                <option value="set">按天数从今天起算</option>
+                <option value="absolute">指定到期时间</option>
+                <option value="lifetime">永久 Pro</option>
               </select>
             </label>
-            <label class="full" style="display:flex;align-items:center;gap:8px">
-              <input name="lifetime" type="checkbox" />
-              永久 Pro（无到期时间）
+            <label id="proDaysField">有效天数
+              <input name="duration_days" type="number" min="1" max="3650" value="30" />
+            </label>
+            <label class="full" id="proEndsField" hidden>
+              指定到期时间（本地时区）
+              <input name="ends_at_local" type="datetime-local" value="" />
             </label>
             <button class="btn primary full" type="submit">保存会员有效期</button>
           </form>
@@ -2065,58 +2064,87 @@
         alert(result.temporary_password ? `新密码只显示这一次：${result.temporary_password}` : "密码已修改");
       } catch (e) { alert(e.message); }
     });
+    const syncProModeFields = () => {
+      const mode = String($("proModeSelect")?.value || "extend");
+      const daysField = $("proDaysField");
+      const endsField = $("proEndsField");
+      if (daysField) daysField.hidden = mode === "absolute" || mode === "lifetime";
+      if (endsField) endsField.hidden = mode !== "absolute";
+    };
+    $("proModeSelect")?.addEventListener("change", syncProModeFields);
+    syncProModeFields();
+
     $("membershipForm")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const fd = new FormData(ev.target);
       const level = String(fd.get("level") || "free");
-      const lifetime = fd.get("lifetime") === "on";
-      const durationMode = String(fd.get("duration_mode") || "set");
+      const proMode = String(fd.get("pro_mode") || "extend");
       const daysRaw = String(fd.get("duration_days") || "").trim();
       const durationDays = daysRaw === "" ? null : Number(daysRaw);
       let endsAt = null;
-      try {
-        endsAt = localInputToIso(fd.get("ends_at_local"));
-      } catch (e) {
-        alert(e.message);
-        return;
+      if (level === "pro" && proMode === "absolute") {
+        try {
+          endsAt = localInputToIso(fd.get("ends_at_local"));
+        } catch (e) {
+          alert(e.message);
+          return;
+        }
+        if (!endsAt) {
+          alert("请选择到期时间");
+          return;
+        }
       }
-      if (level === "pro" && !lifetime && !endsAt && !durationDays) {
-        alert("请填写到期时间、有效天数，或勾选永久 Pro");
+      if (
+        level === "pro" &&
+        (proMode === "extend" || proMode === "set") &&
+        (!durationDays || durationDays < 1)
+      ) {
+        alert("请填写有效天数");
         return;
       }
       const summary =
         level === "free"
           ? "免费（吊销 Pro）"
-          : lifetime
+          : proMode === "lifetime"
             ? "永久 Pro"
-            : endsAt
+            : proMode === "absolute"
               ? `Pro，到期 ${new Date(endsAt).toLocaleString("zh-CN")}`
-              : durationMode === "extend"
+              : proMode === "extend"
                 ? `Pro，在现有到期上叠加 ${durationDays} 天`
-                : `Pro，从今天起 ${durationDays || 30} 天`;
+                : `Pro，从今天起 ${durationDays} 天`;
       if (!confirm(`确认将用户 #${userId} 设为：${summary}？`)) return;
       try {
-        const body = { level, lifetime: level === "pro" && lifetime };
+        const body = { level };
         if (level === "pro") {
-          if (lifetime) {
-            body.duration_days = null;
-            body.ends_at = null;
-          } else if (endsAt) {
+          if (proMode === "lifetime") {
+            body.lifetime = true;
+          } else if (proMode === "absolute") {
             body.ends_at = endsAt;
-            body.duration_days = null;
           } else {
-            body.duration_days = durationDays || 30;
-            body.duration_mode = durationMode;
-            body.ends_at = null;
+            body.duration_days = durationDays;
+            body.duration_mode = proMode === "extend" ? "extend" : "set";
           }
         }
-        await api(`/users/${userId}/membership`, {
+        const result = await api(`/users/${userId}/membership`, {
           method: "PUT",
           body: JSON.stringify(body),
         });
-        await Promise.all([loadDetail(userId), loadStats()]);
+        const savedEnds = result?.entitlement?.ends_at;
+        alert(
+          level === "free"
+            ? "已改为免费"
+            : savedEnds
+              ? `已保存。新到期：${new Date(savedEnds).toLocaleString("zh-CN")}`
+              : "已保存为永久 Pro"
+        );
+        try {
+          await loadDetail(userId);
+        } catch (_) {}
+        try {
+          await loadStats();
+        } catch (_) {}
       } catch (e) {
-        alert(e.message);
+        alert(`保存失败：${e.message}`);
       }
     });
     $("grantForm")?.addEventListener("submit", async (ev) => {
