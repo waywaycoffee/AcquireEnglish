@@ -34,7 +34,9 @@ import 'invite_promo_sheet.dart';
 import '../../home/presentation/widgets/theme_widget.dart';
 import 'bilibili_login_sheet.dart';
 import 'cloud_subtitle_library_screen.dart';
+import '../../onboarding/data/feature_tour_prefs.dart';
 import '../../onboarding/presentation/auth_sources_settings_screen.dart';
+import '../../onboarding/presentation/feature_tour_provider.dart';
 import 'learning_preferences_screen.dart';
 import 'settings_provider.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
@@ -301,6 +303,19 @@ class SettingsScreen extends ConsumerWidget {
                 description: '哔哩哔哩、YouTube、网盘授权与导入',
                 icon: Icons.link_rounded,
                 onTap: () => context.push(AuthSourcesSettingsScreen.route),
+              ),
+              _ActionRow(
+                title: '重看功能引导',
+                description: '再次高亮首页「最近看过」与底栏主要入口',
+                icon: Icons.tour_outlined,
+                onTap: () async {
+                  await resetHomeFeatureTourSeen();
+                  if (!context.mounted) return;
+                  context.go('/home');
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    ref.read(featureTourProvider.notifier).start(force: true);
+                  });
+                },
               ),
               _ActionRow(
                 title: '软件优化建议',

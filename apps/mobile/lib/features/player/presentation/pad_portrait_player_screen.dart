@@ -124,6 +124,8 @@ import 'widgets/study_shell_tokens.dart';
 import 'widgets/study_top_bar.dart';
 import 'widgets/player_video_options.dart';
 import 'widgets/study_word_cards_tab.dart';
+import 'widgets/tutorial_overlay.dart';
+import '../../onboarding/data/feature_tour_prefs.dart';
 import 'episode_study_progress_provider.dart';
 
 /// Build a whole-episode English excerpt for oral-coach topic generation.
@@ -321,10 +323,12 @@ class PadPortraitPlayerScreenState
   StudyLoopSettings _loopSettings = const StudyLoopSettings();
   int _loopCompleted = 0;
   bool _loopIntervalPending = false;
+  bool _showListenTip = false;
 
   @override
   void initState() {
     super.initState();
+    _showListenTip = !readPlayerListenTipSeen();
     _studyTab = switch (widget.videoPlanActivity) {
       'words' => StudyModeTab.wordCards,
       'practice' => StudyModeTab.practice,
@@ -4119,6 +4123,13 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                     ),
                   ),
                 ),
+              ),
+            if (_showListenTip && !_isBootstrapping)
+              TutorialOverlay(
+                onDismiss: () {
+                  setState(() => _showListenTip = false);
+                  unawaited(markPlayerListenTipSeen());
+                },
               ),
           ],
         ),

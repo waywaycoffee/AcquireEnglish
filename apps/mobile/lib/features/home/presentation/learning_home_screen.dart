@@ -14,8 +14,11 @@ import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../membership/presentation/welcome_pro_claim_host.dart';
 import '../../navigation/presentation/navigation_destination.dart';
+import '../../onboarding/presentation/feature_tour_keys.dart';
+import '../../onboarding/presentation/feature_tour_provider.dart';
 import '../../onboarding/presentation/onboarding_provider.dart';
 import '../../onboarding/presentation/focus_recommendation.dart';
+import '../../onboarding/data/feature_tour_prefs.dart';
 import '../../player/presentation/learning_resume_provider.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_library_provider.dart';
@@ -59,7 +62,17 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
     }
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_pollFingerprintNotifications());
+      _maybeStartFeatureTour();
     });
+  }
+
+  void _maybeStartFeatureTour() {
+    if (!mounted) return;
+    final AuthSessionState auth = ref.read(authSessionProvider);
+    if (!auth.isLoggedIn) return;
+    if (!readOnboardingCompletedSync()) return;
+    if (readHomeFeatureTourSeen()) return;
+    ref.read(featureTourProvider.notifier).start();
   }
 
   Future<void> _pollFingerprintNotifications() async {
@@ -359,50 +372,59 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 12),
-                    text('最近看过', 16, bold: true),
-                    const SizedBox(height: 10),
-                    if (readingLibrary.continueDoc != null) ...<Widget>[
-                      Card(
-                        child: ListTile(
-                          leading: Icon(
-                            Icons.menu_book_rounded,
-                            color: accent,
-                          ),
-                          title: Text(
-                            readingLibrary.continueDoc!.displayTitle,
-                          ),
-                          subtitle: Text(
-                            '继续阅读 · 约 ${readingLibrary.continueDoc!.wordCount} 词',
-                          ),
-                          trailing: const Icon(Icons.chevron_right),
-                          onTap: () => context.push(
-                            '/reading/${Uri.encodeComponent(readingLibrary.continueDoc!.id)}',
-                          ),
-                        ),
+                    KeyedSubtree(
+                      key: FeatureTourKeys.recentWatched,
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
+                        children: <Widget>[
+                          text('最近看过', 16, bold: true),
+                          const SizedBox(height: 10),
+                          if (readingLibrary.continueDoc != null) ...<Widget>[
+                            Card(
+                              child: ListTile(
+                                leading: Icon(
+                                  Icons.menu_book_rounded,
+                                  color: accent,
+                                ),
+                                title: Text(
+                                  readingLibrary.continueDoc!.displayTitle,
+                                ),
+                                subtitle: Text(
+                                  '继续阅读 · 约 ${readingLibrary.continueDoc!.wordCount} 词',
+                                ),
+                                trailing: const Icon(Icons.chevron_right),
+                                onTap: () => context.push(
+                                  '/reading/${Uri.encodeComponent(readingLibrary.continueDoc!.id)}',
+                                ),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                          ],
+                          if (recentCourses.isEmpty &&
+                              readingLibrary.continueDoc == null)
+                            section(
+                              text(
+                                '还没有最近记录。看完视频或打开文章后会出现在这里。',
+                                13,
+                                color: muted,
+                              ),
+                            )
+                          else if (recentCourses.isNotEmpty)
+                            RecentCourses(
+                              courses: recentCourses,
+                              onTap: (LibraryCourseData course) =>
+                                  context.push(
+                                Uri(
+                                  path: '/library',
+                                  queryParameters: <String, String>{
+                                    'courseId': course.id,
+                                  },
+                                ).toString(),
+                              ),
+                            ),
+                        ],
                       ),
-                      const SizedBox(height: 8),
-                    ],
-                    if (recentCourses.isEmpty &&
-                        readingLibrary.continueDoc == null)
-                      section(
-                        text(
-                          '还没有最近记录。看完视频或打开文章后会出现在这里。',
-                          13,
-                          color: muted,
-                        ),
-                      )
-                    else if (recentCourses.isNotEmpty)
-                      RecentCourses(
-                        courses: recentCourses,
-                        onTap: (LibraryCourseData course) => context.push(
-                          Uri(
-                            path: '/library',
-                            queryParameters: <String, String>{
-                              'courseId': course.id,
-                            },
-                          ).toString(),
-                        ),
-                      ),
+                    ),
                     const SizedBox(height: 24),
                     text('推荐视频', 21, bold: true),
                     const SizedBox(height: 12),

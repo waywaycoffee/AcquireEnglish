@@ -3,6 +3,7 @@ import 'dart:ui';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../onboarding/presentation/feature_tour_keys.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../data/bottom_nav_scroll_hint.dart';
 import 'navigation_destination.dart';
@@ -33,7 +34,6 @@ class FloatingBottomNav extends StatefulWidget {
   State<FloatingBottomNav> createState() => FloatingBottomNavState();
 }
 
-@visibleForTesting
 class FloatingBottomNavState extends State<FloatingBottomNav> {
   final ScrollController _scrollController = ScrollController();
   bool _showHint = false;
@@ -66,10 +66,44 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
         _centerCurrent(animated: true);
       });
     }
-    if (oldWidget.forceShowScrollHint != widget.forceShowScrollHint &&
-        widget.forceShowScrollHint != null) {
-      _showHint = widget.forceShowScrollHint!;
+    if (oldWidget.forceShowScrollHint != widget.forceShowScrollHint) {
+      if (widget.forceShowScrollHint != null) {
+        _showHint = widget.forceShowScrollHint!;
+      } else {
+        _showHint = !readBottomNavScrollHintSeen();
+      }
     }
+  }
+
+  /// Scrolls the bar so [destination] is visible (used by feature tour).
+  void ensureDestinationVisible(AppNavDestination destination) {
+    final int index = barDestinations.indexOf(destination);
+    if (index < 0) return;
+    _scrollToIndex(index);
+  }
+
+  void ensureMoreVisible() {
+    _scrollToIndex(_moreIndex);
+  }
+
+  void _scrollToIndex(int index) {
+    if (!_scrollController.hasClients) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        _scrollToIndex(index);
+      });
+      return;
+    }
+    final double viewport = _scrollController.position.viewportDimension;
+    if (viewport <= 0) return;
+    final double itemWidth = _itemWidth(viewport);
+    final double target = (index * itemWidth) - (viewport - itemWidth) / 2;
+    final double clamped = target.clamp(
+      0.0,
+      _scrollController.position.maxScrollExtent,
+    );
+    // Jump (not animate) so tour GlobalKeys attach on the next frame.
+    _scrollController.jumpTo(clamped);
   }
 
   @override
@@ -211,6 +245,7 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
                                 itemBuilder: (BuildContext context, int index) {
                                   if (index == _moreIndex) {
                                     return SizedBox(
+                                      key: FeatureTourKeys.navMore,
                                       width: itemWidth,
                                       child: _MoreNavItem(
                                         selected: moreSelected,
@@ -221,7 +256,17 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
                                   }
                                   final AppNavDestination destination =
                                       barDestinations[index];
+                                  final Key? tourKey = switch (destination) {
+                                    AppNavDestination.library =>
+                                      FeatureTourKeys.navLibrary,
+                                    AppNavDestination.reading =>
+                                      FeatureTourKeys.navReading,
+                                    AppNavDestination.oralCoach =>
+                                      FeatureTourKeys.navOral,
+                                    _ => null,
+                                  };
                                   return SizedBox(
+                                    key: tourKey,
                                     width: itemWidth,
                                     child: _NavItem(
                                       destination: destination,

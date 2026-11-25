@@ -1,12 +1,17 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../navigation/presentation/floating_bottom_nav.dart';
 import '../../../navigation/presentation/navigation_destination.dart';
+import '../../../onboarding/data/feature_tour_prefs.dart';
+import '../../../onboarding/presentation/feature_tour_keys.dart';
+import '../../../onboarding/presentation/feature_tour_overlay.dart';
+import '../../../onboarding/presentation/feature_tour_provider.dart';
 import '../continue_learning_button.dart';
 import 'app_design_tokens.dart';
 import 'pad_sidebar.dart';
 
-class PadScaffold extends StatelessWidget {
+class PadScaffold extends ConsumerWidget {
   const PadScaffold({
     required this.currentDestination,
     required this.body,
@@ -29,11 +34,14 @@ class PadScaffold extends StatelessWidget {
   final Color? backgroundColor;
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
     final Size size = MediaQuery.sizeOf(context);
     final bool isPortrait = size.height > size.width;
     final bool useBottomNavigation = size.width < 840 || isPortrait;
     final Color scaffoldColor = backgroundColor ?? AppDesignTokens.softWhite;
+    final FeatureTourState tour = ref.watch(featureTourProvider);
+    final bool suppressScrollHint =
+        tour.active || !readHomeFeatureTourSeen();
     final Widget content = _PadBackdrop(
       flatColor: backgroundColor,
       child: Column(
@@ -44,8 +52,9 @@ class PadScaffold extends StatelessWidget {
       ),
     );
 
+    final Widget scaffold;
     if (showNavigation && useBottomNavigation && useBottomTabWhenPortrait) {
-      return Scaffold(
+      scaffold = Scaffold(
         backgroundColor: scaffoldColor,
         floatingActionButton: showContinueLearning
             ? const ContinueLearningButton()
@@ -53,25 +62,41 @@ class PadScaffold extends StatelessWidget {
         body: SafeArea(top: false, bottom: false, child: content),
         bottomNavigationBar: SafeArea(
           top: false,
-          child: FloatingBottomNav(current: currentDestination),
+          child: FloatingBottomNav(
+            key: FeatureTourKeys.bottomNav,
+            current: currentDestination,
+            forceShowScrollHint: suppressScrollHint ? false : null,
+          ),
+        ),
+      );
+    } else {
+      scaffold = Scaffold(
+        backgroundColor: scaffoldColor,
+        floatingActionButton: showContinueLearning
+            ? const ContinueLearningButton()
+            : null,
+        body: SafeArea(
+          top: false,
+          child: Row(
+            children: <Widget>[
+              if (showNavigation) PadSidebar(current: currentDestination),
+              Expanded(child: content),
+            ],
+          ),
         ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: scaffoldColor,
-      floatingActionButton: showContinueLearning
-          ? const ContinueLearningButton()
-          : null,
-      body: SafeArea(
-        top: false,
-        child: Row(
-          children: <Widget>[
-            if (showNavigation) PadSidebar(current: currentDestination),
-            Expanded(child: content),
-          ],
-        ),
-      ),
+    if (!tour.active) {
+      return scaffold;
+    }
+
+    return Stack(
+      fit: StackFit.expand,
+      children: <Widget>[
+        scaffold,
+        const FeatureTourOverlay(),
+      ],
     );
   }
 }
