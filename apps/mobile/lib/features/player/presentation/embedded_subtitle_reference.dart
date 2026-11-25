@@ -1,8 +1,9 @@
 import 'dart:io';
 
 import 'package:media_kit/media_kit.dart';
+import 'package:path_provider/path_provider.dart';
 
-import 'desktop_ffmpeg.dart';
+import 'ffmpeg_runner.dart';
 import 'player_mock_state.dart';
 import 'player_subtitle_loader.dart';
 
@@ -60,33 +61,50 @@ int _bestChineseTrackIndex(List<SubtitleTrack> tracks) {
 Future<List<PlayerSubtitleLine>> _extractTrackSrt({
   required String videoPath,
   required int streamIndex,
-  required String? ffmpeg,
 }) async {
-  if (ffmpeg == null || streamIndex < 0) {
-    return const <PlayerSubtitleLine>[];
-  }
+  if (streamIndex < 0) return const <PlayerSubtitleLine>[];
+  if (!await isFfmpegAvailable()) return const <PlayerSubtitleLine>[];
+  Directory? tmpDir;
   try {
-    final ProcessResult result = await Process.run(ffmpeg, <String>[
+    tmpDir = await getTemporaryDirectory();
+    final String outPath =
+        '${tmpDir.path}${Platform.pathSeparator}ae_emb_${streamIndex}_${DateTime.now().microsecondsSinceEpoch}.srt';
+    final FfmpegRunResult result = await runFfmpeg(<String>[
       '-v',
       'error',
+      '-y',
       '-i',
       videoPath,
       '-map',
       '0:s:$streamIndex',
-      '-f',
+      '-c:s',
       'srt',
-      '-',
+      outPath,
     ]);
-    if (result.exitCode != 0) {
-      return const <PlayerSubtitleLine>[];
+    final File out = File(outPath);
+    if (!result.ok || !out.existsSync()) {
+      // Fallback: some builds prefer -f srt without -c:s.
+      final FfmpegRunResult retry = await runFfmpeg(<String>[
+        '-v',
+        'error',
+        '-y',
+        '-i',
+        videoPath,
+        '-map',
+        '0:s:$streamIndex',
+        '-f',
+        'srt',
+        outPath,
+      ]);
+      if (!retry.ok || !out.existsSync()) {
+        return const <PlayerSubtitleLine>[];
+      }
     }
-    final Object? out = result.stdout;
-    final String text = out is String
-        ? out
-        : (out is List<int> ? String.fromCharCodes(out) : '');
-    if (text.trim().isEmpty) {
-      return const <PlayerSubtitleLine>[];
-    }
+    final String text = await out.readAsString();
+    try {
+      await out.delete();
+    } catch (_) {}
+    if (text.trim().isEmpty) return const <PlayerSubtitleLine>[];
     return parseSubtitleLines(text);
   } catch (_) {
     return const <PlayerSubtitleLine>[];
@@ -99,7 +117,6 @@ Future<List<PlayerSubtitleLine>> extractEmbeddedEnglishSubtitles({
   required List<SubtitleTrack> tracks,
 }) async {
   if (tracks.isEmpty) return const <PlayerSubtitleLine>[];
-  // Network URLs cannot be ffmpeg-mapped from the device path.
   final String path = videoPath.trim();
   if (path.isEmpty ||
       path.startsWith('http://') ||
@@ -110,14 +127,12 @@ Future<List<PlayerSubtitleLine>> extractEmbeddedEnglishSubtitles({
     return const <PlayerSubtitleLine>[];
   }
   try {
-    final String? ffmpeg = await findDesktopFfmpeg();
-    if (ffmpeg == null) return const <PlayerSubtitleLine>[];
+    if (!await isFfmpegAvailable()) return const <PlayerSubtitleLine>[];
 
     final int enIndex = _bestEnglishTrackIndex(tracks);
     final List<PlayerSubtitleLine> english = await _extractTrackSrt(
       videoPath: path,
       streamIndex: enIndex,
-      ffmpeg: ffmpeg,
     );
     if (english.isEmpty) return const <PlayerSubtitleLine>[];
 
@@ -128,12 +143,10 @@ Future<List<PlayerSubtitleLine>> extractEmbeddedEnglishSubtitles({
     final List<PlayerSubtitleLine> chinese = await _extractTrackSrt(
       videoPath: path,
       streamIndex: zhIndex,
-      ffmpeg: ffmpeg,
     );
     if (chinese.isEmpty) return english;
     return mergeSubtitleLines(englishLines: english, chineseLines: chinese);
   } catch (_) {
-    // Embedded subtitles are optional and must not prevent video playback.
     return const <PlayerSubtitleLine>[];
   }
 }

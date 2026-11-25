@@ -9,7 +9,7 @@ import 'package:flutter/services.dart';
 
 import '../../settings/data/api_usage_ledger.dart';
 import '../../settings/presentation/settings_provider.dart';
-import 'desktop_ffmpeg.dart';
+import 'ffmpeg_runner.dart';
 import 'local_whisper_asr.dart';
 
 const MethodChannel _audioToolsChannel = MethodChannel(
@@ -1318,12 +1318,11 @@ class AsrSubtitleService {
           )
           .toList(growable: false);
     }
-    final String? ffmpeg = await findDesktopFfmpeg();
-    if (ffmpeg == null) {
+    if (!await isFfmpegAvailable()) {
       throw StateError('应用内置音频组件缺失或无法运行，请重新安装最新版本。');
     }
     final Directory dir = await Directory.systemTemp.createTemp('cle_asr_');
-    final ProcessResult result = await Process.run(ffmpeg, <String>[
+    final FfmpegRunResult result = await runFfmpeg(<String>[
       '-y',
       '-i',
       file.path,
@@ -1347,7 +1346,7 @@ class AsrSubtitleService {
         (FileSystemEntity a, FileSystemEntity b) => a.path.compareTo(b.path),
       );
     final List<File> chunks = files.whereType<File>().toList(growable: false);
-    if (result.exitCode != 0 || chunks.isEmpty) {
+    if (!result.ok || chunks.isEmpty) {
       dir.deleteSync(recursive: true);
       throw StateError('音频提取失败：${result.stderr}');
     }

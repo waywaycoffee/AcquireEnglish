@@ -30,7 +30,12 @@ List<String> desktopFfmpegCandidates({
   ];
 }
 
+/// Locate a desktop/system ffmpeg CLI. Android/iOS use FFmpegKit instead —
+/// see [isFfmpegAvailable] / [runFfmpeg] in `ffmpeg_runner.dart`.
 Future<String?> findDesktopFfmpeg() async {
+  if (Platform.isAndroid || Platform.isIOS) {
+    return null;
+  }
   for (final String candidate in desktopFfmpegCandidates()) {
     try {
       final ProcessResult result = await Process.run(candidate, <String>[

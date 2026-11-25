@@ -4,6 +4,7 @@
 
 list(APPEND FLUTTER_PLUGIN_LIST
   desktop_multi_window
+  ffmpeg_kit_flutter_new_min
   file_selector_linux
   flutter_ocr_native
   flutter_secure_storage_linux

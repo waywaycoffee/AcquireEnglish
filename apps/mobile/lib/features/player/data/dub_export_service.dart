@@ -4,7 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
-import '../presentation/desktop_ffmpeg.dart';
+import '../presentation/ffmpeg_runner.dart';
 import 'dub_session_store.dart';
 
 const MethodChannel _audioToolsChannel = MethodChannel(
@@ -80,12 +80,10 @@ class DubExportService {
       }
     }
 
-    final String? ffmpeg = await findDesktopFfmpeg();
-    if (ffmpeg == null) {
+    if (!await isFfmpegAvailable()) {
       throw StateError('当前设备无法导出配音视频（缺少 FFmpeg / 原生混音）。');
     }
     await _exportWithFfmpeg(
-      ffmpeg: ffmpeg,
       videoSource: videoSource,
       outputPath: output,
       startMs: startMs,
@@ -136,7 +134,6 @@ class DubExportService {
   }
 
   Future<void> _exportWithFfmpeg({
-    required String ffmpeg,
     required String videoSource,
     required String outputPath,
     required int startMs,
@@ -223,12 +220,12 @@ class DubExportService {
       outputPath,
     ]);
 
-    final ProcessResult result = await Process.run(ffmpeg, args);
+    final FfmpegRunResult result = await runFfmpeg(args);
     try {
       await File(filterScript).delete();
     } catch (_) {}
-    if (result.exitCode != 0 || !File(outputPath).existsSync()) {
-      final String err = '${result.stderr}'.trim();
+    if (!result.ok || !File(outputPath).existsSync()) {
+      final String err = result.stderr.trim();
       throw StateError(err.isEmpty ? 'FFmpeg 导出配音失败。' : 'FFmpeg 导出失败：$err');
     }
   }
