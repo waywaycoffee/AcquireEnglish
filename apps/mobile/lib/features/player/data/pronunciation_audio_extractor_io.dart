@@ -7,7 +7,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../domain/pronunciation_assessment.dart';
-import '../presentation/desktop_ffmpeg.dart';
+import '../presentation/ffmpeg_runner.dart';
 import 'pronunciation_audio_extractor_stub.dart';
 
 const MethodChannel _pronunciationAudioChannel = MethodChannel(
@@ -35,9 +35,6 @@ class PronunciationAudioExtractor {
     if (source.startsWith('http://') || source.startsWith('https://')) {
       throw const PronunciationAudioExtractionException('暂不支持从远程视频提取原声。');
     }
-    if (Platform.isIOS) {
-      throw const PronunciationAudioExtractionException('iOS 暂不支持提取视频原声。');
-    }
 
     String localSource = source;
     String? stagedAsset;
@@ -63,106 +60,37 @@ class PronunciationAudioExtractor {
     bool returned = false;
     try {
       final String wavPath;
-      if (Platform.isAndroid) {
-        final String requestId = _randomId();
-        bool cancelled = false;
-        Future<void> cancelRequest() async {
-          cancelled = true;
-          try {
-            await _pronunciationAudioChannel
-                .invokeMethod<void>(
-                  'cancelPronunciationAudioExtraction',
-                  <String, Object?>{'requestId': requestId},
-                )
-                .timeout(const Duration(seconds: 2));
-          } catch (_) {}
-        }
-
-        onCancelAvailable?.call(() async {
-          await cancelRequest();
-        });
-        final Future<String?> extraction = _pronunciationAudioChannel
-            .invokeMethod<String>(
-              'extractPronunciationAudio',
-              <String, Object?>{
-                'requestId': requestId,
-                'sourcePath': localSource,
-                'startMs': boundedStart,
-                'endMs': boundedEnd,
-              },
-            );
-        if (cancelled) {
-          await cancelRequest();
-        }
-        final String? result;
-        try {
-          result = await extraction.timeout(const Duration(seconds: 35));
-        } on TimeoutException {
-          await cancelRequest();
-          throw TimeoutException('Audio extraction timed out.');
-        }
-        if (result == null || result.isEmpty) {
-          throw const PronunciationAudioExtractionException('提取视频原声失败。');
-        }
-        wavPath = result;
-        generatedWav = result;
-      } else {
-        final String? ffmpeg = await findDesktopFfmpeg();
-        if (ffmpeg == null) {
+      if (Platform.isAndroid || Platform.isIOS) {
+        final String? nativePath = await _extractNative(
+          localSource: localSource,
+          boundedStart: boundedStart,
+          boundedEnd: boundedEnd,
+          onCancelAvailable: onCancelAvailable,
+        );
+        if (nativePath != null && nativePath.isNotEmpty) {
+          wavPath = nativePath;
+          generatedWav = nativePath;
+        } else if (await isMobileFfmpegAvailable()) {
+          wavPath = await _extractWithFfmpeg(
+            localSource: localSource,
+            boundedStart: boundedStart,
+            boundedEnd: boundedEnd,
+            onCancelAvailable: onCancelAvailable,
+          );
+          generatedWav = wavPath;
+        } else {
           throw const PronunciationAudioExtractionException(
-            '未找到桌面版 FFmpeg，无法提取视频原声。',
+            '当前视频格式暂不支持提取原声（MKV 等请先转封装为 MP4）。',
           );
         }
-        final Directory temp = await getTemporaryDirectory();
-        await temp.create(recursive: true);
-        final String output =
-            '${temp.path}/pronunciation-reference-${_randomId()}.wav';
-        generatedWav = output;
-        final Process process = await Process.start(ffmpeg, <String>[
-          '-hide_banner',
-          '-loglevel',
-          'error',
-          '-y',
-          '-ss',
-          (boundedStart / 1000).toStringAsFixed(3),
-          '-i',
-          localSource,
-          '-t',
-          ((boundedEnd - boundedStart) / 1000).toStringAsFixed(3),
-          '-vn',
-          '-ac',
-          '1',
-          '-ar',
-          Pcm16MonoAudio.expectedSampleRate.toString(),
-          '-c:a',
-          'pcm_s16le',
-          output,
-        ]);
-        onCancelAvailable?.call(() async {
-          process.kill();
-          try {
-            await process.exitCode.timeout(const Duration(seconds: 2));
-          } catch (_) {}
-          final File outputFile = File(output);
-          try {
-            if (outputFile.existsSync()) await outputFile.delete();
-          } catch (_) {
-            debugPrint('Pronunciation temporary audio cleanup failed.');
-          }
-        });
-        unawaited(process.stdout.drain<void>());
-        unawaited(process.stderr.drain<void>());
-        final int exitCode = await process.exitCode.timeout(
-          const Duration(seconds: 30),
-          onTimeout: () {
-            process.kill();
-            return -1;
-          },
+      } else {
+        wavPath = await _extractWithFfmpeg(
+          localSource: localSource,
+          boundedStart: boundedStart,
+          boundedEnd: boundedEnd,
+          onCancelAvailable: onCancelAvailable,
         );
-        if (exitCode != 0) {
-          throw const PronunciationAudioExtractionException('提取视频原声失败。');
-        }
-        wavPath = output;
+        generatedWav = wavPath;
       }
 
       final File wavFile = File(wavPath);
@@ -177,7 +105,6 @@ class PronunciationAudioExtractor {
     } on PronunciationAudioExtractionException {
       rethrow;
     } on PlatformException {
-      // Soft message — UI falls back to playing the sentence from video.
       throw const PronunciationAudioExtractionException(
         '无法切出独立原声，请改用视频本句播放。',
       );
@@ -195,6 +122,106 @@ class PronunciationAudioExtractor {
     }
   }
 
+  Future<String?> _extractNative({
+    required String localSource,
+    required int boundedStart,
+    required int boundedEnd,
+    void Function(Future<void> Function() cancel)? onCancelAvailable,
+  }) async {
+    try {
+      final String requestId = _randomId();
+      bool cancelled = false;
+      Future<void> cancelRequest() async {
+        cancelled = true;
+        try {
+          await _pronunciationAudioChannel
+              .invokeMethod<void>(
+                'cancelPronunciationAudioExtraction',
+                <String, Object?>{'requestId': requestId},
+              )
+              .timeout(const Duration(seconds: 2));
+        } catch (_) {}
+      }
+
+      onCancelAvailable?.call(() async {
+        await cancelRequest();
+      });
+      final Future<String?> extraction = _pronunciationAudioChannel
+          .invokeMethod<String>(
+            'extractPronunciationAudio',
+            <String, Object?>{
+              'requestId': requestId,
+              'sourcePath': localSource,
+              'startMs': boundedStart,
+              'endMs': boundedEnd,
+            },
+          );
+      if (cancelled) {
+        await cancelRequest();
+      }
+      final String? result = await extraction.timeout(
+        const Duration(seconds: 35),
+      );
+      if (result == null || result.isEmpty) {
+        return null;
+      }
+      return result;
+    } catch (_) {
+      return null;
+    }
+  }
+
+  Future<String> _extractWithFfmpeg({
+    required String localSource,
+    required int boundedStart,
+    required int boundedEnd,
+    void Function(Future<void> Function() cancel)? onCancelAvailable,
+  }) async {
+    if (!await isMobileFfmpegAvailable()) {
+      throw const PronunciationAudioExtractionException(
+        '当前设备无法提取视频原声（缺少 FFmpeg）。',
+      );
+    }
+    final Directory temp = await getTemporaryDirectory();
+    await temp.create(recursive: true);
+    final String output =
+        '${temp.path}/pronunciation-reference-${_randomId()}.wav';
+    onCancelAvailable?.call(() async {
+      try {
+        final File outputFile = File(output);
+        if (outputFile.existsSync()) await outputFile.delete();
+      } catch (_) {
+        debugPrint('Pronunciation temporary audio cleanup failed.');
+      }
+    });
+    final FfmpegRunResult ff = await runFfmpeg(<String>[
+      '-hide_banner',
+      '-loglevel',
+      'error',
+      '-y',
+      '-ss',
+      (boundedStart / 1000).toStringAsFixed(3),
+      '-i',
+      localSource,
+      '-t',
+      ((boundedEnd - boundedStart) / 1000).toStringAsFixed(3),
+      '-vn',
+      '-ac',
+      '1',
+      '-ar',
+      Pcm16MonoAudio.expectedSampleRate.toString(),
+      '-c:a',
+      'pcm_s16le',
+      output,
+    ]);
+    if (!ff.ok || !File(output).existsSync()) {
+      throw PronunciationAudioExtractionException(
+        ff.stderr.trim().isEmpty ? '提取视频原声失败。' : ff.stderr.trim(),
+      );
+    }
+    return output;
+  }
+
   static String _randomId() {
     final Random random = Random.secure();
     return List<String>.generate(
@@ -208,7 +235,6 @@ class PronunciationAudioExtractor {
       final File file = File(path);
       if (file.existsSync()) await file.delete();
     } catch (_) {
-      // Never include temporary paths or audio data in diagnostics.
       debugPrint('Pronunciation temporary audio cleanup failed.');
     }
   }

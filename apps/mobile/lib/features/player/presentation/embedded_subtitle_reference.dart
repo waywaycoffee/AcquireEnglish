@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:media_kit/media_kit.dart';
@@ -58,15 +59,14 @@ int _bestChineseTrackIndex(List<SubtitleTrack> tracks) {
   return tracks.indexWhere(_looksChineseTrack);
 }
 
-Future<List<PlayerSubtitleLine>> _extractTrackSrt({
+Future<List<PlayerSubtitleLine>> _extractTrackSrtWithFfmpeg({
   required String videoPath,
   required int streamIndex,
 }) async {
   if (streamIndex < 0) return const <PlayerSubtitleLine>[];
   if (!await isFfmpegAvailable()) return const <PlayerSubtitleLine>[];
-  Directory? tmpDir;
   try {
-    tmpDir = await getTemporaryDirectory();
+    final Directory tmpDir = await getTemporaryDirectory();
     final String outPath =
         '${tmpDir.path}${Platform.pathSeparator}ae_emb_${streamIndex}_${DateTime.now().microsecondsSinceEpoch}.srt';
     final FfmpegRunResult result = await runFfmpeg(<String>[
@@ -111,6 +111,134 @@ Future<List<PlayerSubtitleLine>> _extractTrackSrt({
   }
 }
 
+String _formatHarvestTimestamp(int ms) {
+  final int total = ms < 0 ? 0 : ms;
+  final int h = total ~/ 3600000;
+  final int m = (total % 3600000) ~/ 60000;
+  final int s = (total % 60000) ~/ 1000;
+  final int frac = total % 1000;
+  return '${h.toString().padLeft(2, '0')}:'
+      '${m.toString().padLeft(2, '0')}:'
+      '${s.toString().padLeft(2, '0')},'
+      '${frac.toString().padLeft(3, '0')}';
+}
+
+PlayerSubtitleLine _harvestLine({
+  required int startMs,
+  required int endMs,
+  required String text,
+  bool asChinese = false,
+}) {
+  return PlayerSubtitleLine(
+    startTime: _formatHarvestTimestamp(startMs),
+    english: asChinese ? '' : text,
+    chinese: asChinese ? text : '',
+    startMs: startMs,
+    endMs: endMs,
+  );
+}
+
+/// Harvest softsubs via a headless media_kit player (MKV fallback on iOS/Android).
+Future<List<PlayerSubtitleLine>> _harvestTrackWithMediaKit({
+  required String videoPath,
+  required SubtitleTrack track,
+  bool asChinese = false,
+}) async {
+  final Player player = Player(
+    configuration: const PlayerConfiguration(
+      muted: true,
+      title: 'embed-sub-harvest',
+    ),
+  );
+  final List<PlayerSubtitleLine> lines = <PlayerSubtitleLine>[];
+  String? lastText;
+  int? lastStartMs;
+  try {
+    await player.open(Media(videoPath), play: false);
+    // Wait until demuxer exposes tracks, then rematch by id (cross-player ids vary).
+    List<SubtitleTrack> loaded = player.state.tracks.subtitle;
+    for (int i = 0; i < 50 && loaded.isEmpty; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      loaded = player.state.tracks.subtitle;
+    }
+    SubtitleTrack selected = track;
+    if (loaded.isNotEmpty) {
+      selected = loaded.firstWhere(
+        (SubtitleTrack t) => t.id == track.id,
+        orElse: () {
+          final int idx = asChinese
+              ? _bestChineseTrackIndex(loaded)
+              : _bestEnglishTrackIndex(loaded);
+          return idx >= 0 ? loaded[idx] : loaded.first;
+        },
+      );
+    }
+    await player.setSubtitleTrack(selected);
+    await Future<void>.delayed(const Duration(milliseconds: 200));
+    Duration duration = player.state.duration;
+    for (int i = 0; i < 40 && duration <= Duration.zero; i++) {
+      await Future<void>.delayed(const Duration(milliseconds: 100));
+      duration = player.state.duration;
+    }
+    if (duration <= Duration.zero) {
+      return const <PlayerSubtitleLine>[];
+    }
+
+    void flushAt(int nowMs) {
+      if (lastText != null && lastStartMs != null && nowMs > lastStartMs!) {
+        lines.add(
+          _harvestLine(
+            startMs: lastStartMs!,
+            endMs: nowMs,
+            text: lastText!,
+            asChinese: asChinese,
+          ),
+        );
+        lastText = null;
+        lastStartMs = null;
+      }
+    }
+
+    final StreamSubscription<List<String>> sub = player.stream.subtitle.listen((
+      List<String> event,
+    ) {
+      final String text =
+          event.where((String s) => s.trim().isNotEmpty).join('\n').trim();
+      final int nowMs = player.state.position.inMilliseconds;
+      if (text.isEmpty) {
+        flushAt(nowMs);
+        return;
+      }
+      if (text == lastText) return;
+      flushAt(nowMs);
+      lastText = text;
+      lastStartMs = nowMs;
+    });
+
+    // High-speed playback is more reliable than seek-scrub for softsub decode.
+    try {
+      await player.setRate(16);
+    } catch (_) {}
+    await player.play();
+    final int deadlineMs = duration.inMilliseconds;
+    final int maxWaitMs = (deadlineMs / 8).clamp(8000, 180000).toInt() + 5000;
+    final DateTime started = DateTime.now();
+    while (DateTime.now().difference(started).inMilliseconds < maxWaitMs) {
+      final int pos = player.state.position.inMilliseconds;
+      if (pos >= deadlineMs - 200 || player.state.completed) break;
+      await Future<void>.delayed(const Duration(milliseconds: 200));
+    }
+    await player.pause();
+    await sub.cancel();
+    flushAt(duration.inMilliseconds);
+    return lines;
+  } catch (_) {
+    return const <PlayerSubtitleLine>[];
+  } finally {
+    await player.dispose();
+  }
+}
+
 /// Pull MKV/MP4 softsubs into study-ready [PlayerSubtitleLine]s (EN, optional ZH).
 Future<List<PlayerSubtitleLine>> extractEmbeddedEnglishSubtitles({
   required String videoPath,
@@ -127,23 +255,36 @@ Future<List<PlayerSubtitleLine>> extractEmbeddedEnglishSubtitles({
     return const <PlayerSubtitleLine>[];
   }
   try {
-    if (!await isFfmpegAvailable()) return const <PlayerSubtitleLine>[];
-
     final int enIndex = _bestEnglishTrackIndex(tracks);
-    final List<PlayerSubtitleLine> english = await _extractTrackSrt(
+    if (enIndex < 0) return const <PlayerSubtitleLine>[];
+
+    List<PlayerSubtitleLine> english = await _extractTrackSrtWithFfmpeg(
       videoPath: path,
       streamIndex: enIndex,
     );
+    if (english.isEmpty) {
+      english = await _harvestTrackWithMediaKit(
+        videoPath: path,
+        track: tracks[enIndex],
+      );
+    }
     if (english.isEmpty) return const <PlayerSubtitleLine>[];
 
     final int zhIndex = _bestChineseTrackIndex(tracks);
     if (zhIndex < 0 || zhIndex == enIndex) {
       return english;
     }
-    final List<PlayerSubtitleLine> chinese = await _extractTrackSrt(
+    List<PlayerSubtitleLine> chinese = await _extractTrackSrtWithFfmpeg(
       videoPath: path,
       streamIndex: zhIndex,
     );
+    if (chinese.isEmpty) {
+      chinese = await _harvestTrackWithMediaKit(
+        videoPath: path,
+        track: tracks[zhIndex],
+        asChinese: true,
+      );
+    }
     if (chinese.isEmpty) return english;
     return mergeSubtitleLines(englishLines: english, chineseLines: chinese);
   } catch (_) {

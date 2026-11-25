@@ -27,22 +27,27 @@ Future<bool> isFfmpegAvailable() async {
   return (await findDesktopFfmpeg()) != null;
 }
 
+/// Compatibility alias used by extract/export call sites.
+Future<bool> isMobileFfmpegAvailable() => isFfmpegAvailable();
+
 /// Run ffmpeg with [args] (without the `ffmpeg` binary name).
 ///
 /// Mobile uses the bundled FFmpegKit native libraries; desktop uses the
 /// packaged/system CLI discovered by [findDesktopFfmpeg].
 Future<FfmpegRunResult> runFfmpeg(List<String> args) async {
   if (kIsWeb) {
-    return const FfmpegRunResult(exitCode: 127, stderr: 'ffmpeg unavailable on web');
+    return const FfmpegRunResult(
+      exitCode: 127,
+      stderr: 'ffmpeg unavailable on web',
+    );
   }
   if (Platform.isAndroid || Platform.isIOS) {
     try {
       final session = await FFmpegKit.executeWithArguments(args);
       final ReturnCode? code = await session.getReturnCode();
       final String logs = (await session.getAllLogsAsString()) ?? '';
-      final int exitCode = ReturnCode.isSuccess(code)
-          ? 0
-          : (code?.getValue() ?? 1);
+      final int exitCode =
+          ReturnCode.isSuccess(code) ? 0 : (code?.getValue() ?? 1);
       return FfmpegRunResult(exitCode: exitCode, stderr: logs);
     } catch (error) {
       return FfmpegRunResult(exitCode: 1, stderr: '$error');

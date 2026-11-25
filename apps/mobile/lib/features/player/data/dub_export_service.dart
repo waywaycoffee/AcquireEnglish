@@ -62,8 +62,8 @@ class DubExportService {
     final bool hasAccomp =
         accompanimentPath != null && File(accompanimentPath).existsSync();
 
-    if (!kIsWeb && Platform.isAndroid) {
-      final String? nativePath = await _exportAndroid(
+    if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
+      final String? nativePath = await _exportNative(
         videoSource: videoSource,
         outputPath: output,
         startMs: startMs,
@@ -98,7 +98,7 @@ class DubExportService {
     );
   }
 
-  Future<String?> _exportAndroid({
+  Future<String?> _exportNative({
     required String videoSource,
     required String outputPath,
     required int startMs,
@@ -169,7 +169,9 @@ class DubExportService {
         '-i',
         accompanimentPath,
       ]);
-      filter.write('[$inputIndex:a]aformat=sample_rates=44100:channel_layouts=stereo[base];');
+      filter.write(
+        '[$inputIndex:a]aformat=sample_rates=44100:channel_layouts=stereo[base];',
+      );
       inputIndex += 1;
     } else {
       // Duck original audio inside each take window.
@@ -181,9 +183,7 @@ class DubExportService {
         if (i > 0) {
           volumeExpr.write('+');
         }
-        volumeExpr.write(
-          'between(t\\,$a\\,$b)',
-        );
+        volumeExpr.write('between(t\\,$a\\,$b)');
       }
       filter.write(
         '[0:a]volume=\'if(${volumeExpr.isEmpty ? '0' : volumeExpr},0.05,1)\':eval=frame,aformat=sample_rates=44100:channel_layouts=stereo[base];',
