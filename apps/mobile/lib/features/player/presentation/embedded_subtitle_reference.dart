@@ -258,6 +258,7 @@ Future<List<PlayerSubtitleLine>> extractEmbeddedEnglishSubtitles({
     final int enIndex = _bestEnglishTrackIndex(tracks);
     if (enIndex < 0) return const <PlayerSubtitleLine>[];
 
+    // FFmpegKit demux matches Android path and is much faster than harvest.
     List<PlayerSubtitleLine> english = await _extractTrackSrtWithFfmpeg(
       videoPath: path,
       streamIndex: enIndex,

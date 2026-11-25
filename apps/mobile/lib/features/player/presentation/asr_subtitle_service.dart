@@ -1303,20 +1303,27 @@ class AsrSubtitleService {
       ];
     }
     if (Platform.isAndroid) {
-      final List<dynamic>? chunks = await _audioToolsChannel
-          .invokeMethod<List<dynamic>>('splitAudio', <String, Object?>{
-            'sourcePath': file.path,
-            'chunkMs': _chunkMs,
-          });
-      return (chunks ?? const <dynamic>[])
-          .whereType<Map<dynamic, dynamic>>()
-          .map(
-            (Map<dynamic, dynamic> chunk) => AsrAudioChunk(
-              file: File(chunk['path'] as String),
-              offsetMs: chunk['offsetMs'] as int,
-            ),
-          )
-          .toList(growable: false);
+      try {
+        final List<dynamic>? chunks = await _audioToolsChannel
+            .invokeMethod<List<dynamic>>('splitAudio', <String, Object?>{
+              'sourcePath': file.path,
+              'chunkMs': _chunkMs,
+            });
+        final List<AsrAudioChunk> nativeChunks = (chunks ?? const <dynamic>[])
+            .whereType<Map<dynamic, dynamic>>()
+            .map(
+              (Map<dynamic, dynamic> chunk) => AsrAudioChunk(
+                file: File(chunk['path'] as String),
+                offsetMs: chunk['offsetMs'] as int,
+              ),
+            )
+            .toList(growable: false);
+        if (nativeChunks.isNotEmpty) {
+          return nativeChunks;
+        }
+      } catch (_) {
+        // Fall through to FFmpegKit (same path iOS uses).
+      }
     }
     if (!await isFfmpegAvailable()) {
       throw StateError('应用内置音频组件缺失或无法运行，请重新安装最新版本。');

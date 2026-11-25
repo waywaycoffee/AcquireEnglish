@@ -9,6 +9,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 
 import 'bilingual_subtitle_helpers.dart';
+import 'ffmpeg_runner.dart';
 import 'local_ocr_models.dart';
 
 typedef OcrFrameCapturer =
@@ -206,7 +207,8 @@ class OcrSubtitleSampler {
     }
   }
 
-  /// Prefer live media_kit screenshot; fall back to Android native frame grab.
+  /// Prefer live media_kit screenshot; then native frame grab (Android/iOS);
+  /// finally FFmpegKit still for MKV and other containers.
   static Future<Uint8List?> defaultCaptureFrame({
     required Player? player,
     required String? videoPath,
@@ -222,27 +224,67 @@ class OcrSubtitleSampler {
     if (path == null || path.isEmpty || !File(path).existsSync()) {
       return null;
     }
-    if (!Platform.isAndroid) {
+    if (Platform.isAndroid || Platform.isIOS) {
+      try {
+        final Object? raw = await _audioToolsChannel.invokeMethod(
+          'captureFrameAt',
+          <String, Object?>{'sourcePath': path, 'positionMs': positionMs},
+        );
+        if (raw is Uint8List && raw.isNotEmpty) {
+          return raw;
+        }
+        if (raw is String && raw.isNotEmpty) {
+          final File file = File(raw);
+          if (file.existsSync()) {
+            final Uint8List bytes = await file.readAsBytes();
+            file.deleteSync();
+            return bytes;
+          }
+        }
+      } catch (_) {}
+    }
+    return _captureFrameWithFfmpeg(path: path, positionMs: positionMs);
+  }
+
+  static Future<Uint8List?> _captureFrameWithFfmpeg({
+    required String path,
+    required int positionMs,
+  }) async {
+    if (!await isFfmpegAvailable()) return null;
+    try {
+      final Directory temp = await Directory.systemTemp.createTemp('ae_frame_');
+      final String out =
+          '${temp.path}${Platform.pathSeparator}frame_${positionMs}.jpg';
+      final FfmpegRunResult result = await runFfmpeg(<String>[
+        '-hide_banner',
+        '-loglevel',
+        'error',
+        '-y',
+        '-ss',
+        (positionMs / 1000).toStringAsFixed(3),
+        '-i',
+        path,
+        '-frames:v',
+        '1',
+        '-q:v',
+        '3',
+        out,
+      ]);
+      final File file = File(out);
+      if (!result.ok || !file.existsSync()) {
+        try {
+          await temp.delete(recursive: true);
+        } catch (_) {}
+        return null;
+      }
+      final Uint8List bytes = await file.readAsBytes();
+      try {
+        await temp.delete(recursive: true);
+      } catch (_) {}
+      return bytes.isEmpty ? null : bytes;
+    } catch (_) {
       return null;
     }
-    try {
-      final Object? raw = await _audioToolsChannel.invokeMethod(
-        'captureFrameAt',
-        <String, Object?>{'sourcePath': path, 'positionMs': positionMs},
-      );
-      if (raw is Uint8List && raw.isNotEmpty) {
-        return raw;
-      }
-      if (raw is String && raw.isNotEmpty) {
-        final File file = File(raw);
-        if (file.existsSync()) {
-          final Uint8List bytes = await file.readAsBytes();
-          file.deleteSync();
-          return bytes;
-        }
-      }
-    } catch (_) {}
-    return null;
   }
 
   /// Join ML Kit word elements using horizontal gaps as space boundaries.

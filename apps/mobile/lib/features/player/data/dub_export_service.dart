@@ -5,6 +5,7 @@ import 'package:flutter/services.dart';
 import 'package:path_provider/path_provider.dart';
 
 import '../presentation/ffmpeg_runner.dart';
+import '../presentation/media_container_support.dart';
 import 'dub_session_store.dart';
 
 const MethodChannel _audioToolsChannel = MethodChannel(
@@ -62,6 +63,30 @@ class DubExportService {
     final bool hasAccomp =
         accompanimentPath != null && File(accompanimentPath).existsSync();
 
+    final bool ffmpegReady = await isFfmpegAvailable();
+    final bool ffmpegFirst =
+        Platform.isIOS && prefersFfmpegMediaTools(videoSource);
+
+    if (ffmpegFirst && ffmpegReady) {
+      try {
+        await _exportWithFfmpeg(
+          videoSource: videoSource,
+          outputPath: output,
+          startMs: startMs,
+          endMs: endMs,
+          takes: scoped,
+          accompanimentPath: hasAccomp ? accompanimentPath : null,
+        );
+        return DubExportResult(
+          outputPath: output,
+          usedAccompaniment: hasAccomp,
+          duckedDialogue: !hasAccomp,
+        );
+      } catch (_) {
+        // Fall through to native / retry.
+      }
+    }
+
     if (!kIsWeb && (Platform.isAndroid || Platform.isIOS)) {
       final String? nativePath = await _exportNative(
         videoSource: videoSource,
@@ -80,7 +105,7 @@ class DubExportService {
       }
     }
 
-    if (!await isFfmpegAvailable()) {
+    if (!ffmpegReady) {
       throw StateError('当前设备无法导出配音视频（缺少 FFmpeg / 原生混音）。');
     }
     await _exportWithFfmpeg(

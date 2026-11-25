@@ -1,6 +1,7 @@
 import AVFoundation
 import Flutter
 import Foundation
+import UIKit
 
 /// Native audio extract + dub export for iOS (AVFoundation).
 /// MKV softsub demux still goes through Dart media_kit harvest when needed.
@@ -42,6 +43,8 @@ final class AudioToolsPlugin: NSObject, FlutterPlugin {
       }
     case "exportDubbedVideo":
       handleExportDub(call, result: result)
+    case "captureFrameAt":
+      handleCaptureFrame(call, result: result)
     default:
       result(FlutterMethodNotImplemented)
     }
@@ -106,6 +109,52 @@ final class AudioToolsPlugin: NSObject, FlutterPlugin {
     }
   }
 
+  private func handleCaptureFrame(_ call: FlutterMethodCall, result: @escaping FlutterResult) {
+    guard
+      let args = call.arguments as? [String: Any],
+      let sourcePath = args["sourcePath"] as? String,
+      !sourcePath.isEmpty
+    else {
+      result(FlutterError(code: "bad_args", message: "sourcePath is required.", details: nil))
+      return
+    }
+    let positionMs = intArg(args, "positionMs") ?? 0
+    DispatchQueue.global(qos: .userInitiated).async {
+      do {
+        let jpeg = try self.captureFrameJpeg(sourcePath: sourcePath, positionMs: positionMs)
+        DispatchQueue.main.async { result(FlutterStandardTypedData(bytes: jpeg)) }
+      } catch {
+        DispatchQueue.main.async {
+          result(
+            FlutterError(
+              code: "capture_failed",
+              message: error.localizedDescription,
+              details: nil
+            )
+          )
+        }
+      }
+    }
+  }
+
+  private func captureFrameJpeg(sourcePath: String, positionMs: Int) throws -> Data {
+    let url = URL(fileURLWithPath: sourcePath)
+    let asset = AVURLAsset(url: url)
+    let generator = AVAssetImageGenerator(asset: asset)
+    generator.appliesPreferredTrackTransform = true
+    generator.maximumSize = CGSize(width: 1280, height: 1280)
+    let time = CMTime(value: CMTimeValue(max(0, positionMs)), timescale: 1000)
+    var actual = CMTime.zero
+    let cgImage = try generator.copyCGImage(at: time, actualTime: &actual)
+    let image = UIImage(cgImage: cgImage)
+    guard let data = image.jpegData(compressionQuality: 0.85) else {
+      throw NSError(domain: "AudioTools", code: 20, userInfo: [
+        NSLocalizedDescriptionKey: "unable to encode jpeg frame",
+      ])
+    }
+    return data
+  }
+
   private func extractPronunciationAudio(
     requestId: String,
     sourcePath: String,
@@ -113,6 +162,13 @@ final class AudioToolsPlugin: NSObject, FlutterPlugin {
     endMs: Int
   ) throws -> String {
     let url = URL(fileURLWithPath: sourcePath)
+    let ext = url.pathExtension.lowercased()
+    // Fail fast: AVFoundation rarely opens MKV/WebM — Dart will use FFmpegKit.
+    if ["mkv", "webm", "avi", "flv", "ts", "m2ts", "wmv"].contains(ext) {
+      throw NSError(domain: "AudioTools", code: 0, userInfo: [
+        NSLocalizedDescriptionKey: "container requires ffmpeg",
+      ])
+    }
     let asset = AVURLAsset(url: url)
     guard let track = asset.tracks(withMediaType: .audio).first else {
       throw NSError(domain: "AudioTools", code: 1, userInfo: [
@@ -248,6 +304,12 @@ final class AudioToolsPlugin: NSObject, FlutterPlugin {
     accompanimentPath: String?
   ) throws -> String {
     let sourceURL = URL(fileURLWithPath: sourcePath)
+    let ext = sourceURL.pathExtension.lowercased()
+    if ["mkv", "webm", "avi", "flv", "ts", "m2ts", "wmv"].contains(ext) {
+      throw NSError(domain: "AudioTools", code: 0, userInfo: [
+        NSLocalizedDescriptionKey: "container requires ffmpeg",
+      ])
+    }
     let asset = AVURLAsset(url: sourceURL)
     let start = CMTime(value: CMTimeValue(startMs), timescale: 1000)
     let duration = CMTime(value: CMTimeValue(endMs - startMs), timescale: 1000)

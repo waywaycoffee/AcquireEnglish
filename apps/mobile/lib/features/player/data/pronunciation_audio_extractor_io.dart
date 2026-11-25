@@ -8,6 +8,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../domain/pronunciation_assessment.dart';
 import '../presentation/ffmpeg_runner.dart';
+import '../presentation/media_container_support.dart';
 import 'pronunciation_audio_extractor_stub.dart';
 
 const MethodChannel _pronunciationAudioChannel = MethodChannel(
@@ -59,39 +60,13 @@ class PronunciationAudioExtractor {
     String? generatedWav;
     bool returned = false;
     try {
-      final String wavPath;
-      if (Platform.isAndroid || Platform.isIOS) {
-        final String? nativePath = await _extractNative(
-          localSource: localSource,
-          boundedStart: boundedStart,
-          boundedEnd: boundedEnd,
-          onCancelAvailable: onCancelAvailable,
-        );
-        if (nativePath != null && nativePath.isNotEmpty) {
-          wavPath = nativePath;
-          generatedWav = nativePath;
-        } else if (await isMobileFfmpegAvailable()) {
-          wavPath = await _extractWithFfmpeg(
-            localSource: localSource,
-            boundedStart: boundedStart,
-            boundedEnd: boundedEnd,
-            onCancelAvailable: onCancelAvailable,
-          );
-          generatedWav = wavPath;
-        } else {
-          throw const PronunciationAudioExtractionException(
-            '当前视频格式暂不支持提取原声（MKV 等请先转封装为 MP4）。',
-          );
-        }
-      } else {
-        wavPath = await _extractWithFfmpeg(
-          localSource: localSource,
-          boundedStart: boundedStart,
-          boundedEnd: boundedEnd,
-          onCancelAvailable: onCancelAvailable,
-        );
-        generatedWav = wavPath;
-      }
+      final String wavPath = await _extractBestEffort(
+        localSource: localSource,
+        boundedStart: boundedStart,
+        boundedEnd: boundedEnd,
+        onCancelAvailable: onCancelAvailable,
+      );
+      generatedWav = wavPath;
 
       final File wavFile = File(wavPath);
       final Pcm16MonoAudio audio = Pcm16MonoAudio.parseWav(
@@ -120,6 +95,57 @@ class PronunciationAudioExtractor {
         await _deleteTemporaryFile(stagedAsset);
       }
     }
+  }
+
+  /// iOS: FFmpeg first for MKV/WebM (AVFoundation can't). Native first for MP4/MOV.
+  /// Android: native first (MediaExtractor covers more), then FFmpeg.
+  Future<String> _extractBestEffort({
+    required String localSource,
+    required int boundedStart,
+    required int boundedEnd,
+    void Function(Future<void> Function() cancel)? onCancelAvailable,
+  }) async {
+    final bool ffmpegFirst =
+        Platform.isIOS && prefersFfmpegMediaTools(localSource);
+    final bool ffmpegReady = await isFfmpegAvailable();
+
+    if (ffmpegFirst && ffmpegReady) {
+      try {
+        return await _extractWithFfmpeg(
+          localSource: localSource,
+          boundedStart: boundedStart,
+          boundedEnd: boundedEnd,
+          onCancelAvailable: onCancelAvailable,
+        );
+      } catch (_) {
+        // Fall through to native as a last resort.
+      }
+    }
+
+    if (Platform.isAndroid || Platform.isIOS) {
+      final String? nativePath = await _extractNative(
+        localSource: localSource,
+        boundedStart: boundedStart,
+        boundedEnd: boundedEnd,
+        onCancelAvailable: onCancelAvailable,
+      );
+      if (nativePath != null && nativePath.isNotEmpty) {
+        return nativePath;
+      }
+    }
+
+    if (ffmpegReady) {
+      return _extractWithFfmpeg(
+        localSource: localSource,
+        boundedStart: boundedStart,
+        boundedEnd: boundedEnd,
+        onCancelAvailable: onCancelAvailable,
+      );
+    }
+
+    throw const PronunciationAudioExtractionException(
+      '当前设备无法提取视频原声，请更新到最新版本后重试。',
+    );
   }
 
   Future<String?> _extractNative({
@@ -159,9 +185,11 @@ class PronunciationAudioExtractor {
       if (cancelled) {
         await cancelRequest();
       }
-      final String? result = await extraction.timeout(
-        const Duration(seconds: 35),
-      );
+      // MKV fail-fast on iOS should return quickly; keep a tight bound.
+      final Duration timeout = Platform.isIOS && prefersFfmpegMediaTools(localSource)
+          ? const Duration(seconds: 8)
+          : const Duration(seconds: 35);
+      final String? result = await extraction.timeout(timeout);
       if (result == null || result.isEmpty) {
         return null;
       }
@@ -177,7 +205,7 @@ class PronunciationAudioExtractor {
     required int boundedEnd,
     void Function(Future<void> Function() cancel)? onCancelAvailable,
   }) async {
-    if (!await isMobileFfmpegAvailable()) {
+    if (!await isFfmpegAvailable()) {
       throw const PronunciationAudioExtractionException(
         '当前设备无法提取视频原声（缺少 FFmpeg）。',
       );
