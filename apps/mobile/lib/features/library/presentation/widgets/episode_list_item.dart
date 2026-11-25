@@ -159,7 +159,7 @@ class EpisodeListItem extends StatelessWidget {
                         ? Icons.download_done_rounded
                         : (downloadActive
                             ? Icons.downloading_rounded
-                            : (downloadLabel!.trim() == '已预约'
+                            : (downloadLabel!.trim().contains('已预约')
                                 ? Icons.schedule_rounded
                                 : Icons.download_for_offline_outlined)),
                     label: downloadLabel!.trim(),

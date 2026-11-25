@@ -184,7 +184,7 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
       }
       final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
       final String success = course.episodes.length > 1
-          ? '在线播放第一集。预约后会在工作站准备字幕，也可手动下载合集。'
+          ? '在线播放第一集。预约字幕后会在工作站准备，也可手动下载合集。'
           : '在线播放。手动下载后，本地播放更流畅。';
       Navigator.of(context).pop(importedEpisode.id);
       messenger.showSnackBar(SnackBar(content: Text(success)));

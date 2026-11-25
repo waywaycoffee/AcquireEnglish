@@ -94,7 +94,7 @@ class CourseEpisodeTile extends ConsumerWidget {
         (cache?.isScheduled ?? false);
     final String? downloadLabel = !showDownload
         ? null
-        : (cache?.label ?? (reserved ? '已预约' : '未下载'));
+        : (cache?.label ?? (reserved ? '已预约字幕' : '未下载'));
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomPadding),

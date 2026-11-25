@@ -195,10 +195,10 @@ class _BilibiliCollectionReservationState
       if (!atCapacity || !retry) {
         _message(
           atCapacity
-              ? '已保留预约进度，队列有空位后会继续提交'
+              ? '已保留预约字幕进度，队列有空位后会继续提交'
               : error.response?.statusCode == 401
-              ? '登录已失效，请重新登录后继续预约'
-              : '字幕服务暂时不可用，请稍后继续预约',
+              ? '登录已失效，请重新登录后继续预约字幕'
+              : '字幕服务暂时不可用，请稍后继续预约字幕',
         );
       }
     } on FormatException catch (error) {
@@ -209,7 +209,7 @@ class _BilibiliCollectionReservationState
     } catch (_) {
       if (mounted) {
         setState(() => _waitingForCapacity = false);
-        _message('预约暂时无法完成，请稍后重试');
+        _message('预约字幕暂时无法完成，请稍后重试');
       }
     } finally {
       if (mounted) {
@@ -274,7 +274,7 @@ class _BilibiliCollectionReservationState
     if (yt != null && yt.isNotEmpty) {
       final job = await api.enqueueYoutubeSubtitleJob(yt);
       if (job.id.isEmpty || job.isTerminalFailure) {
-        throw const FormatException('字幕预约未提交，请重试');
+        throw const FormatException('预约字幕未提交，请重试');
       }
       await prefs.put(key, job.id);
       if (job.state == 'completed') {
@@ -352,7 +352,7 @@ class _BilibiliCollectionReservationState
             reserve: true,
           );
     if (job == null || job.id.isEmpty || job.isTerminalFailure) {
-      throw const FormatException('字幕预约未提交，请重试');
+      throw const FormatException('预约字幕未提交，请重试');
     }
     await prefs.put(key, job.id);
     if (mounted) {
@@ -403,7 +403,7 @@ class _BilibiliCollectionReservationState
           final id = YoutubeImport.extractVideoId(episode.sourceUrl ?? '');
           if (id == null) throw const FormatException('缺少 YouTube 视频 ID');
           final job = await api.enqueueYoutubeSubtitleJob(id);
-          if (job.id.isEmpty) throw const FormatException('预约未提交');
+          if (job.id.isEmpty) throw const FormatException('预约字幕未提交');
           ids.add(job.id);
           await prefs.put(key, ids.join(','));
           await prefs.put('$key:next', '${index + 1}');
@@ -453,7 +453,7 @@ class _BilibiliCollectionReservationState
                   reserve: true,
                 );
           if (job == null || job.id.isEmpty || job.isTerminalFailure) {
-            throw FormatException('第 ${episode.numberStr} 集字幕预约未提交，请重试');
+            throw FormatException('第 ${episode.numberStr} 集预约字幕未提交，请重试');
           }
           ids.add(job.id);
           await prefs.put(key, ids.join(','));
@@ -486,9 +486,9 @@ class _BilibiliCollectionReservationState
       _ready = ids.isEmpty && rejected.isEmpty;
     });
     if (rejected.isNotEmpty) {
-      _message('第 ${rejected.join('、')} 集字幕预约未提交，其他集可照常学习');
+      _message('第 ${rejected.join('、')} 集预约字幕未提交，其他集可照常学习');
     } else {
-      _message(ids.isEmpty ? '公共字幕已齐，可以进入合集' : '已预约，工作站正在准备缺失的字幕');
+      _message(ids.isEmpty ? '公共字幕已齐，可以进入合集' : '已预约字幕，工作站正在准备');
     }
   }
 
@@ -544,11 +544,11 @@ class _BilibiliCollectionReservationState
         _ready
             ? (multi ? '进入视频合集' : '字幕已就绪')
             : _busy
-            ? '正在预约…'
+            ? '正在预约字幕…'
             : _waitingForCapacity
             ? '等待字幕队列空位'
             : _requested
-            ? '已预约 · 字幕准备中'
+            ? '已预约字幕'
             : '预约字幕',
         style: TextStyle(
           fontWeight: FontWeight.w800,

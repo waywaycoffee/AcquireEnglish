@@ -21,7 +21,7 @@ extension IdleJobKindX on IdleJobKind {
     IdleJobKind.modelPrefetch => '模型预取',
     IdleJobKind.vocabEnrich => '生词 AI 补全',
     IdleJobKind.cloudSync => '云同步',
-    IdleJobKind.netdiskDrama => '美剧预约下载',
+    IdleJobKind.netdiskDrama => '美剧预约字幕',
   };
 }
 

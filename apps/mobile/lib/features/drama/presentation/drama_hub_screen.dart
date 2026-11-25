@@ -143,7 +143,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       children: <Widget>[
         if (!widget.embedded) ...<Widget>[
           Text(
-            '点海报打开剧集；正版公开片单全员可学。添加片源只挂播放地址；可按集「预约学习」，空闲时后台下载到手机。',
+            '点海报打开剧集；正版公开片单全员可学。添加片源只挂播放地址；可按集「预约字幕」，空闲时后台下载到手机。',
             style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                   color: AppDesignTokens.textSecondary,
                   height: 1.4,
@@ -255,7 +255,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                   (cache?.isScheduled ?? false);
               final String downloadLabel = cache?.label ??
                   (reserved
-                      ? '已预约'
+                      ? '已预约字幕'
                       : (canDownload ? '未下载' : ''));
               final bool downloading = cache?.isDownloading ?? false;
               final bool ready = cache?.isReady ?? false;
@@ -334,7 +334,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                                       }
                                     }());
                                   },
-                                  child: Text(reserved ? '取消预约' : '预约学习'),
+                                  child: Text(reserved ? '取消预约字幕' : '预约字幕'),
                                 ),
                             ],
                           ),
@@ -433,7 +433,7 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
       showContinueLearning: false,
       topBar: PadTopBar(
         title: '美剧精学',
-        description: '精选片单 · 预约学习后空闲下载',
+        description: '精选片单 · 预约字幕后空闲下载',
         trailing: IconButton(
           tooltip: '添加网盘片源',
           onPressed: () => showNetdiskImportSheet(context, ref),
