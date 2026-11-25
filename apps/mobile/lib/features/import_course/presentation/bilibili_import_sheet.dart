@@ -10,6 +10,7 @@ import '../../library/presentation/library_mock_data.dart';
 import '../../membership/domain/module_access.dart';
 import '../../onboarding/presentation/auth_sources_settings_screen.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
+import '../../settings/presentation/bilibili_login_sheet.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/personal_import_sync.dart';
@@ -226,9 +227,24 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           OutlinedButton.icon(
             onPressed: _busy
                 ? null
+                : () async {
+                    final bool ok = await showBilibiliLoginSheet(context, ref);
+                    if (!mounted || !ok) {
+                      return;
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('B 站扫码登录成功，可继续导入')),
+                    );
+                  },
+            icon: const Icon(Icons.qr_code_2_rounded),
+            label: const Text('扫码登录哔哩哔哩'),
+          ),
+          const SizedBox(height: 8),
+          TextButton(
+            onPressed: _busy
+                ? null
                 : () => context.push(AuthSourcesSettingsScreen.route),
-            icon: const Icon(Icons.link_rounded),
-            label: const Text('连接哔哩哔哩（可选）'),
+            child: const Text('其他授权方式（可选）'),
           ),
         ],
         const SizedBox(height: 12),

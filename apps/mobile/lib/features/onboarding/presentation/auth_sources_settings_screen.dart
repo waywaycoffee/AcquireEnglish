@@ -173,15 +173,15 @@ class _AuthSourcesSettingsScreenState
             name: '哔哩哔哩',
             color: const Color(0xFFFB7299),
             state: <String>[
+              if (biliOk) '扫码/Cookie 登录已就绪',
               if (_verified) '官方账号授权已验证',
-              if (!biliOk && !_verified)
-                _available ? '可在本机打开官方授权页' : '官方授权按需启用',
-              if (biliOk) '视频网页登录已就绪',
+              if (!biliOk && !_verified) '暂保留扫码授权；公开视频也可先导入',
             ].join(' · '),
-            actionLabel: _busy ? '正在打开…' : '连接哔哩哔哩',
-            onAction: _connectBilibili,
-            secondaryLabel: '跨设备扫码',
-            onSecondary: () => showBilibiliLoginSheet(context, ref),
+            // Keep QR login as the primary path for now.
+            actionLabel: biliOk ? '重新扫码' : '扫码授权',
+            onAction: () => showBilibiliLoginSheet(context, ref),
+            secondaryLabel: _busy ? '正在打开…' : '官方授权页',
+            onSecondary: _connectBilibili,
           ),
           const SizedBox(height: 10),
           _SourceCard(
@@ -201,7 +201,7 @@ class _AuthSourcesSettingsScreenState
           ),
           const SizedBox(height: 18),
           Text(
-            '部分受限视频或官方字幕仍需 B 站网页登录权限。',
+            'B 站扫码授权暂时保留：用手机哔哩哔哩 App 扫码即可拉取官方字幕与受限视频；官方 OAuth 页作为备选。',
             style: TextStyle(
               fontSize: 13,
               height: 1.45,
