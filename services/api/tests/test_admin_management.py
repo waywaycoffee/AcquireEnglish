@@ -55,6 +55,35 @@ async def test_admin_manage_post_and_user():
             assert member.status_code == 200, member.text
             detail = await client.get(f"/api/admin/users/{user_id}")
             assert detail.json()["user"]["membership_level"] == "pro"
+            # Absolute ends_at must stick.
+            from datetime import datetime, timedelta, timezone
+
+            ends = (datetime.now(timezone.utc) + timedelta(days=90)).replace(microsecond=0)
+            absolute = await client.put(
+                f"/api/admin/users/{user_id}/membership",
+                json={"level": "pro", "ends_at": ends.isoformat()},
+            )
+            assert absolute.status_code == 200, absolute.text
+            assert absolute.json()["entitlement"]["ends_at"].startswith(ends.date().isoformat())
+            # Extend stacks onto current expiry (not "from today").
+            before = datetime.fromisoformat(
+                absolute.json()["entitlement"]["ends_at"].replace("Z", "+00:00")
+            )
+            stacked = await client.put(
+                f"/api/admin/users/{user_id}/membership",
+                json={"level": "pro", "duration_days": 10, "duration_mode": "extend"},
+            )
+            assert stacked.status_code == 200, stacked.text
+            after = datetime.fromisoformat(
+                stacked.json()["entitlement"]["ends_at"].replace("Z", "+00:00")
+            )
+            assert after - before >= timedelta(days=9, hours=23)
+            lifetime = await client.put(
+                f"/api/admin/users/{user_id}/membership",
+                json={"level": "pro", "lifetime": True},
+            )
+            assert lifetime.status_code == 200, lifetime.text
+            assert lifetime.json()["entitlement"]["ends_at"] is None
             free = await client.put(f"/api/admin/users/{user_id}/membership", json={"level": "free"})
             assert free.status_code == 200
             detail = await client.get(f"/api/admin/users/{user_id}")

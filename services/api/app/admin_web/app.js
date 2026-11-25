@@ -93,6 +93,53 @@
       .replace(/>/g, "&gt;")
       .replace(/"/g, "&quot;");
   }
+  function findActiveProEntitlement(data) {
+    const rows = data?.entitlements || [];
+    return (
+      rows.find(
+        (e) =>
+          e.asset_kind === "membership" &&
+          e.asset_ref === "pro" &&
+          e.status === "active"
+      ) || null
+    );
+  }
+
+  function proEndsLabel(data) {
+    if ((data?.user?.membership_level || "free") !== "pro") {
+      return "非 Pro";
+    }
+    const ent = findActiveProEntitlement(data);
+    if (!ent) return "Pro（未找到权益行）";
+    if (!ent.ends_at) return "永久";
+    try {
+      return new Date(ent.ends_at).toLocaleString("zh-CN");
+    } catch {
+      return String(ent.ends_at);
+    }
+  }
+
+  function proEndsLocalValue(data) {
+    const ent = findActiveProEntitlement(data);
+    if (!ent?.ends_at) return "";
+    const d = new Date(ent.ends_at);
+    if (Number.isNaN(d.getTime())) return "";
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+      d.getHours()
+    )}:${pad(d.getMinutes())}`;
+  }
+
+  function localInputToIso(localValue) {
+    const raw = String(localValue || "").trim();
+    if (!raw) return null;
+    const d = new Date(raw);
+    if (Number.isNaN(d.getTime())) {
+      throw new Error("到期时间格式无效");
+    }
+    return d.toISOString();
+  }
+
   function escapeAttr(value) {
     return escapeHtml(value).replace(/'/g, "&#39;");
   }
@@ -1878,16 +1925,39 @@
       </div>
       <section class="section">
         <h3>账号安全与会员等级</h3>
-        <p class="muted">密码无法查看。重置后只显示一次新密码；修改邮箱会影响原邮箱登录。会员操作会覆盖当前 Pro 权益的有效期。</p>
+        <p class="muted">密码无法查看。重置后只显示一次新密码；修改邮箱会影响原邮箱登录。可直接改 Pro 到期时间，或按天数重设 / 叠加。</p>
         <div class="actions">
           <form id="passwordForm" class="inline-form" style="flex:1">
             <input name="new_password" type="password" minlength="12" autocomplete="new-password" placeholder="自定新密码（至少12位，留空则生成）" />
             <button class="btn danger full" type="submit">修改 / 重置密码</button>
           </form>
-          <form id="membershipForm" class="inline-form" style="flex:1">
-            <select name="level"><option value="free" ${u.membership_level === "free" ? "selected" : ""}>免费</option><option value="pro" ${u.membership_level === "pro" ? "selected" : ""}>Pro 会员</option></select>
-            <input name="duration_days" type="number" min="1" max="3650" value="30" aria-label="Pro有效天数" />
-            <button class="btn primary full" type="submit">修改会员等级</button>
+          <form id="membershipForm" class="grant-grid" style="flex:1.4">
+            <label>等级
+              <select name="level">
+                <option value="free" ${u.membership_level === "free" ? "selected" : ""}>免费</option>
+                <option value="pro" ${u.membership_level === "pro" ? "selected" : ""}>Pro 会员</option>
+              </select>
+            </label>
+            <label>当前到期
+              <input type="text" readonly value="${escapeAttr(proEndsLabel(data))}" />
+            </label>
+            <label class="full">指定到期时间（本地时区；填写后优先于天数）
+              <input name="ends_at_local" type="datetime-local" value="${escapeAttr(proEndsLocalValue(data))}" />
+            </label>
+            <label>有效天数
+              <input name="duration_days" type="number" min="1" max="3650" value="30" />
+            </label>
+            <label>天数用法
+              <select name="duration_mode">
+                <option value="set">从今天起算</option>
+                <option value="extend">在现有到期上叠加</option>
+              </select>
+            </label>
+            <label class="full" style="display:flex;align-items:center;gap:8px">
+              <input name="lifetime" type="checkbox" />
+              永久 Pro（无到期时间）
+            </label>
+            <button class="btn primary full" type="submit">保存会员有效期</button>
           </form>
         </div>
       </section>
@@ -1998,12 +2068,56 @@
     $("membershipForm")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();
       const fd = new FormData(ev.target);
-      const level = String(fd.get("level"));
-      if (!confirm(`确认将用户 #${userId} 的会员设为 ${level}？现有 Pro 有效期会被覆盖。`)) return;
+      const level = String(fd.get("level") || "free");
+      const lifetime = fd.get("lifetime") === "on";
+      const durationMode = String(fd.get("duration_mode") || "set");
+      const daysRaw = String(fd.get("duration_days") || "").trim();
+      const durationDays = daysRaw === "" ? null : Number(daysRaw);
+      let endsAt = null;
       try {
-        await api(`/users/${userId}/membership`, { method: "PUT", body: JSON.stringify({ level, duration_days: Number(fd.get("duration_days")) }) });
+        endsAt = localInputToIso(fd.get("ends_at_local"));
+      } catch (e) {
+        alert(e.message);
+        return;
+      }
+      if (level === "pro" && !lifetime && !endsAt && !durationDays) {
+        alert("请填写到期时间、有效天数，或勾选永久 Pro");
+        return;
+      }
+      const summary =
+        level === "free"
+          ? "免费（吊销 Pro）"
+          : lifetime
+            ? "永久 Pro"
+            : endsAt
+              ? `Pro，到期 ${new Date(endsAt).toLocaleString("zh-CN")}`
+              : durationMode === "extend"
+                ? `Pro，在现有到期上叠加 ${durationDays} 天`
+                : `Pro，从今天起 ${durationDays || 30} 天`;
+      if (!confirm(`确认将用户 #${userId} 设为：${summary}？`)) return;
+      try {
+        const body = { level, lifetime: level === "pro" && lifetime };
+        if (level === "pro") {
+          if (lifetime) {
+            body.duration_days = null;
+            body.ends_at = null;
+          } else if (endsAt) {
+            body.ends_at = endsAt;
+            body.duration_days = null;
+          } else {
+            body.duration_days = durationDays || 30;
+            body.duration_mode = durationMode;
+            body.ends_at = null;
+          }
+        }
+        await api(`/users/${userId}/membership`, {
+          method: "PUT",
+          body: JSON.stringify(body),
+        });
         await Promise.all([loadDetail(userId), loadStats()]);
-      } catch (e) { alert(e.message); }
+      } catch (e) {
+        alert(e.message);
+      }
     });
     $("grantForm")?.addEventListener("submit", async (ev) => {
       ev.preventDefault();

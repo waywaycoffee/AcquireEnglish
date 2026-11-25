@@ -124,7 +124,14 @@ class PasswordResetBody(BaseModel):
 
 class MembershipBody(BaseModel):
     level: str = Field(pattern="^(free|pro)$")
-    duration_days: int = Field(default=30, ge=1, le=3650)
+    # Optional when level=free, lifetime=true, or ends_at is set.
+    duration_days: int | None = Field(default=None, ge=1, le=3650)
+    # Absolute expiry (ISO-8601). Wins over duration_days when both sent.
+    ends_at: datetime | None = None
+    # Permanent Pro (ends_at = null).
+    lifetime: bool = False
+    # How duration_days applies: set from now, or stack onto current ends_at.
+    duration_mode: str = Field(default="set", pattern="^(set|extend)$")
 
 
 class PostPatchBody(BaseModel):
@@ -457,29 +464,87 @@ async def set_user_membership(
     user = await db.get(User, user_id)
     if user is None:
         raise HTTPException(404, "user not found")
-    row = (await db.execute(select(UserEntitlement).where(
-        UserEntitlement.user_id == user_id,
-        UserEntitlement.asset_kind == "membership",
-        UserEntitlement.asset_ref == "pro",
-    ))).scalar_one_or_none()
+    # Prefer the active Pro row; collapse duplicates so scalar lookups stay safe.
+    rows = (
+        await db.execute(
+            select(UserEntitlement)
+            .where(
+                UserEntitlement.user_id == user_id,
+                UserEntitlement.asset_kind == "membership",
+                UserEntitlement.asset_ref == "pro",
+            )
+            .order_by(UserEntitlement.id.desc())
+        )
+    ).scalars().all()
+    row = next((r for r in rows if r.status == "active"), rows[0] if rows else None)
+    for other in rows:
+        if row is not None and other.id != row.id and other.status == "active":
+            other.status = "revoked"
+
     if body.level == "free":
-        if row is not None:
-            row.status = "revoked"
-    else:
-        now = datetime.now(timezone.utc)
-        if row is None:
-            row = UserEntitlement(user_id=user_id, asset_kind="membership", asset_ref="pro")
-            db.add(row)
-        row.status = "active"
-        row.source = "grant"
+        for r in rows:
+            if r.status == "active":
+                r.status = "revoked"
+        await db.commit()
+        _audit_log.warning("admin membership changed user_id=%s level=free", user_id)
+        return {"level": "free", "entitlement": None}
+
+    now = datetime.now(timezone.utc)
+    if row is None:
+        row = UserEntitlement(
+            user_id=user_id, asset_kind="membership", asset_ref="pro"
+        )
+        db.add(row)
+    row.status = "active"
+    row.source = "grant"
+    if row.starts_at is None:
         row.starts_at = now
-        row.ends_at = now + timedelta(days=body.duration_days)
-        row.meta_json = json.dumps({"via": "admin_web", "admin_override": True})
+
+    if body.lifetime:
+        row.ends_at = None
+        mode = "lifetime"
+    elif body.ends_at is not None:
+        ends = body.ends_at
+        if ends.tzinfo is None:
+            ends = ends.replace(tzinfo=timezone.utc)
+        else:
+            ends = ends.astimezone(timezone.utc)
+        if ends <= now:
+            raise HTTPException(400, "ends_at must be in the future")
+        row.ends_at = ends
+        mode = "absolute"
+    else:
+        days = int(body.duration_days or 30)
+        if body.duration_mode == "extend":
+            current = row.ends_at
+            if current is not None and current.tzinfo is None:
+                current = current.replace(tzinfo=timezone.utc)
+            base = current if current is not None and current > now else now
+            row.ends_at = base + timedelta(days=days)
+            mode = "extend"
+        else:
+            row.starts_at = now
+            row.ends_at = now + timedelta(days=days)
+            mode = "set"
+
+    row.meta_json = json.dumps(
+        {
+            "via": "admin_web",
+            "admin_override": True,
+            "mode": mode,
+            "duration_days": body.duration_days,
+        },
+        ensure_ascii=False,
+    )
     await db.commit()
-    _audit_log.warning("admin membership changed user_id=%s level=%s", user_id, body.level)
-    if row is not None:
-        await db.refresh(row)
-    return {"level": body.level, "entitlement": _entitlement_out(row) if row else None}
+    _audit_log.warning(
+        "admin membership changed user_id=%s level=pro mode=%s ends_at=%s",
+        user_id,
+        mode,
+        row.ends_at,
+    )
+    await db.refresh(row)
+    return {"level": "pro", "entitlement": _entitlement_out(row)}
 
 
 @router.get("/community/posts")
