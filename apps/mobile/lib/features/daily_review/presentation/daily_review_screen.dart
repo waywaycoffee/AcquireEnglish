@@ -57,6 +57,7 @@ import 'foundation_media_video_sheet.dart';
 import 'fsrs_sd_meter.dart';
 import 'review_source_context_panel.dart';
 import 'review_spelling_screen.dart';
+import 'word_occurrences_sheet.dart';
 
 class DailyReviewScreen extends ConsumerStatefulWidget {
   const DailyReviewScreen({
@@ -1720,6 +1721,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 },
               ),
             ],
+            if (word && (_revealed || (!listenStage && !useCloze && !contrastStage)))
+              TextButton.icon(
+                onPressed: () => unawaited(showWordOccurrences(context, ref, source.question)),
+                icon: const Icon(Icons.hub_outlined),
+                label: const Text('查看已学素材中的出现记录'),
+              ),
             const SizedBox(height: 16),
             Row(
               children: <Widget>[

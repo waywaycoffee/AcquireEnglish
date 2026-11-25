@@ -23,9 +23,10 @@ String _reservationKey(String email, String courseId) =>
     'bilibili-reservation:$email:$courseId';
 
 class BilibiliCollectionReservation extends ConsumerStatefulWidget {
-  const BilibiliCollectionReservation({required this.source, super.key});
+  const BilibiliCollectionReservation({required this.source, this.courseId, super.key});
 
   final String source;
+  final String? courseId;
 
   @override
   ConsumerState<BilibiliCollectionReservation> createState() =>
@@ -41,10 +42,14 @@ class _BilibiliCollectionReservationState
   bool _checking = false;
   bool _waitingForCapacity = false;
 
-  LibraryCourseData? get _course => findLibraryEpisodeForBilibiliInput(
-    ref.read(libraryCatalogProvider),
-    widget.source,
-  )?.course;
+  LibraryCourseData? get _course {
+    final courses = ref.read(libraryCatalogProvider);
+    final courseId = widget.courseId;
+    if (courseId != null) {
+      return courses.where((course) => course.id == courseId).firstOrNull;
+    }
+    return findLibraryEpisodeForBilibiliInput(courses, widget.source)?.course;
+  }
 
   String? _key(LibraryCourseData? course) {
     final account = ref.read(authSessionProvider);

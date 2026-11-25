@@ -613,10 +613,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           child: const Text('下载全部合集'),
                         ),
                       ),
-                    if (isMultiEpisodeBilibiliCourse(selectedCourse) &&
-                        selectedCourse.episodes.first.sourceUrl != null)
+                    if (isMultiEpisodeBilibiliCourse(selectedCourse))
                       BilibiliCollectionReservation(
-                        source: selectedCourse.episodes.first.sourceUrl!,
+                        source: selectedCourse.episodes.first.sourceUrl ?? '',
+                        courseId: selectedCourse.id,
                         key: ValueKey(selectedCourse.id),
                       ),
                     if (selectedCourse.episodes.length > 1 &&
@@ -1769,6 +1769,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             child: _LibraryCourseMatchShell(
                               match: match,
                               showEpisodeHint: hasActiveQuery,
+                              onDownloadCollection: editMode ? null : () => unawaited(
+                                _confirmCollectionDownload(match.course),
+                              ),
                               child: LibraryCourseCard(
                                 course: match.course,
                                 selected: selectedCourseIds.contains(
@@ -1797,6 +1800,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         _LibraryCourseMatchShell(
                           match: browsedCourses[i],
                           showEpisodeHint: hasActiveQuery,
+                          onDownloadCollection: editMode ? null : () => unawaited(
+                            _confirmCollectionDownload(browsedCourses[i].course),
+                          ),
                           child: LibraryCourseListItem(
                             course: browsedCourses[i].course,
                             selected: selectedCourseIds.contains(
@@ -1832,6 +1838,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             _LibraryCourseMatchShell(
                               match: browsedCourses[i],
                               showEpisodeHint: hasActiveQuery,
+                              onDownloadCollection: editMode ? null : () => unawaited(
+                                _confirmCollectionDownload(browsedCourses[i].course),
+                              ),
                               darkSurface: true,
                               child: LibraryFeedCard(
                                 course: browsedCourses[i].course,
@@ -3118,16 +3127,22 @@ class _LibraryCourseMatchShell extends StatelessWidget {
     required this.child,
     this.showEpisodeHint = false,
     this.darkSurface = false,
+    this.onDownloadCollection,
   });
 
   final LibraryCourseMatch match;
   final Widget child;
   final bool showEpisodeHint;
   final bool darkSurface;
+  final VoidCallback? onDownloadCollection;
 
   @override
   Widget build(BuildContext context) {
-    if (!showEpisodeHint || !match.matchedByEpisode) {
+    final course = match.course;
+    final showActions = onDownloadCollection != null &&
+        isMultiEpisodeBilibiliCourse(course);
+    final showHint = showEpisodeHint && match.matchedByEpisode;
+    if (!showHint && !showActions) {
       return child;
     }
     final String hint =
@@ -3136,6 +3151,23 @@ class _LibraryCourseMatchShell extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         child,
+        if (showActions)
+          Wrap(
+            crossAxisAlignment: WrapCrossAlignment.center,
+            children: [
+              BilibiliCollectionReservation(
+                key: ValueKey(course.id),
+                source: course.episodes.first.sourceUrl ?? '',
+                courseId: course.id,
+              ),
+              IconButton(
+                tooltip: '下载全部合集',
+                onPressed: onDownloadCollection,
+                icon: const Icon(Icons.download_outlined),
+              ),
+            ],
+          ),
+        if (showHint)
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
           child: Text(

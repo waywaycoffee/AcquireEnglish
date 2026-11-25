@@ -729,7 +729,10 @@ GoRouter goRouter(Ref ref) {
           moduleCode: 'reading',
           title: '阅读模块',
           freePreviewAllowed: freePreview,
-          child: ReadingReaderScreen(docId: docId),
+          child: ReadingReaderScreen(
+            docId: docId,
+            initialOffset: int.tryParse(state.uri.queryParameters['offset'] ?? ''),
+          ),
         );
       },
     ).fade(),

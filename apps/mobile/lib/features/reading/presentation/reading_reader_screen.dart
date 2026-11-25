@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/rendering.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
@@ -53,9 +54,10 @@ const String kReadingSlowModeKey = 'reading_slow_mode_v1';
 const String kReadingSoeEnabledKey = 'reading_soe_enabled_v1';
 
 class ReadingReaderScreen extends ConsumerStatefulWidget {
-  const ReadingReaderScreen({required this.docId, super.key});
+  const ReadingReaderScreen({required this.docId, this.initialOffset, super.key});
 
   final String docId;
+  final int? initialOffset;
 
   @override
   ConsumerState<ReadingReaderScreen> createState() =>
@@ -64,6 +66,34 @@ class ReadingReaderScreen extends ConsumerStatefulWidget {
 
 class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   final ScrollController _scroll = ScrollController();
+  final GlobalKey _articleTextKey = GlobalKey();
+
+  void _scrollToArticleOffset(int offset) {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      RenderParagraph? paragraph;
+      void findParagraph(RenderObject node) {
+        if (node is RenderParagraph) {
+          paragraph = node;
+        } else if (paragraph == null) {
+          node.visitChildren(findParagraph);
+        }
+      }
+      final root = _articleTextKey.currentContext?.findRenderObject();
+      if (root == null) return;
+      findParagraph(root);
+      final text = paragraph;
+      if (text == null || offset < 0 || offset >= text.text.toPlainText().length) return;
+      final boxes = text.getBoxesForSelection(
+        TextSelection(baseOffset: offset, extentOffset: offset + 1),
+      );
+      final viewport = RenderAbstractViewport.maybeOf(text);
+      if (boxes.isEmpty || viewport == null) return;
+      final top = viewport.getOffsetToReveal(text, 0).offset + boxes.first.top;
+      _scroll.jumpTo((top - 20).clamp(0.0, _scroll.position.maxScrollExtent));
+    });
+  }
+
   double _fontSize = 20;
   final double _lineHeight = 1.7;
   bool _dark = false;
@@ -216,6 +246,20 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     _pagedDocId = doc.id;
     // Sync split is fine for short texts; long novels are paged once and cached.
     _pages = splitReadingPages(doc.plainText);
+    final initialOffset = widget.initialOffset;
+    if (initialOffset != null && _pages.isNotEmpty) {
+      int cursor = 0;
+      for (int index = 0; index < _pages.length; index++) {
+        final start = doc.plainText.indexOf(_pages[index], cursor);
+        if (start < 0) break;
+        cursor = start + _pages[index].length;
+        if (initialOffset < cursor) {
+          _pageIndex = index;
+          _scrollToArticleOffset(initialOffset - start);
+          return;
+        }
+      }
+    }
     _restorePageFromProgress(doc);
   }
 
@@ -1899,6 +1943,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   if (!useInteractive)
                     Text(
                       _pageText,
+                      key: _articleTextKey,
                       style: TextStyle(
                         color: fg,
                         fontSize: _fontSize,
@@ -1971,6 +2016,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                         highlightWordIndex: _highlightWordIndex,
                       ),
                     ),
+                    key: _articleTextKey,
                   ),
                   if (_pages.length > 1)
                     Padding(
