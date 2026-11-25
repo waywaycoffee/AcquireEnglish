@@ -103,3 +103,11 @@ services/api/data/exam_bank_vendor/**
 *.keystore
 **/android/key.properties
 **/android/keystore/
+
+# 时文生成器输出文件
+reading_generator/ik_english_reading/
+reading_generator/review_report.csv
+
+# 缓存、日志
+reading_generator/*.log
+reading_generator/.env
