@@ -61,8 +61,8 @@ const SHOTS = [
     caption: "学习页：视频课程、导入入口与继续学习",
   },
   {
-    src: "/shots/03-home.png",
-    caption: "首页：今日推荐与学习任务",
+    src: "/shots/05-more.png",
+    caption: "影视库：按来源浏览课程与继续学习",
   },
   {
     src: "/shots/02-player-modes.png",
