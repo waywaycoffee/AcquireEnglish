@@ -94,71 +94,11 @@ async def run(command):
                 and all(isinstance(t,str) and any('\u4e00'<=ch<='\u9fff' for ch in t) for t in local_zh)):
             # Translated on the 5060 Ti; no cloud LLM call.
             return await _store(job,cues,local_zh)
-        # Default: do NOT burn cloud LLMs. Worker must send local `zh`.
-        # Opt-in only: SUBTITLE_ALLOW_CLOUD_TRANSLATE=1 on ECS.
-        import os
-        allow_cloud = (os.environ.get('SUBTITLE_ALLOW_CLOUD_TRANSLATE') or '').strip().lower() in (
-            '1', 'true', 'yes', 'on',
-        )
-        if not allow_cloud:
-            queue.update(job, 'retry', 'local_zh_missing_no_cloud_fallback')
-            return {
-                'error': 'local_zh_missing_no_cloud_fallback',
-                'hint': 'Run tools/subtitle/gpu_worker.py with Ollama qwen2.5:3b; '
-                        'set SUBTITLE_ALLOW_CLOUD_TRANSLATE=1 only if you accept cloud cost.',
-            }
-        # Opt-in fallback: the configured coach LLM; only text leaves the GPU.
-        from dotenv import dotenv_values
-        values=dotenv_values('/opt/acquireenglish/tools/oral_coach/.env')
-        key=values.get('DEEPSEEK_API_KEY') or values.get('OPENAI_API_KEY')
-        base=values.get('OPENAI_BASE_URL') or 'https://api.deepseek.com/v1'
-        model=values.get('DEEPSEEK_MODEL') or values.get('OPENAI_MODEL') or 'deepseek-chat'
-        if not key: raise RuntimeError('Translation LLM unavailable')
-        translated=[]
-        prompt_tokens=0
-        completion_tokens=0
-        async with httpx.AsyncClient(timeout=120) as client:
-            for offset in range(0,len(cues),25):
-                chunk=cues[offset:offset+25]
-                response=await client.post(base.rstrip('/')+'/chat/completions',
-                  headers={
-                    'Authorization':'Bearer '+key,
-                    'X-Acquire-Module':'subtitle_translate',
-                    'X-Acquire-Client-Id':'ecs-gpu-subtitle',
-                  },
-                  json={'model':model,'temperature':0,'messages':[
-                    {'role':'system','content':'Translate each English string into Simplified Chinese. Return a JSON object with key translations containing an array of strings in exactly the same order and length. Do not add explanations.'},
-                    {'role':'user','content':json.dumps([c['text'] for c in chunk])}],
-                    'response_format':{'type':'json_object'}})
-                response.raise_for_status()
-                payload=response.json()
-                usage=(payload.get('usage') or {}) if isinstance(payload,dict) else {}
-                prompt_tokens+=int(usage.get('prompt_tokens') or 0)
-                completion_tokens+=int(usage.get('completion_tokens') or 0)
-                rows=json.loads(payload['choices'][0]['message']['content'])['translations']
-                if len(rows)!=len(chunk) or not all(isinstance(r,str) and r.strip() for r in rows):
-                    raise ValueError('Translation alignment failed')
-                translated.extend(rows)
-                queue.update(job,'translating')
-        try:
-            from app.services import api_usage as usage_svc
-            async with SessionLocal() as usage_db:
-                await usage_svc.record_usage(
-                    usage_db,
-                    user_id=None,
-                    kind='translation',
-                    provider='deepseek' if 'deepseek' in (base or '').lower() else 'openai',
-                    model=model,
-                    module='subtitle_translate',
-                    prompt_tokens=prompt_tokens,
-                    completion_tokens=completion_tokens,
-                    api_key=key,
-                    key_owner='platform',
-                    note=f"subtitle_translate:{job.get('bvid')}",
-                )
-        except Exception:
-            pass
-        return await _store(job,cues,translated)
+        queue.update(job, 'retry', 'local_zh_missing_no_cloud_fallback')
+        return {
+            'error': 'local_zh_missing_no_cloud_fallback',
+            'hint': 'Check the subtitle worker and its local Qwen model.',
+        }
     raise ValueError('Unknown action')
 
 

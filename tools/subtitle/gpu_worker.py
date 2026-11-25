@@ -4,9 +4,8 @@ ASR jobs: download Bilibili audio → faster-whisper (CUDA) → EN→ZH on the l
 Qwen shim (deploy/gpu-box-ollama, :11434/v1) → store on ECS.
 Translate jobs: English cues arrive from ECS; only the local EN→ZH runs.
 
-Translation + upload of one job overlaps the download/ASR of the next. If the
-local LLM is unreachable the cues go up without Chinese and ECS falls back to
-its configured cloud LLM.
+Translation runs on the same workstation. A missing translation is retried
+through the queue.
 """
 import argparse
 import json
@@ -144,7 +143,7 @@ class Heartbeat:
 def finalize(job, cues, beat):
     """Translate locally, then store on ECS. Runs on the background thread."""
     try:
-        beat.mark('translating', pct=0.72, message='云端正在翻译中文字幕…')
+        beat.mark('translating', pct=0.72, message='工作站正在翻译中文字幕…')
         started=time.time()
         zh=translate_local(cues)
         took=round(time.time()-started,1)
@@ -155,7 +154,7 @@ def finalize(job, cues, beat):
         beat.stop()
         result=rpc(payload)
         print(job['bvid'],job['page'],job.get('kind','asr'),
-              'zh=local' if zh is not None else 'zh=ecs-fallback',f'{took}s',result,flush=True)
+              'zh=local' if zh is not None else 'zh=retry',f'{took}s',result,flush=True)
     except Exception as exc:
         beat.stop()
         print('Job failed',job['id'],type(exc).__name__,exc,flush=True)
@@ -233,7 +232,7 @@ def main(once=False,model='small.en'):
             if job.get('kind')=='translate':
                 cues=job.pop('cues',None) or []
                 if len(cues)<2: raise ValueError('Translate job has no cues')
-                beat.mark('translating', pct=0.7, message='云端正在翻译中文字幕…')
+                beat.mark('translating', pct=0.7, message='工作站正在翻译中文字幕…')
             else:
                 cues=transcribe(recognizer,job,beat=beat)
         except Exception as exc:
