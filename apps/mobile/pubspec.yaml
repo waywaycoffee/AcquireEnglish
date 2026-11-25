@@ -107,8 +107,6 @@ dependencies:
   syncfusion_flutter_pdf: ^33.2.13
   flutter_ocr_native: ^0.3.8
   ffmpeg_kit_flutter_new_min: ^4.0.0
-
-
 dev_dependencies:
   flutter_test:
     sdk: flutter

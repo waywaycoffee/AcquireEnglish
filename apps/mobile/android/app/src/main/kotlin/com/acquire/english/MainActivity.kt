@@ -48,6 +48,7 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
     private lateinit var orientationChannel: MethodChannel
     private lateinit var subtitleOverlayChannel: MethodChannel
     private lateinit var ocrAssetsChannel: MethodChannel
+    private lateinit var microReviewIslandChannel: MethodChannel
     private var ocrAssetPathRegistered: Boolean = false
     private val subtitleFloatingBall: SubtitleFloatingBall
         get() = SubtitleFloatingBall.get(this)
@@ -153,6 +154,42 @@ class MainActivity : FlutterActivity(), MethodChannel.MethodCallHandler {
             "com.acquire.english/ocr_assets",
         )
         ocrAssetsChannel.setMethodCallHandler(this)
+        microReviewIslandChannel = MethodChannel(
+            flutterEngine.dartExecutor.binaryMessenger,
+            "com.acquire.english/micro_review_island",
+        )
+        microReviewIslandChannel.setMethodCallHandler { call, result ->
+            when (call.method) {
+                "start", "update" -> {
+                    val args = call.arguments as? Map<*, *> ?: emptyMap<Any, Any>()
+                    MicroReviewIslandNotifier.showOrUpdate(
+                        this,
+                        word = args["word"] as? String ?: "",
+                        gloss = args["gloss"] as? String ?: "",
+                        remainingSec = (args["remainingSec"] as? Number)?.toInt() ?: 0,
+                        ratedCount = (args["ratedCount"] as? Number)?.toInt() ?: 0,
+                        total = (args["total"] as? Number)?.toInt() ?: 0,
+                        endsAtMs = (args["endsAtMs"] as? Number)?.toLong()
+                            ?: (System.currentTimeMillis() + 5 * 60_000L),
+                    )
+                    result.success(true)
+                }
+                "end" -> {
+                    MicroReviewIslandNotifier.cancel(this)
+                    result.success(true)
+                }
+                else -> result.notImplemented()
+            }
+        }
+        MicroReviewIslandNotifier.setActionCallback { action ->
+            mainHandler.post {
+                microReviewIslandChannel.invokeMethod(
+                    "action",
+                    mapOf("action" to action),
+                )
+            }
+        }
+        MicroReviewIslandNotifier.ensureReceiver(this)
     }
 
     override fun onMethodCall(call: MethodCall, result: MethodChannel.Result) {

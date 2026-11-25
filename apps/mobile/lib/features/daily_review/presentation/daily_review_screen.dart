@@ -46,6 +46,7 @@ import '../../words/presentation/widgets/phonics_syllable_blocks.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
 import '../../words/presentation/word_review_settings_sheet.dart';
+import '../../micro_review/presentation/micro_review_controller.dart';
 import '../data/missed_review_book.dart';
 import '../data/review_session_draft.dart';
 import '../data/word_encounter_store.dart';
@@ -1262,10 +1263,29 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         : plan.today.reviews > 0
         ? '继续今天的记忆练习'
         : '把学过的，真正记住';
+    final MicroReviewUiState micro = ref.watch(microReviewProvider);
+    ref.listen<MicroReviewUiState>(microReviewProvider, (
+      MicroReviewUiState? prev,
+      MicroReviewUiState next,
+    ) {
+      final String? msg = next.message;
+      if (msg == null || msg == prev?.message) return;
+      if (msg == 'open_review') {
+        handleMicroReviewOpenMessage(context, ref);
+        return;
+      }
+      if (msg.startsWith('本轮')) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    });
     return _ReviewSurface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
+          if (micro.active) ...<Widget>[
+            _MicroReviewActiveCard(state: micro),
+            const SizedBox(height: 16),
+          ],
           const Icon(
             Icons.auto_awesome_rounded,
             size: 38,
@@ -1310,7 +1330,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             ],
           ),
           const SizedBox(height: 30),
-          if (!empty && !done)
+          if (!empty && !done) ...<Widget>[
             FilledButton.icon(
               key: const Key('daily-review-start'),
               onPressed: () => context.push(_sessionRoute()),
@@ -1323,7 +1343,15 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     ? '再次复习'
                     : '开始今日复习',
               ),
-            )
+            ),
+            const SizedBox(height: 10),
+            OutlinedButton.icon(
+              key: const Key('daily-review-micro'),
+              onPressed: () => startMicroReviewFromUi(context, ref),
+              icon: const Icon(Icons.timer_outlined),
+              label: const Text('碎片 5 分钟'),
+            ),
+          ]
           else if (empty)
             FilledButton.icon(
               onPressed: () => context.go(AppNavDestination.library.route),
@@ -3239,6 +3267,91 @@ class _ReviewMetric extends StatelessWidget {
       ),
     ],
   );
+}
+
+class _MicroReviewActiveCard extends ConsumerWidget {
+  const _MicroReviewActiveCard({required this.state});
+
+  final MicroReviewUiState state;
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppDesignTokens.appWhite,
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(color: AppDesignTokens.borderGray),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Text(
+                '碎片记忆 · ${state.remainingLabel}',
+                style: TextStyle(
+                  fontWeight: FontWeight.w700,
+                  color: AppDesignTokens.textPrimary,
+                ),
+              ),
+              const Spacer(),
+              Text(
+                '已记 ${state.ratedCount}',
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          Text(
+            state.word,
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w800,
+              color: AppDesignTokens.textPrimary,
+            ),
+          ),
+          if (state.gloss.isNotEmpty) ...<Widget>[
+            const SizedBox(height: 4),
+            Text(
+              state.gloss,
+              style: TextStyle(color: AppDesignTokens.textSecondary),
+            ),
+          ],
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: <Widget>[
+              FilledButton(
+                onPressed: () => ref
+                    .read(microReviewProvider.notifier)
+                    .rateCurrent(fsrs.Rating.good),
+                child: const Text('认识'),
+              ),
+              OutlinedButton(
+                onPressed: () => ref
+                    .read(microReviewProvider.notifier)
+                    .rateCurrent(fsrs.Rating.hard),
+                child: const Text('模糊'),
+              ),
+              OutlinedButton(
+                onPressed: () => ref
+                    .read(microReviewProvider.notifier)
+                    .rateCurrent(fsrs.Rating.again),
+                child: const Text('忘记'),
+              ),
+              TextButton(
+                onPressed: () => ref.read(microReviewProvider.notifier).stop(),
+                child: const Text('结束'),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
 }
 
 String _formatDue(DateTime due, DateTime now) {

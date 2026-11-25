@@ -18,6 +18,7 @@ import '../../shared/data/aliyun_speech_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../micro_review/presentation/micro_review_controller.dart';
 import '../../debug/demo_seed_service.dart';
 import '../../idle_jobs/idle_job_queue.dart';
 import '../../idle_jobs/idle_job_scheduler.dart';
@@ -459,6 +460,17 @@ class SettingsScreen extends ConsumerWidget {
                   ref
                       .read(learningSettingsProvider.notifier)
                       .setReminder(value: value);
+                },
+              ),
+              _SwitchRow(
+                title: '碎片记忆灵动岛',
+                description:
+                    '开启 5 分钟碎片记忆时，在小米超级岛 / iOS 灵动岛或通知栏显示当前词与倒计时。',
+                value: ref.watch(microReviewIslandEnabledProvider),
+                onChanged: (bool value) {
+                  ref
+                      .read(microReviewIslandEnabledProvider.notifier)
+                      .setEnabled(value);
                 },
               ),
               _TtsEngineRow(

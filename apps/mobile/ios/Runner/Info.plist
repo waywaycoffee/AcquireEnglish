@@ -22,6 +22,8 @@
 	<string>$(FLUTTER_BUILD_NAME)</string>
 	<key>CFBundleSignature</key>
 	<string>????</string>
+	<key>NSSupportsLiveActivities</key>
+	<true/>
 	<key>CFBundleURLTypes</key>
 	<array>
 		<dict>
@@ -33,6 +35,16 @@
 			<array>
 				<!-- Must equal Open Platform AppID (WeChat SDK URL return). -->
 				<string>wx00b4272a8eabb1cd</string>
+			</array>
+		</dict>
+		<dict>
+			<key>CFBundleTypeRole</key>
+			<string>Editor</string>
+			<key>CFBundleURLName</key>
+			<string>acquireenglish.micro-review</string>
+			<key>CFBundleURLSchemes</key>
+			<array>
+				<string>acquireenglish</string>
 			</array>
 		</dict>
 	</array>
