@@ -13,13 +13,13 @@ list(APPEND FLUTTER_PLUGIN_LIST
   gal
   livekit_client
   media_kit_libs_windows_video
-  media_kit_video
   record_windows
   screen_brightness_windows
   screen_retriever_windows
-  share_plus
   sqlite3_flutter_libs
   url_launcher_windows
+  share_plus
+  media_kit_video
   window_manager
 )
 

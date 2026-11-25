@@ -179,8 +179,9 @@ class WordPronunciationService {
     StreamSubscription<bool>? playing;
     StreamSubscription<String>? errors;
     try {
-      player = Player();
-      _recordedPlayer = player;
+      final Player activePlayer = Player();
+      player = activePlayer;
+      _recordedPlayer = activePlayer;
       final Completer<bool> result = Completer<bool>();
       _recordedCompletion = result;
       bool started = false;
@@ -198,7 +199,7 @@ class WordPronunciationService {
         }());
       }
 
-      playing = player.stream.playing.listen((bool value) {
+      playing = activePlayer.stream.playing.listen((bool value) {
         if (value) {
           started = true;
           return;
@@ -209,29 +210,29 @@ class WordPronunciationService {
           scheduleFinish(true);
         }
       });
-      completed = player.stream.completed.listen((bool value) {
+      completed = activePlayer.stream.completed.listen((bool value) {
         if (value && started) {
           scheduleFinish(true);
         }
       });
-      errors = player.stream.error.listen((String _) {
+      errors = activePlayer.stream.error.listen((String _) {
         if (!result.isCompleted) result.complete(false);
       });
-      await player.open(Media(url), play: true).timeout(
+      await activePlayer.open(Media(url), play: true).timeout(
         const Duration(seconds: 20),
       );
       // Cloud MP3 already has natural pacing; don't slow it (caused choppy cutoffs).
       final double clamped = rate.clamp(0.85, 1.8);
       if ((clamped - 1.0).abs() > 0.02) {
-        await player.setRate(clamped);
+        await activePlayer.setRate(clamped);
       }
       // Short clips: also watch duration/position as a safety net.
       unawaited(() async {
         try {
-          final Duration duration = await player!.stream.duration
+          final Duration duration = await activePlayer.stream.duration
               .firstWhere((Duration d) => d > Duration.zero)
               .timeout(const Duration(seconds: 5));
-          await player.stream.position
+          await activePlayer.stream.position
               .firstWhere(
                 (Duration p) =>
                     duration.inMilliseconds > 0 &&

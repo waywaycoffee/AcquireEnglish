@@ -22,12 +22,8 @@ android {
 
     compileOptions {
         isCoreLibraryDesugaringEnabled = true
-        sourceCompatibility = JavaVersion.VERSION_11
-        targetCompatibility = JavaVersion.VERSION_11
-    }
-
-    kotlinOptions {
-        jvmTarget = JavaVersion.VERSION_11.toString()
+        sourceCompatibility = JavaVersion.VERSION_17
+        targetCompatibility = JavaVersion.VERSION_17
     }
 
     defaultConfig {
@@ -110,11 +106,9 @@ dependencies {
     implementation("com.google.mlkit:text-recognition-chinese:16.0.1")
 }
 
-// AGP 8.11 cannot consume androidx.core 1.19 (needs AGP 9.1+).
-configurations.configureEach {
-    resolutionStrategy {
-        force("androidx.core:core:1.16.0")
-        force("androidx.core:core-ktx:1.16.0")
+kotlin {
+    compilerOptions {
+        jvmTarget.set(org.jetbrains.kotlin.gradle.dsl.JvmTarget.JVM_17)
     }
 }
 
