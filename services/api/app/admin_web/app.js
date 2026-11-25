@@ -63,7 +63,7 @@
     q: "",
   };
   const examAssetsState = { status: "pending" };
-  const commerceState = { status: "paid", kind: "", offset: 0, limit: 40 };
+  const commerceState = { status: "", kind: "", offset: 0, limit: 40 };
   const communityState = { offset: 0, limit: 40, total: 0, q: "", status: "" };
 
   async function api(path, options = {}) {
@@ -542,21 +542,65 @@
       ),
     ]);
     const trial = overview.trial || {};
+    const users = overview.users || {};
+    const orderStats = overview.orders || {};
     $("commerceOverview").innerHTML = `
-      <div class="stat"><span class="muted">SKU 种类</span><strong>${num(
-        Object.keys(overview.skus_by_kind || {}).length
+      <div class="stat"><span class="muted">注册用户总数</span><strong>${num(
+        users.total
       )}</strong></div>
+      <div class="stat"><span class="muted">今日新注册</span><strong>${num(
+        users.new_today
+      )}</strong></div>
+      <div class="stat"><span class="muted">近 7 日新注册</span><strong>${num(
+        users.new_7d
+      )}</strong></div>
+      <div class="stat"><span class="muted">近 30 日新注册</span><strong>${num(
+        users.new_30d
+      )}</strong></div>
+      <div class="stat"><span class="muted">当前 Pro 会员</span><strong>${num(
+        users.active_pro
+      )}</strong></div>
+      <div class="stat"><span class="muted">近 7 日新增 Pro</span><strong>${num(
+        users.new_pro_7d
+      )}</strong></div>
+      <div class="stat"><span class="muted">已支付订单</span><strong>${num(
+        orderStats.paid
+      )}</strong><span class="muted">近 7 日 ${num(orderStats.paid_7d)}</span></div>
+      <div class="stat"><span class="muted">未支付订单</span><strong>${num(
+        orderStats.unpaid
+      )}</strong><span class="muted">实收 ${money(
+        (orderStats.paid_amount_cents || 0) / 100
+      )}</span></div>
       <div class="stat"><span class="muted">试用延展券</span><strong>${num(
         trial.extend_coupons
       )} / 已兑 ${num(trial.extend_redeemed)}</strong></div>
-      <div class="stat"><span class="muted">登录日记录</span><strong>${num(
-        trial.login_day_rows
-      )}</strong></div>
-      <div class="stat"><span class="muted">积分流水</span><strong>${num(
-        overview.points_ledger_rows
-      )}</strong></div>`;
+      <div class="stat"><span class="muted">SKU / 积分流水</span><strong>${num(
+        Object.keys(overview.skus_by_kind || {}).length
+      )} / ${num(overview.points_ledger_rows)}</strong></div>`;
+    const recent = users.recent || [];
+    const recentHtml = `<div class="section commerce-recent">
+      <h3>最近注册用户</h3>
+      <div class="table-wrap"><table>
+        <thead><tr><th>ID</th><th>昵称</th><th>邮箱</th><th>手机</th><th>注册时间</th></tr></thead>
+        <tbody>
+          ${
+            recent
+              .map(
+                (u) => `<tr>
+              <td>${u.id}</td>
+              <td>${escapeHtml(u.display_name || "—")}</td>
+              <td>${escapeHtml(u.email || "—")}</td>
+              <td>${escapeHtml(u.phone || "—")}</td>
+              <td>${escapeHtml(formatDateTime(u.created_at))}</td>
+            </tr>`
+              )
+              .join("") || `<tr><td colspan="5" class="muted">暂无注册用户</td></tr>`
+          }
+        </tbody>
+      </table></div>
+    </div>`;
     const items = orders.items || [];
-    $("commerceOrdersList").innerHTML = `<table>
+    $("commerceOrdersList").innerHTML = `${recentHtml}<h3>订单列表</h3><table>
       <thead><tr><th>ID</th><th>用户</th><th>状态</th><th>渠道</th><th>金额</th><th>SKU</th><th>时间</th></tr></thead>
       <tbody>
         ${

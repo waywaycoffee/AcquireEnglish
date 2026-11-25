@@ -5,12 +5,12 @@ from __future__ import annotations
 import json
 import logging
 import secrets
-from datetime import datetime, timezone
+from datetime import datetime, timedelta, timezone
 from typing import Any
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from pydantic import BaseModel, Field
-from sqlalchemy import func, or_, select
+from sqlalchemy import and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
@@ -673,54 +673,130 @@ async def commerce_overview(
     _: str = Depends(require_admin_token),
     db: AsyncSession = Depends(get_db),
 ) -> dict[str, Any]:
+    now = datetime.now(tz=timezone.utc)
+    day_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    since_7d = now - timedelta(days=7)
+    since_30d = now - timedelta(days=30)
+
+    async def _count(stmt) -> int:
+        return int((await db.execute(stmt)).scalar() or 0)
+
     sku_rows = (await db.execute(select(ProductSku))).scalars().all()
     by_kind: dict[str, int] = {}
     for s in sku_rows:
         by_kind[s.kind] = by_kind.get(s.kind, 0) + 1
-    trial_coupons = int(
-        (
-            await db.execute(
-                select(func.count())
-                .select_from(MembershipCoupon)
-                .where(MembershipCoupon.reward_code.like("trial_extend%"))
-            )
-        ).scalar()
-        or 0
+
+    total_users = await _count(select(func.count()).select_from(User))
+    new_users_today = await _count(
+        select(func.count()).select_from(User).where(User.created_at >= day_start)
     )
-    trial_used = int(
+    new_users_7d = await _count(
+        select(func.count()).select_from(User).where(User.created_at >= since_7d)
+    )
+    new_users_30d = await _count(
+        select(func.count()).select_from(User).where(User.created_at >= since_30d)
+    )
+
+    # Active Pro: status=active and not past ends_at (null ends_at = open-ended).
+    active_pro = await _count(
+        select(func.count())
+        .select_from(UserEntitlement)
+        .where(
+            UserEntitlement.asset_kind == "membership",
+            UserEntitlement.asset_ref == "pro",
+            UserEntitlement.status == "active",
+            or_(UserEntitlement.ends_at.is_(None), UserEntitlement.ends_at > now),
+        )
+    )
+    new_pro_7d = await _count(
+        select(func.count())
+        .select_from(UserEntitlement)
+        .where(
+            UserEntitlement.asset_kind == "membership",
+            UserEntitlement.asset_ref == "pro",
+            UserEntitlement.created_at >= since_7d,
+        )
+    )
+
+    order_status_rows = (
+        await db.execute(select(Order.status, func.count()).group_by(Order.status))
+    ).all()
+    orders_by_status = {str(status): int(cnt) for status, cnt in order_status_rows}
+    paid_orders = int(orders_by_status.get("paid", 0))
+    unpaid_orders = int(orders_by_status.get("pending", 0)) + int(
+        orders_by_status.get("created", 0)
+    )
+    paid_7d = await _count(
+        select(func.count())
+        .select_from(Order)
+        .where(
+            Order.status == "paid",
+            or_(Order.paid_at >= since_7d, and_(Order.paid_at.is_(None), Order.created_at >= since_7d)),
+        )
+    )
+    paid_cents_total = int(
         (
             await db.execute(
-                select(func.count())
-                .select_from(MembershipCoupon)
-                .where(
-                    MembershipCoupon.reward_code.like("trial_extend%"),
-                    MembershipCoupon.used == 1,
+                select(func.coalesce(func.sum(Order.amount_cents), 0)).where(
+                    Order.status == "paid"
                 )
             )
         ).scalar()
         or 0
     )
+
+    recent_users = (
+        await db.execute(select(User).order_by(User.created_at.desc(), User.id.desc()).limit(12))
+    ).scalars().all()
+
+    trial_coupons = await _count(
+        select(func.count())
+        .select_from(MembershipCoupon)
+        .where(MembershipCoupon.reward_code.like("trial_extend%"))
+    )
+    trial_used = await _count(
+        select(func.count())
+        .select_from(MembershipCoupon)
+        .where(
+            MembershipCoupon.reward_code.like("trial_extend%"),
+            MembershipCoupon.used == 1,
+        )
+    )
     return {
         "skus_by_kind": by_kind,
+        "users": {
+            "total": total_users,
+            "new_today": new_users_today,
+            "new_7d": new_users_7d,
+            "new_30d": new_users_30d,
+            "active_pro": active_pro,
+            "new_pro_7d": new_pro_7d,
+            "recent": [
+                {
+                    "id": u.id,
+                    "display_name": u.display_name,
+                    "email": u.email,
+                    "phone": u.phone,
+                    "created_at": _iso(u.created_at),
+                }
+                for u in recent_users
+            ],
+        },
+        "orders": {
+            "by_status": orders_by_status,
+            "paid": paid_orders,
+            "unpaid": unpaid_orders,
+            "paid_7d": paid_7d,
+            "paid_amount_cents": paid_cents_total,
+        },
         "trial": {
             "extend_coupons": trial_coupons,
             "extend_redeemed": trial_used,
-            "login_day_rows": int(
-                (await db.execute(select(func.count()).select_from(UserLoginDay))).scalar()
-                or 0
-            ),
+            "login_day_rows": await _count(select(func.count()).select_from(UserLoginDay)),
         },
-        "points_ledger_rows": int(
-            (await db.execute(select(func.count()).select_from(PointsLedger))).scalar()
-            or 0
-        ),
-        "rank_states": int(
-            (await db.execute(select(func.count()).select_from(RankState))).scalar() or 0
-        ),
-        "commerce_events": int(
-            (await db.execute(select(func.count()).select_from(CommerceEvent))).scalar()
-            or 0
-        ),
+        "points_ledger_rows": await _count(select(func.count()).select_from(PointsLedger)),
+        "rank_states": await _count(select(func.count()).select_from(RankState)),
+        "commerce_events": await _count(select(func.count()).select_from(CommerceEvent)),
     }
 
 

@@ -303,11 +303,17 @@ th { color: var(--muted); font-weight: 700; }
 }
 .kpi-row {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
   gap: 12px;
   margin-bottom: 14px;
 }
 .kpi-row.kpi-5 { grid-template-columns: repeat(5, minmax(0, 1fr)); }
+.commerce-recent { margin: 8px 0 18px; }
+.commerce-recent h3,
+#commerceOrdersList > h3 {
+  margin: 0 0 10px;
+  font-size: 15px;
+}
 .stat .muted { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; }
 .note-box {
   margin-top: 10px;
