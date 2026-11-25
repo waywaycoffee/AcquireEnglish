@@ -35,11 +35,14 @@ class BilibiliCollectionReservation extends ConsumerStatefulWidget {
   const BilibiliCollectionReservation({
     required this.source,
     this.courseId,
+    /// When the feed/API already knows shared softsubs exist, hide the CTA.
+    this.knownSharedSubs = false,
     super.key,
   });
 
   final String source;
   final String? courseId;
+  final bool knownSharedSubs;
 
   @override
   ConsumerState<BilibiliCollectionReservation> createState() =>
@@ -500,14 +503,19 @@ class _BilibiliCollectionReservationState
   }
 
   bool _alreadyHasSubtitles(LibraryCourseData? course) {
+    if (widget.knownSharedSubs) return true;
     if (course != null) {
-      if (course.id == 'oral_core_9000' || courseHasStudySubtitles(course)) {
+      if (course.id == 'oral_core_9000' ||
+          course.id == 'american_ipa_20' ||
+          course.id == 'british_ipa_bbc' ||
+          course.id == 'phonics_nessy' ||
+          courseHasStudySubtitles(course)) {
         return true;
       }
     }
     final String source = widget.source.trim();
     if (source.isEmpty) return false;
-    // Official ECS softsub series (9000句 etc.) — never show 预约字幕.
+    // Official / free-seed series with ECS softsubs — never show 预约字幕.
     if (sourceLooksLikeOfficialBilibiliSoftsubSeries(source)) {
       return true;
     }

@@ -365,6 +365,7 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                   BilibiliCollectionReservation(
                     key: ValueKey(video.watchUrl),
                     source: video.watchUrl,
+                    knownSharedSubs: video.hasSharedSubs,
                   ),
                   IconButton(
                     tooltip: '下载合集全部视频',
