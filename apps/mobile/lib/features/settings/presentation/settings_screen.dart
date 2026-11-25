@@ -1339,7 +1339,7 @@ class SettingsScreen extends ConsumerWidget {
       return;
     }
     if (state.update == null) {
-      ref.read(appUpdateProvider.notifier).check();
+      ref.read(appUpdateProvider.notifier).check(auto: false);
       return;
     }
     ref.read(appUpdateProvider.notifier).download();

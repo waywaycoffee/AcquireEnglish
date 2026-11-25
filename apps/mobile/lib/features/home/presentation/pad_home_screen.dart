@@ -18,6 +18,7 @@ import '../../library/presentation/widgets/ensuring_course_poster.dart';
 import '../../membership/presentation/pro_member_badge.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/learning_resume_provider.dart';
+import '../../settings/presentation/app_update_provider.dart';
 import '../../settings/presentation/learning_preferences_screen.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
@@ -49,6 +50,58 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
     super.initState();
     primeDramaCoverCacheSyncFromPersisted();
     unawaited(primeDramaCoverCacheFromDisk());
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_autoCheckAppUpdate());
+    });
+  }
+
+  Future<void> _autoCheckAppUpdate() async {
+    await ref.read(appUpdateProvider.notifier).maybeAutoCheck();
+    if (!mounted) return;
+    final AppUpdateState state = ref.read(appUpdateProvider);
+    final update = state.update;
+    if (!state.fromAutoCheck || update == null) return;
+    final String notes = update.notes.trim();
+    final bool? go = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        backgroundColor: AppDesignTokens.appWhite,
+        title: Text(
+          '发现新版本 v${update.version}',
+          style: TextStyle(color: AppDesignTokens.textPrimary),
+        ),
+        content: Text(
+          notes.isEmpty
+              ? '官网已发布更新包，建议立即下载安装以获得最新功能与修复。'
+              : notes,
+          style: TextStyle(color: AppDesignTokens.textSecondary, height: 1.5),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('稍后'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('立即更新'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted) return;
+    if (go == true) {
+      await ref.read(appUpdateProvider.notifier).download();
+      final AppUpdateState after = ref.read(appUpdateProvider);
+      if (after.downloadedPath != null) {
+        await ref.read(appUpdateProvider.notifier).install();
+      } else if (after.message != null && mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text(after.message!)));
+      }
+    } else {
+      ref.read(appUpdateProvider.notifier).dismissPrompt();
+    }
   }
 
   @override

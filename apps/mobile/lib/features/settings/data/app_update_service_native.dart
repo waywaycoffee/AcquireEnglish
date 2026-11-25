@@ -2,26 +2,32 @@
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
-import 'package:flutter/foundation.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 
-const String _releasesUrl =
-    'https://api.github.com/repos/TideSparrow/shadowing-english/releases?per_page=100';
+/// Official sideload channel (ECS / download page).
+const String kOfficialAndroidManifestUrl =
+    'https://acquireenglish.curlhairai.com/downloads/android-latest.json';
 
 class AppUpdate {
   const AppUpdate({
     required this.version,
     required this.assetName,
     required this.downloadUrl,
-    required this.checksumUrl,
+    this.versionCode,
+    this.checksumUrl,
+    this.sha256,
+    this.notes = '',
   });
 
   final String version;
+  final int? versionCode;
   final String assetName;
   final String downloadUrl;
-  final String checksumUrl;
+  final String? checksumUrl;
+  final String? sha256;
+  final String notes;
 }
 
 class AppUpdateService {
@@ -30,41 +36,55 @@ class AppUpdateService {
   final Dio _dio;
 
   Future<AppUpdate?> checkForUpdate() async {
+    if (!Platform.isAndroid) {
+      // Desktop still unsupported for official APK channel.
+      return null;
+    }
     final PackageInfo packageInfo = await PackageInfo.fromPlatform();
-    final Response<List<dynamic>> response = await _dio.get<List<dynamic>>(
-      _releasesUrl,
+    final Response<dynamic> response = await _dio.get<dynamic>(
+      kOfficialAndroidManifestUrl,
       options: Options(
-        headers: <String, String>{
-          'Accept': 'application/vnd.github+json',
-          'X-GitHub-Api-Version': '2022-11-28',
-        },
+        headers: <String, String>{'Accept': 'application/json'},
+        receiveTimeout: const Duration(seconds: 12),
       ),
     );
-    final Map<String, dynamic> release = _highestStableRelease(
-      response.data ?? <dynamic>[],
-    );
-    final String latestVersion = _versionFromTag(release['tag_name']);
-    if (_compareVersions(latestVersion, packageInfo.version) <= 0) {
+    final Object? data = response.data;
+    if (data is! Map) {
+      throw StateError('官网更新清单格式无效。');
+    }
+    final Map<String, dynamic> json = Map<String, dynamic>.from(data);
+    final String latestVersion = '${json['version'] ?? ''}'.trim();
+    if (latestVersion.isEmpty) {
+      throw StateError('官网更新清单缺少 version。');
+    }
+    final int? latestCode = (json['version_code'] as num?)?.toInt();
+    final int localCode = int.tryParse(packageInfo.buildNumber) ?? 0;
+    final bool newerByCode =
+        latestCode != null && latestCode > 0 && latestCode > localCode;
+    final bool newerByName =
+        _compareVersions(latestVersion, packageInfo.version) > 0;
+    if (!newerByCode && !newerByName) {
       return null;
     }
 
-    final List<dynamic> assets =
-        release['assets'] as List<dynamic>? ?? <dynamic>[];
-    final String suffix = _assetSuffixForCurrentPlatform();
-    final Map<String, dynamic>? package = _assetEndingWith(assets, suffix);
-    final Map<String, dynamic>? checksum = _assetEndingWith(
-      assets,
-      'SHA256SUMS.txt',
-    );
-    if (package == null || checksum == null) {
-      throw StateError('该 Release 未提供当前平台（$suffix）的更新包。');
+    final String apkUrl = '${json['apk_url'] ?? ''}'.trim();
+    if (apkUrl.isEmpty) {
+      throw StateError('官网更新清单缺少 apk_url。');
     }
+    final String assetName = '${json['apk_name'] ?? ''}'.trim().isEmpty
+        ? 'AcquireEnglish-android-latest.apk'
+        : '${json['apk_name']}'.trim();
+    final String sha = '${json['sha256'] ?? ''}'.trim();
+    final String checksumUrl = '${json['checksum_url'] ?? ''}'.trim();
 
     return AppUpdate(
       version: latestVersion,
-      assetName: package['name'] as String,
-      downloadUrl: package['browser_download_url'] as String,
-      checksumUrl: checksum['browser_download_url'] as String,
+      versionCode: latestCode,
+      assetName: assetName,
+      downloadUrl: apkUrl,
+      checksumUrl: checksumUrl.isEmpty ? null : checksumUrl,
+      sha256: sha.isEmpty ? null : sha,
+      notes: '${json['notes'] ?? ''}'.trim(),
     );
   }
 
@@ -88,15 +108,15 @@ class AppUpdateService {
       file.path,
       onReceiveProgress: onProgress,
     );
-    final String expectedChecksum = await _checksumFor(
-      update.assetName,
-      update.checksumUrl,
-    );
-    final String actualChecksum = (await sha256.bind(file.openRead()).first)
-        .toString();
-    if (actualChecksum.toLowerCase() != expectedChecksum.toLowerCase()) {
-      await file.delete();
-      throw StateError('安装包校验失败，已删除下载文件。');
+
+    final String? expected = await _expectedChecksum(update);
+    if (expected != null && expected.isNotEmpty) {
+      final String actualChecksum = (await sha256.bind(file.openRead()).first)
+          .toString();
+      if (actualChecksum.toLowerCase() != expected.toLowerCase()) {
+        await file.delete();
+        throw StateError('安装包校验失败，已删除下载文件。');
+      }
     }
     return file.path;
   }
@@ -108,83 +128,25 @@ class AppUpdateService {
     }
   }
 
-  Future<String> _checksumFor(String assetName, String checksumUrl) async {
-    final Response<String> response = await _dio.get<String>(checksumUrl);
+  Future<String?> _expectedChecksum(AppUpdate update) async {
+    final String? inline = update.sha256?.trim();
+    if (inline != null && inline.isNotEmpty) return inline;
+    final String? url = update.checksumUrl?.trim();
+    if (url == null || url.isEmpty) return null;
+    final Response<String> response = await _dio.get<String>(url);
     for (final String rawLine in response.data?.split('\n') ?? <String>[]) {
       final String line = rawLine.trim();
-      if (line.endsWith('  $assetName')) {
+      if (line.endsWith('  ${update.assetName}') ||
+          line.endsWith(' ${update.assetName}')) {
         return line.split(RegExp(r'\s+')).first;
       }
-    }
-    throw StateError('SHA256SUMS.txt 中未找到 $assetName。');
-  }
-
-  Map<String, dynamic>? _assetEndingWith(List<dynamic> assets, String suffix) {
-    for (final dynamic asset in assets) {
-      if (asset is Map<String, dynamic>) {
-        final Object? name = asset['name'];
-        if (name is String && name.endsWith(suffix)) {
-          return asset;
-        }
+      // Single-hash file.
+      if (RegExp(r'^[0-9a-fA-F]{64}$').hasMatch(line)) {
+        return line;
       }
     }
     return null;
   }
-}
-
-Map<String, dynamic> _highestStableRelease(List<dynamic> releases) {
-  Map<String, dynamic>? newestRelease;
-  String? newestVersion;
-  for (final dynamic release in releases) {
-    if (release is! Map<String, dynamic> ||
-        release['draft'] == true ||
-        release['prerelease'] == true) {
-      continue;
-    }
-    final String? version = _tryVersionFromTag(release['tag_name']);
-    if (version == null) {
-      continue;
-    }
-    if (newestVersion == null || _compareVersions(version, newestVersion) > 0) {
-      newestRelease = release;
-      newestVersion = version;
-    }
-  }
-  if (newestRelease == null) {
-    throw const FormatException('GitHub 未返回可用的正式 Release。');
-  }
-  return newestRelease;
-}
-
-String _assetSuffixForCurrentPlatform() {
-  switch (defaultTargetPlatform) {
-    case TargetPlatform.android:
-      return '-android.apk';
-    case TargetPlatform.linux:
-      return '-linux-x64.tar.gz';
-    case TargetPlatform.macOS:
-      return '-macos.dmg';
-    case TargetPlatform.windows:
-      return '-windows-x64.zip';
-    default:
-      throw UnsupportedError('当前平台不支持从 GitHub Release 更新。');
-  }
-}
-
-String _versionFromTag(Object? tag) {
-  final String? version = _tryVersionFromTag(tag);
-  if (version == null) {
-    throw const FormatException('GitHub Release 缺少版本标签。');
-  }
-  return version;
-}
-
-String? _tryVersionFromTag(Object? tag) {
-  if (tag is! String) {
-    return null;
-  }
-  final String version = tag.replaceFirst(RegExp('^v'), '');
-  return RegExp(r'^\d+(?:\.\d+){2}$').hasMatch(version) ? version : null;
 }
 
 int _compareVersions(String left, String right) {
