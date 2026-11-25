@@ -18,7 +18,7 @@ Retired from storefront: module monthly/permanent, combos, vocab packs, efficien
 
 Legacy content×capability codes (`exam_reading` …) still resolve via `LEGACY_MODULE_ALIASES`.
 
-**WeChat MCH:** **BLOCKED** without `WECHAT_MCH_*`. Production → clear 503 / App **待配置商户**. Non-prod → `provider=mock` + `mark-paid`.
+**WeChat MCH:** App/API 链路已就绪；生产仍 **BLOCKED** until `WECHAT_MCH_*` filled on ECS. Use `deploy/apply_wechat_pay_from_local.sh` or `deploy/configure_wechat_pay_env.sh`. Production → 503 / App **待配置商户**. Non-prod → `provider=mock` + `mark-paid`.
 
 OpenMAIC is **out of scope** (separate track).
 
@@ -36,7 +36,7 @@ OpenMAIC is **out of scope** (separate track).
 | B8 Anti-abuse basics | **DONE** | 7d dedupe, duration floor, caps |
 | C Analytics events | **DONE** | `commerce_events` |
 | Admin commerce peek | **DONE** | `/api/admin/commerce/*` |
-| WeChat App pay | **BLOCKED** | needs MCH secrets |
+| WeChat App pay | **BLOCKED** | code+callback OK; needs MCH secrets on ECS |
 | Full 4 arena modes / 2D avatar | **DEFERRED** | art + matchmaking |
 
 ## Modules
@@ -75,11 +75,19 @@ Required env (API host `/opt/acquireenglish/services/api/.env`):
 WECHAT_MCH_ID=
 WECHAT_MCH_SERIAL_NO=
 WECHAT_MCH_API_V3_KEY=          # 32 chars
-WECHAT_MCH_PRIVATE_KEY=         # PEM or absolute path to apiclient_key.pem
+WECHAT_MCH_PRIVATE_KEY=/opt/acquireenglish/secrets/wechat_pay/apiclient_key.pem
 WECHAT_PAY_NOTIFY_URL=https://acquireenglish.curlhairai.com/api/assets/wechat/notify
 ```
 
-Bind the merchant to Open Platform AppID (`WECHAT_APP_ID`). Then `systemctl restart acquireenglish-api` and confirm `wechat_pay_configured=true` on `/api/health`.
+Bind the merchant to Open Platform AppID (`wx00b4272a8eabb1cd`). Apply via:
+
+```bash
+bash deploy/apply_wechat_pay_from_local.sh   # from Mac, with env + PEM path
+# or on ECS:
+sudo bash /opt/acquireenglish/deploy/configure_wechat_pay_env.sh
+```
+
+Confirm `wechat_pay_configured=true` on `/api/health` and `wechat_configured=true` on `/api/commerce/pay-status`.
 
 ## App
 

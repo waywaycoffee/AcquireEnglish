@@ -42,9 +42,12 @@ class WeChatPayError(RuntimeError):
 
 
 def _load_private_key():
-    raw = settings.wechat_mch_private_key.strip()
+    raw = settings.wechat_mch_private_key.strip().strip('"').strip("'")
     if not raw:
         raise WeChatPayError("未配置 WECHAT_MCH_PRIVATE_KEY")
+    # Support single-line env with literal \n escapes.
+    if "\\n" in raw and "-----BEGIN" in raw:
+        raw = raw.replace("\\n", "\n")
     if raw.startswith("-----BEGIN"):
         pem = raw.encode("utf-8")
     else:

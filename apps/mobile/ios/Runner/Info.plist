@@ -31,7 +31,8 @@
 			<string>weixin</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
-				<string>wxAcquireEnglish</string>
+				<!-- Must equal Open Platform AppID (WeChat SDK URL return). -->
+				<string>wx00b4272a8eabb1cd</string>
 			</array>
 		</dict>
 	</array>

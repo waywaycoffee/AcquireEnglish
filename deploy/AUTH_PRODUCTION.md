@@ -27,7 +27,7 @@ curl -fsS https://acquireenglish.curlhairai.com/api/health
 | 短信登录 | **就绪** | `auth_sms_mock=false` · Aliyun |
 | 邮箱注册 | **就绪** | SMTP 已配 |
 | 微信登录 | **就绪** | `auth_wechat_configured=true` · Open Platform AppID/Secret 已写入 ECS `.env` |
-| 微信支付 | **未就绪** | `wechat_pay_configured=false` · `WECHAT_MCH_*` 商户凭证为空。**勿编造密钥**；补齐商户号/证书序列号/APIv3 Key/私钥后重启 API。生产下单拒绝 `mock`/`manual`，未配商户时 `provider=wechat` 返回 503 明文提示。 |
+| 微信支付 | **未就绪（差商户密钥）** | App/API 支付链路已接通；ECS `.env` 里 `WECHAT_MCH_*` **键存在但值为空**。填入商户号/证书序列号/APIv3 Key/`apiclient_key.pem` 后 `wechat_pay_configured` 才会变 `true`。生产拒绝 `mock`/`manual`。 |
 
 > 生产机通过 systemd `PRODUCTION_MODE=true` 禁用 email/wechat mock。  
 > 未配置 SMTP/Webhook 时，邮箱注册接口会返回「邮箱注册暂未开放」。
@@ -120,13 +120,37 @@ flutter build apk --dart-define=WECHAT_APP_ID=wx........ \
 
 ## 3b. 微信支付（App 支付）
 
-Open Platform 的 AppID/AppSecret **不够**完成收款，还需微信支付商户平台：
+Open Platform AppID（`wx00b4272a8eabb1cd`）已配置；收款还需 [微信支付商户平台](https://pay.weixin.qq.com/)：
+
+1. 账户中心 → API 安全：设置 **APIv3 密钥**（32 位）、申请/下载 **API 证书**（`apiclient_key.pem` + 证书序列号）
+2. 产品中心开通 **App 支付**；把商户号与开放平台移动应用 AppID 绑定
+3. 开发配置 → 支付授权目录 / 回调：`https://acquireenglish.curlhairai.com/api/assets/wechat/notify`
+
+Android 应用签名（Open Platform / 商户侧）：包名 `com.acquire.english`，MD5（小写无冒号）  
+`d5a921c1234aef0b8eb6d4871f80e988`（本机 `team-debug.keystore`）
+
+写入 ECS（二选一）：
+
+```bash
+# A) 在本机导出环境变量后一键上传（推荐：私钥落盘，不进 git）
+export WECHAT_MCH_ID=...
+export WECHAT_MCH_SERIAL_NO=...
+export WECHAT_MCH_API_V3_KEY=...          # 恰好 32 字符
+export WECHAT_MCH_PRIVATE_KEY_FILE=/path/to/apiclient_key.pem
+bash deploy/apply_wechat_pay_from_local.sh
+
+# B) SSH 到 ECS 交互填写
+ssh root@8.163.45.100
+sudo bash /opt/acquireenglish/deploy/configure_wechat_pay_env.sh
+```
+
+`.env` 字段：
 
 ```bash
 WECHAT_MCH_ID=商户号
 WECHAT_MCH_SERIAL_NO=商户API证书序列号
 WECHAT_MCH_API_V3_KEY=APIv3密钥(32位)
-WECHAT_MCH_PRIVATE_KEY=-----BEGIN PRIVATE KEY-----...  # 或 apiclient_key.pem 绝对路径
+WECHAT_MCH_PRIVATE_KEY=/opt/acquireenglish/secrets/wechat_pay/apiclient_key.pem
 WECHAT_PAY_NOTIFY_URL=https://acquireenglish.curlhairai.com/api/assets/wechat/notify
 ```
 
@@ -136,7 +160,7 @@ API：
 - `POST /api/assets/orders/{id}/wechat-prepay` 返回 App 调起参数
 - `POST /api/assets/wechat/notify` 支付结果回调 → 自动履约发权益
 
-健康检查字段：`wechat_pay_configured=true` 表示商户凭证齐全。
+健康检查：`wechat_pay_configured=true`；另查 `GET /api/commerce/pay-status`。
 
 ## 4. 新用户试用资产
 
