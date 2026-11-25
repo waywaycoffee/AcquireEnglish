@@ -1346,23 +1346,56 @@
           </table></div>
         </div>
         <div class="dash-card full">
-          <h3>用户消耗 Top</h3>
+          <h3>用户消耗 Top（可点开用户档案）</h3>
           <div class="table-wrap"><table>
-            <thead><tr><th>User ID</th><th>事件</th><th>Tokens</th><th>成本 CNY</th></tr></thead>
+            <thead><tr><th>用户</th><th>联系方式</th><th>微信</th><th>事件</th><th>Tokens</th><th>成本 CNY</th></tr></thead>
             <tbody>
               ${(summary.by_user || [])
-                .map(
-                  (u) =>
-                    `<tr><td>${u.user_id}</td><td>${num(u.events)}</td><td>${num(
-                      u.tokens
-                    )}</td><td>${money(u.cost_cny)}</td></tr>`
-                )
-                .join("") || `<tr><td colspan="4" class="muted">暂无</td></tr>`}
+                .map((u) => {
+                  const name = u.display_name || "—";
+                  const contact = [u.email, u.phone].filter(Boolean).join(" · ") || "—";
+                  return `<tr class="usage-user-row" data-id="${u.user_id}" tabindex="0">
+                    <td><strong>#${u.user_id}</strong> ${escapeHtml(name)}</td>
+                    <td>${escapeHtml(contact)}</td>
+                    <td>${u.wechat_bound ? "已绑定" : "—"}</td>
+                    <td>${num(u.events)}</td>
+                    <td>${num(u.tokens)}</td>
+                    <td>${money(u.cost_cny)}</td>
+                  </tr>`;
+                })
+                .join("") || `<tr><td colspan="6" class="muted">暂无按用户归因的用量</td></tr>`}
+              ${
+                summary.unattributed && summary.unattributed.events
+                  ? `<tr class="muted"><td colspan="3">未归因（服务端/未登录）</td><td>${num(
+                      summary.unattributed.events
+                    )}</td><td>${num(summary.unattributed.tokens)}</td><td>${money(
+                      summary.unattributed.cost_cny
+                    )}</td></tr>`
+                  : ""
+              }
             </tbody>
           </table></div>
           <div class="note-box">${escapeHtml(summary.note || "")}</div>
         </div>
       </div>`;
+    el.querySelectorAll(".usage-user-row").forEach((row) => {
+      const openUser = () => {
+        const userId = Number(row.dataset.id);
+        if (!userId) return;
+        state.selectedId = userId;
+        setTab("users");
+        loadUsers()
+          .then(() => loadDetail(userId))
+          .catch((e) => alert(e.message));
+      };
+      row.addEventListener("click", openUser);
+      row.addEventListener("keydown", (ev) => {
+        if (ev.key === "Enter" || ev.key === " ") {
+          ev.preventDefault();
+          openUser();
+        }
+      });
+    });
   }
 
   async function loadResources() {

@@ -12,7 +12,7 @@ from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.config import settings
-from app.models import ApiUsageEvent, Order
+from app.models import ApiUsageEvent, Order, User
 
 USD_TO_CNY = 7.2
 
@@ -440,6 +440,33 @@ async def usage_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str,
         }
         for r in (await db.execute(user_q)).all()
     ]
+    if by_user:
+        uid_list = [int(u["user_id"]) for u in by_user]
+        profiles = (
+            await db.execute(select(User).where(User.id.in_(uid_list)))
+        ).scalars().all()
+        profile_map = {int(u.id): u for u in profiles}
+        for item in by_user:
+            u = profile_map.get(int(item["user_id"]))
+            item["display_name"] = (u.display_name if u else None) or None
+            item["email"] = (u.email if u else None) or None
+            item["phone"] = (u.phone if u else None) or None
+            item["wechat_bound"] = bool(u and u.wechat_openid)
+
+    unattributed_q = select(
+        func.count(ApiUsageEvent.id),
+        func.coalesce(func.sum(ApiUsageEvent.prompt_tokens), 0),
+        func.coalesce(func.sum(ApiUsageEvent.completion_tokens), 0),
+        func.coalesce(func.sum(ApiUsageEvent.cost_cny), 0.0),
+    ).where(ApiUsageEvent.user_id.is_(None))
+    for f in filters:
+        unattributed_q = unattributed_q.where(f)
+    un_row = (await db.execute(unattributed_q)).one()
+    unattributed = {
+        "events": int(un_row[0] or 0),
+        "tokens": int(un_row[1] or 0) + int(un_row[2] or 0),
+        "cost_cny": float(un_row[3] or 0),
+    }
 
     return {
         "days": days,
@@ -460,8 +487,9 @@ async def usage_summary(db: AsyncSession, *, days: int | None = 30) -> dict[str,
         },
         "by_key": by_key[:40],
         "by_user": by_user,
+        "unattributed": unattributed,
         "fx_usd_cny": USD_TO_CNY,
-        "note": "成本为公开价估算，非账单原件；平台 key 指纹不含明文。",
+        "note": "成本为公开价估算，非账单原件；有 user_id 的事件可归因到具体注册用户，服务端批处理/未登录调用记入「未归因」。",
     }
 
 

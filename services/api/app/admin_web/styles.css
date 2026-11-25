@@ -314,6 +314,8 @@ th { color: var(--muted); font-weight: 700; }
   margin: 0 0 10px;
   font-size: 15px;
 }
+.usage-user-row { cursor: pointer; }
+.usage-user-row:hover { background: var(--accent-soft); }
 .stat .muted { display: block; margin-top: 4px; font-size: 12px; font-weight: 500; }
 .note-box {
   margin-top: 10px;
