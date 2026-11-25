@@ -32,28 +32,51 @@ export default function BetaPage() {
             <p className="landing-kicker">App 封闭内测进行中</p>
             <h1>爱快英语邀请你一起内测</h1>
             <p className="landing-lead">
-              我们正在打磨「用真实视频学英语」的完整闭环：精听、跟读、配音、听写、数字人口语，
-              以及社区素材共建。内测阶段功能会持续迭代，欢迎反馈问题与建议。
+              打开 App 会固定弹出内测须知。请把注册 ID 微信发给作者
+              <strong> youyoufairytale</strong>，并加入「佑佑爸粉丝交流群」反馈 bug。
             </p>
             <div className="landing-cta">
-              <a className="btn" href="#guide">
-                阅读内测说明
+              <a className="btn" href="/download.html">
+                下载 Android APK
               </a>
-              <Link className="btn ghost" to="/register">
-                注册参与内测
-              </Link>
+              <a className="btn ghost" href="#rules">
+                阅读内测规则
+              </a>
             </div>
           </div>
           <aside className="landing-hero-visual card beta-hero-card">
             <p className="muted">内测通道</p>
-            <h2>侧载 Android 包</h2>
+            <h2>Android 官网下载</h2>
             <ul className="landing-hero-points">
-              <li>正式包名 com.acquire.english</li>
-              <li>请使用内测群发放的安装包</li>
-              <li>覆盖安装可保留本地学习数据</li>
-              <li>问题请反馈至 support@curlhairai.com</li>
+              <li>包名 com.acquire.english</li>
+              <li>注册 ID 发微信 youyoufairytale</li>
+              <li>社区上传资源可赠 Pro 时长</li>
+              <li>违规敏感内容永久封号</li>
             </ul>
           </aside>
+        </section>
+
+        <section id="rules" className="landing-section card beta-block">
+          <h2>内测须知（App 打开固定弹窗）</h2>
+          <ol className="beta-list">
+            <li>
+              内测用户请把<strong>注册 ID</strong>通过微信发给作者，作者微信号：
+              <code>youyoufairytale</code>。
+            </li>
+            <li>
+              内测用户可加入「<strong>佑佑爸粉丝交流群</strong>」。有 bug
+              相关问题，作者都会在群里第一时间解决。
+            </li>
+            <li>
+              可提供学习资源（各年级真题试卷、影视资源、电子书、各类教材等），直接在 App{" "}
+              <strong>社区</strong>上传；审核通过后可额外赠送{" "}
+              <strong>Pro 会员时长</strong>。
+            </li>
+            <li>
+              各类英语交流资料不得含有敏感内容。一经发现与国家政策法规不符，立刻
+              <strong>永久封号</strong>处理。
+            </li>
+          </ol>
         </section>
 
         <section id="guide" className="landing-section card beta-block">

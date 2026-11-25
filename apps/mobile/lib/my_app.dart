@@ -11,6 +11,7 @@ import 'package:hive_ce/hive.dart';
 import 'config/theme/theme_logic.dart';
 import 'config/theme/theme_ui_model.dart';
 import 'features/authentication/presentation/auth_session.dart';
+import 'features/home/presentation/internal_beta_notice_host.dart';
 import 'features/idle_jobs/idle_job_drain.dart';
 import 'features/idle_jobs/idle_job_queue.dart';
 import 'features/idle_jobs/idle_job_scheduler.dart';
@@ -262,10 +263,12 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
                     _textScaleForWidth(mediaQuery.size.width),
                   ),
                 ),
-                child: BilibiliLoginGate(
-                  child: OverlayPermissionHost(
-                    child: VideoDownloadProgressHost(
-                      child: child ?? const SizedBox.shrink(),
+                child: InternalBetaNoticeHost(
+                  child: BilibiliLoginGate(
+                    child: OverlayPermissionHost(
+                      child: VideoDownloadProgressHost(
+                        child: child ?? const SizedBox.shrink(),
+                      ),
                     ),
                   ),
                 ),
