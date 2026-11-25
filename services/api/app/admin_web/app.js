@@ -1955,32 +1955,38 @@
     });
   }
 
-  $("loginBtn").addEventListener("click", login);
+  function on(id, event, handler) {
+    const el = $(id);
+    if (!el) return;
+    el.addEventListener(event, handler);
+  }
+
+  on("loginBtn", "click", login);
   ["usernameInput", "passwordInput", "tokenInput"].forEach((id) => {
-    $(id).addEventListener("keydown", (e) => {
+    on(id, "keydown", (e) => {
       if (e.key === "Enter") login();
     });
   });
-  $("loadTokenBtn").addEventListener("click", () => $("tokenFileInput").click());
-  $("tokenFileInput").addEventListener("change", (e) => {
+  on("loadTokenBtn", "click", () => $("tokenFileInput")?.click());
+  on("tokenFileInput", "change", (e) => {
     const file = e.target.files && e.target.files[0];
     if (file) loadTokenFromFile(file);
     e.target.value = "";
   });
-  $("saveTokenBtn").addEventListener("click", saveTokenToLocal);
-  $("logoutBtn").addEventListener("click", logout);
-  $("refreshBtn").addEventListener("click", () => bootstrap().catch((e) => alert(e.message)));
-  $("searchForm").addEventListener("submit", (e) => {
+  on("saveTokenBtn", "click", saveTokenToLocal);
+  on("logoutBtn", "click", logout);
+  on("refreshBtn", "click", () => bootstrap().catch((e) => alert(e.message)));
+  on("searchForm", "submit", (e) => {
     e.preventDefault();
     state.q = $("searchInput").value.trim();
     state.offset = 0;
     loadUsers().catch((err) => alert(err.message));
   });
-  $("prevPage").addEventListener("click", () => {
+  on("prevPage", "click", () => {
     state.offset = Math.max(0, state.offset - state.limit);
     loadUsers().catch((err) => alert(err.message));
   });
-  $("nextPage").addEventListener("click", () => {
+  on("nextPage", "click", () => {
     state.offset += state.limit;
     loadUsers().catch((err) => alert(err.message));
   });
@@ -1998,22 +2004,22 @@
       if (btn.dataset.tab === "community") loadCommunityPosts().catch((e) => alert(e.message));
     });
   });
-  $("communitySearchForm").addEventListener("submit", (e) => {
+  on("communitySearchForm", "submit", (e) => {
     e.preventDefault();
     communityState.q = $("communitySearchInput").value.trim();
     communityState.status = $("communityStatus").value;
     communityState.offset = 0;
     loadCommunityPosts().catch((err) => alert(err.message));
   });
-  $("communityPrev").addEventListener("click", () => {
+  on("communityPrev", "click", () => {
     communityState.offset = Math.max(0, communityState.offset - communityState.limit);
     loadCommunityPosts().catch((err) => alert(err.message));
   });
-  $("communityNext").addEventListener("click", () => {
+  on("communityNext", "click", () => {
     communityState.offset += communityState.limit;
     loadCommunityPosts().catch((err) => alert(err.message));
   });
-  $("feedbackSearchForm").addEventListener("submit", (e) => {
+  on("feedbackSearchForm", "submit", (e) => {
     e.preventDefault();
     feedbackState.status = $("feedbackStatusFilter").value;
     feedbackState.category = $("feedbackCategoryFilter").value;
@@ -2021,20 +2027,20 @@
     feedbackState.offset = 0;
     loadFeedback().catch((err) => alert(err.message));
   });
-  $("feedbackPrev").addEventListener("click", () => {
+  on("feedbackPrev", "click", () => {
     feedbackState.offset = Math.max(0, feedbackState.offset - feedbackState.limit);
     loadFeedback().catch((err) => alert(err.message));
   });
-  $("feedbackNext").addEventListener("click", () => {
+  on("feedbackNext", "click", () => {
     feedbackState.offset += feedbackState.limit;
     loadFeedback().catch((err) => alert(err.message));
   });
-  $("examAssetsFilterForm").addEventListener("submit", (e) => {
+  on("examAssetsFilterForm", "submit", (e) => {
     e.preventDefault();
     examAssetsState.status = $("examAssetsStatusFilter").value;
     loadExamAssets().catch((err) => alert(err.message));
   });
-  $("commerceOrdersForm").addEventListener("submit", (e) => {
+  on("commerceOrdersForm", "submit", (e) => {
     e.preventDefault();
     commerceState.status = $("commerceOrderStatus").value;
     commerceState.kind = $("commerceOrderKind").value;
@@ -2044,6 +2050,6 @@
 
   // Always show login gate (username + password + token). Prefill account/token only.
   showLogin();
-  $("usernameInput").value = state.username || "admin";
-  if (state.token) $("tokenInput").value = state.token;
+  if ($("usernameInput")) $("usernameInput").value = state.username || "admin";
+  if (state.token && $("tokenInput")) $("tokenInput").value = state.token;
 })();

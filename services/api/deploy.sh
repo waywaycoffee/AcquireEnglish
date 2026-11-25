@@ -25,6 +25,12 @@ rsync -az \
   --exclude 'docker-compose.yml' \
   "$ROOT/app/" "$HOST:$PATH_REMOTE/app/"
 rsync -az "$ROOT/requirements.txt" "$HOST:$PATH_REMOTE/requirements.txt"
+
+# nginx serves /admin from www (not uvicorn). Keep that tree in lockstep with admin_web.
+WWW_ADMIN="${DEPLOY_WWW_ADMIN:-/opt/acquireenglish/www/admin}"
+echo "==> Sync admin_web to $HOST:$WWW_ADMIN (nginx public /admin)"
+ssh "$HOST" "mkdir -p '$WWW_ADMIN'"
+rsync -az "$ROOT/app/admin_web/" "$HOST:$WWW_ADMIN/"
 if [[ -d "$ROOT/data/syllabus" ]]; then
   echo "==> Sync first-party syllabus books"
   rsync -az "$ROOT/data/syllabus/" "$HOST:$PATH_REMOTE/data/syllabus/"
