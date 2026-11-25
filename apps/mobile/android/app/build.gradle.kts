@@ -42,17 +42,18 @@ android {
     }
 
     signingConfigs {
-        // Shared team debug keystore (this Mac is the source of truth).
-        // Other machines: copy android/keystore/team-debug.keystore from this PC
-        // (file is gitignored). Fallback: local ~/.android/debug.keystore.
+        // Shared team debug cert — must match sideload devices (SHA256 2D:79:38:C4:…).
+        // Place file at android/keystore/team-debug.keystore (gitignored).
+        // Do not fall back to ~/.android/debug.keystore (machine-local certs diverge).
         getByName("debug") {
-            val teamDebug = rootProject.file("keystore/team-debug.keystore")
-            if (teamDebug.isFile) {
-                storeFile = teamDebug
-                storePassword = "android"
-                keyAlias = "androiddebugkey"
-                keyPassword = "android"
+            val teamDebugKeystore = rootProject.file("keystore/team-debug.keystore")
+            require(teamDebugKeystore.isFile) {
+                "Missing $teamDebugKeystore — copy the team debug keystore before building."
             }
+            storeFile = teamDebugKeystore
+            storePassword = "android"
+            keyAlias = "androiddebugkey"
+            keyPassword = "android"
         }
         create("release") {
             if (keystorePropertiesFile.exists()) {
@@ -83,6 +84,9 @@ android {
     }
 
     buildTypes {
+        getByName("debug") {
+            signingConfig = signingConfigs.getByName("debug")
+        }
         release {
             signingConfig = if (keystorePropertiesFile.exists()) {
                 signingConfigs.getByName("release")

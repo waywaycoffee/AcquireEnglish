@@ -102,7 +102,8 @@ services/api/data/exam_bank_vendor/**
 *.jks
 *.keystore
 **/android/key.properties
-**/android/keystore/
+**/android/keystore/**
+!**/android/keystore/README.md
 
 # 时文生成器输出文件
 reading_generator/ik_english_reading/

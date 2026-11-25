@@ -9,6 +9,8 @@
 
 覆盖安装需与手机上已装包**签名一致**。不一致时不要卸载清数据，改用同 keystore 重签或备份后重装。
 
+团队 debug 证书：`apps/mobile/android/keystore/team-debug.keystore`（别名 `androiddebugkey`，口令 `android`，gitignored）。`prod` debug 构建已强制使用该证书；本机需先放入该文件再建包。
+
 ## 已知限制（告知内测用户）
 
 1. **微信支付未开放**：会员页会提示商户未配置；请用欢迎试用（claim-welcome）与免费种子学习。
