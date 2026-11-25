@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../import_course/data/bilibili_open_or_import.dart';
+import '../../import_course/presentation/bilibili_collection_reservation.dart';
 import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -130,69 +131,80 @@ class _EnglishBrowseScreenState extends ConsumerState<EnglishBrowseScreen> {
           return Material(
             color: AppDesignTokens.appWhite,
             borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: () => unawaited(
-                openBilibiliLearningOrImport(
-                  context,
-                  ref,
-                  watchUrl: item.watchUrl,
-                  startImportImmediately: true,
-                ),
-              ),
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    ClipRRect(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        width: 118,
-                        height: 74,
-                        child: CoverImage(
-                          path: item.coverUrl ?? '',
-                          fit: BoxFit.cover,
+                      onTap: () => unawaited(
+                        openBilibiliLearningOrImport(
+                          context,
+                          ref,
+                          watchUrl: item.watchUrl,
+                          startImportImmediately: true,
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(
-                            item.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: const TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              height: 1.25,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: SizedBox(
+                              width: 118,
+                              height: 74,
+                              child: CoverImage(
+                                path: item.coverUrl ?? '',
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            <String>[
-                              if (item.author.isNotEmpty) item.author,
-                              if (duration.isNotEmpty) duration,
-                              badge,
-                            ].join(' · '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: verified
-                                  ? AppDesignTokens.brandGreen
-                                  : AppDesignTokens.textSecondary,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  item.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    height: 1.25,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  <String>[
+                                    if (item.author.isNotEmpty) item.author,
+                                    if (duration.isNotEmpty) duration,
+                                    badge,
+                                  ].join(' · '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: verified
+                                        ? AppDesignTokens.brandGreen
+                                        : AppDesignTokens.textSecondary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  BilibiliCollectionReservation(
+                    key: ValueKey<String>('reserve-${item.watchUrl}'),
+                    source: item.watchUrl,
+                  ),
+                ],
               ),
             ),
           );

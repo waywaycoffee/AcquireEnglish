@@ -613,11 +613,20 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           child: const Text('下载全部合集'),
                         ),
                       ),
-                    if (isMultiEpisodeBilibiliCourse(selectedCourse) ||
-                        (selectedCourse.id.startsWith('youtube-') &&
-                            selectedCourse.episodes.length > 1))
+                    if (selectedCourse.episodes.isNotEmpty &&
+                        ((selectedCourse.episodes.first.sourceUrl ?? '')
+                                .trim()
+                                .isNotEmpty ||
+                            (selectedCourse.episodes.first.videoAsset ?? '')
+                                .trim()
+                                .isNotEmpty))
                       BilibiliCollectionReservation(
-                        source: selectedCourse.episodes.first.sourceUrl ?? '',
+                        source:
+                            (selectedCourse.episodes.first.sourceUrl ?? '')
+                                .trim()
+                                .isNotEmpty
+                            ? selectedCourse.episodes.first.sourceUrl!
+                            : (selectedCourse.episodes.first.videoAsset ?? ''),
                         courseId: selectedCourse.id,
                         key: ValueKey(selectedCourse.id),
                       ),
@@ -2999,69 +3008,81 @@ class _BilibiliSearchResults extends StatelessWidget {
               child: Material(
                 color: AppDesignTokens.appWhite,
                 borderRadius: BorderRadius.circular(16),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(16),
-                  onTap: () => unawaited(onOpen(hit)),
-                  child: Padding(
-                    padding: const EdgeInsets.all(10),
-                    child: Row(
-                      children: <Widget>[
-                        ClipRRect(
+                child: Padding(
+                  padding: const EdgeInsets.all(10),
+                  child: Row(
+                    children: <Widget>[
+                      Expanded(
+                        child: InkWell(
                           borderRadius: BorderRadius.circular(12),
-                          child: SizedBox(
-                            width: 96,
-                            height: 64,
-                            child: (hit.coverUrl ?? '').trim().isEmpty
-                                ? ColoredBox(
-                                    color: AppDesignTokens.borderGray,
-                                    child: Icon(
-                                      Icons.play_circle_outline,
-                                      color: AppDesignTokens.textSecondary,
-                                    ),
-                                  )
-                                : CoverImage(
-                                    path: hit.coverUrl!,
-                                    fit: BoxFit.cover,
-                                  ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
+                          onTap: () => unawaited(onOpen(hit)),
+                          child: Row(
                             children: <Widget>[
-                              Text(
-                                hit.title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.w800,
+                              ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: SizedBox(
+                                  width: 96,
+                                  height: 64,
+                                  child: (hit.coverUrl ?? '').trim().isEmpty
+                                      ? ColoredBox(
+                                          color: AppDesignTokens.borderGray,
+                                          child: Icon(
+                                            Icons.play_circle_outline,
+                                            color:
+                                                AppDesignTokens.textSecondary,
+                                          ),
+                                        )
+                                      : CoverImage(
+                                          path: hit.coverUrl!,
+                                          fit: BoxFit.cover,
+                                        ),
                                 ),
                               ),
-                              const SizedBox(height: 4),
-                              Text(
-                                [
-                                  if (hit.author.trim().isNotEmpty) hit.author,
-                                  hit.bvid,
-                                ].join(' · '),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  fontWeight: FontWeight.w600,
-                                  color: AppDesignTokens.textSecondary,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: <Widget>[
+                                    Text(
+                                      hit.title,
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: const TextStyle(
+                                        fontSize: 14,
+                                        fontWeight: FontWeight.w800,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      [
+                                        if (hit.author.trim().isNotEmpty)
+                                          hit.author,
+                                        hit.bvid,
+                                      ].join(' · '),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.w600,
+                                        color: AppDesignTokens.textSecondary,
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             ],
                           ),
                         ),
-                        Icon(
-                          Icons.download_rounded,
-                          color: AppDesignTokens.primaryBlueDark,
-                        ),
-                      ],
-                    ),
+                      ),
+                      BilibiliCollectionReservation(
+                        key: ValueKey<String>('search-reserve-${hit.watchUrl}'),
+                        source: hit.watchUrl,
+                      ),
+                      Icon(
+                        Icons.download_rounded,
+                        color: AppDesignTokens.primaryBlueDark,
+                      ),
+                    ],
                   ),
                 ),
               ),
@@ -3146,11 +3167,19 @@ class _LibraryCourseMatchShell extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final course = match.course;
-    final showActions = onDownloadCollection != null &&
+    final String reserveSource =
+        (course.episodes.isNotEmpty
+                ? (course.episodes.first.sourceUrl ??
+                      course.episodes.first.videoAsset ??
+                      '')
+                : '')
+            .trim();
+    final bool showReserve = reserveSource.isNotEmpty;
+    final showDownload = onDownloadCollection != null &&
         (isMultiEpisodeBilibiliCourse(course) ||
             (course.id.startsWith('youtube-') && course.episodes.length > 1));
     final showHint = showEpisodeHint && match.matchedByEpisode;
-    if (!showHint && !showActions) {
+    if (!showHint && !showReserve && !showDownload) {
       return child;
     }
     final String hint =
@@ -3159,20 +3188,22 @@ class _LibraryCourseMatchShell extends StatelessWidget {
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         child,
-        if (showActions)
+        if (showReserve || showDownload)
           Wrap(
             crossAxisAlignment: WrapCrossAlignment.center,
             children: [
-              BilibiliCollectionReservation(
-                key: ValueKey(course.id),
-                source: course.episodes.first.sourceUrl ?? '',
-                courseId: course.id,
-              ),
-              IconButton(
-                tooltip: '下载全部合集',
-                onPressed: onDownloadCollection,
-                icon: const Icon(Icons.download_outlined),
-              ),
+              if (showReserve)
+                BilibiliCollectionReservation(
+                  key: ValueKey(course.id),
+                  source: reserveSource,
+                  courseId: course.id,
+                ),
+              if (showDownload)
+                IconButton(
+                  tooltip: '下载全部合集',
+                  onPressed: onDownloadCollection,
+                  icon: const Icon(Icons.download_outlined),
+                ),
             ],
           ),
         if (showHint)

@@ -23,6 +23,7 @@ import '../../home/presentation/learning_dashboard_provider.dart';
 import '../domain/episode_clip_due.dart';
 import '../../import_course/data/bilibili_collection_download.dart';
 import '../../import_course/data/bilibili_open_or_import.dart';
+import '../../import_course/presentation/bilibili_collection_reservation.dart';
 import '../../import_course/data/youtube_import_service.dart';
 import '../../import_course/data/youtube_import_actions.dart';
 import '../../import_course/domain/youtube_import.dart';
@@ -3783,7 +3784,15 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                 (course.id.startsWith('bilibili-') || course.id.startsWith('youtube-')))
               Wrap(
                 alignment: WrapAlignment.center,
+                crossAxisAlignment: WrapCrossAlignment.center,
                 children: [
+                  BilibiliCollectionReservation(
+                    key: ValueKey<String>(
+                      'player-reserve-${course.id}-${episode.id}',
+                    ),
+                    source: episode.sourceUrl ?? episode.videoAsset ?? '',
+                    courseId: course.id,
+                  ),
                   if (!isUsableLocalVideoPath(episode.videoAsset))
                     TextButton(
                       onPressed: () => unawaited(_downloadCurrentOnlineEpisode(course, episode)),
@@ -3803,10 +3812,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                     ),
                   if (widget.onlinePreview)
                     Text(course.episodes.length > 1
-                        ? (course.id.startsWith('youtube-')
-                            ? '在线播放第一集 · 暂不准备字幕'
-                            : '在线播放试看 · 预约后准备字幕')
-                        : '在线播放 · 下载到本地更流畅'),
+                        ? '在线播放试看 · 可预约字幕'
+                        : '在线播放 · 可预约字幕'),
                 ],
               ),
             Expanded(

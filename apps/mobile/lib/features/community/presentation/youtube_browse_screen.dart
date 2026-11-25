@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../import_course/data/youtube_education_discovery.dart';
 import '../../import_course/data/youtube_import_actions.dart';
+import '../../import_course/presentation/bilibili_collection_reservation.dart';
 import '../../import_course/presentation/youtube_import_sheet.dart';
 import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
@@ -202,66 +203,85 @@ class _YoutubeBrowseScreenState extends ConsumerState<YoutubeBrowseScreen> {
         itemBuilder: (BuildContext context, int index) {
           final AcquireDailyFeedItemDto item = items[index];
           final String duration = _formatDuration(item.durationSec);
+          final String reserveSource = item.watchUrl.trim().isNotEmpty
+              ? item.watchUrl
+              : (item.bvid.trim().isEmpty
+                    ? ''
+                    : 'https://www.youtube.com/watch?v=${item.bvid}');
           return Material(
             color: AppDesignTokens.appWhite,
             borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTap: _openingVideoId == null
-                  ? () => unawaited(_openVideo(item))
-                  : null,
-              child: Padding(
-                padding: const EdgeInsets.all(10),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: <Widget>[
-                    ClipRRect(
+            child: Padding(
+              padding: const EdgeInsets.all(10),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: <Widget>[
+                  Expanded(
+                    child: InkWell(
                       borderRadius: BorderRadius.circular(12),
-                      child: SizedBox(
-                        width: 118,
-                        height: 74,
-                        child: CoverImage(
-                          path: item.coverUrl ?? '',
-                          fit: BoxFit.cover,
-                        ),
-                      ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: Column(
+                      onTap: _openingVideoId == null
+                          ? () => unawaited(_openVideo(item))
+                          : null,
+                      child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
-                          Text(
-                            item.title,
-                            maxLines: 2,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontWeight: FontWeight.w800,
-                              fontSize: 14,
-                              height: 1.25,
-                              color: AppDesignTokens.textPrimary,
+                          ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: SizedBox(
+                              width: 118,
+                              height: 74,
+                              child: CoverImage(
+                                path: item.coverUrl ?? '',
+                                fit: BoxFit.cover,
+                              ),
                             ),
                           ),
-                          const SizedBox(height: 4),
-                          Text(
-                            <String>[
-                              if (item.author.isNotEmpty) item.author,
-                              if (duration.isNotEmpty) duration,
-                              _openingVideoId == item.bvid ? '正在打开…' : '英语教育',
-                            ].join(' · '),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w600,
-                              color: AppDesignTokens.textSecondary,
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: <Widget>[
+                                Text(
+                                  item.title,
+                                  maxLines: 2,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontWeight: FontWeight.w800,
+                                    fontSize: 14,
+                                    height: 1.25,
+                                    color: AppDesignTokens.textPrimary,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  <String>[
+                                    if (item.author.isNotEmpty) item.author,
+                                    if (duration.isNotEmpty) duration,
+                                    _openingVideoId == item.bvid
+                                        ? '正在打开…'
+                                        : '英语教育',
+                                  ].join(' · '),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.w600,
+                                    color: AppDesignTokens.textSecondary,
+                                  ),
+                                ),
+                              ],
                             ),
                           ),
                         ],
                       ),
                     ),
-                  ],
-                ),
+                  ),
+                  if (reserveSource.isNotEmpty)
+                    BilibiliCollectionReservation(
+                      key: ValueKey<String>('reserve-yt-${item.bvid}'),
+                      source: reserveSource,
+                    ),
+                ],
               ),
             ),
           );

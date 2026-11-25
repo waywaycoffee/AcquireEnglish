@@ -11,6 +11,7 @@ import '../../drama/data/drama_cover_cache.dart';
 import '../../growth/presentation/growth_provider.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
 import '../../import_course/data/bilibili_open_or_import.dart';
+import '../../import_course/presentation/bilibili_collection_reservation.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../library/presentation/widgets/ensuring_course_poster.dart';
@@ -326,18 +327,27 @@ class DailyRecommendSection extends ConsumerWidget {
                         ? '点此试看本集 · 右侧下载合集'
                         : '$subtitle · 点此试看本集',
                   ),
-                  trailing: IconButton(
-                    tooltip: '下载合集全部视频',
-                    icon: const Icon(Icons.download_rounded),
-                    onPressed: () {
-                      unawaited(
-                        downloadBilibiliCollectionForWatchUrl(
-                          context,
-                          ref,
-                          watchUrl: item.watchUrl,
-                        ),
-                      );
-                    },
+                  trailing: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      BilibiliCollectionReservation(
+                        key: ValueKey<String>('home-reserve-${item.watchUrl}'),
+                        source: item.watchUrl,
+                      ),
+                      IconButton(
+                        tooltip: '下载合集全部视频',
+                        icon: const Icon(Icons.download_rounded),
+                        onPressed: () {
+                          unawaited(
+                            downloadBilibiliCollectionForWatchUrl(
+                              context,
+                              ref,
+                              watchUrl: item.watchUrl,
+                            ),
+                          );
+                        },
+                      ),
+                    ],
                   ),
                   onTap: () {
                     unawaited(
