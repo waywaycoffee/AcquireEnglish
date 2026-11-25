@@ -112,3 +112,18 @@ reading_generator/review_report.csv
 # 缓存、日志
 reading_generator/*.log
 reading_generator/.env
+
+# HarmonyOS local toolchains, credentials and generated build state
+apps/mobile_harmony/.dart_tool/
+apps/mobile_harmony/.flutter-plugins-dependencies
+apps/mobile_harmony/build/
+apps/mobile_harmony/pubspec.lock
+apps/mobile_harmony/ohos/local.properties
+apps/mobile_harmony/ohos/.hvigor/
+apps/mobile_harmony/ohos/oh_modules/
+apps/mobile_harmony/ohos/entry/oh_modules/
+apps/mobile_harmony/ohos/**/build/
+apps/mobile_harmony/ohos/oh-package-lock.json5
+apps/mobile_harmony/ohos/entry/oh-package-lock.json5
+apps/mobile_harmony/ohos/signing/
+apps/mobile_harmony/pubspec.yaml

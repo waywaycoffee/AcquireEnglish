@@ -1,0 +1,24 @@
+{
+  "string": [
+    {
+      "name": "module_desc",
+      "value": "module description"
+    },
+    {
+      "name": "EntryAbility_desc",
+      "value": "description"
+    },
+    {
+      "name": "EntryAbility_label",
+      "value": "爱快英语"
+    },
+    {
+      "name": "microphone_reason",
+      "value": "Record speaking exercises and voice conversations"
+    },
+    {
+      "name": "camera_reason",
+      "value": "Photograph learning materials for import"
+    }
+  ]
+}

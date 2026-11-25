@@ -1,0 +1,10 @@
+{
+  "app": {
+    "bundleName": "com.acquire.english",
+    "vendor": "AcquireEnglish",
+    "versionCode": 273,
+    "versionName": "0.2.253",
+    "icon": "$media:app_icon",
+    "label": "$string:app_name"
+  }
+}

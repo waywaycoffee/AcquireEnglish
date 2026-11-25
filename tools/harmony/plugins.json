@@ -1,0 +1,72 @@
+{
+  "sdk": {
+    "url": "https://gitcode.com/CPF-Flutter/flutter_flutter.git",
+    "ref": "fda3a43c32421c5cba9bcd5488b82903575e448d",
+    "version": "3.44.9+ohos-1.0.0"
+  },
+  "excluded_dev_dependencies": [
+    "build_runner",
+    "json_serializable",
+    "riverpod_generator",
+    "riverpod_lint",
+    "freezed",
+    "rider",
+    "hive_ce_generator",
+    "drift_dev",
+    "flutter_launcher_icons"
+  ],
+  "compatibility_overrides": {
+    "uuid": "4.5.3"
+  },
+  "overrides": {
+    "path_provider": {
+      "url": "https://gitcode.com/CPF-Flutter/flutter_packages.git",
+      "ref": "7cc9f4cfbd464943096dc7c87288252c543df5cb",
+      "path": "packages/path_provider/path_provider"
+    },
+    "shared_preferences": {
+      "url": "https://gitcode.com/CPF-Flutter/flutter_packages.git",
+      "ref": "ce0d3d4a9c6921edf5a5e4467c3dfecb377fd684",
+      "path": "packages/shared_preferences/shared_preferences"
+    },
+    "file_selector": {
+      "url": "https://gitcode.com/CPF-Flutter/flutter_packages.git",
+      "ref": "3f06e78bc19a3a255cd3e0fa25fa3928b1ecdfda",
+      "path": "packages/file_selector/file_selector"
+    },
+    "image_picker": {
+      "url": "https://gitcode.com/CPF-Flutter/flutter_packages.git",
+      "ref": "57dbefb489a3db11a95295f8eb77b7de6761f67d",
+      "path": "packages/image_picker/image_picker"
+    },
+    "camera": {
+      "url": "https://gitcode.com/CPF-Flutter/flutter_packages.git",
+      "ref": "e69a01149d7a43cbc054db397ed7558baba76c76",
+      "path": "packages/camera/camera"
+    },
+    "record": {
+      "url": "https://gitcode.com/CPF-Flutter/fluttertpc_record.git",
+      "ref": "19dd2a305eb0ecd122a9f700c0ed43186da78195",
+      "path": "record"
+    },
+    "flutter_tts": {
+      "url": "https://gitcode.com/CPF-Flutter/fluttertpc_flutter_tts.git",
+      "ref": "87e7864803e99ff40dbed53d3759729069bdc1cf"
+    },
+    "package_info_plus": {
+      "url": "https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git",
+      "ref": "bc4df814a726042a9dad1a267ebb1d2973544e24",
+      "path": "packages/package_info_plus/package_info_plus"
+    },
+    "device_info_plus": {
+      "url": "https://gitcode.com/CPF-Flutter/flutter_plus_plugins.git",
+      "ref": "d830b2cf650aeeb89c7ccc8d8091eb905303274c",
+      "path": "packages/device_info_plus/device_info_plus"
+    },
+    "url_launcher": {
+      "url": "https://gitcode.com/CPF-Flutter/flutter_packages.git",
+      "ref": "36a61d9c960cf4ed4b684475332e18e194e5be9f",
+      "path": "packages/url_launcher/url_launcher"
+    }
+  }
+}

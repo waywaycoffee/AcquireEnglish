@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+set -euo pipefail
+SDK_ROOT="${FLUTTER_OHOS_HOME:-$HOME/Library/Developer/AcquireEnglish/flutter-ohos}"
+DEVECO_ROOT="${DEVECO_HOME:-/Applications/DevEco-Studio.app/Contents}"
+DEVECO_CLI_ROOT="${DEVECO_CLI_HOME:-$HOME/Library/Developer/AcquireEnglish/deveco-cli}"
+if [[ ! -x "$SDK_ROOT/bin/flutter" ]]; then
+  echo "鸿蒙 Flutter 尚未安装完成：$SDK_ROOT" >&2
+  exit 2
+fi
+if [[ -d "$DEVECO_ROOT" ]]; then
+  export DEVECO_SDK_HOME="$DEVECO_ROOT/sdk"
+  export PATH="$DEVECO_ROOT/tools/node/bin:$DEVECO_ROOT/tools/ohpm/bin:$DEVECO_ROOT/tools/hvigor/bin:$PATH"
+  if [[ -d "$DEVECO_ROOT/jbr/Contents/Home" ]]; then
+    export JAVA_HOME="$DEVECO_ROOT/jbr/Contents/Home"
+  fi
+fi
+if [[ -d "$DEVECO_CLI_ROOT/bin" ]]; then
+  export PATH="$DEVECO_CLI_ROOT/bin:$PATH"
+fi
+export PUB_CACHE="${HARMONY_PUB_CACHE:-$HOME/Library/Developer/AcquireEnglish/pub-cache-harmony}"
+export PUB_HOSTED_URL="${PUB_HOSTED_URL:-https://pub.flutter-io.cn}"
+export FLUTTER_STORAGE_BASE_URL="${FLUTTER_STORAGE_BASE_URL:-https://storage.flutter-io.cn}"
+exec "$SDK_ROOT/bin/flutter" "$@"

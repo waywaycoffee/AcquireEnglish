@@ -166,8 +166,7 @@ String _assetSuffixForCurrentPlatform() {
       return '-macos.dmg';
     case TargetPlatform.windows:
       return '-windows-x64.zip';
-    case TargetPlatform.iOS:
-    case TargetPlatform.fuchsia:
+    default:
       throw UnsupportedError('当前平台不支持从 GitHub Release 更新。');
   }
 }
