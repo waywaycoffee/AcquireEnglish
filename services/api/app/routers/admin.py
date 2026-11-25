@@ -63,6 +63,7 @@ def _user_brief(user: User, *, wallet: WalletAccount | None = None) -> dict[str,
         "phone": user.phone,
         "wechat_bound": bool(user.wechat_openid),
         "points_balance": int(user.points_balance or 0),
+        "member_no": (getattr(user, "member_no", None) or None),
         "wallet_credits": int(wallet.balance_credits or 0) if wallet else None,
         "created_at": _iso(user.created_at),
     }

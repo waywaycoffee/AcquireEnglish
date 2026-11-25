@@ -13,6 +13,7 @@ import '../../authentication/presentation/auth_session.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
 import '../../home/presentation/product_feedback_sheet.dart';
+import '../../membership/presentation/pro_member_badge.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/data/aliyun_speech_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
@@ -110,7 +111,14 @@ class SettingsScreen extends ConsumerWidget {
               leading: const Icon(Icons.workspace_premium_rounded),
               title: const Text('Pro 会员中心'),
               subtitle: const Text('会员状态 · 权益套餐 · 微信支付 · 我的订单'),
-              trailing: const Icon(Icons.chevron_right),
+              trailing: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  const ProMemberBadgeIfActive(compact: true),
+                  const SizedBox(width: 6),
+                  const Icon(Icons.chevron_right),
+                ],
+              ),
               onTap: () => context.push(SGRoute.membership.route),
             ),
           ),
@@ -139,11 +147,16 @@ class SettingsScreen extends ConsumerWidget {
                   title: authSession.displayName.isEmpty
                       ? authSession.email
                       : authSession.displayName,
-                  description: authSession.displayName.isEmpty
-                      ? '已登录，可同步学习进度与词库。'
-                      : '${authSession.email}\n已登录，可同步学习进度与词库。',
+                  description: () {
+                    final String serial = authSession.memberNo.trim();
+                    final String base = authSession.displayName.isEmpty
+                        ? '已登录，可同步学习进度与词库。'
+                        : '${authSession.email}\n已登录，可同步学习进度与词库。';
+                    if (serial.isEmpty) return base;
+                    return '$base\n注册序号 $serial';
+                  }(),
                   icon: Icons.verified_user_rounded,
-                  onTap: () {},
+                  onTap: () => showAccountHubSheet(context, ref),
                 ),
                 _ActionRow(
                   title: '使用积分',

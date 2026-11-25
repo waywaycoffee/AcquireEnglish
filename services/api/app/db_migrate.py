@@ -25,6 +25,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_upload_task_notify_column(conn)
     await _ensure_product_feedback_columns(conn)
     await _ensure_user_invite_code_column(conn)
+    await _ensure_user_member_no_column(conn)
     await _ensure_study_stats_star_columns(conn)
     await _ensure_published_netdisk_series_table(conn)
 
@@ -395,6 +396,35 @@ async def _ensure_user_invite_code_column(conn: AsyncConnection) -> None:
     if "invite_code" not in existing:
         await conn.execute(
             text("ALTER TABLE users ADD COLUMN invite_code VARCHAR(16)")
+        )
+
+
+async def _ensure_user_member_no_column(conn: AsyncConnection) -> None:
+    existing = await _existing_columns(conn, "users")
+    if existing is None:
+        return
+    if "member_no" not in existing:
+        await conn.execute(
+            text("ALTER TABLE users ADD COLUMN member_no VARCHAR(16)")
+        )
+    # Backfill from primary key for rows that never received a serial.
+    # SQLite / Postgres both accept printf-style via Python-side update if
+    # dialect differs; use portable CASE with zero-pad via LPAD where available.
+    dialect = _dialect_name(conn)
+    if dialect == "postgresql":
+        await conn.execute(
+            text(
+                "UPDATE users SET member_no = 'AE-' || LPAD(id::text, 6, '0') "
+                "WHERE member_no IS NULL OR TRIM(member_no) = ''"
+            )
+        )
+    else:
+        # SQLite: printf('%06d', id)
+        await conn.execute(
+            text(
+                "UPDATE users SET member_no = 'AE-' || printf('%06d', id) "
+                "WHERE member_no IS NULL OR TRIM(member_no) = ''"
+            )
         )
 
 

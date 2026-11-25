@@ -48,6 +48,7 @@ from app.services.phone_auth import (
     sms_mock_enabled,
     verify_sms_code,
 )
+from app.services.member_no import ensure_member_no
 from app.services.wechat_auth import (
     exchange_wechat_code,
     random_password_hash as wechat_password_hash,
@@ -101,6 +102,8 @@ async def _ensure_default_pro(db: AsyncSession, user: User) -> None:
 async def _after_auth_success(
     db: AsyncSession, user: User, *, is_new: bool = False
 ) -> None:
+    # Assign / backfill public registration serial (AE-000123).
+    await ensure_member_no(db, user)
     # Pro welcome month is claim-once via popup (POST /commerce/trial/claim-welcome).
     await _ensure_default_pro(db, user)
     await _record_login_day(db, user)
@@ -300,7 +303,11 @@ async def wechat_login(payload: WechatLoginIn, db: AsyncSession = Depends(get_db
 
 
 @router.get("/me", response_model=UserOut)
-async def me(user: User = Depends(get_current_user)) -> UserOut:
+async def me(
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> UserOut:
+    await ensure_member_no(db, user)
     return UserOut.from_user(user)
 
 

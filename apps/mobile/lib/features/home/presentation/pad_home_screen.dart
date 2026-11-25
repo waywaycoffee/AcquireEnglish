@@ -15,6 +15,7 @@ import '../../import_course/presentation/bilibili_collection_reservation.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../library/presentation/widgets/ensuring_course_poster.dart';
+import '../../membership/presentation/pro_member_badge.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/presentation/learning_resume_provider.dart';
 import '../../settings/presentation/learning_preferences_screen.dart';
@@ -25,8 +26,8 @@ import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
+import '../../sync/presentation/user_assets_provider.dart';
 import '../../words/presentation/estimated_vocabulary_provider.dart';
-import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'learning_dashboard_provider.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
 import 'widgets/home_membership_section.dart';
@@ -132,6 +133,9 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
             ),
             _AccountChipButton(
               loggedIn: auth.isLoggedIn,
+              isPro: isProMembership(
+                ref.watch(userAssetsProvider).asData?.value?.activeMembership,
+              ),
               label: auth.isLoggedIn
                   ? (auth.displayName.trim().isEmpty
                         ? '账号'
@@ -149,6 +153,10 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
               stats: stats,
               growth: growth,
               displayName: ref.watch(authSessionProvider).displayName,
+              memberNo: ref.watch(authSessionProvider).memberNo,
+              isPro: isProMembership(
+                ref.watch(userAssetsProvider).asData?.value?.activeMembership,
+              ),
             ),
             SizedBox(height: compact ? 18 : 20),
             const HomeMembershipSection(),
@@ -385,11 +393,13 @@ String _greetingForNow(DateTime now) {
 class _AccountChipButton extends StatelessWidget {
   const _AccountChipButton({
     required this.loggedIn,
+    required this.isPro,
     required this.label,
     required this.onPressed,
   });
 
   final bool loggedIn;
+  final bool isPro;
   final String label;
   final VoidCallback onPressed;
 
@@ -397,19 +407,9 @@ class _AccountChipButton extends StatelessWidget {
   Widget build(BuildContext context) {
     return Tooltip(
       message: loggedIn ? '账号与同步' : '登录爱快账号',
-      child: TextButton.icon(
+      child: TextButton(
         key: const Key('home-account-chip'),
         onPressed: onPressed,
-        icon: Icon(
-          loggedIn ? Icons.person_rounded : Icons.login_rounded,
-          size: 18,
-        ),
-        label: Text(
-          label,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          style: const TextStyle(fontWeight: FontWeight.w800),
-        ),
         style: TextButton.styleFrom(
           foregroundColor: AppDesignTokens.brandGreenDark,
           backgroundColor: AppDesignTokens.appWhite.withValues(alpha: 0.92),
@@ -419,6 +419,29 @@ class _AccountChipButton extends StatelessWidget {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(999),
           ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Icon(
+              loggedIn ? Icons.person_rounded : Icons.login_rounded,
+              size: 18,
+            ),
+            const SizedBox(width: 6),
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 88),
+              child: Text(
+                label,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                style: const TextStyle(fontWeight: FontWeight.w800),
+              ),
+            ),
+            if (loggedIn && isPro) ...<Widget>[
+              const SizedBox(width: 6),
+              const ProMemberBadge(compact: true),
+            ],
+          ],
         ),
       ),
     );
@@ -430,11 +453,15 @@ class _GreetingHeader extends StatelessWidget {
     required this.stats,
     required this.growth,
     required this.displayName,
+    this.memberNo = '',
+    this.isPro = false,
   });
 
   final LearningDashboardStats stats;
   final UserGrowth growth;
   final String displayName;
+  final String memberNo;
+  final bool isPro;
 
   @override
   Widget build(BuildContext context) {
@@ -447,20 +474,42 @@ class _GreetingHeader extends StatelessWidget {
         ? 'weiwei'
         : rawName;
     final String greeting = _greetingForNow(DateTime.now());
+    final String serial = memberNo.trim();
     return Row(
       children: <Widget>[
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
-              Text(
-                '$greeting $name 👋',
-                style: TextStyle(
-                  fontSize: 26,
-                  fontWeight: FontWeight.w900,
-                  color: AppDesignTokens.textPrimary,
-                ),
+              Row(
+                children: <Widget>[
+                  Flexible(
+                    child: Text(
+                      '$greeting $name 👋',
+                      style: TextStyle(
+                        fontSize: 26,
+                        fontWeight: FontWeight.w900,
+                        color: AppDesignTokens.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (isPro) ...<Widget>[
+                    const SizedBox(width: 8),
+                    const ProMemberBadge(),
+                  ],
+                ],
               ),
+              if (serial.isNotEmpty) ...<Widget>[
+                const SizedBox(height: 4),
+                Text(
+                  '注册序号 $serial',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w700,
+                    color: AppDesignTokens.textSecondary,
+                  ),
+                ),
+              ],
               SizedBox(height: 6),
               Text(
                 '继续你的英语成长旅程',

@@ -27,6 +27,7 @@ class UserOut(BaseModel):
     phone: str | None = None
     wechat_bound: bool = False
     points_balance: int = 0
+    member_no: str | None = None
 
     model_config = {"from_attributes": True}
 
@@ -39,6 +40,7 @@ class UserOut(BaseModel):
             phone=getattr(user, "phone", None),
             wechat_bound=bool(getattr(user, "wechat_openid", None)),
             points_balance=int(getattr(user, "points_balance", 0) or 0),
+            member_no=(getattr(user, "member_no", None) or None),
         )
 
 

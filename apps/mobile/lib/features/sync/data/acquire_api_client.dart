@@ -32,6 +32,7 @@ class AcquireUser {
     this.phone,
     this.wechatBound = false,
     this.pointsBalance = 0,
+    this.memberNo,
   });
 
   factory AcquireUser.fromJson(Map<String, dynamic> json) => AcquireUser(
@@ -41,6 +42,7 @@ class AcquireUser {
     phone: json['phone'] as String?,
     wechatBound: json['wechat_bound'] == true,
     pointsBalance: (json['points_balance'] as num?)?.toInt() ?? 0,
+    memberNo: (json['member_no'] as String?)?.trim(),
   );
 
   final int id;
@@ -49,6 +51,8 @@ class AcquireUser {
   final String? phone;
   final bool wechatBound;
   final int pointsBalance;
+  /// Public registration serial, e.g. AE-000123.
+  final String? memberNo;
 }
 
 class AcquireShareRewardResult {
@@ -1339,6 +1343,11 @@ class AcquireApiClient {
       },
     );
     return AcquireTokenResult.fromJson(response.data as Map<String, dynamic>);
+  }
+
+  Future<AcquireUser> fetchMe() async {
+    final Response<dynamic> response = await _dio.get(Endpoints.me);
+    return AcquireUser.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<AcquireSmsSendResult> sendEmailCode({required String email}) async {

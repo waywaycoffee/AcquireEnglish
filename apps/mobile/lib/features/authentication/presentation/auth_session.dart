@@ -10,11 +10,14 @@ class AuthSessionState {
     this.accessToken = '',
     this.email = '',
     this.displayName = '',
+    this.memberNo = '',
   });
 
   final String accessToken;
   final String email;
   final String displayName;
+  /// Public registration serial from API, e.g. AE-000123.
+  final String memberNo;
 
   bool get isLoggedIn => accessToken.isNotEmpty;
 
@@ -22,10 +25,12 @@ class AuthSessionState {
     String? accessToken,
     String? email,
     String? displayName,
+    String? memberNo,
   }) => AuthSessionState(
     accessToken: accessToken ?? this.accessToken,
     email: email ?? this.email,
     displayName: displayName ?? this.displayName,
+    memberNo: memberNo ?? this.memberNo,
   );
 }
 
@@ -34,6 +39,7 @@ class AuthSession extends _$AuthSession {
   static const String _tokenKey = 'authAccessToken';
   static const String _emailKey = 'authEmail';
   static const String _nameKey = 'authDisplayName';
+  static const String _memberNoKey = 'authMemberNo';
 
   Box<String>? get _prefsOrNull {
     if (!Hive.isBoxOpen('prefs')) {
@@ -48,6 +54,7 @@ class AuthSession extends _$AuthSession {
     final String token = prefs?.get(_tokenKey) ?? '';
     final String email = prefs?.get(_emailKey) ?? '';
     final String displayName = prefs?.get(_nameKey) ?? '';
+    final String memberNo = prefs?.get(_memberNoKey) ?? '';
     if (token.isNotEmpty) {
       ref.read(networkRepositoryProvider.notifier).setToken(token);
     }
@@ -55,6 +62,7 @@ class AuthSession extends _$AuthSession {
       accessToken: token,
       email: email,
       displayName: displayName,
+      memberNo: memberNo,
     );
   }
 
@@ -62,17 +70,31 @@ class AuthSession extends _$AuthSession {
     required String accessToken,
     required String email,
     String? displayName,
+    String? memberNo,
   }) async {
     final Box<String>? prefs = _prefsOrNull;
     await prefs?.put(_tokenKey, accessToken);
     await prefs?.put(_emailKey, email);
     await prefs?.put(_nameKey, displayName ?? '');
+    if (memberNo != null) {
+      await prefs?.put(_memberNoKey, memberNo);
+    }
     ref.read(networkRepositoryProvider.notifier).setToken(accessToken);
     state = AuthSessionState(
       accessToken: accessToken,
       email: email,
       displayName: displayName ?? '',
+      memberNo: memberNo ?? state.memberNo,
     );
+  }
+
+  Future<void> updateProfile({String? displayName, String? memberNo}) async {
+    final Box<String>? prefs = _prefsOrNull;
+    final String nextName = displayName ?? state.displayName;
+    final String nextNo = memberNo ?? state.memberNo;
+    await prefs?.put(_nameKey, nextName);
+    await prefs?.put(_memberNoKey, nextNo);
+    state = state.copyWith(displayName: nextName, memberNo: nextNo);
   }
 
   Future<void> signOut() async {
@@ -80,6 +102,7 @@ class AuthSession extends _$AuthSession {
     await prefs?.delete(_tokenKey);
     await prefs?.delete(_emailKey);
     await prefs?.delete(_nameKey);
+    await prefs?.delete(_memberNoKey);
     ref.read(networkRepositoryProvider.notifier).clearToken();
     state = const AuthSessionState();
   }

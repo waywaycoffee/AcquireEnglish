@@ -6,8 +6,10 @@ import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../../router/app_router.dart';
+import '../../membership/presentation/pro_member_badge.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../settings/presentation/learning_preferences_screen.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../data/authentication_repository.dart';
@@ -55,6 +57,27 @@ class _AccountHubSheet extends ConsumerStatefulWidget {
 
 class _AccountHubSheetState extends ConsumerState<_AccountHubSheet> {
   bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_refreshProfile());
+    });
+  }
+
+  Future<void> _refreshProfile() async {
+    final AuthSessionState auth = ref.read(authSessionProvider);
+    if (!auth.isLoggedIn) return;
+    try {
+      final AcquireUser me =
+          await ref.read(acquireApiClientProvider).fetchMe();
+      await ref.read(authSessionProvider.notifier).updateProfile(
+            displayName: me.displayName ?? auth.displayName,
+            memberNo: me.memberNo,
+          );
+    } catch (_) {}
+  }
 
   Future<void> _toast(String message) async {
     if (!mounted) {
@@ -190,12 +213,23 @@ class _AccountHubSheetState extends ConsumerState<_AccountHubSheet> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: <Widget>[
-                        Text(
-                          title,
-                          style: const TextStyle(
-                            fontSize: 18,
-                            fontWeight: FontWeight.w900,
-                          ),
+                        Row(
+                          children: <Widget>[
+                            Flexible(
+                              child: Text(
+                                title,
+                                style: const TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w900,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                            if (loggedIn) ...<Widget>[
+                              const SizedBox(width: 8),
+                              const ProMemberBadgeIfActive(),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 4),
                         Text(
@@ -205,6 +239,19 @@ class _AccountHubSheetState extends ConsumerState<_AccountHubSheet> {
                             fontWeight: FontWeight.w600,
                           ),
                         ),
+                        if (loggedIn &&
+                            auth.memberNo.trim().isNotEmpty) ...<Widget>[
+                          const SizedBox(height: 6),
+                          Text(
+                            '注册序号 ${auth.memberNo.trim()}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
+                              color: AppDesignTokens.textSecondary,
+                              letterSpacing: 0.2,
+                            ),
+                          ),
+                        ],
                       ],
                     ),
                   ),

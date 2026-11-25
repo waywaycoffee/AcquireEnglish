@@ -51,6 +51,7 @@ class HttpAuthRepository implements AuthenticationRepository {
       accessToken: result.accessToken,
       email: result.user.email,
       displayName: result.user.displayName,
+      memberNo: result.user.memberNo,
     );
     return LoginResponse(
       token: result.accessToken,
@@ -119,6 +120,7 @@ class HttpAuthRepository implements AuthenticationRepository {
         accessToken: result.accessToken,
         email: result.user.email,
         displayName: result.user.displayName ?? displayName,
+        memberNo: result.user.memberNo,
       );
       return RegisterResponse(id: result.user.id, token: result.accessToken);
     } on DioException catch (e) {
