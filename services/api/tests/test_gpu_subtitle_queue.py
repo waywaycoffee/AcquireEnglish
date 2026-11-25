@@ -40,6 +40,24 @@ class QueueTest(unittest.TestCase):
   self.assertEqual(reopened['state'],'queued')
   self.assertEqual(reopened['attempts'],0)
   self.assertIsNotNone(queue.claim())
+ def test_long_reservation_runs_without_client_retry(self):
+  bvid = 'BV1CS4y1v7sQ'
+  with patch.object(queue, 'MAX_ACTIVE_PAGES_PER_BVID', 1):
+   first = queue.enqueue(bvid, 1, reserve=True)
+   second = queue.enqueue(bvid, 2, reserve=True)
+   self.assertEqual(second['state'], 'deferred')
+   job = queue.claim()
+   self.assertEqual(job['id'], first['id'])
+   self.assertIsNone(queue.claim())
+   queue.update(job, 'completed')
+   self.assertEqual(queue.claim()['id'], second['id'])
+
+ def test_youtube_identity_is_case_sensitive(self):
+  a = queue.enqueue('YT:Abcdefghijk', 1, user_id=1)
+  b = queue.enqueue('YT:abcdefghijk', 1, user_id=2)
+  self.assertNotEqual(a['id'], b['id'])
+  self.assertEqual(queue.job_requesters(a['id']), [1])
+
  def test_invalid(self):
   with self.assertRaises(ValueError):queue.enqueue('bad',1)
 

@@ -18,6 +18,7 @@ import '../data/bilibili_multipage.dart';
 import '../data/bilibili_import_service.dart';
 import '../data/bilibili_open_or_import.dart';
 import '../domain/bilibili_import.dart';
+import '../domain/youtube_import.dart';
 
 String _reservationKey(String email, String courseId) =>
     'bilibili-reservation:$email:$courseId';
@@ -140,7 +141,8 @@ class _BilibiliCollectionReservationState
         _message('合集资料尚未加载，请稍后重试');
         return;
       }
-      if (!isMultiEpisodeBilibiliCourse(course)) {
+      final youtube = course.id.startsWith('youtube-');
+      if (course.episodes.length < 2 || (!youtube && !isMultiEpisodeBilibiliCourse(course))) {
         _message('这是单集视频，可直接在线播放');
         return;
       }
@@ -168,6 +170,16 @@ class _BilibiliCollectionReservationState
         if (!mounted || key != _key(_course)) return;
         final episode = course.episodes[index];
         try {
+          if (youtube) {
+            final id = YoutubeImport.extractVideoId(episode.sourceUrl ?? '');
+            if (id == null) throw const FormatException('缺少 YouTube 视频 ID');
+            final job = await api.enqueueYoutubeSubtitleJob(id);
+            if (job.id.isEmpty) throw const FormatException('预约未提交');
+            ids.add(job.id);
+            await prefs.put(key, ids.join(','));
+            await prefs.put('$key:next', '${index + 1}');
+            continue;
+          }
           final source = bilibiliSourceForEpisode(
             course: course,
             episode: episode,
@@ -198,6 +210,7 @@ class _BilibiliCollectionReservationState
                     bvid: bvid,
                     page: page,
                     reportErrors: true,
+                    reserve: true,
                   )
                 : await api.enqueueSharedSubtitleTranslateJob(
                     bvid: bvid,
@@ -206,6 +219,7 @@ class _BilibiliCollectionReservationState
                     title: episode.title,
                     durationSec: pack?.durationSec,
                     reportErrors: true,
+                    reserve: true,
                   );
             if (job == null || job.id.isEmpty || job.isTerminalFailure) {
               throw FormatException('第 ${episode.numberStr} 集字幕预约未提交，请重试');

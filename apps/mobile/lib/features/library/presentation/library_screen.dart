@@ -613,7 +613,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           child: const Text('下载全部合集'),
                         ),
                       ),
-                    if (isMultiEpisodeBilibiliCourse(selectedCourse))
+                    if (isMultiEpisodeBilibiliCourse(selectedCourse) ||
+                        (selectedCourse.id.startsWith('youtube-') &&
+                            selectedCourse.episodes.length > 1))
                       BilibiliCollectionReservation(
                         source: selectedCourse.episodes.first.sourceUrl ?? '',
                         courseId: selectedCourse.id,
@@ -2233,6 +2235,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   Future<void> _confirmCollectionDownload(LibraryCourseData course) async {
+    if (course.id.startsWith('youtube-') && course.episodes.length > 1) {
+      await downloadYoutubeCollection(context, ref, course);
+      return;
+    }
+
     final int count = _pendingCollectionEpisodes(course);
     if (count == 0 || isBilibiliCollectionDownloadInFlight(course.id)) return;
     final bool? confirmed = await showDialog<bool>(
@@ -3140,7 +3147,8 @@ class _LibraryCourseMatchShell extends StatelessWidget {
   Widget build(BuildContext context) {
     final course = match.course;
     final showActions = onDownloadCollection != null &&
-        isMultiEpisodeBilibiliCourse(course);
+        (isMultiEpisodeBilibiliCourse(course) ||
+            (course.id.startsWith('youtube-') && course.episodes.length > 1));
     final showHint = showEpisodeHint && match.matchedByEpisode;
     if (!showHint && !showActions) {
       return child;

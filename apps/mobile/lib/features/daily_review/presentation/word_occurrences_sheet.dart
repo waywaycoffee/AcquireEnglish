@@ -4,10 +4,15 @@ import 'package:go_router/go_router.dart';
 
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../player/presentation/player_subtitle_loader.dart';
+import '../../player/presentation/player_mock_state.dart';
 import '../../player/presentation/subtitle_file_persist.dart';
 import '../../player/presentation/widgets/study_bottom_controls.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../reading/presentation/reading_text_spans.dart';
+
+import '../../sync/data/acquire_api_client.dart';
+import '../../import_course/domain/youtube_import.dart';
+import '../../subtitle_completion/shared_bilibili_subtitle_sync.dart';
 
 typedef _Occurrence = ({String title, String sentence, Uri destination});
 
@@ -18,6 +23,7 @@ Future<void> showWordOccurrences(
 ) async {
   final courses = ref.read(libraryCatalogProvider);
   final reading = ref.read(readingLibraryProvider);
+  final api = ref.read(acquireApiClientProvider);
   final pattern = RegExp(
     r"(?<![A-Za-z0-9'])" + RegExp.escape(word.trim()) + r"(?![A-Za-z0-9'])",
     caseSensitive: false,
@@ -25,6 +31,15 @@ Future<void> showWordOccurrences(
 
   Future<List<_Occurrence>> scan() async {
     final hits = <_Occurrence>[];
+    Future<List<PersonalImportAsset>>? personal;
+    Future<List<PersonalImportAsset>> loadPersonal() async {
+      try {
+        return await api.listPersonalImports().timeout(const Duration(seconds: 6));
+      } catch (_) {
+        return const [];
+      }
+    }
+
     for (final course in courses) {
       for (final episode in course.episodes) {
         if (!episode.completed &&
@@ -35,12 +50,39 @@ Future<void> showWordOccurrences(
         }
         try {
           final track = episode.enSubtitleAsset;
-          final lines = track == null || track.isEmpty
-              ? (await loadAsrSentenceSubtitles(
-                  episodeId: episode.id,
-                ))?.sentenceLines
-              : await loadSubtitleLines(track);
-          if (lines == null) continue;
+          var lines = <PlayerSubtitleLine>[];
+          if (track != null && track.isNotEmpty) {
+            try {
+              lines = await loadSubtitleLines(track);
+            } catch (_) {}
+          }
+          if (lines.isEmpty) {
+            lines = (await loadAsrSentenceSubtitles(episodeId: episode.id))
+                ?.sentenceLines ?? [];
+          }
+          if (lines.isEmpty) {
+            final youtube = course.id.startsWith('youtube-')
+                ? YoutubeImport.extractVideoId(episode.sourceUrl ?? '') : null;
+            final bili = resolveBilibiliSharedSubtitleIds(
+              course: course, episode: episode, sourceUrl: episode.sourceUrl,
+            );
+            if (youtube != null || bili != null) {
+              final assets = await (personal ??= loadPersonal());
+              final asset = assets.where((asset) => asset.hasEn &&
+                  (youtube != null
+                      ? asset.source == 'youtube' && asset.externalId == youtube
+                      : asset.source == 'bilibili' &&
+                        (asset.externalId == '${bili!.bvid}-p${bili.page}' ||
+                         (bili.page == 1 && asset.externalId == bili.bvid)))).firstOrNull;
+              final raw = asset == null ? null :
+                  await api.fetchPersonalImportSrt(importId: asset.id, lang: 'en');
+              if (raw != null) lines = parseSubtitleLines(raw);
+              if (lines.isEmpty && bili != null) {
+                final pack = await api.getSharedBilibiliSubtitle(bvid: bili.bvid, page: bili.page);
+                if (pack != null) lines = parseSubtitleLines(pack.subtitleEnSrt);
+              }
+            }
+          }
           for (final line in lines) {
             if (!pattern.hasMatch(line.english)) continue;
             final time = StudyBottomControls.formatClock(

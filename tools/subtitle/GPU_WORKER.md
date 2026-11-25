@@ -20,6 +20,12 @@ POST /api/shared-subtitles/jobs（登录）提交 {bvid,page}，重复视频分�
 
 Worker 会通过 heartbeat 上报 `progress_pct` / `progress_message`（准备音频 → 识别 → 翻译 → 入库），App 轮询 `GET /api/shared-subtitles/jobs/{id}` 展示进度条与文案。
 
+## 合集预约
+
+B 站长合集预约可先写入 `deferred` 状态，工作站会在同一视频的在途分 P 处理完后继续领取。App 关闭后，已提交的任务仍保留在 ECS。
+
+YouTube 集合的分集任务由新版 worker 使用同一虚拟环境里的 `yt-dlp` 读取音频。工作站网络必须能访问 YouTube。识别和翻译在工作站完成，字幕保存到预约账号的个人云字幕库。上线时先更新工作站 worker 和依赖，再更新 ECS API。
+
 ## 批量补推荐片源公共字幕
 
 推荐列表里不少合集只有部分分 P 有共享字幕。可在 **ECS** 把缺 EN 的分 P 推进 GPU 队列，由本机 5060 Ti 消化后写入公共库：

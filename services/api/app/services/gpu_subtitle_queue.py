@@ -97,11 +97,17 @@ def _active_page_count(db, bvid: str) -> int:
     return sum(1 for r in rows if (r["state"] or "") in _ACTIVE_STATES)
 
 
-def enqueue(bvid, page, *, user_id: int | None = None):
-    _check_identity(bvid, page)
+def enqueue(bvid, page, *, user_id: int | None = None, reserve=False, rerun_completed=False):
+    youtube = bvid.startswith('YT:')
+    if youtube:
+        if page != 1 or not re.fullmatch(r'YT:[A-Za-z0-9_-]{11}', bvid):
+            raise ValueError('Invalid YouTube identity')
+    else:
+        _check_identity(bvid, page)
+    match = 'bvid=?' if youtube else 'upper(bvid)=upper(?)'
     with connection() as db:
         db.execute('BEGIN IMMEDIATE')
-        row=db.execute('SELECT * FROM jobs WHERE upper(bvid)=upper(?) AND page=?',(bvid,page)).fetchone()
+        row=db.execute(f'SELECT * FROM jobs WHERE {match} AND page=?',(bvid,page)).fetchone()
         if row is not None:
             # An English-only translate job cannot produce English; upgrade it.
             if row['kind']=='translate' and row['state'] in ('failed','retry'):
@@ -113,7 +119,7 @@ def enqueue(bvid, page, *, user_id: int | None = None):
                 row = db.execute('SELECT * FROM jobs WHERE id=?', (row['id'],)).fetchone()
             # Terminal failures used to stick forever: app re-scans treated the
             # existing row as "queued" while claim() permanently skipped them.
-            elif row['state'] == 'failed':
+            elif row['state'] == 'failed' or (rerun_completed and row['state'] == 'completed'):
                 db.execute(
                     "UPDATE jobs SET state='queued', attempts=0, error=NULL, "
                     "lease=NULL, deadline=NULL, updated=? WHERE id=?",
@@ -124,15 +130,16 @@ def enqueue(bvid, page, *, user_id: int | None = None):
                 ).fetchone()
             _add_requester(db, row['id'], user_id)
             return public(db.execute('SELECT * FROM jobs WHERE id=?', (row['id'],)).fetchone())
-        if _active_page_count(db, bvid) >= MAX_ACTIVE_PAGES_PER_BVID:
+        at_capacity = not youtube and _active_page_count(db, bvid) >= MAX_ACTIVE_PAGES_PER_BVID
+        if at_capacity and not reserve:
             raise ValueError(
                 f"bvid_page_cap:{MAX_ACTIVE_PAGES_PER_BVID}:"
                 "合集同时排队分P过多；请等本机 GPU 消化后再补后续页"
             )
         job_id = uuid.uuid4().hex
-        db.execute('INSERT OR IGNORE INTO jobs(id,bvid,page,updated) VALUES(?,?,?,?)',
-          (job_id,bvid,page,time.time()))
-        row=db.execute('SELECT * FROM jobs WHERE upper(bvid)=upper(?) AND page=?',(bvid,page)).fetchone()
+        db.execute('INSERT OR IGNORE INTO jobs(id,bvid,page,state,updated) VALUES(?,?,?,?,?)',
+          (job_id,bvid,page,'deferred' if at_capacity else 'queued',time.time()))
+        row=db.execute(f'SELECT * FROM jobs WHERE {match} AND page=?',(bvid,page)).fetchone()
         _add_requester(db, row['id'], user_id)
         return public(db.execute('SELECT * FROM jobs WHERE id=?', (row['id'],)).fetchone())
 
@@ -168,6 +175,7 @@ def enqueue_translate(
     cid=None,
     duration=None,
     user_id: int | None = None,
+    reserve=False,
 ):
     """Queue EN→ZH for an episode whose English already exists."""
     _check_identity(bvid, page)
@@ -181,14 +189,15 @@ def enqueue_translate(
         db.execute('BEGIN IMMEDIATE')
         row=db.execute('SELECT * FROM jobs WHERE upper(bvid)=upper(?) AND page=?',(bvid,page)).fetchone()
         if row is None:
-            if _active_page_count(db, bvid) >= MAX_ACTIVE_PAGES_PER_BVID:
+            at_capacity = _active_page_count(db, bvid) >= MAX_ACTIVE_PAGES_PER_BVID
+            if at_capacity and not reserve:
                 raise ValueError(
                     f"bvid_page_cap:{MAX_ACTIVE_PAGES_PER_BVID}:"
                     "合集同时排队分P过多；请等本机 GPU 消化后再补后续页"
                 )
             job_id = uuid.uuid4().hex
-            db.execute("INSERT INTO jobs(id,bvid,page,kind,payload,updated) VALUES(?,?,?,'translate',?,?)",
-              (job_id,bvid,page,payload,time.time()))
+            db.execute("INSERT INTO jobs(id,bvid,page,kind,payload,state,updated) VALUES(?,?,?,'translate',?,?,?)",
+              (job_id,bvid,page,payload,'deferred' if at_capacity else 'queued',time.time()))
         elif row['state']=='completed' or (row['kind']=='asr' and row['state'] not in ('failed',)):
             # Done already, or a full ASR run will produce both languages.
             _add_requester(db, row['id'], user_id)
@@ -233,7 +242,10 @@ def claim():
         # Prefer translate, then fresh queued rows, then retries — so a burst of
         # Audio-unavailable retries cannot starve healthy queued work.
         row=db.execute("""SELECT * FROM jobs WHERE
-          (state IN ('queued','retry') OR (state IN ('transcribing','translating') AND deadline<?))
+          (state IN ('queued','retry') OR (state='deferred' AND NOT EXISTS (
+            SELECT 1 FROM jobs active WHERE upper(active.bvid)=upper(jobs.bvid)
+            AND active.state IN ('queued','transcribing','translating','retry')
+          )) OR (state IN ('transcribing','translating') AND deadline<?))
           AND attempts<4
           ORDER BY (kind='translate') DESC, (state='queued') DESC, updated
           LIMIT 1""",(time.time(),)).fetchone()

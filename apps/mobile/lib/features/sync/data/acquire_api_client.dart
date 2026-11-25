@@ -3048,10 +3048,19 @@ class AcquireApiClient {
   /// Submit / reuse a durable ECS GPU subtitle job for one Bilibili page.
   ///
   /// Returns null when offline, unauthenticated, or the identity is invalid.
+  Future<SharedSubtitleGpuJob> enqueueYoutubeSubtitleJob(String id) async {
+    final response = await _dio.post<Map<String, dynamic>>(
+      'api/shared-subtitles/youtube/jobs',
+      data: {'video_id': id},
+    );
+    return SharedSubtitleGpuJob.fromJson(response.data!);
+  }
+
   Future<SharedSubtitleGpuJob?> enqueueSharedSubtitleJob({
     required String bvid,
     int page = 1,
     bool reportErrors = false,
+    bool reserve = false,
   }) async {
     final String id = bvid.trim();
     if (id.isEmpty) {
@@ -3060,7 +3069,7 @@ class AcquireApiClient {
     try {
       final Response<dynamic> response = await _dio.post<Object?>(
         Endpoints.sharedSubtitlesJobs,
-        data: <String, Object>{'bvid': id, 'page': page < 1 ? 1 : page},
+        data: <String, Object>{'bvid': id, 'page': page < 1 ? 1 : page, if (reserve) 'reserve': true},
         options: Options(
           validateStatus: (int? status) =>
               status != null && status >= 200 && status < 300,
@@ -3093,6 +3102,7 @@ class AcquireApiClient {
     required String subtitleEnSrt,
     int page = 1,
     bool reportErrors = false,
+    bool reserve = false,
     String? title,
     int? cid,
     int? durationSec,
@@ -3109,6 +3119,7 @@ class AcquireApiClient {
           'bvid': id,
           'page': page < 1 ? 1 : page,
           'subtitle_en_srt': en,
+          if (reserve) 'reserve': true,
           if ((title ?? '').trim().isNotEmpty) 'title': title!.trim(),
           if (cid != null) 'cid': cid,
           if (durationSec != null) 'duration_sec': durationSec,

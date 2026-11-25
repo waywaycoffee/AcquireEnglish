@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import SharedBilibiliSubtitle, User
+from app.models import SharedBilibiliSubtitle, User, UserLinkCourse
 from app.shared_subtitle_store import (
     get_shared_bilibili_pack,
     preview_zh_from_srt,
@@ -238,6 +238,28 @@ async def put_shared_bilibili_subtitle(
 class GpuSubtitleJobIn(BaseModel):
     bvid: str = Field(pattern=r'^BV[0-9A-Za-z]{10}$')
     page: int = Field(default=1, ge=1, le=9999)
+    reserve: bool = False
+
+
+class YoutubeSubtitleJobIn(BaseModel):
+    video_id: str = Field(pattern=r'^[A-Za-z0-9_-]{11}$')
+
+
+@router.post('/youtube/jobs')
+async def enqueue_youtube_subtitles(
+    payload: YoutubeSubtitleJobIn,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+):
+    from app.services.gpu_subtitle_queue import enqueue
+    asset = await db.scalar(select(UserLinkCourse).where(
+        UserLinkCourse.user_id == user.id,
+        UserLinkCourse.source == 'youtube',
+        UserLinkCourse.external_id == payload.video_id,
+    ))
+    ready = asset and asset.subtitle_en_srt and asset.subtitle_zh_srt
+    return enqueue(f'YT:{payload.video_id}', 1, user_id=user.id,
+                   rerun_completed=not ready)
 
 
 @router.post('/jobs')
@@ -250,7 +272,7 @@ async def enqueue_gpu_subtitles(
     from app.shared_subtitle_store import fanout_gpu_pack_to_personal
 
     try:
-        job = enqueue(payload.bvid, payload.page, user_id=user.id)
+        job = enqueue(payload.bvid, payload.page, user_id=user.id, reserve=payload.reserve)
     except ValueError as exc:
         detail = str(exc)
         code = (
@@ -283,6 +305,7 @@ class GpuTranslateJobIn(BaseModel):
     title: str | None = Field(default=None, max_length=300)
     cid: int | None = None
     duration_sec: int | None = Field(default=None, ge=0)
+    reserve: bool = False
 
 
 @router.post('/translate-jobs')
@@ -304,6 +327,7 @@ async def enqueue_gpu_translation(
             cid=payload.cid,
             duration=payload.duration_sec,
             user_id=user.id,
+            reserve=payload.reserve,
         )
     except ValueError as exc:
         raise HTTPException(status.HTTP_422_UNPROCESSABLE_ENTITY, str(exc)) from exc

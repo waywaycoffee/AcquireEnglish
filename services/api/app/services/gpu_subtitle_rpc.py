@@ -6,6 +6,8 @@ import httpx
 from app.services import gpu_subtitle_queue as queue
 from app.config import settings
 from app.database import SessionLocal
+from app.models import UserLinkCourse
+from sqlalchemy import select
 from app.shared_subtitle_store import (
     fanout_gpu_pack_to_personal,
     upsert_shared_bilibili_pack,
@@ -22,6 +24,8 @@ async def run(command):
             return {**job,'cues':payload.get('cues') or [],'title':payload.get('title') or job['bvid'],
               'cid':payload.get('cid'),'duration':payload.get('duration')}
         job.pop('payload',None)
+        if job['bvid'].startswith('YT:'):
+            return job
         async with httpx.AsyncClient(headers=_bilibili_headers(settings.bilibili_cookie),timeout=40) as client:
             view=(await client.get('https://api.bilibili.com/x/web-interface/view',params={'bvid':job['bvid']})).json()
             data=(view.get('data') or {})
@@ -168,6 +172,28 @@ async def _store(job,cues,translated):
     en_srt=srt([c['text'] for c in cues])
     zh_srt=srt(translated)
     requesters=queue.job_requesters(job['id'])
+    if job['bvid'].startswith('YT:'):
+        video_id = job['bvid'][3:]
+        async with SessionLocal() as db:
+            for uid in requesters:
+                row = await db.scalar(select(UserLinkCourse).where(
+                    UserLinkCourse.user_id == uid,
+                    UserLinkCourse.source == 'youtube',
+                    UserLinkCourse.external_id == video_id,
+                ))
+                if row is None:
+                    row = UserLinkCourse(
+                        user_id=uid, source='youtube', external_id=video_id,
+                        title=video_id,
+                        watch_url=f'https://www.youtube.com/watch?v={video_id}',
+                        duration_sec=duration,
+                    )
+                    db.add(row)
+                row.subtitle_en_srt = en_srt
+                row.subtitle_zh_srt = zh_srt
+            await db.commit()
+        queue.update(job, 'completed')
+        return {'stored': True, 'personal': len(requesters)}
     async with SessionLocal() as db:
         result=await upsert_shared_bilibili_pack(db,bvid=job['bvid'],page=job['page'],
           cid=job.get('cid'),duration_sec=duration,subtitle_en_srt=en_srt,

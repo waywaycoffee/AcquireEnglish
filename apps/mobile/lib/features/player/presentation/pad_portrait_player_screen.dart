@@ -903,6 +903,32 @@ class PadPortraitPlayerScreenState
         resolvedLines = const <PlayerSubtitleLine>[];
       }
     }
+    if (resolvedLines.isEmpty &&
+        (resource.course?.id.startsWith('youtube-') ?? false)) {
+      final id = YoutubeImport.extractVideoId(resource.episode?.sourceUrl ?? '');
+      if (id != null) {
+        try {
+          final api = ref.read(acquireApiClientProvider);
+          final assets = await api.listPersonalImports().timeout(const Duration(seconds: 5));
+          final asset = assets.where((item) =>
+              item.source == 'youtube' && item.externalId == id && item.hasEn).firstOrNull;
+          if (asset != null) {
+            final en = await api.fetchPersonalImportSrt(importId: asset.id, lang: 'en');
+            final zh = asset.hasZh
+                ? await api.fetchPersonalImportSrt(importId: asset.id, lang: 'zh')
+                : null;
+            resolvedLines = mergeSubtitleLines(
+              englishLines: parseSubtitleLines(en ?? ''),
+              chineseLines: parseSubtitleLines(zh ?? ''),
+            );
+            officialEnglish = resolvedLines.isNotEmpty;
+          }
+        } catch (_) {
+          // Playback remains available while cloud subtitles are unreachable.
+        }
+        if (!mounted) return;
+      }
+    }
     if (!preferSpeech &&
         !resolvedLines.any(
           (PlayerSubtitleLine line) => looksChinese(line.chinese),

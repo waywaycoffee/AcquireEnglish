@@ -169,11 +169,19 @@ def transcribe(recognizer, job, beat=None):
         beat.mark('transcribing', pct=0.18, message='准备音频中…')
     with tempfile.TemporaryDirectory(prefix='acquire-gpu-') as folder:
         audio=Path(folder)/'source.m4a'
-        with httpx.stream('GET',job['url'],headers={'User-Agent':'Mozilla/5.0',
-            'Referer':'https://www.bilibili.com/'},follow_redirects=True,timeout=60) as response:
-            response.raise_for_status()
-            with audio.open('wb') as output:
-                for chunk in response.iter_bytes(): output.write(chunk)
+        if job['bvid'].startswith('YT:'):
+            video_id = job['bvid'][3:]
+            subprocess.run([
+                sys.executable, '-m', 'yt_dlp', '--no-playlist',
+                '-f', 'bestaudio', '-o', str(audio),
+                f'https://www.youtube.com/watch?v={video_id}',
+            ], check=True, timeout=600, stdout=sys.stderr)
+        else:
+            with httpx.stream('GET',job['url'],headers={'User-Agent':'Mozilla/5.0',
+                'Referer':'https://www.bilibili.com/'},follow_redirects=True,timeout=60) as response:
+                response.raise_for_status()
+                with audio.open('wb') as output:
+                    for chunk in response.iter_bytes(): output.write(chunk)
         if beat is not None:
             beat.mark('transcribing', pct=0.38, message='云端正在识别英文字幕…')
         segments,_=recognizer.transcribe(str(audio),language='en',vad_filter=True,beam_size=5)
