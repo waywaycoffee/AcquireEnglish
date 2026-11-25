@@ -48,3 +48,9 @@ python3 reading_generator/mysql_import.py /path/to/reviewed-json
 在 ECS 配置 `K12_OUTPUT_DIR=/opt/acquireenglish/services/api/media/reading/k12` 后运行 `python3 reading_generator/generate_grades.py`。密钥复用 API `.env`，不输出密钥。输出包含 `grade_id`，按年级保存 JSON，原子更新 `catalog.json`，App 的 K12 年级书架按该字段筛选，仅显示通过校验的内容。所有文本从 ECS 下载；本流程不生成或打包音视频。完整题目、词汇、句式与数字人问题保留在 JSON，当前书架打开正文进入现有阅读器。
 
 验证：`python3 -m unittest discover -s reading_generator -p test_grades.py`。
+
+## 全年级审校与官方资料发布
+
+在 ECS 运行 `python3 reading_generator/review_grades.py`，对现有 12 篇逐篇进行 AI 编辑审校：修订语法、年级难度、题型、答案唯一性和中文解析，验证篇幅及讲解句逐字来自正文。修订结果存入 ECS `reading/k12/official/<grade_id>.json`，保留原稿，支持断点继续。仅在全部 12 年级通过后原子替换线上目录，并输出 `official/review_report.json`。官方资料指爱快英语自有资料，保留 `source_type=ai_original`、`review_status=ai_reviewed`，不冒充官方考试真题或真实新闻。App 年级书架仅展示相应集合内已审校文章。
+
+首批 12 篇已在 AI 审校后逐篇由代理复核修订：二年级节水文简化，四年级冠词修正，五年级场景与题目去歧义，中学统一主旨/细节/推理/词义或态度题序，并修正太阳能储能用语和城市鸟类保护的无来源引述。线上 `review_method` 记录 AI 审校与代理编辑，保留 AI 来源标记。发布内容与审校报告在 ECS，不随 APK 打包、不提交生成 JSON。

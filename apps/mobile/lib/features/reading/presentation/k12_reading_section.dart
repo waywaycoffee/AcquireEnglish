@@ -57,7 +57,7 @@ class K12ReadingSection extends ConsumerWidget {
         titleZh: article['title_zh'] as String? ?? '',
         sourceType: ReadingSourceType.catalog,
         plainText: article['passage'] as String,
-        sourceLabel: '${item['level']} · 原创主题阅读',
+        sourceLabel: '爱快英语官方资料 · ${item['level']} · AI原创/审校',
         courseTitle: '${item['level']}时文阅读',
         createdAt: DateTime.now().toUtc(),
       );
@@ -82,7 +82,7 @@ class K12ReadingSection extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
         const Text(
-          '本年级时文阅读',
+          '官方资料 · 本年级时文阅读',
           style: TextStyle(fontSize: 16, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 8),
@@ -96,7 +96,12 @@ class K12ReadingSection extends ConsumerWidget {
               ),
               data: (List<Map<String, dynamic>> items) {
                 final List<Map<String, dynamic>> articles = items
-                    .where((Map<String, dynamic> e) => e['grade_id'] == gradeId)
+                    .where(
+                      (Map<String, dynamic> e) =>
+                          e['grade_id'] == gradeId &&
+                          e['collection'] == 'official_k12_reading' &&
+                          e['review_status'] == 'ai_reviewed',
+                    )
                     .toList();
                 if (articles.isEmpty) return const Text('本年级阅读正在准备中');
                 return Column(
@@ -109,7 +114,7 @@ class K12ReadingSection extends ConsumerWidget {
                             '${(item['article'] as Map<dynamic, dynamic>)['title_zh'] ?? (item['article'] as Map<dynamic, dynamic>)['title'] ?? '主题阅读'}',
                           ),
                           subtitle: Text(
-                            '${item['level']} · ${(item['article'] as Map<dynamic, dynamic>)['word_count']} 词',
+                            '${item['level']} · ${(item['article'] as Map<dynamic, dynamic>)['word_count']} 词 · AI 审校',
                           ),
                           trailing: const Icon(Icons.chevron_right),
                           onTap: () => _open(context, ref, item),
