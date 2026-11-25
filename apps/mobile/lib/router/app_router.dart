@@ -63,6 +63,7 @@ import '../features/reading/presentation/reading_catalog_screen.dart';
 import '../features/reading/presentation/reading_hub_screen.dart';
 import '../features/reading/presentation/reading_library_provider.dart';
 import '../features/reading/presentation/reading_reader_screen.dart';
+import '../features/settings/presentation/about_screen.dart';
 import '../features/settings/presentation/settings_screen.dart';
 import '../features/learning/presentation/learning_review_screen.dart';
 import '../features/words/presentation/sm2_daily_session_screen.dart';
@@ -772,6 +773,11 @@ GoRouter goRouter(Ref ref) {
       path: SGRoute.settings.route,
       builder: (BuildContext context, GoRouterState state) =>
           const SettingsScreen(),
+    ).fade(),
+    GoRoute(
+      path: AboutScreen.route,
+      builder: (BuildContext context, GoRouterState state) =>
+          const AboutScreen(),
     ).fade(),
     GoRoute(
       path: SGRoute.importCourse.route,

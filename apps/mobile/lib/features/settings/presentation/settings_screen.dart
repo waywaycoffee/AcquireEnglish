@@ -26,8 +26,10 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
+import 'about_screen.dart';
 import 'ai_subtitle_management_screen.dart';
 import 'app_update_provider.dart';
+import 'developer_mode_provider.dart';
 import 'invite_promo_sheet.dart';
 import '../../home/presentation/widgets/theme_widget.dart';
 import 'bilibili_login_sheet.dart';
@@ -36,6 +38,7 @@ import '../../onboarding/presentation/auth_sources_settings_screen.dart';
 import 'learning_preferences_screen.dart';
 import 'settings_provider.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
+import '../domain/app_legal_info.dart';
 import 'widgets/api_usage_card.dart';
 import 'widgets/pronunciation_settings_card.dart';
 import 'widgets/settings_group_card.dart';
@@ -47,6 +50,7 @@ class SettingsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final bool compact = context.isPadCompact;
     final LearningSettingsState settings = ref.watch(learningSettingsProvider);
+    final bool developerMode = ref.watch(developerModeProvider);
     final bool isAiProvider = _isAiProvider(settings.translationProvider);
     final bool isGoogleTranslate = settings.translationProvider == 'Google 翻译';
     final bool isBaiduTranslate = settings.translationProvider == '百度翻译';
@@ -112,20 +116,21 @@ class SettingsScreen extends ConsumerWidget {
             title: '爱快账号',
             icon: Icons.person_rounded,
             children: <Widget>[
-              _InputRow(
-                title: '云端 API 地址',
-                description:
-                    '仅账号 / 进度 / 词库同步部署在服务器。 '
-                    '留空则用编译参数 API_BASE（当前 ${settings.resolvedCloudApiBaseUrl}）。 '
-                    'ASR、翻译、口语陪练等仍在 App 内运行。',
-                value: settings.cloudApiBaseUrl,
-                hintText: settings.resolvedCloudApiBaseUrl,
-                onChanged: (String value) {
-                  ref
-                      .read(learningSettingsProvider.notifier)
-                      .setCloudApiBaseUrl(value);
-                },
-              ),
+              if (developerMode)
+                _InputRow(
+                  title: '云端 API 地址',
+                  description:
+                      '仅账号 / 进度 / 词库同步部署在服务器。 '
+                      '留空则用编译参数 API_BASE（当前 ${settings.resolvedCloudApiBaseUrl}）。 '
+                      'ASR、翻译、口语陪练等仍在 App 内运行。',
+                  value: settings.cloudApiBaseUrl,
+                  hintText: settings.resolvedCloudApiBaseUrl,
+                  onChanged: (String value) {
+                    ref
+                        .read(learningSettingsProvider.notifier)
+                        .setCloudApiBaseUrl(value);
+                  },
+                ),
               if (authSession.isLoggedIn) ...<Widget>[
                 _ActionRow(
                   title: authSession.displayName.isEmpty
@@ -237,12 +242,13 @@ class SettingsScreen extends ConsumerWidget {
                   icon: Icons.person_add_alt_1_rounded,
                   onTap: () => context.push(SGRoute.register.route),
                 ),
-                _ActionRow(
-                  title: '使用默认账号 weiwei',
-                  description: '一键登录测试账号并同步云端字幕资产。',
-                  icon: Icons.bolt_rounded,
-                  onTap: () => showAccountHubSheet(context, ref),
-                ),
+                if (developerMode)
+                  _ActionRow(
+                    title: '使用默认账号 weiwei',
+                    description: '一键登录测试账号并同步云端字幕资产。',
+                    icon: Icons.bolt_rounded,
+                    onTap: () => showAccountHubSheet(context, ref),
+                  ),
               ],
             ],
           ),
@@ -257,8 +263,10 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          SizedBox(height: context.padSectionGap),
-          const ApiUsageCard(),
+          if (developerMode) ...<Widget>[
+            SizedBox(height: context.padSectionGap),
+            const ApiUsageCard(),
+          ],
           SizedBox(height: context.padSectionGap),
           SettingsGroupCard(
             title: '课程与偏好',
@@ -490,11 +498,12 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
-          SizedBox(height: compact ? 20 : 24),
-          if (pronunciationScoringEnabled) ...<Widget>[
-            const PronunciationSettingsCard(),
+          if (developerMode && pronunciationScoringEnabled) ...<Widget>[
             SizedBox(height: compact ? 20 : 24),
+            const PronunciationSettingsCard(),
           ],
+          if (developerMode) ...<Widget>[
+          SizedBox(height: compact ? 20 : 24),
           SettingsGroupCard(
             title: '口语陪练（数字人）',
             icon: Icons.record_voice_over_rounded,
@@ -584,6 +593,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          ],
           SizedBox(height: compact ? 20 : 24),
           SettingsGroupCard(
             title: 'B 站账号',
@@ -595,8 +605,6 @@ class SettingsScreen extends ConsumerWidget {
                     ? (settings.bilibiliUserId.isEmpty
                           ? '已登录：可用于拉取官方字幕与缓存视频。'
                           : '已登录 UID ${settings.bilibiliUserId}：可用于拉取官方字幕与缓存视频。')
-                    : settings.bilibiliCookieFromEnv
-                    ? '已从 .env 加载 Cookie；也可扫码覆盖。'
                     : '推荐：手机哔哩哔哩 App 扫码，确认后自动保存登录态。',
                 icon: Icons.qr_code_2_rounded,
                 onTap: () async {
@@ -650,24 +658,26 @@ class SettingsScreen extends ConsumerWidget {
                     );
                   },
                 ),
-              _InputRow(
-                title: 'SESSDATA（高级）',
-                description: settings.bilibiliCookieFromEnv
-                    ? '已从 apps/mobile/.env 的 BILIBILI_SESSDATA / BILIBILI_COOKIE 加载；此处可覆盖。'
-                    : '也可手动粘贴 Cookie。优先使用上方扫码登录。',
-                value: settings.bilibiliSessdata,
-                hintText: settings.bilibiliCookieFromEnv
-                    ? '（已使用 .env）'
-                    : '粘贴 SESSDATA 或整段 Cookie',
-                obscureText: true,
-                onChanged: (String value) {
-                  ref
-                      .read(learningSettingsProvider.notifier)
-                      .setBilibiliSessdata(value);
-                },
-              ),
+              if (developerMode)
+                _InputRow(
+                  title: 'SESSDATA（高级）',
+                  description: settings.bilibiliCookieFromEnv
+                      ? '已从 apps/mobile/.env 的 BILIBILI_SESSDATA / BILIBILI_COOKIE 加载；此处可覆盖。'
+                      : '也可手动粘贴 Cookie。优先使用上方扫码登录。',
+                  value: settings.bilibiliSessdata,
+                  hintText: settings.bilibiliCookieFromEnv
+                      ? '（已使用 .env）'
+                      : '粘贴 SESSDATA 或整段 Cookie',
+                  obscureText: true,
+                  onChanged: (String value) {
+                    ref
+                        .read(learningSettingsProvider.notifier)
+                        .setBilibiliSessdata(value);
+                  },
+                ),
             ],
           ),
+          if (developerMode) ...<Widget>[
           SizedBox(height: compact ? 20 : 24),
           SettingsGroupCard(
             title: '翻译',
@@ -1030,6 +1040,7 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          ],
           SizedBox(height: compact ? 20 : 24),
           SettingsGroupCard(
             title: '系统',
@@ -1124,81 +1135,129 @@ class SettingsScreen extends ConsumerWidget {
               ),
             ],
           ),
+          if (developerMode) ...<Widget>[
+            SizedBox(height: compact ? 20 : 24),
+            SettingsGroupCard(
+              title: '调试 · 体验与空闲任务',
+              icon: Icons.science_rounded,
+              children: <Widget>[
+                _ActionRow(
+                  title: '注入演示数据（仅调试）',
+                  description:
+                      '填充单词收藏、短语、今日复习、成长连续天、推荐词与空闲队列样例，便于内测核对各模块。',
+                  icon: Icons.dataset_rounded,
+                  onTap: () async {
+                    final DemoSeedReport report = await injectDemoSeed(ref);
+                    if (context.mounted) {
+                      _showMessage(context, report.message);
+                    }
+                  },
+                ),
+                _ActionRow(
+                  title: '清除演示数据',
+                  description: '只删除演示样例，保留你自己的学习记录。',
+                  icon: Icons.delete_sweep_rounded,
+                  onTap: () async {
+                    final DemoSeedReport report = await clearDemoSeed(ref);
+                    if (context.mounted) {
+                      _showMessage(context, report.message);
+                    }
+                  },
+                ),
+                const _IdleJobsToggleRow(),
+                const _IdleQueueStatusRow(),
+              ],
+            ),
+          ],
           SizedBox(height: compact ? 20 : 24),
           SettingsGroupCard(
-            title: '调试 · 体验与空闲任务',
-            icon: Icons.science_rounded,
+            title: '关于',
+            icon: Icons.info_outline_rounded,
             children: <Widget>[
-              _ActionRow(
-                title: '注入演示数据（仅调试）',
-                description:
-                    '填充单词收藏、短语、今日复习、成长连续天、推荐词与空闲队列样例，便于内测核对各模块。',
-                icon: Icons.dataset_rounded,
-                onTap: () async {
-                  final DemoSeedReport report = await injectDemoSeed(ref);
-                  if (context.mounted) {
-                    _showMessage(context, report.message);
-                  }
-                },
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 14, 16, 6),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      AppLegalInfo.appDisplayName,
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                        color: AppDesignTokens.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      '开发公司：${AppLegalInfo.companyName}',
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w600,
+                        color: AppDesignTokens.textPrimary,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      '包名 ${AppLegalInfo.packageName}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppDesignTokens.textSecondary,
+                      ),
+                    ),
+                  ],
+                ),
               ),
               _ActionRow(
-                title: '清除演示数据',
-                description: '只删除演示样例，保留你自己的学习记录。',
-                icon: Icons.delete_sweep_rounded,
-                onTap: () async {
-                  final DemoSeedReport report = await clearDemoSeed(ref);
-                  if (context.mounted) {
-                    _showMessage(context, report.message);
-                  }
-                },
+                title: '关于爱快英语',
+                description: '版本、用户协议、隐私政策与联系方式',
+                icon: Icons.chevron_right_rounded,
+                onTap: () => context.push(AboutScreen.route),
               ),
-              const _IdleJobsToggleRow(),
-              const _IdleQueueStatusRow(),
-            ],
-          ),
-          SizedBox(height: compact ? 20 : 24),
-          SettingsGroupCard(
-            title: '支持项目',
-            icon: Icons.coffee_rounded,
-            children: <Widget>[
               _ActionRow(
-                title: '请我喝杯咖啡',
-                description: '自愿赞助，支持开源维护与改进。将在浏览器打开 Buy Me a Coffee。',
-                icon: Icons.open_in_new_rounded,
-                onTap: () => _openSupportPage(context),
+                title: '用户协议',
+                description: '打开用户协议与版权声明',
+                icon: Icons.description_outlined,
+                onTap: () => openUrl(Uri.parse(AppLegalInfo.termsUrl)),
+              ),
+              _ActionRow(
+                title: '隐私政策',
+                description: '打开隐私政策页面',
+                icon: Icons.privacy_tip_outlined,
+                onTap: () => openUrl(Uri.parse(AppLegalInfo.privacyUrl)),
               ),
             ],
           ),
           SizedBox(height: compact ? 20 : 24),
           Center(
-            child: Text(
-              appVersion.when(
-                data: (String version) => '当前版本 v$version',
-                loading: () => '当前版本',
-                error: (_, _) => '当前版本未知',
-              ),
-              style: TextStyle(
-                fontSize: 12,
-                color: AppDesignTokens.textSecondary,
+            child: GestureDetector(
+              onTap: () {
+                if (developerMode) return;
+                ref.read(versionTapCountProvider.notifier).bump();
+                final int taps = ref.read(versionTapCountProvider);
+                if (taps >= 7) {
+                  ref.read(developerModeProvider.notifier).enable();
+                  ref.read(versionTapCountProvider.notifier).reset();
+                  _showMessage(context, '已开启开发者选项（含 API Key 配置）');
+                }
+              },
+              child: Text(
+                appVersion.when(
+                  data: (String version) =>
+                      '当前版本 v$version · ${AppLegalInfo.companyName}',
+                  loading: () => '当前版本',
+                  error: (_, _) => '当前版本未知',
+                ),
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: AppDesignTokens.textSecondary,
+                ),
               ),
             ),
           ),
         ],
       ),
     );
-  }
-
-  Future<void> _openSupportPage(BuildContext context) async {
-    try {
-      final bool opened = await openUrl(
-        Uri.parse('https://buymeacoffee.com/marklongpcm'),
-      );
-      if (opened) return;
-    } catch (_) {
-      // Platform failures use the same actionable fallback as a rejected launch.
-    }
-    if (!context.mounted) return;
-    _showMessage(context, '无法打开浏览器，请访问 buymeacoffee.com/marklongpcm');
   }
 
   Future<void> _confirmReset(BuildContext context, WidgetRef ref) async {
