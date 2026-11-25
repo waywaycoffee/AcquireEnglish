@@ -3175,9 +3175,9 @@ class _LibraryCourseMatchShell extends StatelessWidget {
                       '')
                 : '')
             .trim();
-    // Hide「预约字幕」when official/server softsubs are already on the course.
+    // Hide「预约字幕」only when every episode already has EN + ZH softsubs.
     final bool showReserve =
-        reserveSource.isNotEmpty && !courseHasStudySubtitles(course);
+        reserveSource.isNotEmpty && !courseHasBilingualStudySubtitles(course);
     final showDownload = onDownloadCollection != null &&
         !courseHasAllLocalVideos(course) &&
         (isMultiEpisodeBilibiliCourse(course) ||

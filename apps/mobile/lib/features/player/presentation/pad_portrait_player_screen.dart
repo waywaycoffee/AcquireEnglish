@@ -3834,8 +3834,8 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       child: const Text('下载全部合集'),
                     ),
                   if (widget.onlinePreview &&
-                      !episodeHasStudySubtitles(episode) &&
-                      !courseHasStudySubtitles(course))
+                      !episodeHasBilingualStudySubtitles(episode) &&
+                      !courseHasBilingualStudySubtitles(course))
                     Text(course.episodes.length > 1
                         ? '在线播放试看 · 可预约字幕'
                         : '在线播放 · 可预约字幕'),
