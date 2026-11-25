@@ -54,3 +54,9 @@ python3 reading_generator/mysql_import.py /path/to/reviewed-json
 在 ECS 运行 `python3 reading_generator/review_grades.py`，对现有 12 篇逐篇进行 AI 编辑审校：修订语法、年级难度、题型、答案唯一性和中文解析，验证篇幅及讲解句逐字来自正文。修订结果存入 ECS `reading/k12/official/<grade_id>.json`，保留原稿，支持断点继续。仅在全部 12 年级通过后原子替换线上目录，并输出 `official/review_report.json`。官方资料指爱快英语自有资料，保留 `source_type=ai_original`、`review_status=ai_reviewed`，不冒充官方考试真题或真实新闻。App 年级书架仅展示相应集合内已审校文章。
 
 首批 12 篇已在 AI 审校后逐篇由代理复核修订：二年级节水文简化，四年级冠词修正，五年级场景与题目去歧义，中学统一主旨/细节/推理/词义或态度题序，并修正太阳能储能用语和城市鸟类保护的无来源引述。线上 `review_method` 记录 AI 审校与代理编辑，保留 AI 来源标记。发布内容与审校报告在 ECS，不随 APK 打包、不提交生成 JSON。
+
+## 每年级扩充至五篇
+
+`python3 reading_generator/expand_grades.py` 保留每个年级已审校的首篇，新增四篇不同主题，并逐篇进行独立 AI 内容审校。新篇要求逐题原文证据和中学题型顺序，失败自动修订，已通过文件可断点复用。最多八个并发请求任务。只有全部 60 篇通过、ID 与正文无重复后才原子更新官方目录；失败时保留既有线上目录。每篇带稳定独立 ID，避免同年级多篇在阅读器中混用进度。审校草稿及生成 JSON 只保存在 ECS；新报告位于 `official/expansion_report.json`。
+
+运行扩充后不要再运行旧的单篇目录发布脚本覆盖多篇目录。

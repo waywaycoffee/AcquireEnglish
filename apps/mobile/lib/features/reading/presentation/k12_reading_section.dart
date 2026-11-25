@@ -50,7 +50,7 @@ class K12ReadingSection extends ConsumerWidget {
       final Map<String, dynamic> article = Map<String, dynamic>.from(
         item['article'] as Map<dynamic, dynamic>,
       );
-      final String id = 'k12-reading:$gradeId';
+      final String id = item['id'] as String? ?? 'k12-reading:$gradeId';
       final ReadingDoc doc = ReadingDoc(
         id: id,
         title: article['title'] as String? ?? 'English Reading',
