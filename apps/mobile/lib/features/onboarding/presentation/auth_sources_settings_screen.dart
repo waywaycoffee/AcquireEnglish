@@ -1,35 +1,144 @@
+import 'package:dio/dio.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 import '../../../constants/assets.dart';
+import '../../../data/repository/network_repository.dart';
+import '../../authentication/presentation/auth_session.dart';
 import '../../import_course/presentation/netdisk_import_sheet.dart';
 import '../../import_course/presentation/youtube_import_sheet.dart';
+import '../../navigation/presentation/navigation_destination.dart';
 import '../../settings/presentation/bilibili_login_sheet.dart';
 import '../../settings/presentation/settings_provider.dart';
-import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_compact.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 
 /// Settings hub for Bilibili / YouTube / netdisk authorization.
-class AuthSourcesSettingsScreen extends ConsumerWidget {
+class AuthSourcesSettingsScreen extends ConsumerStatefulWidget {
   const AuthSourcesSettingsScreen({super.key});
 
   static const String route = '/settings/auth-sources';
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final LearningSettingsState settings = ref.watch(learningSettingsProvider);
-    final bool biliOk = settings.isBilibiliLoggedIn;
+  ConsumerState<AuthSourcesSettingsScreen> createState() =>
+      _AuthSourcesSettingsScreenState();
+}
+
+class _AuthSourcesSettingsScreenState
+    extends ConsumerState<AuthSourcesSettingsScreen> {
+  late final AppLifecycleListener _lifecycle;
+  bool _available = false;
+  bool _verified = false;
+  bool _busy = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _lifecycle = AppLifecycleListener(onResume: _refreshBilibili);
+    _refreshBilibili();
+  }
+
+  @override
+  void dispose() {
+    _lifecycle.dispose();
+    super.dispose();
+  }
+
+  Dio _client() {
+    final Dio network = ref.read(networkRepositoryProvider);
+    return Dio(
+      BaseOptions(
+        baseUrl: network.options.baseUrl,
+        headers: Map<String, dynamic>.of(network.options.headers),
+        connectTimeout: const Duration(seconds: 8),
+        receiveTimeout: const Duration(seconds: 12),
+      ),
+    );
+  }
+
+  Future<void> _refreshBilibili() async {
+    if (!ref.read(authSessionProvider).isLoggedIn) return;
+    final Dio client = _client();
+    try {
+      final Response<Map<String, dynamic>> response = await client
+          .get<Map<String, dynamic>>('api/bilibili/oauth/status');
+      if (!mounted) return;
+      setState(() {
+        _available = response.data?['available'] == true;
+        _verified = response.data?['verified'] == true;
+      });
+    } on DioException {
+      // The existing login remains available if the OAuth API is unreachable.
+    } finally {
+      client.close();
+    }
+  }
+
+  Future<void> _connectBilibili() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final Dio client = _client();
+    try {
+      if (!ref.read(authSessionProvider).isLoggedIn) {
+        _showBilibiliMessage('请先登录爱快英语账号。');
+        return;
+      }
+      final Response<Map<String, dynamic>> response = await client
+          .post<Map<String, dynamic>>('api/bilibili/oauth/start');
+      final Uri? url = Uri.tryParse(response.data?['url'] as String? ?? '');
+      if (!mounted) return;
+      if (url == null ||
+          url.scheme != 'https' ||
+          url.authority != 'account.bilibili.com' ||
+          url.path != '/h5/account-h5/auth/oauth') {
+        throw const FormatException('Unexpected Bilibili authorization URL');
+      }
+      bool opened = false;
+      try {
+        opened = await launchUrl(
+          url,
+          mode: LaunchMode.externalNonBrowserApplication,
+        );
+      } on Exception {
+        // Browser fallback for devices without an app handler.
+      }
+      if (!opened && mounted) {
+        opened = await launchUrl(url, mode: LaunchMode.externalApplication);
+      }
+      if (!opened) _showBilibiliMessage('无法打开授权页，请稍后重试。');
+    } on DioException catch (error) {
+      final int? status = error.response?.statusCode;
+      _showBilibiliMessage(
+        status == 503 || status == 404
+            ? 'B 站官方授权暂未开通。需要登录态时可选「跨设备扫码」。'
+            : '无法发起 B 站授权，请检查网络后重试。',
+      );
+    } on Exception {
+      _showBilibiliMessage('无法打开授权页，请稍后重试。');
+    } finally {
+      client.close();
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  void _showBilibiliMessage(String message) {
+    if (!mounted) return;
+    ScaffoldMessenger.of(
+      context,
+    ).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final bool biliOk = ref.watch(learningSettingsProvider).isBilibiliLoggedIn;
 
     return PadScaffold(
       currentDestination: AppNavDestination.settings,
       showContinueLearning: false,
-      topBar: const PadTopBar(
-        title: '授权与素材来源',
-        subtitle: 'B 站 · YouTube · 网盘',
-      ),
+      topBar: const PadTopBar(title: '授权与素材来源', subtitle: 'B 站 · YouTube · 网盘'),
       body: ListView(
         padding: EdgeInsets.all(context.padPagePadding),
         children: <Widget>[
@@ -43,7 +152,7 @@ class AuthSourcesSettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 8),
           Text(
-            '管好来源之后，学习页里的课、字幕和复习才会同步。授权随时可撤销。',
+            '按需连接素材来源。公开视频和已有字幕可直接使用。',
             style: TextStyle(
               fontSize: 14,
               height: 1.45,
@@ -63,19 +172,16 @@ class AuthSourcesSettingsScreen extends ConsumerWidget {
           _SourceCard(
             name: '哔哩哔哩',
             color: const Color(0xFFFB7299),
-            state: biliOk
-                ? (settings.bilibiliUserId.isEmpty
-                    ? '已授权 · 可同步课程与字幕'
-                    : '已授权 · UID ${settings.bilibiliUserId}')
-                : '未授权 · 扫码登录后同步课程',
-            actionLabel: biliOk ? '重新登录' : '去授权',
-            onAction: () => showBilibiliLoginSheet(context, ref),
-            secondaryLabel: biliOk ? '退出登录' : null,
-            onSecondary: biliOk
-                ? () => ref
-                    .read(learningSettingsProvider.notifier)
-                    .clearBilibiliLogin()
-                : null,
+            state: <String>[
+              if (_verified) '官方账号授权已验证',
+              if (!biliOk && !_verified)
+                _available ? '可在本机打开官方授权页' : '官方授权按需启用',
+              if (biliOk) '视频网页登录已就绪',
+            ].join(' · '),
+            actionLabel: _busy ? '正在打开…' : '连接哔哩哔哩',
+            onAction: _connectBilibili,
+            secondaryLabel: '跨设备扫码',
+            onSecondary: () => showBilibiliLoginSheet(context, ref),
           ),
           const SizedBox(height: 10),
           _SourceCard(
@@ -95,7 +201,7 @@ class AuthSourcesSettingsScreen extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
           Text(
-            '打开相关功能时弹出的授权页是正常流程，不是广告。未授权仍可使用本地已有内容。',
+            '部分受限视频或官方字幕仍需 B 站网页登录权限。',
             style: TextStyle(
               fontSize: 13,
               height: 1.45,
@@ -172,7 +278,7 @@ class _SourceCard extends StatelessWidget {
             onPressed: onAction,
             child: Text(
               actionLabel,
-              style: TextStyle(
+              style: const TextStyle(
                 color: AppDesignTokens.brandGreen,
                 fontWeight: FontWeight.w800,
               ),

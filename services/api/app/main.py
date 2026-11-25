@@ -13,6 +13,7 @@ from app.routers import (
     app_settings_backup,
     assets,
     auth,
+    bilibili_oauth,
     commerce,
     community,
     community_groups,
@@ -119,6 +120,7 @@ app.add_middleware(
 )
 
 app.include_router(auth.router, prefix="/api")
+app.include_router(bilibili_oauth.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(admin_analytics.router, prefix="/api")
 app.include_router(usage.router, prefix="/api")

@@ -21,6 +21,9 @@ class Settings(BaseSettings):
     media_public_base: str = "https://acquireenglish.curlhairai.com"
     # Optional Bilibili cookie (e.g. "SESSDATA=xxx; bili_jct=yyy") for login-gated CC/AI subtitles.
     bilibili_cookie: str = ""
+    bilibili_oauth_client_id: str = ""
+    bilibili_oauth_client_secret: str = ""
+    bilibili_oauth_callback: str = ""
     # Optional global DashScope / 百炼 API key for web AI subtitles / scene VL.
     dashscope_api_key: str = ""
     # Optional dedicated OpenAI-compatible podcast backend. Set all three together.

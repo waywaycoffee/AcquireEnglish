@@ -503,7 +503,7 @@ class _FeaturesPage extends StatelessWidget {
           ),
           const SizedBox(height: 10),
           const Text(
-            '每一屏都是现在 App 里的截图。视频来自哔哩哔哩、YouTube 和网盘，第一次要你授权。',
+            '视频来自哔哩哔哩、YouTube 和网盘。公开素材可先学，需要账号权限时再连接。',
             style: TextStyle(
               color: _body,
               fontSize: 14,
@@ -1121,7 +1121,7 @@ class _WhyAuthPage extends StatelessWidget {
             ),
             const SizedBox(height: 10),
             const Text(
-              '授权之后，课程和字幕才会出现在这样的学习页里。',
+              '公开视频和已有字幕可以直接使用，部分素材需要连接来源账号。',
               style: TextStyle(
                 color: _body,
                 fontSize: 14,
@@ -1155,7 +1155,7 @@ class _WhyAuthPage extends StatelessWidget {
                       border: Border.all(color: const Color(0x55F5C16C)),
                     ),
                     child: const Text(
-                      '打开 B 站、YouTube 或网盘时弹出的授权页是正常步骤，用来拉取课程、字幕和导入视频，不是广告。',
+                      '连接账号可访问来源允许的课程和字幕。可以进入爱快英语后再按需连接。',
                       style: TextStyle(
                         color: Color(0xFFF4E7C4),
                         fontSize: 14,
@@ -1168,7 +1168,7 @@ class _WhyAuthPage extends StatelessWidget {
                   for (final String line in <String>[
                     '每次授权都由你确认',
                     '可在设置里随时撤销',
-                    '未授权仍可学本地已有内容',
+                    '未授权也能学习公开素材和本地内容',
                   ])
                     Padding(
                       padding: const EdgeInsets.only(bottom: 8),
@@ -1246,7 +1246,7 @@ class _SourcesPage extends StatelessWidget {
                 children: <Widget>[
                   const _SourcePreviewTile(
                     name: '哔哩哔哩',
-                    state: '未授权 · 扫码后同步课程',
+                    state: '可选连接 · 公开视频可直接学习',
                     color: Color(0xFFFB7299),
                   ),
                   const SizedBox(height: 8),

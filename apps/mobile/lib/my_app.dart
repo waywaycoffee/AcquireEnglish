@@ -20,7 +20,6 @@ import 'features/import_course/presentation/video_download_progress_host.dart';
 import 'features/library/presentation/library_catalog_provider.dart';
 import 'features/library/presentation/library_mock_data.dart';
 import 'features/membership/presentation/free_trial_seed_bootstrap.dart';
-import 'features/settings/presentation/bilibili_login_sheet.dart';
 import 'features/settings/presentation/settings_provider.dart';
 import 'features/shared/presentation/app_orientation.dart';
 import 'features/shared/presentation/pad/app_design_tokens.dart';
@@ -264,11 +263,9 @@ class _MyAppState extends ConsumerState<MyApp> with WidgetsBindingObserver {
                   ),
                 ),
                 child: InternalBetaNoticeHost(
-                  child: BilibiliLoginGate(
-                    child: OverlayPermissionHost(
-                      child: VideoDownloadProgressHost(
-                        child: child ?? const SizedBox.shrink(),
-                      ),
+                  child: OverlayPermissionHost(
+                    child: VideoDownloadProgressHost(
+                      child: child ?? const SizedBox.shrink(),
                     ),
                   ),
                 ),

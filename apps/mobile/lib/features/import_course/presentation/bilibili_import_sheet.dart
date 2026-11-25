@@ -2,13 +2,14 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../authentication/presentation/auth_session.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../membership/domain/module_access.dart';
+import '../../onboarding/presentation/auth_sources_settings_screen.dart';
 import '../../player/presentation/widgets/study_shell_tokens.dart';
-import '../../settings/presentation/bilibili_login_sheet.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/personal_import_sync.dart';
@@ -180,8 +181,8 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           } catch (_) {}
         }());
       }
-      final messenger = ScaffoldMessenger.of(context);
-      final success = course.episodes.length > 1
+      final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+      final String success = course.episodes.length > 1
           ? '在线播放第一集。预约后会在工作站准备字幕，也可手动下载合集。'
           : '在线播放。手动下载后，本地播放更流畅。';
       Navigator.of(context).pop(importedEpisode.id);
@@ -225,17 +226,9 @@ class _BilibiliImportFormState extends ConsumerState<_BilibiliImportForm> {
           OutlinedButton.icon(
             onPressed: _busy
                 ? null
-                : () async {
-                    final bool ok = await showBilibiliLoginSheet(context, ref);
-                    if (!mounted || !ok) {
-                      return;
-                    }
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('B 站登录成功，可继续导入')),
-                    );
-                  },
-            icon: const Icon(Icons.qr_code_2_rounded),
-            label: const Text('扫码登录哔哩哔哩'),
+                : () => context.push(AuthSourcesSettingsScreen.route),
+            icon: const Icon(Icons.link_rounded),
+            label: const Text('连接哔哩哔哩（可选）'),
           ),
         ],
         const SizedBox(height: 12),

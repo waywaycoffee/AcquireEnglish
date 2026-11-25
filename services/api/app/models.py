@@ -20,6 +20,15 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.database import Base
 
 
+class BilibiliAuthorization(Base):
+    __tablename__ = "bilibili_authorizations"
+
+    user_id: Mapped[int] = mapped_column(ForeignKey("users.id", ondelete="CASCADE"), primary_key=True)
+    state_hash: Mapped[str | None] = mapped_column(String(64), unique=True)
+    state_expires: Mapped[int] = mapped_column(BigInteger, default=0)
+    verified: Mapped[bool] = mapped_column(Boolean, default=False)
+
+
 class User(Base):
     __tablename__ = "users"
 

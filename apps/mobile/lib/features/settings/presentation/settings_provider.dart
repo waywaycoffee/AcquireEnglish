@@ -1346,7 +1346,7 @@ class LearningSettingsNotifier extends Notifier<LearningSettingsState> {
   Future<void> applyFromCloud(Map<String, dynamic> json) async {
     final LearningSettingsState defaults = LearningSettingsState.defaults();
     // Cloud document backups often omit SESSDATA (or store ""). Starting from
-    // defaults would wipe a good local Cookie and trip BilibiliLoginGate.
+    // defaults would wipe a good local Cookie.
     final String? cloudBiliCookie = _stringOrNull(json['bilibiliSessdata']);
     final String? cloudBiliUserId = _stringOrNull(json['bilibiliUserId']);
     final LearningSettingsState loaded = defaults.copyWith(

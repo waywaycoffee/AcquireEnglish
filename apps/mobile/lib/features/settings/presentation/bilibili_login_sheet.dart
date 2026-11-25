@@ -98,46 +98,6 @@ Future<bool> showBilibiliLoginSheet(
   return ok ?? false;
 }
 
-/// Blocks the whole app until a Bilibili login Cookie is available.
-class BilibiliLoginGate extends ConsumerWidget {
-  const BilibiliLoginGate({required this.child, super.key});
-
-  final Widget child;
-
-  @override
-  Widget build(BuildContext context, WidgetRef ref) {
-    final LearningSettingsState settings = ref.watch(learningSettingsProvider);
-    if (settings.hasBilibiliCookie) {
-      return child;
-    }
-    return const _BilibiliRequiredLoginPage();
-  }
-}
-
-class _BilibiliRequiredLoginPage extends StatelessWidget {
-  const _BilibiliRequiredLoginPage();
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: StudyShellTokens.surface,
-      child: SafeArea(
-        child: Center(
-          child: ConstrainedBox(
-            constraints: const BoxConstraints(maxWidth: 420),
-            child: const SingleChildScrollView(
-              padding: EdgeInsets.fromLTRB(20, 24, 20, 24),
-              child: BilibiliLoginPanel(
-                requiredLogin: true,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class BilibiliLoginPanel extends ConsumerStatefulWidget {
   const BilibiliLoginPanel({
     this.requiredLogin = false,
