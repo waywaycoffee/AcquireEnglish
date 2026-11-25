@@ -2,14 +2,29 @@
 
 ## 安装包
 
+### 官网 Release（推荐内测分发）
+
+- 下载：https://acquireenglish.curlhairai.com/download.html
+- 包名：`com.acquire.english` · 正式签名 Release
+- **只含 arm64-v8a**（体积约 110MB；勿打 fat APK）
+- 构建：
+
+```bash
+cd apps/mobile
+flutter build apk --release --flavor prod --no-pub \
+  --target-platform android-arm64 \
+  --dart-define-from-file=.env
+```
+
+上传 ECS：`/opt/acquireenglish/www/downloads/AcquireEnglish-android-<ver>.apk`，并更新 `latest` 软链。
+
+### 本机 Debug 侧载
+
 - 路径：`apps/mobile/build/app/outputs/flutter-apk/app-prod-debug.apk`
-- 包名：`com.acquire.english`（prod flavor）
 - 构建：`flutter build apk --debug --flavor prod --no-pub`
-- 提交：见当前 `main`（含网盘书籍导入与测试对齐）
+- 团队 debug 证书：`apps/mobile/android/keystore/team-debug.keystore`（gitignored）
 
 覆盖安装需与手机上已装包**签名一致**。不一致时不要卸载清数据，改用同 keystore 重签或备份后重装。
-
-团队 debug 证书：`apps/mobile/android/keystore/team-debug.keystore`（别名 `androiddebugkey`，口令 `android`，gitignored）。`prod` debug 构建已强制使用该证书；本机需先放入该文件再建包。
 
 ## 已知限制（告知内测用户）
 

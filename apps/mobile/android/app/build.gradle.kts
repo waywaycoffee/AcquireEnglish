@@ -34,10 +34,11 @@ android {
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName
-        // Sideload/release phones are overwhelmingly arm64; drop 32-bit + x86
-        // to shrink fat APKs. Prefer: flutter build apk --split-per-abi.
+        // Sideload/release phones are overwhelmingly arm64. Also pass
+        // --target-platform android-arm64 when building the website APK.
         ndk {
-            abiFilters += listOf("arm64-v8a")
+            abiFilters.clear()
+            abiFilters.addAll(listOf("arm64-v8a"))
         }
     }
 
@@ -93,11 +94,10 @@ android {
             } else {
                 signingConfigs.getByName("debug")
             }
-            // Hotfix 0.2.252: R8 was stripping ML Kit DI deps and crashing
-            // MlKitInitProvider on every cold start. Keep rules restored below;
-            // minify stays off until a minify-on release is re-validated on device.
-            isMinifyEnabled = false
-            isShrinkResources = false
+            // ML Kit keep rules live in proguard-rules.pro — validate on device
+            // after every minify-on release (cold-start MlKitInitProvider).
+            isMinifyEnabled = true
+            isShrinkResources = true
             proguardFiles(
                 getDefaultProguardFile("proguard-android-optimize.txt"),
                 "proguard-rules.pro",
@@ -105,12 +105,25 @@ android {
         }
     }
 
-    // Keep native OCR .so in the APK, but strip model assets — those are
-    // downloaded on first use from https://acquireenglish.curlhairai.com/models/ocr/
+    // Keep native OCR .so for arm64 only. Model assets under
+    // mlkit-google-ocr-models are fetched on first use from ECS CDN.
     packaging {
+        jniLibs {
+            excludes += setOf(
+                "**/armeabi/**",
+                "**/armeabi-v7a/**",
+                "**/x86/**",
+                "**/x86_64/**",
+                "**/mips/**",
+                "**/mips64/**",
+            )
+        }
         resources {
             excludes += setOf(
                 "**/mlkit-google-ocr-models/**",
+                "**/META-INF/*.kotlin_module",
+                "**/META-INF/AL2.0",
+                "**/META-INF/LGPL2.1",
             )
         }
     }
