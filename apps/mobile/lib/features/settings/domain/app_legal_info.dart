@@ -9,7 +9,7 @@ class AppLegalInfo {
 
   /// 开发公司全称（微信支付尾页 / 应用市场开发者信息须一致）。
   /// 若与营业执照不一致，请只改这一处。
-  static const String companyName = '广州柯海智能科技有限公司';
+  static const String companyName = '佛山市乔奈科技有限公司';
 
   static const String supportEmail = 'support@curlhairai.com';
   static const String supportWechat = 'youyoufairytale';
