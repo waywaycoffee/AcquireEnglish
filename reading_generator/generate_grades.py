@@ -21,6 +21,7 @@ def run():
             if existing.get('grade_id') == grade_id and not validate_one(existing):
                 data = existing
         feedback = ''
+        previous = None
         for attempt in range(6):
             if data is not None:
                 break
@@ -31,11 +32,14 @@ def run():
             prompt += '\n这是原创校园与生活主题阅读，不得捏造有日期、媒体出处的真实新闻。article额外提供title英文标题与title_zh中文标题。'
             if feedback:
                 prompt += '\n上次未通过，必须修正：' + feedback
+                if previous is not None:
+                    prompt += '\n请编辑下列JSON来修正错误，调整正文后同步修改问题、原文引用和讲解，勿重新扩写：' + json.dumps(previous, ensure_ascii=False)
             try:
                 candidate = json.loads(call_llm(prompt))
                 candidate['grade_id'] = grade_id
                 candidate['level'] = grade['name']
                 candidate['article']['word_count'] = count_english_words(candidate['article']['passage'])
+                previous = candidate
                 errors = validate_one(candidate)
                 if errors:
                     feedback = '；'.join(errors)
