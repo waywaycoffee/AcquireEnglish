@@ -1,11 +1,11 @@
 {
-  "version": "0.2.261",
-  "version_code": 281,
-  "apk_name": "AcquireEnglish-android-0.2.261+281.apk",
+  "version": "0.2.262",
+  "version_code": 282,
+  "apk_name": "AcquireEnglish-android-0.2.262+282.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "a30059c5299c706e6a374cfcd3cf1a9d61d55891434480c2346c4f222e7208cf",
+  "sha256": "96eecffaafbe76b549063b31e012c01ffaf37f371e66bf446836df982ab200f9",
   "force": true,
-  "min_version_code": 281,
-  "notes": "必须更新：修复同日发版不弹窗 · 支持强制更新 · 口语诊断与签名安装修复",
-  "published_at": "2026-11-26T09:28:53+08:00"
+  "min_version_code": 282,
+  "notes": "必须更新：修复数字人长句播放时男老师中途切换女声的问题",
+  "published_at": "2026-11-26T09:37:50+08:00"
 }
