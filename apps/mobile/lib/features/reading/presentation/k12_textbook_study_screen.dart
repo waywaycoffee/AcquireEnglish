@@ -51,7 +51,6 @@ class _K12TextbookStudyScreenState
     super.initState();
     _player = Player();
     _pdfController = PdfViewerController();
-    _pdfController.addListener(_onPdfChanged);
     _player.stream.playing.listen((bool value) {
       if (!mounted) return;
       setState(() => _playing = value);
@@ -65,14 +64,12 @@ class _K12TextbookStudyScreenState
 
   @override
   void dispose() {
-    _pdfController.removeListener(_onPdfChanged);
     unawaited(_completedSub?.cancel() ?? Future<void>.value());
     unawaited(_player.dispose());
     super.dispose();
   }
 
-  void _onPdfChanged() {
-    final int? page = _pdfController.pageNumber;
+  void _onPageChanged(int? page) {
     if (page == null || page == _pageNumber) return;
     _pageNumber = page;
     if (!_followPages || _sync.isEmpty) {
@@ -177,7 +174,7 @@ class _K12TextbookStudyScreenState
     K12TextbookLesson lesson, {
     bool fromPageSync = false,
   }) async {
-    if (_caching && fromPageSync) return;
+    // Always retarget the desired seq so a mid-download page flip wins.
     setState(() {
       _playingSeq = lesson.seq;
       _caching = true;
@@ -192,18 +189,20 @@ class _K12TextbookStudyScreenState
       if (!mounted) return;
       // Another page flip may have requested a newer track.
       if (_playingSeq != lesson.seq) {
-        setState(() => _caching = false);
         return;
       }
       setState(() => _caching = false);
       await _player.open(Media(cached.uri.toString()));
+      if (!mounted || _playingSeq != lesson.seq) return;
       await _player.play();
       if (mounted) setState(() {});
     } catch (error) {
       if (!mounted) return;
       setState(() {
-        _caching = false;
-        if (_playingSeq == lesson.seq) _playingSeq = null;
+        if (_playingSeq == lesson.seq) {
+          _caching = false;
+          _playingSeq = null;
+        }
       });
       if (!fromPageSync) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -412,6 +411,7 @@ class _K12TextbookStudyScreenState
                     controller: _pdfController,
                     params: PdfViewerParams(
                       backgroundColor: AppDesignTokens.softWhite,
+                      onPageChanged: _onPageChanged,
                       loadingBannerBuilder:
                           (
                             BuildContext context,

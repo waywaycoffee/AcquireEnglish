@@ -19,6 +19,42 @@ Revision Being a good guest 74
     expect(parseRevisionPrintedStart(contents), 74);
   });
 
+  test('contents parser handles PEP next-line page numbers', () {
+    const String contents = '''
+Contents
+Unit 1  Making friends
+2
+Unit 2  Different families
+14
+Unit 3  Our animal friends
+26
+Revision  Being a good guest
+74
+''';
+    expect(parseUnitPrintedStarts(contents), <int, int>{
+      1: 2,
+      2: 14,
+      3: 26,
+    });
+    expect(parseRevisionPrintedStart(contents), 74);
+  });
+
+  test('offset skips Contents page that also mentions Unit 1', () {
+    final List<String> pages = <String>[
+      'cover',
+      'title',
+      'copyright',
+      'welcome',
+      'Contents\nUnit 1 Making friends\n2\nUnit 2 Different families\n14',
+      'characters',
+      'Making friends\nHow do we make friends?\nUnit 1\n2',
+    ];
+    expect(
+      inferPrintedPageOffset(pages, <int, int>{1: 2, 2: 14}),
+      5,
+    );
+  });
+
   test('page map follows unit audio activities', () {
     final List<K12TextbookLesson> lessons = <K12TextbookLesson>[
       _lesson(1, 1, '', 'Listen and chant', '01_Unit 1 Listen and chant.mp3'),
