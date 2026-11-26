@@ -250,6 +250,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   int? _coachMinutesLeft;
   late final String _historyAccount;
   String? _voicePlaybackLabel;
+  String? _configuredLocalVoiceSignature;
   int _roundStartBubble = 0;
   int _lastRoundTurns = 0;
   List<String> _lastRoundExpressions = const <String>[];
@@ -295,18 +296,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       return 'oralCoachHistory:${jsonEncode(<String>[_historyAccount, episodeId])}';
     }
     if (!widget.standalone) return null;
-    return 'oralCoachStandaloneHistory:${jsonEncode(<String>[
-      _historyAccount,
-      _activeScenario?.id ?? 'freechat',
-      widget.courseTitle,
-      widget.topicSummary,
-    ])}';
+    return 'oralCoachStandaloneHistory:${jsonEncode(<String>[_historyAccount, _activeScenario?.id ?? 'freechat', widget.courseTitle, widget.topicSummary])}';
   }
+
   bool _historyLoading = true;
   Player? _speechPlayer;
   String? _learningSessionId;
   bool _busy = false;
   bool _recordingActive = false;
+
   /// True while the finger is down on hold-to-talk (survives async mic start).
   bool _holdPressed = false;
   bool _started = false;
@@ -315,6 +313,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   String _difficulty = 'B1';
   late final AnimationController _orbPulse;
   bool _coachSpeaking = false;
+
   /// Bumped to cancel in-flight coach TTS when the learner barges in.
   int _speakGen = 0;
   final FlutterTts _cartoonTts = FlutterTts();
@@ -426,8 +425,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
     } catch (_) {}
     if (!mounted) return;
-    final DigitalHumanPersona persona =
-        ref.read(learningSettingsProvider).selectedDigitalHuman;
+    final DigitalHumanPersona persona = ref
+        .read(learningSettingsProvider)
+        .selectedDigitalHuman;
     await _loadVoiceFor(persona);
     if (mounted && widget.standalone) {
       await _maybeShowColdStartQuest();
@@ -442,77 +442,81 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_isGuidedTutorLesson) return;
     if (widget.standalone && widget.articleExcerpt.trim().isEmpty) return;
     if (_scenarios.isEmpty) return;
-    final LearningScenario? picked = await showModalBottomSheet<LearningScenario>(
-      context: context,
-      backgroundColor: const Color(0xFF1B1530),
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (BuildContext context) {
-        return SafeArea(
-          child: Padding(
-            padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                const Text(
-                  '3 分钟开口挑战',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 18,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 6),
-                const Text(
-                  '选 1 个情景，开口 $_questTargetUtterances 句即可完成本日目标。',
-                  style: TextStyle(color: Colors.white70, fontSize: 13),
-                ),
-                const SizedBox(height: 14),
-                for (final LearningScenario scenario in _scenarios.take(6))
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 8),
-                    child: ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                        side: const BorderSide(color: Colors.white24),
-                      ),
-                      tileColor: Colors.white.withValues(alpha: 0.06),
-                      title: Text(
-                        scenario.title,
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      subtitle: Text(
-                        scenario.goal,
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        style: const TextStyle(
-                          color: Colors.white60,
-                          fontSize: 12,
-                        ),
-                      ),
-                      trailing: Text(
-                        scenario.difficulty,
-                        style: const TextStyle(color: Colors.white54),
-                      ),
-                      onTap: () => Navigator.pop(context, scenario),
-                    ),
-                  ),
-                TextButton(
-                  onPressed: () => Navigator.pop(context),
-                  child: const Text('跳过，稍后选', style: TextStyle(color: Colors.white54)),
-                ),
-              ],
-            ),
+    final LearningScenario? picked =
+        await showModalBottomSheet<LearningScenario>(
+          context: context,
+          backgroundColor: const Color(0xFF1B1530),
+          isScrollControlled: true,
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
+          builder: (BuildContext context) {
+            return SafeArea(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(20, 16, 20, 28),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    const Text(
+                      '3 分钟开口挑战',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    const Text(
+                      '选 1 个情景，开口 $_questTargetUtterances 句即可完成本日目标。',
+                      style: TextStyle(color: Colors.white70, fontSize: 13),
+                    ),
+                    const SizedBox(height: 14),
+                    for (final LearningScenario scenario in _scenarios.take(6))
+                      Padding(
+                        padding: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(14),
+                            side: const BorderSide(color: Colors.white24),
+                          ),
+                          tileColor: Colors.white.withValues(alpha: 0.06),
+                          title: Text(
+                            scenario.title,
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.w700,
+                            ),
+                          ),
+                          subtitle: Text(
+                            scenario.goal,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              color: Colors.white60,
+                              fontSize: 12,
+                            ),
+                          ),
+                          trailing: Text(
+                            scenario.difficulty,
+                            style: const TextStyle(color: Colors.white54),
+                          ),
+                          onTap: () => Navigator.pop(context, scenario),
+                        ),
+                      ),
+                    TextButton(
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        '跳过，稍后选',
+                        style: TextStyle(color: Colors.white54),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            );
+          },
         );
-      },
-    );
     if (picked != null && mounted) {
       setState(() {
         _activeScenario = picked;
@@ -593,24 +597,24 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         if (raw != null) {
           final List<dynamic> rows = jsonDecode(raw) as List<dynamic>;
           _bubbles.addAll(
-            rows.whereType<Map<String, dynamic>>().map(
-              (Map<String, dynamic> row) {
-                OralExpressionDiagnosis? diagnosis;
-                final Object? rawDiag = row['diagnosis'];
-                if (rawDiag is Map) {
-                  diagnosis = OralExpressionDiagnosis.fromJson(
-                    Map<String, dynamic>.from(rawDiag),
-                  );
-                }
-                return _ChatBubble(
-                  role: row['role'] as String? ?? 'coach',
-                  text: row['text'] as String? ?? '',
-                  hint: row['hint'] == true,
-                  zh: row['zh'] as String? ?? '',
-                  diagnosis: diagnosis,
+            rows.whereType<Map<String, dynamic>>().map((
+              Map<String, dynamic> row,
+            ) {
+              OralExpressionDiagnosis? diagnosis;
+              final Object? rawDiag = row['diagnosis'];
+              if (rawDiag is Map) {
+                diagnosis = OralExpressionDiagnosis.fromJson(
+                  Map<String, dynamic>.from(rawDiag),
                 );
-              },
-            ),
+              }
+              return _ChatBubble(
+                role: row['role'] as String? ?? 'coach',
+                text: row['text'] as String? ?? '',
+                hint: row['hint'] == true,
+                zh: row['zh'] as String? ?? '',
+                diagnosis: diagnosis,
+              );
+            }),
           );
         }
       } catch (_) {}
@@ -841,10 +845,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       // Offline / API fail: still give a local scaffold from current focus.
       final String focus = _tutorFocusLine.trim().isNotEmpty
           ? _tutorFocusLine.trim()
-          : (widget.articleExcerpt.trim().split('\n').firstWhere(
-                (String s) => s.trim().isNotEmpty,
-                orElse: () => widget.topicSummary,
-              ));
+          : (widget.articleExcerpt
+                .trim()
+                .split('\n')
+                .firstWhere(
+                  (String s) => s.trim().isNotEmpty,
+                  orElse: () => widget.topicSummary,
+                ));
       setState(() {
         _busy = false;
         _status = '本地提示已就绪';
@@ -1007,8 +1014,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   Future<bool> _duplexQuotaAllowsConnect() async {
     if (!ref.read(authSessionProvider).isLoggedIn) return true;
     try {
-      final OralExploreSnapshot snap =
-          await ref.read(oralExploreSnapshotProvider.future);
+      final OralExploreSnapshot snap = await ref.read(
+        oralExploreSnapshotProvider.future,
+      );
       _duplexMinutesLeftToday = snap.duplexRemaining;
       if (snap.duplexExhausted) {
         if (mounted) {
@@ -1105,7 +1113,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _difficulty = session.difficulty;
   }
 
-  bool _usesCloudVoice(DigitalHumanPersona persona) => !_preferChineseReply ||
+  bool _usesCloudVoice(DigitalHumanPersona persona) =>
+      !_preferChineseReply ||
       isBilingualCoachVoice(_englishVoiceId ?? persona.recommendedVoiceId);
 
   String _coachVoice(DigitalHumanPersona persona) {
@@ -1113,8 +1122,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_preferChineseReply && !_usesCloudVoice(persona)) {
       return persona.edgeVoice(chinese: true);
     }
-    final String? preferred =
-        _englishVoiceId ?? persona.recommendedVoiceId;
+    final String? preferred = _englishVoiceId ?? persona.recommendedVoiceId;
     if (preferred != null && preferred.trim().isNotEmpty) {
       return preferred.trim();
     }
@@ -1131,12 +1139,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   Future<void> _loadVoiceFor(DigitalHumanPersona persona) async {
     String? selected;
     try {
-      selected = await readCoachVoicePreference(SharedPreferencesAsync(), persona);
+      selected = await readCoachVoicePreference(
+        SharedPreferencesAsync(),
+        persona,
+      );
     } catch (_) {
       // Use the default voice when preferences are unavailable.
     }
     if (mounted &&
-        ref.read(learningSettingsProvider).selectedDigitalHuman.id == persona.id) {
+        ref.read(learningSettingsProvider).selectedDigitalHuman.id ==
+            persona.id) {
       setState(() => _englishVoiceId = selected);
     }
   }
@@ -1158,10 +1170,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             ),
           ),
         );
-    if (!mounted || chosen == null || _busy || _recordingActive || _coachSpeaking) {
+    if (!mounted ||
+        chosen == null ||
+        _busy ||
+        _recordingActive ||
+        _coachSpeaking) {
       return;
     }
-    if (ref.read(learningSettingsProvider).selectedDigitalHuman.id == chosen.id) {
+    if (ref.read(learningSettingsProvider).selectedDigitalHuman.id ==
+        chosen.id) {
       return;
     }
     setState(() {
@@ -1186,7 +1203,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Future<void> _chooseEnglishVoice() async {
-    final DigitalHumanPersona persona = ref.read(learningSettingsProvider).selectedDigitalHuman;
+    final DigitalHumanPersona persona = ref
+        .read(learningSettingsProvider)
+        .selectedDigitalHuman;
     final String? chosen = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -1206,17 +1225,21 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                       selected: _englishVoiceId == null,
                       onTap: () => Navigator.pop(sheetContext, ''),
                     ),
-                    for (final CoachEnglishVoice voice
-                        in coachVoicesForPersona(persona))
+                    for (final CoachEnglishVoice voice in coachVoicesForPersona(
+                      persona,
+                    ))
                       ListTile(
-                        selected: voice.id == (_englishVoiceId ?? persona.recommendedVoiceId),
+                        selected:
+                            voice.id ==
+                            (_englishVoiceId ?? persona.recommendedVoiceId),
                         title: Text(voice.name),
                         subtitle: Text(voice.description),
                         onTap: () => Navigator.pop(sheetContext, voice.id),
                         trailing: IconButton(
                           tooltip: '试听 ${voice.name}',
                           icon: const Icon(Icons.play_circle_outline),
-                          onPressed: () => unawaited(_previewEnglishVoice(voice)),
+                          onPressed: () =>
+                              unawaited(_previewEnglishVoice(voice)),
                         ),
                       ),
                   ],
@@ -1230,12 +1253,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (!mounted || chosen == null) return;
     setState(() => _englishVoiceId = chosen.isEmpty ? null : chosen);
     try {
-      await SharedPreferencesAsync().setString('$coachEnglishVoicePreference:${persona.id}', chosen);
+      await SharedPreferencesAsync().setString(
+        '$coachEnglishVoicePreference:${persona.id}',
+        chosen,
+      );
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已切换音色，但保存偏好失败。')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('已切换音色，但保存偏好失败。')));
       }
     }
   }
@@ -1260,9 +1286,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
     } catch (_) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('暂时无法试听，请稍后重试。')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('暂时无法试听，请稍后重试。')));
       }
     } finally {
       if (mounted && gen == _speakGen) {
@@ -1282,8 +1308,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     bool started = false;
     try {
       // Fail fast on dead coach cache URLs (historically 404 → ~45s silence).
-      final StreamSubscription<bool> playingSub =
-          player.stream.playing.listen((bool value) {
+      final StreamSubscription<bool> playingSub = player.stream.playing.listen((
+        bool value,
+      ) {
         if (value) started = true;
       });
       final Future<bool> completed = player.stream.completed
@@ -1407,17 +1434,18 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         final String excerpt = widget.articleExcerpt.trim();
         List<PodcastGuideSegment> generated = const <PodcastGuideSegment>[];
         try {
-          generated = await ref.read(acquireApiClientProvider).generatePodcastScript(
-            excerpt.length > 6000 ? excerpt.substring(0, 6000) : excerpt,
-            singleHost: _podcastSingleHost,
-          );
+          generated = await ref
+              .read(acquireApiClientProvider)
+              .generatePodcastScript(
+                excerpt.length > 6000 ? excerpt.substring(0, 6000) : excerpt,
+                singleHost: _podcastSingleHost,
+              );
         } catch (_) {}
         if (!mounted || generation != _podcastGeneration) return;
         _podcastLines = generated.isNotEmpty
             ? generated
             : <PodcastGuideSegment>[
-                for (final String passage
-                    in tutorSourceLines(excerpt).take(5))
+                for (final String passage in tutorSourceLines(excerpt).take(5))
                   PodcastGuideSegment(text: passage),
               ];
         // Show full script immediately so learners can follow along.
@@ -1450,7 +1478,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         } else {
           setState(() {});
         }
-        final result = await _pipelineClient.synthesizeSpeechWithProvider(
+        final ({String url, String provider})? result =
+            await _pipelineClient.synthesizeSpeechWithProvider(
           rawBaseUrl: settings.oralCoachPipelineUrl,
           text: text,
           digitalHumanId: settings.selectedDigitalHuman.id,
@@ -1546,17 +1575,24 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       // Letting it synthesize here can replace a male coach with its default
       // female voice. Keep the selected persona voice authoritative; realtime
       // lip-sync may render the avatar but must not take over speech audio.
-      final bool usesCloudVoice = _usesCloudVoice(settings.selectedDigitalHuman);
+      final bool usesCloudVoice = _usesCloudVoice(
+        settings.selectedDigitalHuman,
+      );
       String? remote = ttsUrl;
       String provider = '';
       if (remote == null || remote.isEmpty) {
         try {
-          final result = await _pipelineClient.synthesizeSpeechWithProvider(
+          final ({String url, String provider})? result =
+              await _pipelineClient.synthesizeSpeechWithProvider(
             rawBaseUrl: settings.oralCoachPipelineUrl,
             text: speak,
             digitalHumanId: settings.selectedDigitalHuman.id,
             ttsVoice: _coachVoice(settings.selectedDigitalHuman),
             language: _preferChineseReply ? 'zh' : 'en',
+            // Normal Q&A responsiveness is the priority. If cloud TTS cannot
+            // produce first audio quickly, fall back to on-device speech;
+            // lip-sync/high-fidelity voice must never hold the turn hostage.
+            latencyBudget: const Duration(milliseconds: 1200),
           );
           if (gen != _speakGen) return;
           remote = result?.url;
@@ -1567,15 +1603,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       if (!mounted || !_started || gen != _speakGen) return;
       if (remote != null && remote.isNotEmpty) {
-        setState(() => _voicePlaybackLabel = switch (provider) {
-          'qwen-audio' => '阿里云陪练音色',
-          'edge' => usesCloudVoice ? '备用音色 · Edge' : '中文音色 · Edge',
-          _ => '在线音色',
-        });
+        setState(
+          () => _voicePlaybackLabel = switch (provider) {
+            'qwen-audio' => '阿里云陪练音色',
+            'edge' => usesCloudVoice ? '备用音色 · Edge' : '中文音色 · Edge',
+            _ => '在线音色',
+          },
+        );
         if (await _playRemoteTts(remote, gen: gen)) return;
       }
       if (!mounted || !_started || gen != _speakGen) return;
-      setState(() => _voicePlaybackLabel = '备用音色 · 本机');
+      setState(() => _voicePlaybackLabel = '流畅模式 · 本机音色');
       await _configureLocalPersonaVoice(settings.selectedDigitalHuman);
       await _cartoonTts.awaitSpeakCompletion(true);
       if (!mounted || !_started || gen != _speakGen) return;
@@ -1595,6 +1633,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   /// Device TTS fallback: pick a gendered local voice + persona pitch/rate.
   Future<void> _configureLocalPersonaVoice(DigitalHumanPersona persona) async {
     final String locale = persona.locale(chinese: _preferChineseReply);
+    final String signature =
+        '${persona.id}|$locale|${persona.localPitch}|${persona.localSpeechRate}';
+    if (_configuredLocalVoiceSignature == signature) return;
     await _cartoonTts.setLanguage(locale);
     await _cartoonTts.setPitch(persona.localPitch);
     await _cartoonTts.setSpeechRate(persona.localSpeechRate);
@@ -1658,7 +1699,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       if (best != null && best['name']!.isNotEmpty) {
         await _cartoonTts.setVoice(best);
       }
-    } catch (_) {}
+      _configuredLocalVoiceSignature = signature;
+    } catch (_) {
+      _configuredLocalVoiceSignature = signature;
+    }
   }
 
   Future<void> _askPreparedTopic(int index) async {
@@ -1694,7 +1738,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (_busy || _historyLoading || _started) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
     _preferChineseReply = false;
-    if (_isGuidedTutorLesson && !_podcastPausedForQuestion && !_podcastPlaying) {
+    if (_isGuidedTutorLesson &&
+        !_podcastPausedForQuestion &&
+        !_podcastPlaying) {
       setState(() {
         _started = true;
         _roundStartBubble = _bubbles.length;
@@ -1767,7 +1813,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final LearningScenario? scenario = _activeScenario;
     final String email = ref.read(authSessionProvider).email.trim();
     return <String, dynamic>{
-      'task_id': scenario?.id ?? (widget.hasTranscript ? 'video_line' : 'freechat'),
+      'task_id':
+          scenario?.id ?? (widget.hasTranscript ? 'video_line' : 'freechat'),
       'scenario_title': scenario?.title ?? '',
       'scenario_prompt': scenario?.prompt ?? '',
       'current_english': widget.articleExcerpt.isNotEmpty
@@ -1893,8 +1940,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (pron is Map && pron['overall'] is num) {
       overall = (pron['overall'] as num).toDouble();
     }
-    final String transcript =
-        '${score['transcript'] ?? score['text'] ?? ''}'.trim();
+    final String transcript = '${score['transcript'] ?? score['text'] ?? ''}'
+        .trim();
     setState(() {
       _questUtterances += 1;
       if (overall != null) _roundPronScores.add(overall);
@@ -1952,9 +1999,17 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   void _scheduleIdlePrompt() {
     _idlePromptTimer?.cancel();
-    if (!_started || _podcastPlaying || _podcastPausedForQuestion || _idlePromptCount >= 2) return;
+    if (!_started ||
+        _podcastPlaying ||
+        _podcastPausedForQuestion ||
+        _idlePromptCount >= 2)
+      return;
     _idlePromptTimer = Timer(const Duration(seconds: 18), () async {
-      if (!mounted || !_started || _busy || _recordingActive || _coachSpeaking) {
+      if (!mounted ||
+          !_started ||
+          _busy ||
+          _recordingActive ||
+          _coachSpeaking) {
         if (mounted && _started) _scheduleIdlePrompt();
         return;
       }
@@ -2502,7 +2557,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         ? turn.avatarText.trim()
         : turn.coachText.trim();
     final String speakText = preferEnglishCoachReply(
-      rawSpeak.isEmpty ? 'Nice — that sounds more natural. What happened next?' : rawSpeak,
+      rawSpeak.isEmpty
+          ? 'Nice — that sounds more natural. What happened next?'
+          : rawSpeak,
       allowChinese: _preferChineseReply,
       topic: _topicLabel,
     );
@@ -2528,13 +2585,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         : diagnosis.literalEn;
     if (english.trim().isEmpty) {
       if (notify && mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('暂无可收藏的地道表达')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('暂无可收藏的地道表达')));
       }
       return;
     }
-    final bool added = ref.read(phraseBookProvider.notifier).addPhraseIfMissing(
+    final bool added = ref
+        .read(phraseBookProvider.notifier)
+        .addPhraseIfMissing(
           english: english,
           chinese: diagnosis.source,
           course: '口语诊断',
@@ -2555,7 +2614,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     _pendingDiagnosisSaved = true;
     if (!notify || !mounted) return;
     final bool asSentence =
-        english.trim().split(RegExp(r'\s+')).where((String w) => w.isNotEmpty).length >=
+        english
+            .trim()
+            .split(RegExp(r'\s+'))
+            .where((String w) => w.isNotEmpty)
+            .length >=
         5;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -2671,9 +2734,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   ),
                 ),
                 subtitle: Text(
-                  _liveSceneOn
-                      ? '停止摄像头，不再自动更新场景'
-                      : '打开摄像头，周期性告诉数字人眼前有什么',
+                  _liveSceneOn ? '停止摄像头，不再自动更新场景' : '打开摄像头，周期性告诉数字人眼前有什么',
                   style: const TextStyle(color: Colors.white70),
                 ),
                 onTap: () => Navigator.pop(
@@ -2682,10 +2743,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 ),
               ),
               ListTile(
-                leading: const Icon(Icons.photo_camera_rounded, color: Colors.white),
+                leading: const Icon(
+                  Icons.photo_camera_rounded,
+                  color: Colors.white,
+                ),
                 title: const Text(
                   '拍摄真实场景',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 subtitle: const Text(
                   '给数字人看眼前的东西并识词',
@@ -2694,10 +2761,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 onTap: () => Navigator.pop(context, 'camera'),
               ),
               ListTile(
-                leading: const Icon(Icons.photo_library_rounded, color: Colors.white),
+                leading: const Icon(
+                  Icons.photo_library_rounded,
+                  color: Colors.white,
+                ),
                 title: const Text(
                   '从相册选择',
-                  style: TextStyle(color: Colors.white, fontWeight: FontWeight.w700),
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                  ),
                 ),
                 onTap: () => Navigator.pop(context, 'gallery'),
               ),
@@ -2791,8 +2864,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           _tutorFocusLine = line;
           _tutorCoachQuestion = '听这一句示范';
           _bubbles.add(_ChatBubble(role: 'coach', text: demo));
-          _status =
-              '六步外教课 · 示范 ${_tutorShadowIndex + 1}/${lines.length}';
+          _status = '六步外教课 · 示范 ${_tutorShadowIndex + 1}/${lines.length}';
         });
         _scrollChatToEnd();
         await _speakCoach(demo, settings);
@@ -2837,8 +2909,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         _scrollChatToEnd();
         await _speakCoach(prompt, settings);
       case TutorLessonStep.dialogue:
-        final String focus =
-            lines.isNotEmpty ? lines.first : linePreview;
+        final String focus = lines.isNotEmpty ? lines.first : linePreview;
         final List<String> questions = <String>[
           lines.isNotEmpty
               ? 'Using ideas from “$focus”, why does this matter to you?'
@@ -2962,10 +3033,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           softGrade: soft,
         );
       } catch (_) {}
-      ref.read(phraseBookProvider.notifier).addPhraseIfMissing(
+      ref
+          .read(phraseBookProvider.notifier)
+          .addPhraseIfMissing(
             english: line,
             chinese: '外教课 · ${_topicLabel}',
-            course: widget.courseTitle.isNotEmpty ? widget.courseTitle : 'AI 外教课',
+            course: widget.courseTitle.isNotEmpty
+                ? widget.courseTitle
+                : 'AI 外教课',
             episode: widget.episodeTitle.isNotEmpty
                 ? widget.episodeTitle
                 : _topicLabel,
@@ -2978,7 +3053,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     }
     for (final String word in tutorKeyExpressions(_tutorLines)) {
       try {
-        ref.read(wordBookProvider.notifier).addFavoriteWord(
+        ref
+            .read(wordBookProvider.notifier)
+            .addFavoriteWord(
               rawWord: word,
               episodeId: episode,
               course: widget.courseTitle.isNotEmpty
@@ -3014,7 +3091,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             'quote': 'overall',
             'suggestion': 'AI tutor score $overall',
           },
-          ..._tutorCorrections.take(5).map(
+          ..._tutorCorrections
+              .take(5)
+              .map(
                 (String c) => <String, String>{
                   'quote': 'correction',
                   'suggestion': c,
@@ -3077,8 +3156,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   Future<List<SceneWordLabel>> _filterSceneLabels(
     List<SceneWordLabel> labels,
   ) async {
-    final ReadingFrequencyLexicon lexicon =
-        await ref.read(readingFrequencyLexiconProvider.future);
+    final ReadingFrequencyLexicon lexicon = await ref.read(
+      readingFrequencyLexiconProvider.future,
+    );
     final ReadingVocabLists lists = ref.read(readingVocabListsProvider);
     final Set<String> known = effectiveKnownWords(
       lists: lists,
@@ -3109,16 +3189,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (path == null || !mounted) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
     try {
-      final List<SceneWordLabel> raw =
-          await ref.read(sceneWordRecognizerProvider).recognize(
-                path,
-                settings: settings,
-                limit: 8,
-              );
+      final List<SceneWordLabel> raw = await ref
+          .read(sceneWordRecognizerProvider)
+          .recognize(path, settings: settings, limit: 8);
       final List<SceneWordLabel> labels = await _filterSceneLabels(raw);
       if (!mounted || !_liveSceneOn) return;
-      final String description =
-          ref.read(sceneWordRecognizerProvider).buildSceneDescription(labels);
+      final String description = ref
+          .read(sceneWordRecognizerProvider)
+          .buildSceneDescription(labels);
       final bool changed = description != _sceneDescription;
       setState(() {
         _sceneImagePath = path;
@@ -3190,10 +3268,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             autoRefine: true,
             onAddWord: _addSceneWordToBook,
             onShareWithCoach: (List<SceneWordLabel> current) =>
-                _shareSceneWithCoach(
-              imagePath: imagePath,
-              labels: current,
-            ),
+                _shareSceneWithCoach(imagePath: imagePath, labels: current),
             onLabelsChanged: (List<SceneWordLabel> current) {
               if (!mounted) return;
               setState(() {
@@ -3215,10 +3290,12 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   Future<void> _addSceneWordToBook(SceneWordLabel label) async {
     final String word = normalizeWord(label.word);
     if (word.isEmpty) return;
-    final bool wasFavorite = ref.read(wordBookProvider).any(
-          (WordEntry entry) => entry.word == word && entry.favorite,
-        );
-    final bool added = ref.read(wordBookProvider.notifier).addFavoriteWord(
+    final bool wasFavorite = ref
+        .read(wordBookProvider)
+        .any((WordEntry entry) => entry.word == word && entry.favorite);
+    final bool added = ref
+        .read(wordBookProvider.notifier)
+        .addFavoriteWord(
           rawWord: word,
           episodeId: 'scene:${widget.episodeId ?? 'digital-human'}',
           course: '数字人识物',
@@ -3237,17 +3314,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         );
     if (!added) {
       if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('无法收藏：$word')),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('无法收藏：$word')));
       throw StateError('无法收藏 $word');
     }
     if (!mounted) return;
     setState(() => _sceneSavedWords.add(word));
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(wasFavorite ? '已在收藏词本：$word' : '已加入收藏词本：$word'),
-      ),
+      SnackBar(content: Text(wasFavorite ? '已在收藏词本：$word' : '已加入收藏词本：$word')),
     );
   }
 
@@ -3257,7 +3332,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }) async {
     if (_sceneSharing) return;
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
-    final SceneWordRecognizer recognizer = ref.read(sceneWordRecognizerProvider);
+    final SceneWordRecognizer recognizer = ref.read(
+      sceneWordRecognizerProvider,
+    );
     final String description = recognizer.buildSceneDescription(labels);
     setState(() {
       _sceneSharing = true;
@@ -3284,15 +3361,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       final String coachLine = labels.isEmpty
           ? "Thanks for sharing your photo. What do you see? Try one English sentence."
           : "Nice — I can see your scene with $nouns. "
-              "Can you describe what you are holding or looking at in one English sentence?";
+                "Can you describe what you are holding or looking at in one English sentence?";
       if (!mounted) return;
       setState(() {
-        _bubbles.add(
-          _ChatBubble(
-            role: 'coach',
-            text: coachLine,
-          ),
-        );
+        _bubbles.add(_ChatBubble(role: 'coach', text: coachLine));
         _busy = false;
         _sceneSharing = false;
         _status = '围绕眼前场景继续说';
@@ -3377,10 +3449,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     Map<String, dynamic>? closed;
     final String? sid = _learningSessionId;
     if (sid != null && sid.isNotEmpty) {
-      closed = await ref.read(acquireApiClientProvider).closeLearningSession(sid);
+      closed = await ref
+          .read(acquireApiClientProvider)
+          .closeLearningSession(sid);
     }
     try {
-      final summary = await ref.read(acquireApiClientProvider).learningSummary();
+      final summary = await ref
+          .read(acquireApiClientProvider)
+          .learningSummary();
       _lastDueReviewCount = summary.dueReviewCount;
       _lastWrongItemCount = summary.wrongItemCount;
     } catch (_) {}
@@ -3388,7 +3464,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final Set<String> expressions = <String>{
       for (final _ChatBubble bubble in round)
         if (bubble.diagnosis case final OralExpressionDiagnosis diagnosis)
-          if (diagnosis.idiomaticEn.trim().isNotEmpty) diagnosis.idiomaticEn.trim(),
+          if (diagnosis.idiomaticEn.trim().isNotEmpty)
+            diagnosis.idiomaticEn.trim(),
     };
     final Object? closedCorrections = closed?['corrections'];
     if (closedCorrections is List) {
@@ -3428,89 +3505,90 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final double? avgPron = _roundPronScores.isEmpty
         ? null
         : _roundPronScores.reduce((double a, double b) => a + b) /
-            _roundPronScores.length;
-    final int? tutorScore = _tutorOverallScore ??
+              _roundPronScores.length;
+    final int? tutorScore =
+        _tutorOverallScore ??
         (_isGuidedTutorLesson && _tutorStepScores.isNotEmpty
             ? (_tutorStepScores.reduce((int a, int b) => a + b) /
                       _tutorStepScores.length)
                   .round()
             : null);
-    unawaited(showDialog<void>(
-      context: context,
-      builder: (BuildContext context) => AlertDialog(
-        title: Text(_isGuidedTutorLesson ? '外教课小结' : '本轮练习报告'),
-        content: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text('$_topicLabel · 开口 $_lastRoundTurns 次'),
-              if (tutorScore != null) ...<Widget>[
-                Text('外教课得分 $tutorScore'),
-                if (_tutorFsrsWritten)
-                  const Text('已进入学习记录与 FSRS 复习'),
-                if (_tutorCorrections.isNotEmpty)
-                  Text('纠错 ${_tutorCorrections.length} 条'),
-              ],
-              Text(
-                '今日目标 $_questUtterances/$_questTargetUtterances'
-                '${_questUtterances >= _questTargetUtterances ? '（已达成）' : ''}',
-              ),
-              if (avgPron != null)
-                Text('发音均分 ${(avgPron * 100).round()}%'),
-              Text('待复习 $_lastDueReviewCount · 错题 $_lastWrongItemCount'),
-              if (_liveKitStatus.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 6),
+    unawaited(
+      showDialog<void>(
+        context: context,
+        builder: (BuildContext context) => AlertDialog(
+          title: Text(_isGuidedTutorLesson ? '外教课小结' : '本轮练习报告'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text('$_topicLabel · 开口 $_lastRoundTurns 次'),
+                if (tutorScore != null) ...<Widget>[
+                  Text('外教课得分 $tutorScore'),
+                  if (_tutorFsrsWritten) const Text('已进入学习记录与 FSRS 复习'),
+                  if (_tutorCorrections.isNotEmpty)
+                    Text('纠错 ${_tutorCorrections.length} 条'),
+                ],
                 Text(
-                  _duplexLive || _liveKitStatus.contains('接通')
-                      ? '通话：$_liveKitStatus'
-                      : '通话回退：$_liveKitStatus',
-                  style: const TextStyle(fontSize: 12, color: Colors.black54),
+                  '今日目标 $_questUtterances/$_questTargetUtterances'
+                  '${_questUtterances >= _questTargetUtterances ? '（已达成）' : ''}',
                 ),
-              ],
-              if (_lastRoundExpressions.isNotEmpty) ...<Widget>[
-                const SizedBox(height: 12),
-                const Text('明天可复习的表达'),
-                for (final String expression in _lastRoundExpressions)
-                  Padding(
-                    padding: const EdgeInsets.only(top: 6),
-                    child: Row(
-                      children: <Widget>[
-                        Expanded(child: SelectableText(expression)),
-                        IconButton(
-                          tooltip: '复制表达',
-                          icon: const Icon(Icons.copy_outlined),
-                          onPressed: () => unawaited(_copyBubble(expression)),
-                        ),
-                      ],
-                    ),
+                if (avgPron != null) Text('发音均分 ${(avgPron * 100).round()}%'),
+                Text('待复习 $_lastDueReviewCount · 错题 $_lastWrongItemCount'),
+                if (_liveKitStatus.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 6),
+                  Text(
+                    _duplexLive || _liveKitStatus.contains('接通')
+                        ? '通话：$_liveKitStatus'
+                        : '通话回退：$_liveKitStatus',
+                    style: const TextStyle(fontSize: 12, color: Colors.black54),
                   ),
+                ],
+                if (_lastRoundExpressions.isNotEmpty) ...<Widget>[
+                  const SizedBox(height: 12),
+                  const Text('明天可复习的表达'),
+                  for (final String expression in _lastRoundExpressions)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: Row(
+                        children: <Widget>[
+                          Expanded(child: SelectableText(expression)),
+                          IconButton(
+                            tooltip: '复制表达',
+                            icon: const Icon(Icons.copy_outlined),
+                            onPressed: () => unawaited(_copyBubble(expression)),
+                          ),
+                        ],
+                      ),
+                    ),
+                ],
               ],
-            ],
+            ),
           ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () {
+                Navigator.pop(context);
+                context.push('/review/learning');
+              },
+              child: const Text('去复习'),
+            ),
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('完成'),
+            ),
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _startTopicConversation();
+              },
+              child: const Text('继续练习'),
+            ),
+          ],
         ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () {
-              Navigator.pop(context);
-              context.push('/review/learning');
-            },
-            child: const Text('去复习'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('完成'),
-          ),
-          FilledButton(
-            onPressed: () {
-              Navigator.pop(context);
-              _startTopicConversation();
-            },
-            child: const Text('继续练习'),
-          ),
-        ],
       ),
-    ));
+    );
   }
 
   void _scrollChatToEnd() {
@@ -3682,8 +3760,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final bool avatarSpeaking = _coachSpeaking || _duplexAgentSpeaking;
     final bool avatarThinking = _busy || (_duplexLive && _duplexThinking);
     // Only real listening — idle waiting stays on closed mouth (no pose thrash).
-    final bool avatarListening =
-        _recordingActive || _duplexLearnerSpeaking;
+    final bool avatarListening = _recordingActive || _duplexLearnerSpeaking;
     final bool useCartoonLips =
         settings.cartoonDigitalHuman && persona.hasCartoonAtlas;
     final String stageLabel = _coachEncouraging
@@ -3773,8 +3850,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           ),
         ),
         if (_liveSceneOn ||
-            (_sceneImagePath != null &&
-                File(_sceneImagePath!).existsSync()))
+            (_sceneImagePath != null && File(_sceneImagePath!).existsSync()))
           Positioned(
             right: 12,
             top: 12,
@@ -3801,32 +3877,23 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                     width: 2,
                   ),
                   boxShadow: const <BoxShadow>[
-                    BoxShadow(
-                      color: Color(0x66000000),
-                      blurRadius: 10,
-                    ),
+                    BoxShadow(color: Color(0x66000000), blurRadius: 10),
                   ],
                 ),
                 clipBehavior: Clip.antiAlias,
                 child: Stack(
                   fit: StackFit.expand,
                   children: <Widget>[
-                    if (_liveSceneOn &&
-                        _liveSceneCamera.controller != null)
+                    if (_liveSceneOn && _liveSceneCamera.controller != null)
                       CameraPreview(_liveSceneCamera.controller!)
                     else if (_sceneImagePath != null)
-                      Image.file(
-                        File(_sceneImagePath!),
-                        fit: BoxFit.cover,
-                      ),
+                      Image.file(File(_sceneImagePath!), fit: BoxFit.cover),
                     Align(
                       alignment: Alignment.bottomCenter,
                       child: Container(
                         width: double.infinity,
                         color: const Color(0xAA111827),
-                        padding: const EdgeInsets.symmetric(
-                          vertical: 3,
-                        ),
+                        padding: const EdgeInsets.symmetric(vertical: 3),
                         child: Text(
                           _liveSceneOn
                               ? '直播中'
@@ -3861,14 +3928,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   right: 18,
                   top: 16,
                   child: ActionChip(
-                    avatar: Icon(_podcastPlaying ? Icons.pause : Icons.headphones),
+                    avatar: Icon(
+                      _podcastPlaying ? Icons.pause : Icons.headphones,
+                    ),
                     label: Text(
                       _podcastPlaying
                           ? '暂停口播'
                           : (_podcastIndex > 0 &&
-                                  _podcastIndex < _podcastLines.length
-                              ? '继续口播'
-                              : (widget.episodeId != null ? '视频口播' : '文章口播')),
+                                    _podcastIndex < _podcastLines.length
+                                ? '继续口播'
+                                : (widget.episodeId != null ? '视频口播' : '文章口播')),
                     ),
                     onPressed: () => unawaited(_openArticlePodcast()),
                   ),
@@ -3924,18 +3993,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     final Widget callPane = stage;
     final Widget contentPane = Column(
       children: <Widget>[
-        Expanded(
-          flex: 7,
-          child: _buildTutorCoursewarePane(persona),
-        ),
-        Container(
-          height: 1,
-          color: Colors.white.withValues(alpha: 0.1),
-        ),
-        Expanded(
-          flex: 3,
-          child: _buildTutorDialoguePane(persona),
-        ),
+        Expanded(flex: 7, child: _buildTutorCoursewarePane(persona)),
+        Container(height: 1, color: Colors.white.withValues(alpha: 0.1)),
+        Expanded(flex: 3, child: _buildTutorDialoguePane(persona)),
         _buildTutorMicDock(orbHint),
       ],
     );
@@ -3954,14 +4014,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: <Widget>[
         Expanded(child: contentPane),
-        Container(
-          width: 1,
-          color: Colors.white.withValues(alpha: 0.1),
-        ),
-        SizedBox(
-          width: constraints.maxWidth * 0.38,
-          child: callPane,
-        ),
+        Container(width: 1, color: Colors.white.withValues(alpha: 0.1)),
+        SizedBox(width: constraints.maxWidth * 0.38, child: callPane),
       ],
     );
   }
@@ -4170,15 +4224,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }) {
     return Column(
       children: <Widget>[
-        Expanded(
-          flex: _podcastLines.isNotEmpty ? 2 : 3,
-          child: stage,
-        ),
+        Expanded(flex: _podcastLines.isNotEmpty ? 2 : 3, child: stage),
         if (_podcastLines.isNotEmpty)
-          Expanded(
-            flex: 3,
-            child: _buildPodcastScriptPane(persona),
-          ),
+          Expanded(flex: 3, child: _buildPodcastScriptPane(persona)),
         Padding(
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 4),
           child: Row(
@@ -4191,10 +4239,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   onTap: null,
                   child: Text(
                     '陪练 ${_coachMinutesLeft!} 分',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 11,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 11),
                   ),
                 ),
                 const SizedBox(width: 6),
@@ -4217,10 +4262,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 Expanded(
                   child: Text(
                     '开口目标 $_questUtterances/$_questTargetUtterances',
-                    style: const TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                    ),
+                    style: const TextStyle(color: Colors.white70, fontSize: 12),
                   ),
                 ),
               ],
@@ -4257,15 +4299,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   child: Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 28),
                     child: Text(
-                      _activeScenario != null &&
-                              _activeScenario!.isFreeChat
+                      _activeScenario != null && _activeScenario!.isFreeChat
                           ? '自由闲聊模式：随便用英语聊日常。点上方时钟可换情景；点相机可共享眼前场景。'
                           : (_activeScenario != null &&
-                                  !_activeScenario!.isVideoGrounded
-                              ? '数字人将主动教你「${_activeScenario!.title}」情景对话。点上方时钟可换场景。'
-                              : (_talkTopics.isEmpty
-                                    ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
-                                    : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。')),
+                                    !_activeScenario!.isVideoGrounded
+                                ? '数字人将主动教你「${_activeScenario!.title}」情景对话。点上方时钟可换场景。'
+                                : (_talkTopics.isEmpty
+                                      ? 'Hi~ 我会先读字幕，再围绕“$_topicLabel”生成口语问答。'
+                                      : '已准备 ${_talkTopics.length} 个口语话题，点下方话题或直接说话。')),
                       textAlign: TextAlign.center,
                       style: TextStyle(
                         color: Colors.white.withValues(alpha: 0.78),
@@ -4284,8 +4325,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   itemBuilder: (BuildContext context, int offset) {
                     final int index = _bubbles.length - 1 - offset;
                     final _ChatBubble bubble = _bubbles[index];
-                    final OralExpressionDiagnosis? diagnosis =
-                        bubble.diagnosis;
+                    final OralExpressionDiagnosis? diagnosis = bubble.diagnosis;
                     if (bubble.role == 'diagnosis' && diagnosis != null) {
                       return Padding(
                         padding: const EdgeInsets.only(bottom: 10),
@@ -4369,9 +4409,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                   backgroundColor: active
                       ? const Color(0xFF5B3FD4)
                       : Colors.white.withValues(alpha: 0.12),
-                  side: BorderSide(
-                    color: Colors.white.withValues(alpha: 0.18),
-                  ),
+                  side: BorderSide(color: Colors.white.withValues(alpha: 0.18)),
                   onPressed: _busy
                       ? null
                       : () => unawaited(_askPreparedTopic(index)),
@@ -4469,19 +4507,15 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                 _DockRoundButton(
                   label: '卡壳',
                   icon: Icons.lightbulb_outline_rounded,
-                  onTap: _busy
-                      ? null
-                      : () => unawaited(_requestStuckHint()),
+                  onTap: _busy ? null : () => unawaited(_requestStuckHint()),
                 ),
               // Bottom dock is the only mic; center orb was removed as duplicate.
               Listener(
                 key: const ValueKey<String>('study-oral-coach-mic-legacy'),
                 behavior: HitTestBehavior.opaque,
-                onPointerDown:
-                    _busy ? null : (_) => unawaited(_onHoldStart()),
+                onPointerDown: _busy ? null : (_) => unawaited(_onHoldStart()),
                 onPointerUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
-                onPointerCancel:
-                    _busy ? null : (_) => unawaited(_onHoldEnd()),
+                onPointerCancel: _busy ? null : (_) => unawaited(_onHoldEnd()),
                 child: _DockRoundButton(
                   label: _recordingActive
                       ? '松开'
@@ -4565,7 +4599,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           hint: focus.isEmpty ? '开口回答外教' : '可用素材：$focus',
         );
       case TutorLessonStep.summary:
-        final int overall = _tutorOverallScore ??
+        final int overall =
+            _tutorOverallScore ??
             (_tutorStepScores.isEmpty
                 ? 0
                 : (_tutorStepScores.reduce((int a, int b) => a + b) /
@@ -4574,9 +4609,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         return (
           title: '小结 · 本课得分',
           prompt: '$overall 分',
-          hint: _tutorFsrsWritten
-              ? '已写入学习记录与 FSRS 复习'
-              : '正在写入复习循环…',
+          hint: _tutorFsrsWritten ? '已写入学习记录与 FSRS 复习' : '正在写入复习循环…',
         );
     }
   }
@@ -4611,10 +4644,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   Widget _buildPodcastScriptPane(DigitalHumanPersona persona) {
     final int speakingIndex = _podcastPlaying
-        ? _podcastIndex.clamp(0, _podcastLines.isEmpty ? 0 : _podcastLines.length - 1)
+        ? _podcastIndex.clamp(
+            0,
+            _podcastLines.isEmpty ? 0 : _podcastLines.length - 1,
+          )
         : (_podcastIndex > 0
-            ? (_podcastIndex - 1).clamp(0, _podcastLines.length - 1)
-            : 0);
+              ? (_podcastIndex - 1).clamp(0, _podcastLines.length - 1)
+              : 0);
     return DecoratedBox(
       decoration: BoxDecoration(
         color: Colors.white.withValues(alpha: 0.05),
@@ -4703,8 +4739,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                           ),
                           fontSize: active ? 16 : 14,
                           height: 1.4,
-                          fontWeight:
-                              active ? FontWeight.w700 : FontWeight.w500,
+                          fontWeight: active
+                              ? FontWeight.w700
+                              : FontWeight.w500,
                         ),
                       ),
                     ],
@@ -4745,8 +4782,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
                         borderRadius: BorderRadius.circular(999),
                         color: step.index <= current.index
                             ? (step == current
-                                ? const Color(0xFFA78BFA)
-                                : const Color(0xFF34D399))
+                                  ? const Color(0xFFA78BFA)
+                                  : const Color(0xFF34D399))
                             : Colors.white24,
                       ),
                     ),
@@ -4869,24 +4906,27 @@ class _DockRoundButton extends StatelessWidget {
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         Material(
-      color: fill,
-      shape: const CircleBorder(),
-      child: InkWell(
-        customBorder: const CircleBorder(),
-        onTap: onTap,
-        child: SizedBox(
-          width: 48,
-          height: 48,
-          child: Icon(
-            icon,
-            color: danger ? const Color(0xFFFF8A80) : Colors.white,
-            size: 22,
+          color: fill,
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onTap,
+            child: SizedBox(
+              width: 48,
+              height: 48,
+              child: Icon(
+                icon,
+                color: danger ? const Color(0xFFFF8A80) : Colors.white,
+                size: 22,
+              ),
+            ),
           ),
         ),
-      ),
-        ),
         const SizedBox(height: 3),
-        Text(label, style: const TextStyle(color: Colors.white70, fontSize: 11)),
+        Text(
+          label,
+          style: const TextStyle(color: Colors.white70, fontSize: 11),
+        ),
       ],
     );
   }
@@ -4927,18 +4967,18 @@ class _ConversationBubble extends StatelessWidget {
         children: <Widget>[
           if (!mine) ...<Widget>[
             CircleAvatar(
-                radius: 16,
-                backgroundColor: const Color(0xFF5B3FD4),
-                backgroundImage: avatar.isEmpty ? null : AssetImage(avatar),
-                onBackgroundImageError: avatar.isEmpty ? null : (_, __) {},
-                child: avatar.isEmpty
-                    ? const Icon(
-                        Icons.face_retouching_natural_rounded,
-                        size: 18,
-                        color: Colors.white,
-                      )
-                    : null,
-              ),
+              radius: 16,
+              backgroundColor: const Color(0xFF5B3FD4),
+              backgroundImage: avatar.isEmpty ? null : AssetImage(avatar),
+              onBackgroundImageError: avatar.isEmpty ? null : (_, __) {},
+              child: avatar.isEmpty
+                  ? const Icon(
+                      Icons.face_retouching_natural_rounded,
+                      size: 18,
+                      color: Colors.white,
+                    )
+                  : null,
+            ),
             const SizedBox(width: 8),
           ],
           Flexible(
@@ -5058,6 +5098,7 @@ class _ScenePhotoRecognizeHost extends ConsumerStatefulWidget {
 
   final String imagePath;
   final List<SceneWordLabel> initialLabels;
+
   /// Unfiltered on-device labels for VL hints (may include common nouns).
   final List<SceneWordLabel> cloudSeedLabels;
   final Set<String> savedWords;
@@ -5066,7 +5107,7 @@ class _ScenePhotoRecognizeHost extends ConsumerStatefulWidget {
   final VoidCallback onRetake;
   final ValueChanged<List<SceneWordLabel>> onLabelsChanged;
   final Future<List<SceneWordLabel>> Function(List<SceneWordLabel> labels)
-      filterLabels;
+  filterLabels;
   final bool autoRefine;
 
   @override
@@ -5110,14 +5151,12 @@ class _ScenePhotoRecognizeHostState
       final LearningSettingsState settings = ref.read(learningSettingsProvider);
       // Prefer empty seeds: on-device mislabels previously forced VL off-track.
       final List<SceneWordLabel> seed = widget.cloudSeedLabels;
-      final List<SceneWordLabel> refinedRaw =
-          await ref.read(sceneWordRecognizerProvider).refineWithCloud(
-                widget.imagePath,
-                settings: settings,
-                seed: seed,
-              );
-      final List<SceneWordLabel> refined =
-          await widget.filterLabels(refinedRaw);
+      final List<SceneWordLabel> refinedRaw = await ref
+          .read(sceneWordRecognizerProvider)
+          .refineWithCloud(widget.imagePath, settings: settings, seed: seed);
+      final List<SceneWordLabel> refined = await widget.filterLabels(
+        refinedRaw,
+      );
       if (!mounted) return;
       setState(() {
         _labels = refined;

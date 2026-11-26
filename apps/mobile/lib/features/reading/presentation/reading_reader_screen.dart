@@ -423,6 +423,10 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     return _slowMode ? (base * 0.55).clamp(0.5, 1.0) : base.clamp(0.5, 3.0);
   }
 
+  /// Cloud CosyVoice MP3 already has natural pacing. Slowing media_kit below
+  /// ~0.85 chops the last syllable; keep UI "慢读" labels but clamp decode rate.
+  double get _cloudPlaybackRate => _effectiveRate.clamp(0.85, 1.8);
+
   String get _rateLabel {
     final double rate = _effectiveRate;
     final String raw = rate == rate.roundToDouble()
@@ -480,7 +484,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     final Player? player = _readingAudio;
     if (player != null) {
       try {
-        await player.setRate(next);
+        await player.setRate(_cloudPlaybackRate);
       } catch (_) {}
     }
   }
@@ -621,7 +625,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
       );
     }
     final String voiceId = _ttsGender.aliyunVoiceId;
-    final player = Player();
+    final Player player = Player();
     _readingAudio = player;
     Future<String>? prefetch;
     try {
@@ -650,43 +654,77 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             : null;
         final String url = await urlFuture;
         if (!mounted || generation != _continuousGeneration) return;
-        final done = Completer<void>();
+        final Completer<void> done = Completer<void>();
         _readingDone = done;
-        final completed = player.stream.completed.listen((value) {
-          if (value && !done.isCompleted) done.complete();
+        bool started = false;
+        bool finishing = false;
+        final Duration endGrace = pronunciationEndGraceFor(unit.text);
+        // Keep CosyVoice tails audible: media_kit can fire completed during
+        // open, and OEM decode often drops the last syllable at raw EOS.
+        void scheduleFinish() {
+          if (done.isCompleted || finishing) return;
+          finishing = true;
+          unawaited(() async {
+            await Future<void>.delayed(endGrace);
+            if (!done.isCompleted) done.complete();
+          }());
+        }
+
+        final StreamSubscription<bool> playing = player.stream.playing.listen((
+          bool value,
+        ) {
+          if (value) {
+            started = true;
+            return;
+          }
+          if (started) scheduleFinish();
         });
-        final errors = player.stream.error.listen((error) {
+        final StreamSubscription<bool> completed = player.stream.completed
+            .listen((bool value) {
+              if (value && started) scheduleFinish();
+            });
+        final StreamSubscription<String> errors = player.stream.error.listen((
+          String error,
+        ) {
           if (!done.isCompleted) done.completeError(StateError(error));
         });
         final int pageWordBase = unit.firstWordIndex;
-        final position = player.stream.position.listen((position) {
-          if (!mounted || generation != _continuousGeneration) {
-            if (!done.isCompleted) done.complete();
-            return;
-          }
-          final Duration total = player.state.duration;
-          final int durationMs = total.inMilliseconds;
-          if (durationMs <= 0) return;
-          // Relative word positions are estimated within the real audio duration.
-          final local = (position.inMilliseconds / durationMs * unit.wordCount)
-              .floor()
-              .clamp(0, unit.wordCount - 1);
-          if (_audioSeeking) {
-            setState(() => _highlightWordIndex = pageWordBase + local);
-            return;
-          }
-          setState(() {
-            _audioPos = position;
-            _audioDur = total;
-            _highlightWordIndex = pageWordBase + local;
-          });
-        });
+        final StreamSubscription<Duration> position = player.stream.position
+            .listen((Duration position) {
+              if (!mounted || generation != _continuousGeneration) {
+                if (!done.isCompleted) done.complete();
+                return;
+              }
+              final Duration total = player.state.duration;
+              final int durationMs = total.inMilliseconds;
+              if (durationMs <= 0) return;
+              // Relative word positions are estimated within the real audio duration.
+              final int local =
+                  (position.inMilliseconds / durationMs * unit.wordCount)
+                      .floor()
+                      .clamp(0, unit.wordCount - 1);
+              if (_audioSeeking) {
+                setState(() => _highlightWordIndex = pageWordBase + local);
+                return;
+              }
+              setState(() {
+                _audioPos = position;
+                _audioDur = total;
+                _highlightWordIndex = pageWordBase + local;
+              });
+            });
         try {
           await player.open(Media(url));
-          await player.setRate(_effectiveRate);
-          await done.future.timeout(const Duration(minutes: 3));
+          final double cloudRate = _cloudPlaybackRate;
+          if ((cloudRate - 1.0).abs() > 0.02) {
+            await player.setRate(cloudRate);
+          }
+          await done.future.timeout(
+            const Duration(minutes: 3) + endGrace,
+          );
         } finally {
           if (identical(_readingDone, done)) _readingDone = null;
+          await playing.cancel();
           await completed.cancel();
           await errors.cancel();
           await position.cancel();
@@ -1753,7 +1791,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   unawaited(_persistPrefs());
                   final Player? player = _readingAudio;
                   if (player != null) {
-                    unawaited(player.setRate(_effectiveRate));
+                    unawaited(player.setRate(_cloudPlaybackRate));
                   }
                 case 'freq':
                   _openFreqSheet();

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import uuid
 from dataclasses import asdict, dataclass, field
 
@@ -275,12 +276,23 @@ class OralCoachPipeline:
                 )
             except Exception:
                 session.context.talk_topics = []
-        reply = await self.llm.coach_turn(
-            context=session.context,
-            learner_text=transcript,
-            pronunciation=pron,
-            history=session.history,
-        )
+        try:
+            reply = await asyncio.wait_for(
+                self.llm.coach_turn(
+                    context=session.context,
+                    learner_text=transcript,
+                    pronunciation=pron,
+                    history=session.history,
+                ),
+                timeout=self.settings.llm_turn_timeout_seconds,
+            )
+        except TimeoutError:
+            # Conversation continuity beats a perfect answer. Return the local,
+            # topic-grounded fallback instead of leaving the learner waiting on
+            # a slow provider; avatar/TTS remain optional enhancement layers.
+            from .providers.llm import _guided_fallback
+
+            reply = _guided_fallback(session.context, transcript)
         session.difficulty = reply.difficulty or session.difficulty
         session.context.difficulty = session.difficulty
         session.history.append({'role': 'user', 'content': transcript})

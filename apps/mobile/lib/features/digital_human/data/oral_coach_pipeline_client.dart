@@ -207,6 +207,7 @@ class OralCoachPipelineClient {
     required String digitalHumanId,
     String? ttsVoice,
     String language = 'en',
+    Duration latencyBudget = const Duration(seconds: 45),
   }) async {
     final String spoken = text.trim();
     if (spoken.isEmpty) {
@@ -226,7 +227,7 @@ class OralCoachPipelineClient {
       options: Options(
         contentType: Headers.jsonContentType,
         sendTimeout: const Duration(seconds: 30),
-        receiveTimeout: const Duration(seconds: 45),
+        receiveTimeout: latencyBudget,
       ),
     );
     final Map<String, dynamic> body = _asMap(response.data);

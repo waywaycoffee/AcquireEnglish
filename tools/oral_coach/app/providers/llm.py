@@ -41,7 +41,7 @@ def _coach_system(context: VideoContext, *, stuck: bool = False) -> str:
     extra = (
         '\n\n会话能力补充：支持 freechat、视频主题口语、情景角色扮演。'
         '若提供 scene_description，优先围绕眼前实物教词与描述。'
-        '每轮 spoken text 控制在 4 句以内；默认英语台词。'
+        '正常问答每轮 spoken text 控制在 2 个短句以内；默认英语台词。'
         '内容诊断必须检查语法：时态一致、主谓一致、冠词、介词、词形；'
         '有错则 literal_en 给出改正句，不可原样回显。'
     )
@@ -196,6 +196,7 @@ async def _openai_chat_json(
     messages: list[dict[str, str]],
     temperature: float,
     response_format: dict | None = None,
+    max_tokens: int | None = None,
 ) -> dict:
     payload: dict = {
         'model': settings.openai_model,
@@ -204,6 +205,8 @@ async def _openai_chat_json(
     }
     if response_format is not None:
         payload['response_format'] = response_format
+    if max_tokens is not None:
+        payload['max_tokens'] = max_tokens
     async with httpx.AsyncClient(timeout=60) as client:
         response = await client.post(
             f'{settings.openai_base_url}/chat/completions',
@@ -616,6 +619,7 @@ class OpenAiLlm:
             ],
             temperature=0.55,
             response_format={'type': 'json_object'},
+            max_tokens=320,
         )
         fallback = _guided_fallback(context, learner_text)
         text = str(data.get('text') or '').strip() or fallback.text

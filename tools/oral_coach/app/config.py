@@ -36,6 +36,9 @@ class Settings:
     openai_model: str = 'gpt-4o-mini'
     ollama_url: str = 'http://127.0.0.1:11434'
     ollama_model: str = 'llama3.2'
+    # Normal Q&A must not wait indefinitely for the model. On timeout the
+    # pipeline returns a deterministic coaching fallback so the turn continues.
+    llm_turn_timeout_seconds: float = 10.0
     # Internal (ECS → GPU over Tailscale) — used for server-side probes.
     livetalking_url: str = 'http://100.115.252.55:8010'
     # Public HTTPS for mobile clients (nginx reverse proxy). Never require Tailscale on phones.
@@ -114,6 +117,10 @@ class Settings:
             openai_model=model,
             ollama_url=os.getenv('OLLAMA_URL', 'http://127.0.0.1:11434').rstrip('/'),
             ollama_model=os.getenv('OLLAMA_MODEL', 'llama3.2').strip(),
+            llm_turn_timeout_seconds=max(
+                2.0,
+                float(os.getenv('ORAL_COACH_LLM_TURN_TIMEOUT_SECONDS', '10')),
+            ),
             livetalking_url=os.getenv(
                 'LIVETALKING_URL',
                 'http://100.115.252.55:8010',
