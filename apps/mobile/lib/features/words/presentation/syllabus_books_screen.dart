@@ -335,43 +335,17 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                         ),
                         delegate: SliverChildBuilderDelegate(
                           (BuildContext context, int index) {
-                            const List<LilinjiCategory> featured =
-                                <LilinjiCategory>[
-                              LilinjiCategory(
-                                path: '2.中考',
-                                title: '中考',
-                                tag: 'ZK',
-                              ),
-                              LilinjiCategory(
-                                path: '3.四级',
-                                title: '四级 CET-4',
-                                tag: 'CET4',
-                              ),
-                              LilinjiCategory(
-                                path: '7.雅思',
-                                title: '雅思 IELTS',
-                                tag: 'IELTS',
-                              ),
-                              LilinjiCategory(
-                                path: '',
-                                title: '全部开源',
-                                tag: 'ALL',
-                              ),
-                            ];
-                            final LilinjiCategory cat = featured[index];
+                            final LilinjiCategory cat =
+                                kLilinjiCategories[index];
                             return Material(
                               color: theme.card,
                               borderRadius: BorderRadius.circular(14),
                               child: InkWell(
                                 borderRadius: BorderRadius.circular(14),
                                 onTap: () {
-                                  if (cat.path.isEmpty) {
-                                    context.push('/words/syllabus/catalog');
-                                  } else {
-                                    context.push(
-                                      '/words/syllabus/catalog?path=${Uri.encodeComponent(cat.path)}',
-                                    );
-                                  }
+                                  context.push(
+                                    '/words/syllabus/catalog?path=${Uri.encodeComponent(cat.path)}',
+                                  );
                                 },
                                 child: Padding(
                                   padding: const EdgeInsets.fromLTRB(
@@ -397,9 +371,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                                       ),
                                       const Spacer(),
                                       Text(
-                                        cat.path.isEmpty
-                                            ? '更多分类…'
-                                            : '${cat.tag} · 打开书架',
+                                        '${cat.tag} · 打开书架',
                                         style: TextStyle(
                                           fontSize: 12,
                                           color: theme.subtitle,
@@ -411,7 +383,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
                               ),
                             );
                           },
-                          childCount: 4,
+                          childCount: kLilinjiCategories.length,
                         ),
                       ),
                     ),
