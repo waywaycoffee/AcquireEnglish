@@ -10,6 +10,7 @@ using System.Collections.Generic;
 class MonitorWindow : Form {
     readonly Label summary = new Label();
     readonly DataGridView servicesGrid = new DataGridView();
+    readonly DataGridView errorsGrid = new DataGridView();
     readonly DataGridView grid = new DataGridView();
     readonly NotifyIcon tray = new NotifyIcon();
     readonly System.Windows.Forms.Timer timer = new System.Windows.Forms.Timer();
@@ -21,24 +22,24 @@ class MonitorWindow : Form {
     public MonitorWindow(EventWaitHandle signal, bool background) {
         open = signal;
         Text = "爱快英语 - 本地服务监控";
-        Size = new Size(980, 720);
+        Size = new Size(1040, 860);
         StartPosition = FormStartPosition.CenterScreen;
         Font = new Font("Microsoft YaHei UI", 10);
         Icon = SystemIcons.Information;
 
         summary.Dock = DockStyle.Top;
-        summary.Height = 118;
+        summary.Height = 148;
         summary.Padding = new Padding(12);
 
         Label servicesTitle = new Label {
             Dock = DockStyle.Top,
             Height = 28,
             Padding = new Padding(12, 6, 12, 0),
-            Text = "后端服务健康（HTTP / 进程探测；红=不健康，橙=偏慢）"
+            Text = "后端服务健康（HTTP / 进程 / GPU；红=不健康，橙=偏慢）"
         };
 
         servicesGrid.Dock = DockStyle.Top;
-        servicesGrid.Height = 220;
+        servicesGrid.Height = 250;
         servicesGrid.ReadOnly = true;
         servicesGrid.AllowUserToAddRows = false;
         servicesGrid.RowHeadersVisible = false;
@@ -47,20 +48,39 @@ class MonitorWindow : Form {
         foreach (string title in new[] { "服务", "位置", "状态", "延迟ms", "说明" })
             servicesGrid.Columns.Add(title, title);
 
+        Label errorsTitle = new Label {
+            Dock = DockStyle.Top,
+            Height = 28,
+            Padding = new Padding(12, 6, 12, 0),
+            Text = "最近异常（真失败 / 打断 / 缺用量）"
+        };
+
+        errorsGrid.Dock = DockStyle.Top;
+        errorsGrid.Height = 140;
+        errorsGrid.ReadOnly = true;
+        errorsGrid.AllowUserToAddRows = false;
+        errorsGrid.RowHeadersVisible = false;
+        errorsGrid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
+        errorsGrid.SelectionMode = DataGridViewSelectionMode.FullRowSelect;
+        foreach (string title in new[] { "时间", "模块", "类型", "状态码", "延迟ms", "说明" })
+            errorsGrid.Columns.Add(title, title);
+
         grid.Dock = DockStyle.Fill;
         grid.ReadOnly = true;
         grid.AllowUserToAddRows = false;
         grid.AutoSizeColumnsMode = DataGridViewAutoSizeColumnsMode.Fill;
-        foreach (string title in new[] { "客户端标识", "身份类型", "今日请求", "Token", "处理中", "最近访问" })
+        foreach (string title in new[] { "客户端标识", "身份类型", "模块", "今日请求", "Token", "处理中", "会话", "最近访问" })
             grid.Columns.Add(title, title);
 
         Label footer = new Label {
             Dock = DockStyle.Bottom,
             Height = 58,
-            Text = "用量按北京时间；后端健康每约 15 秒探测一次。关闭窗口收起到托盘。关键服务异常会托盘气泡提醒。"
+            Text = "用量按北京时间；失败已拆成真失败/用户打断/缺用量。后端健康约 15 秒刷新。关闭窗口收起到托盘。"
         };
 
         Controls.Add(grid);
+        Controls.Add(errorsGrid);
+        Controls.Add(errorsTitle);
         Controls.Add(servicesGrid);
         Controls.Add(servicesTitle);
         Controls.Add(summary);
@@ -106,6 +126,18 @@ class MonitorWindow : Form {
             return reader.ReadToEnd();
     }
 
+    static string OutcomeZh(string outcome) {
+        if (outcome == "http_error") return "真失败";
+        if (outcome == "client_abort") return "用户打断";
+        if (outcome == "missing_usage") return "缺用量";
+        return outcome ?? "";
+    }
+
+    static object DictGet(Dictionary<string, object> data, string key, object fallback) {
+        if (data == null || !data.ContainsKey(key) || data[key] == null) return fallback;
+        return data[key];
+    }
+
     void RefreshAll(bool forceBackend) {
         RefreshStats();
         refreshTick++;
@@ -118,21 +150,62 @@ class MonitorWindow : Form {
             string json = GetJson("http://127.0.0.1:11435/stats", 2000);
             var data = new JavaScriptSerializer().Deserialize<Dictionary<string, object>>(json);
             string backendLine = summary.Tag as string ?? "后端健康：探测中…";
+            object latObj = DictGet(data, "latency_ms", null);
+            string latencyLine = "";
+            if (latObj is Dictionary<string, object>) {
+                var lat = (Dictionary<string, object>)latObj;
+                latencyLine = String.Format(
+                    "请求延迟 P50={0}ms / P95={1}ms（样本 {2}）",
+                    DictGet(lat, "p50", 0), DictGet(lat, "p95", 0), DictGet(lat, "samples", 0));
+            }
             summary.Text = String.Format(
-                "日期：{0}（北京时间）   活跃客户端：{1}\r\n今日请求：{2}   失败：{3}   Token：{4}（输入 {5} / 输出 {6}）\r\n未返回 Token 用量的请求：{7}\r\n{8}",
-                data["day"], data["active_clients"], data["requests"], data["failures"],
-                data["total_tokens"], data["input_tokens"], data["output_tokens"],
-                data["requests_without_usage"], backendLine);
-            tray.Text = Truncate("爱快英语：" + data["active_clients"] + " 活跃 / " + data["total_tokens"] + " Token", 60);
+                "日期：{0}（北京时间）   刷新：{1}   活跃客户端：{2}\r\n" +
+                "今日请求：{3}   真失败：{4}   用户打断：{5}   缺用量：{6}   （HTTP≥400 合计：{7}）\r\n" +
+                "Token：{8}（输入 {9} / 输出 {10}）   {11}\r\n{12}",
+                DictGet(data, "day", ""),
+                DictGet(data, "refreshed_at", ""),
+                DictGet(data, "active_clients", 0),
+                DictGet(data, "requests", 0),
+                DictGet(data, "true_errors", 0),
+                DictGet(data, "client_aborts", 0),
+                DictGet(data, "missing_usage", DictGet(data, "requests_without_usage", 0)),
+                DictGet(data, "failures", 0),
+                DictGet(data, "total_tokens", 0),
+                DictGet(data, "input_tokens", 0),
+                DictGet(data, "output_tokens", 0),
+                latencyLine,
+                backendLine);
+            tray.Text = Truncate(
+                "爱快英语：" + DictGet(data, "active_clients", 0) + " 活跃 / " + DictGet(data, "total_tokens", 0) + " Token",
+                60);
+
+            errorsGrid.Rows.Clear();
+            object recentObj = DictGet(data, "recent_errors", null);
+            if (recentObj is ArrayList) {
+                foreach (Dictionary<string, object> err in (ArrayList)recentObj) {
+                    errorsGrid.Rows.Add(
+                        DictGet(err, "at", ""),
+                        DictGet(err, "module", ""),
+                        OutcomeZh(Convert.ToString(DictGet(err, "outcome", ""))),
+                        DictGet(err, "status", 0),
+                        DictGet(err, "latency_ms", 0),
+                        DictGet(err, "detail", ""));
+                }
+            }
+            if (errorsGrid.Rows.Count == 0)
+                errorsGrid.Rows.Add("-", "-", "无", "", "", "今日暂无分类异常");
+
             grid.Rows.Clear();
             foreach (Dictionary<string, object> client in (ArrayList)data["clients"]) {
                 DateTime last = new DateTime(1970, 1, 1).AddSeconds(Convert.ToDouble(client["last_seen"])).AddHours(8);
                 grid.Rows.Add(
                     client["client"],
                     (string)client["kind"] == "self-reported account" ? "自报账号" : "匿名客户端",
+                    DictGet(client, "module", ""),
                     client["requests"],
                     client["tokens"],
                     client["in_flight"],
+                    DictGet(client, "session", ""),
                     last.ToString("HH:mm:ss"));
             }
         } catch (Exception error) {
@@ -149,9 +222,21 @@ class MonitorWindow : Form {
             string overall = Convert.ToString(data["overall"]);
             string overallZh = overall == "healthy" ? "健康"
                 : (overall == "degraded" ? "降级" : "不健康");
+            string refreshed = Convert.ToString(DictGet(data, "refreshed_at", ""));
+            string gpuLine = "";
+            object gpuObj = DictGet(data, "gpu", null);
+            if (gpuObj is Dictionary<string, object>) {
+                var gpu = (Dictionary<string, object>)gpuObj;
+                gpuLine = String.Format(
+                    " · GPU {0}% 显存 {1}/{2}MiB",
+                    DictGet(gpu, "util_pct", "?"),
+                    DictGet(gpu, "vram_used_mib", "?"),
+                    DictGet(gpu, "vram_total_mib", "?"));
+            }
             string backendLine = String.Format(
-                "后端：{0}（健康 {1} / 偏慢 {2} / 异常 {3}，关键异常 {4}）",
-                overallZh, counts["healthy"], counts["degraded"], counts["unhealthy"], counts["critical_unhealthy"]);
+                "后端：{0}（健康 {1} / 偏慢 {2} / 异常 {3}，关键异常 {4}）{5} · 刷新 {6}",
+                overallZh, counts["healthy"], counts["degraded"], counts["unhealthy"],
+                counts["critical_unhealthy"], gpuLine, refreshed);
             summary.Tag = backendLine;
             if (summary.Text.IndexOf("后端：") < 0)
                 summary.Text = summary.Text.TrimEnd() + "\r\n" + backendLine;

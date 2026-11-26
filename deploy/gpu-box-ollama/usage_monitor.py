@@ -1,4 +1,5 @@
 """Local-only usage dashboard. No prompts, responses or credentials are stored."""
+import asyncio
 import hashlib
 import json
 import os
@@ -60,10 +61,43 @@ def normalize_json_response(text):
     return json.dumps(value, ensure_ascii=False)
 
 
+OUTCOME_OK = 'ok'
+OUTCOME_HTTP_ERROR = 'http_error'
+OUTCOME_CLIENT_ABORT = 'client_abort'
+OUTCOME_MISSING_USAGE = 'missing_usage'
+
+
+def classify_outcome(status, usage):
+    """Split true errors / barge-in / missing usage so failure rate is not inflated."""
+    status = int(status or 0)
+    has_usage = bool(usage)
+    if status in (499, 408):
+        return OUTCOME_CLIENT_ABORT
+    if status >= 400:
+        return OUTCOME_HTTP_ERROR
+    if status >= 200 and status < 300 and not has_usage:
+        return OUTCOME_MISSING_USAGE
+    return OUTCOME_OK
+
+
+def _percentile(sorted_values, pct):
+    if not sorted_values:
+        return 0
+    if len(sorted_values) == 1:
+        return int(sorted_values[0])
+    rank = (len(sorted_values) - 1) * (pct / 100.0)
+    low = int(rank)
+    high = min(low + 1, len(sorted_values) - 1)
+    frac = rank - low
+    return int(sorted_values[low] * (1 - frac) + sorted_values[high] * frac)
+
+
 class UsageStore:
     def __init__(self, path):
         self.path = str(path)
         self.lock = threading.Lock()
+        self._last_remote_scrape = 0.0
+        self._last_remote_scrape_peer = ''
         with self.connect() as db:
             db.execute('''CREATE TABLE IF NOT EXISTS requests (
                 id INTEGER PRIMARY KEY, started REAL, day TEXT, client TEXT,
@@ -72,8 +106,17 @@ class UsageStore:
             cols = {row[1] for row in db.execute('PRAGMA table_info(requests)')}
             if 'module' not in cols:
                 db.execute("ALTER TABLE requests ADD COLUMN module TEXT DEFAULT 'unknown'")
-            db.execute('''UPDATE requests SET finished=?, status=499, estimated=1
-                          WHERE finished IS NULL''', (time.time(),))
+            for col, decl in (
+                ('session', "TEXT DEFAULT ''"),
+                ('latency_ms', 'INTEGER DEFAULT 0'),
+                ('outcome', "TEXT DEFAULT ''"),
+                ('error_detail', "TEXT DEFAULT ''"),
+            ):
+                if col not in cols:
+                    db.execute(f'ALTER TABLE requests ADD COLUMN {col} {decl}')
+            db.execute('''UPDATE requests SET finished=?, status=499, estimated=1,
+                          outcome=? WHERE finished IS NULL''',
+                       (time.time(), OUTCOME_CLIENT_ABORT))
 
     @contextmanager
     def connect(self):
@@ -84,25 +127,71 @@ class UsageStore:
         finally:
             db.close()
 
-    def begin(self, client, kind, module='unknown'):
+    def note_remote_scrape(self, peer=''):
+        """ECS→本机回程：记录非本机拉取 /stats 的时间。"""
+        with self.lock:
+            self._last_remote_scrape = time.time()
+            if peer:
+                self._last_remote_scrape_peer = str(peer)[:64]
+
+    def reverse_path_info(self):
+        with self.lock:
+            last = self._last_remote_scrape
+            peer = self._last_remote_scrape_peer
+        age = None if not last else max(0, int(time.time() - last))
+        return dict(
+            last_remote_scrape_at=last or 0,
+            last_remote_scrape_peer=peer,
+            age_seconds=age,
+            ok=age is not None and age < 600,
+            detail=(
+                '尚无 ECS/远端拉取记录'
+                if age is None
+                else f'最近远端拉取 /stats {age}s 前' + (f' · {peer}' if peer else '')
+            ),
+        )
+
+    def begin(self, client, kind, module='unknown', session=''):
         now = time.time()
         # Client identifiers are pseudonyms, not authenticated account identities.
         client = hashlib.sha256(client.encode()).hexdigest()[:12]
+        session = hashlib.sha256(session.encode()).hexdigest()[:10] if session else ''
         module = normalize_module(module)
         with self.lock, self.connect() as db:
             cursor = db.execute(
-                'INSERT INTO requests(started, day, client, kind, module) VALUES(?,?,?,?,?)',
-                (now, datetime.now(SHANGHAI).date().isoformat(), client, kind, module),
+                'INSERT INTO requests(started, day, client, kind, module, session) '
+                'VALUES(?,?,?,?,?,?)',
+                (now, datetime.now(SHANGHAI).date().isoformat(), client, kind, module, session),
             )
             return cursor.lastrowid
 
-    def finish(self, request_id, status, usage):
+    def finish(self, request_id, status, usage, error_detail=''):
+        now = time.time()
+        usage = usage or {}
+        outcome = classify_outcome(status, usage)
         with self.lock, self.connect() as db:
-            db.execute('''UPDATE requests SET finished=?, status=?, input_tokens=?,
-                          output_tokens=?, estimated=? WHERE id=?''',
-                       (time.time(), status, max(0, int(usage.get('prompt_tokens', 0))),
-                        max(0, int(usage.get('completion_tokens', 0))),
-                        int(not bool(usage)), request_id))
+            started = db.execute(
+                'SELECT started FROM requests WHERE id=?', (request_id,)
+            ).fetchone()
+            latency_ms = 0
+            if started and started[0]:
+                latency_ms = max(0, int((now - float(started[0])) * 1000))
+            db.execute(
+                '''UPDATE requests SET finished=?, status=?, input_tokens=?,
+                   output_tokens=?, estimated=?, latency_ms=?, outcome=?,
+                   error_detail=? WHERE id=?''',
+                (
+                    now,
+                    status,
+                    max(0, int(usage.get('prompt_tokens', 0))),
+                    max(0, int(usage.get('completion_tokens', 0))),
+                    int(outcome == OUTCOME_MISSING_USAGE or not bool(usage)),
+                    latency_ms,
+                    outcome,
+                    (error_detail or '')[:160],
+                    request_id,
+                ),
+            )
 
     def snapshot(self):
         day = datetime.now(SHANGHAI).date().isoformat()
@@ -111,10 +200,34 @@ class UsageStore:
                 COALESCE(SUM(status>=400),0), COALESCE(SUM(input_tokens),0),
                 COALESCE(SUM(output_tokens),0), COALESCE(SUM(estimated),0)
                 FROM requests WHERE day=?''', (day,)).fetchone()
+            outcome_rows = db.execute(
+                '''SELECT COALESCE(NULLIF(outcome,''),'unknown'), COUNT(*)
+                   FROM requests WHERE day=? AND finished IS NOT NULL
+                   GROUP BY COALESCE(NULLIF(outcome,''),'unknown')''',
+                (day,),
+            ).fetchall()
+            latencies = [
+                int(r[0])
+                for r in db.execute(
+                    '''SELECT latency_ms FROM requests
+                       WHERE day=? AND finished IS NOT NULL AND latency_ms>0
+                       ORDER BY latency_ms''',
+                    (day,),
+                ).fetchall()
+            ]
+            recent = db.execute(
+                '''SELECT finished, module, outcome, status, error_detail, latency_ms
+                   FROM requests
+                   WHERE day=? AND finished IS NOT NULL
+                     AND outcome IN (?,?,?)
+                   ORDER BY finished DESC LIMIT 8''',
+                (day, OUTCOME_HTTP_ERROR, OUTCOME_CLIENT_ABORT, OUTCOME_MISSING_USAGE),
+            ).fetchall()
             rows = db.execute('''SELECT client, kind, module, COUNT(*), MAX(started),
                 COALESCE(SUM(input_tokens+output_tokens),0),
                 COALESCE(SUM(input_tokens),0), COALESCE(SUM(output_tokens),0),
-                SUM(finished IS NULL)
+                SUM(finished IS NULL),
+                MAX(session)
                 FROM requests WHERE day=? GROUP BY client, kind, module
                 ORDER BY MAX(started) DESC''', (day,)).fetchall()
             module_rows = db.execute('''SELECT COALESCE(NULLIF(module,''),'unknown'),
@@ -123,6 +236,11 @@ class UsageStore:
                 FROM requests WHERE day=? GROUP BY COALESCE(NULLIF(module,''),'unknown')
                 ORDER BY COALESCE(SUM(input_tokens+output_tokens),0) DESC''', (day,)).fetchall()
         now = time.time()
+        by_outcome = {r[0]: int(r[1]) for r in outcome_rows}
+        true_errors = by_outcome.get(OUTCOME_HTTP_ERROR, 0)
+        client_aborts = by_outcome.get(OUTCOME_CLIENT_ABORT, 0)
+        missing_usage = by_outcome.get(OUTCOME_MISSING_USAGE, 0)
+        # Keep legacy `failures` as HTTP>=400 for compatibility; expose classified counts.
         by_module = [
             dict(
                 module=r[0],
@@ -134,15 +252,41 @@ class UsageStore:
             )
             for r in module_rows
         ]
+        refreshed = datetime.now(SHANGHAI).strftime('%Y-%m-%d %H:%M:%S')
+        reverse = self.reverse_path_info()
         return dict(
             day=day,
             timezone='Asia/Shanghai',
+            refreshed_at=refreshed,
+            collected_at=time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime()),
             requests=total,
             failures=failed,
+            true_errors=true_errors,
+            client_aborts=client_aborts,
+            missing_usage=missing_usage,
+            by_outcome=by_outcome,
             input_tokens=inputs,
             output_tokens=outputs,
             total_tokens=inputs + outputs,
             requests_without_usage=unknown,
+            latency_ms=dict(
+                p50=_percentile(latencies, 50),
+                p95=_percentile(latencies, 95),
+                max=int(latencies[-1]) if latencies else 0,
+                samples=len(latencies),
+            ),
+            recent_errors=[
+                dict(
+                    at=datetime.fromtimestamp(float(r[0]), SHANGHAI).strftime('%H:%M:%S'),
+                    module=r[1] or 'unknown',
+                    outcome=r[2] or '',
+                    status=int(r[3] or 0),
+                    detail=r[4] or '',
+                    latency_ms=int(r[5] or 0),
+                )
+                for r in recent
+            ],
+            reverse_path=reverse,
             active_clients=sum(row[4] > now - 300 for row in rows),
             by_module=by_module,
             clients=[
@@ -156,6 +300,7 @@ class UsageStore:
                     input_tokens=r[6],
                     output_tokens=r[7],
                     in_flight=r[8],
+                    session=r[9] or '',
                 )
                 for r in rows
             ],
@@ -171,15 +316,24 @@ class UsageMiddleware:
             return await self.app(scope, receive, send)
         headers = dict(scope.get('headers', []))
         client = headers.get(b'x-acquire-client-id', b'').decode(errors='replace')[:128]
+        if not client:
+            # Prefer stable user/session pseudonyms when client-id is absent.
+            client = headers.get(b'x-acquire-user-id', b'').decode(errors='replace')[:128]
         kind = 'self-reported account' if headers.get(b'x-acquire-client-kind') == b'account' else 'anonymous client'
         module = headers.get(b'x-acquire-module', b'').decode(errors='replace')
         if not module:
             # Optional query-ish fallback via custom header aliases.
             module = headers.get(b'x-ae-module', b'').decode(errors='replace')
+        session = headers.get(b'x-acquire-session-id', b'').decode(errors='replace')[:128]
+        if not session:
+            session = headers.get(b'x-ae-session-id', b'').decode(errors='replace')[:128]
         if not client:
             client = str(scope.get('client', ('unknown',))[0])
-        request_id = self.store.begin(client, kind, module=module or 'unknown')
+        request_id = self.store.begin(
+            client, kind, module=module or 'unknown', session=session
+        )
         chunks, status = bytearray(), 500
+        error_detail = ''
 
         async def observed(message):
             nonlocal status
@@ -191,12 +345,20 @@ class UsageMiddleware:
 
         try:
             await self.app(scope, receive, observed)
+        except (asyncio.CancelledError, ConnectionResetError, BrokenPipeError) as exc:
+            status = 499
+            error_detail = type(exc).__name__
+            raise
+        except Exception as exc:  # noqa: BLE001
+            status = 500 if status < 400 else status
+            error_detail = type(exc).__name__
+            raise
         finally:
             try:
-                usage = json.loads(chunks).get('usage', {})
+                usage = json.loads(chunks).get('usage', {}) if chunks else {}
             except (ValueError, AttributeError):
                 usage = {}
-            self.store.finish(request_id, status, usage)
+            self.store.finish(request_id, status, usage, error_detail=error_detail)
 
 
 def install_monitor(app):
@@ -207,7 +369,11 @@ def install_monitor(app):
     class Handler(BaseHTTPRequestHandler):
         def do_GET(self):
             path = self.path.split('?', 1)[0]
+            peer = self.client_address[0] if self.client_address else ''
             if path == '/stats':
+                # Non-loopback scrapes ≈ ECS Tailscale → local reverse path.
+                if peer and peer not in ('127.0.0.1', '::1', 'localhost'):
+                    store.note_remote_scrape(peer)
                 body = json.dumps(store.snapshot()).encode()
             elif path in ('/backend-health', '/health/services'):
                 try:
@@ -223,7 +389,9 @@ def install_monitor(app):
                     assert spec.loader is not None
                     spec.loader.exec_module(mod)
                     collect_backend_health = mod.collect_backend_health
-                body = json.dumps(collect_backend_health()).encode()
+                body = json.dumps(
+                    collect_backend_health(usage_store=store)
+                ).encode()
             else:
                 self.send_error(404)
                 return
