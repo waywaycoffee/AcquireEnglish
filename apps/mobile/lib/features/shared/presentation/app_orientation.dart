@@ -1,3 +1,4 @@
+import 'package:device_info_plus/device_info_plus.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
@@ -6,10 +7,11 @@ const MethodChannel _orientationChannel = MethodChannel(
 );
 
 bool _fullscreenLandscapeActive = false;
+Future<bool>? _isIPad;
 
 bool get isFullscreenLandscapeActive => _fullscreenLandscapeActive;
 
-/// App default: portrait only. Landscape is reserved for video fullscreen.
+/// Phones default to portrait. iPad follows its native orientation settings.
 Future<void> lockPortraitOrientation() async {
   _fullscreenLandscapeActive = false;
   // On Android, SystemChrome alone is remapped to USER on Xiaomi HyperOS and
@@ -17,6 +19,15 @@ Future<void> lockPortraitOrientation() async {
   if (!kIsWeb && defaultTargetPlatform == TargetPlatform.android) {
     await _setNativeOrientation('portrait');
     return;
+  }
+  if (!kIsWeb && defaultTargetPlatform == TargetPlatform.iOS) {
+    final bool isIPad = await (_isIPad ??= DeviceInfoPlugin().iosInfo
+        .then((IosDeviceInfo info) => info.model.toLowerCase().contains('ipad'))
+        .onError((Object error, StackTrace stack) => false));
+    if (isIPad) {
+      await SystemChrome.setPreferredOrientations(const <DeviceOrientation>[]);
+      return;
+    }
   }
   await SystemChrome.setPreferredOrientations(const <DeviceOrientation>[
     DeviceOrientation.portraitUp,

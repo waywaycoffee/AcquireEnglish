@@ -221,6 +221,51 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     );
   }
 
+  Widget _buildReaderLayout(ReadingDoc doc, Color background, Color foreground, Widget reader) {
+    return LayoutBuilder(
+      builder: (BuildContext context, BoxConstraints constraints) {
+        return Row(
+          children: <Widget>[
+            if (constraints.maxWidth >= 800 && _pages.length > 1)
+              SizedBox(
+                width: 208,
+                height: double.infinity,
+                child: ColoredBox(
+                  color: background,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Padding(
+                        padding: const EdgeInsets.all(16),
+                        child: Text('章节目录', style: TextStyle(color: foreground)),
+                      ),
+                      Expanded(
+                        child: ListView.builder(
+                          itemCount: _pages.length,
+                          itemBuilder: (BuildContext context, int index) => ListTile(
+                            selected: index == _pageIndex,
+                            textColor: foreground,
+                            title: Text('第 ${index + 1} 节'),
+                            onTap: index == _pageIndex
+                                ? null
+                                : () async {
+                                    await _stopContinuous();
+                                    if (mounted) _openPage(doc, index);
+                                  },
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            Expanded(key: const ValueKey<String>('reader-content'), child: reader),
+          ],
+        );
+      },
+    );
+  }
+
   void _openPage(ReadingDoc doc, int index) {
     setState(() {
       _pageIndex = index;
@@ -1881,7 +1926,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
           ),
         ],
       ),
-      body: ReadingDigitalHumanBallHost(
+      body: _buildReaderLayout(doc, bg, fg, ReadingDigitalHumanBallHost(
         doc: doc,
         focusedSentence: _focusedSentence,
         onPreparePageQuiz: () => _preparePageComprehensionQuiz(doc),
@@ -2099,6 +2144,7 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
             ],
           ),
         ),
+      ),
       ),
     );
   }
