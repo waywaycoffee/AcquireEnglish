@@ -1,0 +1,10 @@
+{
+  "app_name": "爱快英语",
+  "bundle_id": "com.acquire.english",
+  "version": "0.2.250",
+  "build": 269,
+  "status": "beta_approved",
+  "join_url": "",
+  "notes": "TestFlight 外部 Beta 已批准。请在 App Store Connect → 外部测试群组开启「公开链接」，把链接填入 join_url 后重新部署本文件。",
+  "updated_at": "2026-11-26T13:30:00+08:00"
+}

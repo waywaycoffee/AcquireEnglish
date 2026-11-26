@@ -3,48 +3,254 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>iOS 内测安装说明 — 爱快英语</title>
+    <title>iOS TestFlight 安装步骤 — 爱快英语</title>
+    <meta
+      name="description"
+      content="爱快英语 iOS 内测：通过 Apple TestFlight 安装。详细图文步骤，适合首次参与测试的用户。"
+    />
     <link rel="icon" href="/brand/app-icon.png" />
     <style>
-      body { margin:0; font-family: system-ui, -apple-system, sans-serif; background:#0b1220; color:#e8eef8; line-height:1.65; }
-      main { max-width:720px; margin:0 auto; padding:40px 20px 80px; }
-      a { color:#93c5fd; }
-      .card { background:#121a2b; border:1px solid #243044; border-radius:16px; padding:20px; margin:16px 0; }
-      code { color:#dbeafe; }
-      .btn { display:inline-block; margin:8px 8px 0 0; padding:10px 16px; border-radius:10px; background:#2563eb; color:#fff; text-decoration:none; font-weight:600; }
-      .btn.ghost { background:transparent; border:1px solid #3b82f6; color:#93c5fd; }
+      :root {
+        --bg: #0b1220;
+        --card: #121a2b;
+        --text: #e8eef8;
+        --muted: #9fb0c7;
+        --line: #243044;
+        --ios: #0a84ff;
+        --accent: #93c5fd;
+        --ok: #3ddc84;
+        --warn: #fbbf24;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
+          "Hiragino Sans GB", sans-serif;
+        background: radial-gradient(1000px 500px at 80% -10%, #152238, var(--bg));
+        color: var(--text);
+        line-height: 1.7;
+      }
+      main { max-width: 760px; margin: 0 auto; padding: 36px 20px 88px; }
+      img.logo { width: 56px; height: 56px; border-radius: 14px; }
+      h1 { font-size: clamp(26px, 5vw, 36px); letter-spacing: -0.03em; margin: 16px 0 8px; }
+      h2 { margin: 0 0 10px; font-size: 18px; }
+      .lead { color: var(--muted); margin: 0 0 20px; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        padding: 18px 18px 16px;
+        margin: 14px 0;
+      }
+      .badge {
+        display: inline-block;
+        padding: 4px 10px;
+        border-radius: 999px;
+        background: rgba(10, 132, 255, 0.18);
+        color: #9ec9ff;
+        font-size: 13px;
+        font-weight: 700;
+      }
+      .badge.ok {
+        background: rgba(61, 220, 132, 0.16);
+        color: #9af0c0;
+      }
+      .badge.warn {
+        background: rgba(251, 191, 36, 0.14);
+        color: #fde68a;
+      }
+      ol.steps { margin: 8px 0 0; padding-left: 1.25rem; }
+      ol.steps li { margin: 10px 0; color: var(--muted); }
+      ol.steps li strong { color: var(--text); }
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 20px;
+        border-radius: 999px;
+        text-decoration: none;
+        font-weight: 700;
+        margin: 8px 8px 0 0;
+      }
+      .btn.ios { background: var(--ios); color: #fff; }
+      .btn.ghost {
+        background: transparent;
+        color: var(--accent);
+        border: 1px solid #35507a;
+      }
+      .btn[disabled], .btn.is-disabled {
+        opacity: 0.45;
+        pointer-events: none;
+      }
+      code { color: #dbeafe; }
+      a { color: var(--accent); }
+      .tip {
+        border-left: 3px solid var(--warn);
+        padding: 2px 0 2px 12px;
+        color: #fde68a;
+        margin: 10px 0;
+        font-size: 14px;
+      }
+      .meta { margin-top: 28px; color: var(--muted); font-size: 13px; }
+      #join-status { margin-top: 8px; color: var(--muted); font-size: 14px; }
     </style>
   </head>
   <body>
     <main>
-      <h1>iOS 内测安装说明</h1>
+      <img class="logo" src="/brand/app-icon.png" alt="爱快英语" />
       <p>
-        当前包：<code>com.acquire.english</code> · v0.2.249 (267) · Team <code>BZQNU93J84</code>
+        <span class="badge ok" id="status-badge">TestFlight 外部测试已批准</span>
       </p>
-      <div class="card">
-        <h2>推荐：TestFlight / App Store Connect</h2>
-        <p>
-          官网提供的 <code>.ipa</code> 为 <strong>App Store</strong> 导出包，需上传到 App Store Connect 后通过 TestFlight 安装（可覆盖约 1 万名外测用户）。
+      <h1>iOS 安装步骤（TestFlight）</h1>
+      <p class="lead">
+        爱快英语目前<strong>未上架 App Store</strong>。iPhone / iPad 请用 Apple 官方
+        <strong>TestFlight</strong> 安装内测版（构建
+        <code id="build-label">0.2.250+269</code>）。不需要登记设备 UDID。
+      </p>
+
+      <section class="card">
+        <h2>一键加入（推荐）</h2>
+        <p style="color: var(--muted); margin: 0 0 8px; font-size: 14px">
+          用 Safari 打开下方按钮（不要用微信内置浏览器）。若未安装 TestFlight，系统会引导你先去 App Store 安装。
         </p>
-        <a class="btn" href="/downloads/AcquireEnglish-ios-latest.ipa">下载 App Store IPA</a>
-      </div>
-      <div class="card">
-        <h2>Ad Hoc（仅已登记 UDID 的设备）</h2>
-        <p>
-          若你的 iPhone UDID 已在开发者后台登记，可下载 Ad Hoc 包，用 Finder / Apple Configurator / AltStore 等方式安装。
-          未登记设备无法安装 Ad Hoc。
+        <a class="btn ios is-disabled" id="join-btn" href="#" aria-disabled="true">
+          加入 TestFlight 内测
+        </a>
+        <a
+          class="btn ghost"
+          href="https://apps.apple.com/app/testflight/id899247664"
+          target="_blank"
+          rel="noopener"
+        >
+          先安装 TestFlight App
+        </a>
+        <p id="join-status">正在读取邀请链接…</p>
+      </section>
+
+      <section class="card">
+        <h2>详细步骤（第一次安装）</h2>
+        <ol class="steps">
+          <li>
+            <strong>准备一台 iPhone 或 iPad</strong><br />
+            系统建议 iOS 15 及以上。用本人 Apple ID 登录 App Store。
+          </li>
+          <li>
+            <strong>安装 TestFlight</strong><br />
+            打开 App Store，搜索「TestFlight」（开发者 Apple），安装蓝色飞机图标应用。
+            也可点上方「先安装 TestFlight App」。
+          </li>
+          <li>
+            <strong>用 Safari 打开邀请链接</strong><br />
+            点本页「加入 TestFlight 内测」。若链接在微信里收到，请点右上角
+            「…」→「在 Safari 中打开」，否则可能无法调起 TestFlight。
+          </li>
+          <li>
+            <strong>接受邀请</strong><br />
+            页面会打开 TestFlight，显示「爱快英语」。点
+            <strong>接受 / Accept</strong>。
+          </li>
+          <li>
+            <strong>安装 App</strong><br />
+            接受后点 <strong>安装 / Install</strong>。桌面会出现「爱快英语」图标。
+            首次打开若提示「未受信任的企业级开发者」类提示，按系统引导允许即可（TestFlight
+            包一般为标准 Beta，通常不会出现）。
+          </li>
+          <li>
+            <strong>登录并反馈</strong><br />
+            打开 App → 可用邮箱等方式注册/登录（审核演示也可用邮箱路径）。
+            把<strong>注册 ID</strong>微信发给作者 <code>youyoufairytale</code>，
+            并扫码加入「佑佑爸粉丝交流群」反馈 bug。
+          </li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>更新内测版本</h2>
+        <ol class="steps">
+          <li>打开手机上的 <strong>TestFlight</strong> App。</li>
+          <li>在列表中点「爱快英语」。</li>
+          <li>若有新构建，点 <strong>更新 / Update</strong>。</li>
+        </ol>
+        <p class="tip">
+          TestFlight 内测包大约 90 天后过期；到期前我们会发新构建，你在 TestFlight 里更新即可。
         </p>
-        <a class="btn ghost" href="/downloads/AcquireEnglish-ios-adhoc-latest.ipa">下载 Ad Hoc IPA</a>
-      </div>
-      <div class="card">
-        <h2>注意</h2>
-        <ul>
-          <li>个人/公司账号网页无法像 Android 那样任意设备直接安装。</li>
-          <li>公开内测请优先走 TestFlight。</li>
-          <li>问题反馈：<a href="mailto:support@curlhairai.com">support@curlhairai.com</a></li>
-        </ul>
-      </div>
-      <p><a href="/download.html">← 返回下载页</a> · <a href="/downloads/AcquireEnglish-android-latest.apk">Android APK</a></p>
+      </section>
+
+      <section class="card">
+        <h2>常见问题</h2>
+        <ol class="steps">
+          <li>
+            <strong>点链接没反应 / 一直转圈？</strong><br />
+            换 Safari；确认已登录 Apple ID；先单独打开一次 TestFlight App 再点链接。
+          </li>
+          <li>
+            <strong>提示「无法加入 Beta」？</strong><br />
+            外测名额约 1 万；若已满请微信联系作者。或检查是否用错 Apple ID 地区账号。
+          </li>
+          <li>
+            <strong>能不能不装 TestFlight？</strong><br />
+            外人一般不行。只有已登记 UDID 的设备才能装 Ad Hoc 包；公开测试请统一走
+            TestFlight。
+          </li>
+          <li>
+            <strong>这是正式上架吗？</strong><br />
+            不是。当前是 TestFlight 外部 Beta。App Store 正式上架需另行提交审核。
+          </li>
+        </ol>
+      </section>
+
+      <section class="card">
+        <h2>内测须知</h2>
+        <ol class="steps">
+          <li>注册 ID 发给作者微信 <code>youyoufairytale</code></li>
+          <li>加入粉丝交流群报 bug（见<a href="/download.html#community">下载页二维码</a>）</li>
+          <li>社区上传学习资源，审核通过可赠 Pro 时长</li>
+          <li>违规敏感内容一经发现永久封号</li>
+        </ol>
+        <a class="btn ghost" href="/beta.html">阅读完整内测公告</a>
+        <a class="btn ghost" href="/download.html">Android APK 下载</a>
+      </section>
+
+      <p class="meta">
+        <a href="/">返回官网</a>
+        ·
+        <a href="/download.html">下载页</a>
+        ·
+        <a href="/privacy.html">隐私政策</a>
+        · 支持邮箱
+        <a href="mailto:support@curlhairai.com">support@curlhairai.com</a>
+      </p>
     </main>
+    <script>
+      (async function () {
+        const btn = document.getElementById("join-btn");
+        const status = document.getElementById("join-status");
+        const buildLabel = document.getElementById("build-label");
+        try {
+          const res = await fetch("/downloads/ios-testflight.json", {
+            cache: "no-store",
+          });
+          const data = await res.json();
+          if (data.version && data.build) {
+            buildLabel.textContent = data.version + "+" + data.build;
+          }
+          const url = (data.join_url || "").trim();
+          if (url) {
+            btn.href = url;
+            btn.classList.remove("is-disabled");
+            btn.removeAttribute("aria-disabled");
+            status.textContent =
+              "当前邀请已开启。请用 Safari 打开上方蓝色按钮。";
+          } else {
+            status.innerHTML =
+              '公开邀请链接尚未写入官网。请先加作者微信 <code>youyoufairytale</code> 索取 TestFlight 邀请，或等待作者开启「公开链接」后刷新本页。';
+          }
+        } catch (e) {
+          status.textContent =
+            "读取邀请配置失败，请稍后刷新，或微信联系 youyoufairytale。";
+        }
+      })();
+    </script>
   </body>
 </html>
