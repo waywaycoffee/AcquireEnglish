@@ -1,3 +1,5 @@
+import 'k12_textbook_catalog.dart';
+
 /// ECS-hosted licensed textbook package (PDF + lesson audio).
 class K12TextbookLesson {
   const K12TextbookLesson({
@@ -108,6 +110,7 @@ class K12TextbookMedia {
 /// Stable ECS book_id for a catalog shelf entry, e.g. beijing-g4-b.
 String? k12TextbookMediaBookId(String catalogId) {
   // k12-textbook:beijing:k12_g4:b → beijing-g4-b
+  // k12-textbook:pep-y3-wuxin:k12_g3:a → pep-y3-wuxin-g3-a
   final List<String> parts = catalogId.split(':');
   if (parts.length < 4 || parts.first != 'k12-textbook') return null;
   final String edition = parts[1].trim();
@@ -116,4 +119,55 @@ String? k12TextbookMediaBookId(String catalogId) {
   if (edition.isEmpty || grade.isEmpty || volume.isEmpty) return null;
   final String gradeShort = grade.replaceFirst(RegExp(r'^k12_'), '');
   return '$edition-$gradeShort-$volume';
+}
+
+/// Build a shelf tile from an ECS `/api/reading/textbooks` row.
+K12TextbookEntry? k12TextbookEntryFromMediaRow(Map<String, dynamic> row) {
+  final String catalogId = '${row['catalog_id'] ?? ''}'.trim();
+  final String gradeId = '${row['grade_id'] ?? ''}'.trim();
+  if (catalogId.isEmpty || gradeId.isEmpty) return null;
+  final K12TextbookStage? stage = k12TextbookStageForGradeId(gradeId);
+  if (stage == null) return null;
+  final String titleZh = '${row['title_zh'] ?? ''}'.trim();
+  final String title = '${row['title'] ?? ''}'.trim();
+  return K12TextbookEntry(
+    id: catalogId,
+    gradeId: gradeId,
+    stage: stage,
+    title: title.isEmpty ? (titleZh.isEmpty ? catalogId : titleZh) : title,
+    titleZh: titleZh,
+    edition: '${row['edition'] ?? ''}'.trim(),
+    volume: '${row['volume'] ?? ''}'.trim(),
+    publisher: '${row['publisher'] ?? ''}'.trim(),
+    level: '${row['level'] ?? 'A1'}'.trim(),
+  );
+}
+
+/// Merge local placeholders with ECS-ready books for one grade.
+/// Ready media rows win on the same catalog_id.
+List<K12TextbookEntry> mergeK12TextbookShelf({
+  required String gradeId,
+  required List<K12TextbookEntry> local,
+  required List<Map<String, dynamic>> mediaRows,
+}) {
+  final Map<String, K12TextbookEntry> byId = <String, K12TextbookEntry>{};
+  for (final K12TextbookEntry entry in local) {
+    if (entry.gradeId == gradeId) {
+      byId[entry.id] = entry;
+    }
+  }
+  for (final Map<String, dynamic> row in mediaRows) {
+    if ('${row['grade_id'] ?? ''}'.trim() != gradeId) continue;
+    final K12TextbookEntry? fromMedia = k12TextbookEntryFromMediaRow(row);
+    if (fromMedia != null) {
+      byId[fromMedia.id] = fromMedia;
+    }
+  }
+  final List<K12TextbookEntry> out = byId.values.toList(growable: false);
+  out.sort((K12TextbookEntry a, K12TextbookEntry b) {
+    final int editionCmp = a.edition.compareTo(b.edition);
+    if (editionCmp != 0) return editionCmp;
+    return a.volume.compareTo(b.volume);
+  });
+  return out;
 }

@@ -10,6 +10,7 @@ void main() {
     final K12TextbookEntry pep = k12TextbooksForGrade('k12_g3').firstWhere(
       (K12TextbookEntry e) => e.edition.contains('人教版 PEP'),
     );
+    expect(pep.id, startsWith('k12-textbook:pep-y3-wuxin:'));
     expect(pep.volume, anyOf('上册', '下册'));
     expect(pep.publisher, isNotEmpty);
     expect(pep.shelfIntro, contains('目录占位'));

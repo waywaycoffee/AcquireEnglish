@@ -35,7 +35,10 @@ class _K12TextbookShelfScreenState
   late K12TextbookStage _stage;
   late String _gradeId;
   bool _opening = false;
-  Set<String> _readyCatalogIds = <String>{};
+  bool _loadingMedia = false;
+  /// catalog_id → ECS book_id for uploaded audio packages.
+  Map<String, String> _readyBookIds = <String, String>{};
+  List<Map<String, dynamic>> _mediaRows = const <Map<String, dynamic>>[];
 
   @override
   void initState() {
@@ -69,21 +72,31 @@ class _K12TextbookShelfScreenState
 
   Future<void> _refreshReadyBooks() async {
     final String gradeId = _gradeId;
+    setState(() => _loadingMedia = true);
     try {
       final List<Map<String, dynamic>> rows = await ref
           .read(acquireApiClientProvider)
           .listReadingTextbooks(gradeId: gradeId);
       if (!mounted || gradeId != _gradeId) return;
+      final Map<String, String> ready = <String, String>{};
+      for (final Map<String, dynamic> row in rows) {
+        final String catalogId = '${row['catalog_id'] ?? ''}'.trim();
+        final String bookId = '${row['book_id'] ?? ''}'.trim();
+        if (catalogId.isEmpty || bookId.isEmpty) continue;
+        ready[catalogId] = bookId;
+      }
       setState(() {
-        _readyCatalogIds = <String>{
-          for (final Map<String, dynamic> row in rows)
-            if ('${row['catalog_id'] ?? ''}'.trim().isNotEmpty)
-              '${row['catalog_id']}'.trim(),
-        };
+        _mediaRows = rows;
+        _readyBookIds = ready;
+        _loadingMedia = false;
       });
     } catch (_) {
       if (!mounted || gradeId != _gradeId) return;
-      setState(() => _readyCatalogIds = <String>{});
+      setState(() {
+        _mediaRows = const <Map<String, dynamic>>[];
+        _readyBookIds = <String, String>{};
+        _loadingMedia = false;
+      });
     }
   }
 
@@ -91,21 +104,9 @@ class _K12TextbookShelfScreenState
     if (_opening) return;
     setState(() => _opening = true);
     try {
-      final String? mediaBookId = k12TextbookMediaBookId(entry.id);
-      if (mediaBookId != null && _readyCatalogIds.contains(entry.id)) {
-        if (!mounted) return;
-        await Navigator.of(context).push(
-          MaterialPageRoute<void>(
-            builder: (_) => K12TextbookStudyScreen(
-              mediaBookId: mediaBookId,
-              catalogTitle: entry.titleZh.isEmpty ? entry.title : entry.titleZh,
-            ),
-          ),
-        );
-        return;
-      }
-      if (mediaBookId != null) {
-        // Catalog may lag; still try the ECS package when the id is known.
+      final String? mediaBookId =
+          _readyBookIds[entry.id] ?? k12TextbookMediaBookId(entry.id);
+      if (mediaBookId != null && mediaBookId.isNotEmpty) {
         final Map<String, dynamic>? detail = await ref
             .read(acquireApiClientProvider)
             .getReadingTextbook(mediaBookId);
@@ -158,10 +159,16 @@ class _K12TextbookShelfScreenState
   @override
   Widget build(BuildContext context) {
     final List<ExamFamily> grades = k12TextbookGradesForStage(_stage);
-    final List<K12TextbookEntry> books = k12TextbooksForGrade(_gradeId);
+    final List<K12TextbookEntry> books = mergeK12TextbookShelf(
+      gradeId: _gradeId,
+      local: k12TextbooksForGrade(_gradeId),
+      mediaRows: _mediaRows,
+    );
     final ExamFamily? grade = grades
         .where((ExamFamily f) => f.id == _gradeId)
         .firstOrNull;
+    final int readyCount =
+        books.where((K12TextbookEntry e) => _readyBookIds.containsKey(e.id)).length;
 
     return Scaffold(
       backgroundColor: AppDesignTokens.softWhite,
@@ -169,6 +176,17 @@ class _K12TextbookShelfScreenState
         backgroundColor: AppDesignTokens.softWhite,
         title: const Text('K12 英语教材书架'),
         actions: <Widget>[
+          IconButton(
+            tooltip: '刷新有声教材',
+            onPressed: _loadingMedia ? null : () => unawaited(_refreshReadyBooks()),
+            icon: _loadingMedia
+                ? const SizedBox(
+                    width: 18,
+                    height: 18,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.refresh_rounded),
+          ),
           TextButton(
             onPressed: () => context.push('/reading'),
             child: const Text('我的书架'),
@@ -179,8 +197,11 @@ class _K12TextbookShelfScreenState
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: <Widget>[
           Text(
-            '按年级浏览教材目录。已上传到服务器的课本会显示「有声教材」，'
-            '可直接播放配套 MP3；其余仍为目录占位，需自行导入合法文本。',
+            readyCount > 0
+                ? '本年级已上线 $readyCount 册有声教材（PDF + 课次音频）。'
+                    '点带「有声教材」标签的封面即可学习；其余为目录占位。'
+                : '按年级浏览教材目录。服务器上的有声课本会显示「有声教材」；'
+                    '未上传的仍是目录占位。当前年级暂无已上传册次时，可先切到三～六年级或初中。',
             style: TextStyle(
               color: AppDesignTokens.textSecondary,
               height: 1.45,
@@ -225,7 +246,8 @@ class _K12TextbookShelfScreenState
           ),
           const SizedBox(height: 18),
           Text(
-            '${grade?.label ?? '年级'} · ${books.length} 册',
+            '${grade?.label ?? '年级'} · ${books.length} 册'
+            '${readyCount > 0 ? ' · $readyCount 有声' : ''}',
             style: TextStyle(
               fontSize: 16,
               fontWeight: FontWeight.w900,
@@ -268,7 +290,7 @@ class _K12TextbookShelfScreenState
                           entry: books[i],
                           paletteIndex: i,
                           enabled: !_opening,
-                          hasAudio: _readyCatalogIds.contains(books[i].id),
+                          hasAudio: _readyBookIds.containsKey(books[i].id),
                           onTap: () => unawaited(_openTextbook(books[i])),
                         ),
                       ),

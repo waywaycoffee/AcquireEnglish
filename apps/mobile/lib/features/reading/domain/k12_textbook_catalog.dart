@@ -180,8 +180,9 @@ final List<K12TextbookEntry> kK12TextbookCatalog = <K12TextbookEntry>[
     publisher: '人民教育出版社',
     fromGrade: 1,
   ),
+  // Must match ECS catalog_id / book_id (`pep-y3-wuxin-*` from k12 import).
   ..._primaryEdition(
-    editionKey: 'pep-y3',
+    editionKey: 'pep-y3-wuxin',
     edition: '人教版 PEP（三年级起点）',
     publisher: '人民教育出版社',
     fromGrade: 3,
