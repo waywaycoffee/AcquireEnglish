@@ -1,5 +1,7 @@
 # AcquireEnglish 后续开发计划（2026-11-14）
 
+> **2026-11-26 焦点**：主线改为 **内容丰富**（推荐轨 / 免费种子 / 共享字幕 / 阅读 TTS / foundation 媒体）。电视、Leanback、折叠屏、小程序深化一律靠后。详见 `docs/product/content-enrichment-plan.md`。
+
 依据当前代码与生产环境 `https://acquireenglish.curlhairai.com` 的审计结果。
 
 ## 现状摘要
