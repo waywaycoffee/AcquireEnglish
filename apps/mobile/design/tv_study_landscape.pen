@@ -1,690 +1,1549 @@
 {
-  "version": "2.22",
+  "version": "2.25",
   "children": [
     {
       "type": "frame",
       "id": "landscape-player",
-      "name": "美剧精听 · 横屏 · 双语字幕",
       "x": 0,
       "y": 0,
+      "name": "美剧精听 · 横屏 · 双语字幕",
       "width": 1120,
       "height": 584,
-      "layout": "none",
       "fill": "#101923",
+      "layout": "none",
       "children": [
         {
           "type": "rectangle",
           "id": "header",
           "x": 0,
           "y": 0,
-          "width": 1120,
-          "height": 62,
           "fill": "#15202b",
-          "cornerRadius": 0
+          "width": 1120,
+          "height": 62
         },
         {
           "type": "text",
           "id": "exit",
           "x": 22,
           "y": 19,
+          "fill": "#ecf0f0",
           "content": "‹  返回",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 18,
-          "fontWeight": "normal",
-          "fill": "#ecf0f0"
+          "fontWeight": "normal"
         },
         {
           "type": "text",
           "id": "title",
           "x": 116,
           "y": 16,
+          "fill": "#ecf0f0",
           "content": "美剧精听  /  第 02 集",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 21,
-          "fontWeight": "bold",
-          "fill": "#ecf0f0"
+          "fontWeight": "bold"
         },
         {
           "type": "text",
           "id": "mode",
           "x": 956,
           "y": 20,
+          "fill": "#a8f1c8",
           "content": "横屏学习",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 16,
-          "fontWeight": "normal",
-          "fill": "#a8f1c8"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 12,
           "id": "video",
           "x": 20,
           "y": 78,
-          "width": 650,
-          "height": 366,
           "fill": "#1e323b",
-          "cornerRadius": 12
+          "width": 650,
+          "height": 366
         },
         {
           "type": "rectangle",
+          "cornerRadius": 8,
           "id": "footage",
           "x": 37,
           "y": 94,
-          "width": 616,
-          "height": 271,
           "fill": "#243e47",
-          "cornerRadius": 8
+          "width": 616,
+          "height": 271
         },
         {
           "type": "rectangle",
+          "cornerRadius": 6,
           "id": "window",
           "x": 332,
           "y": 109,
-          "width": 273,
-          "height": 233,
           "fill": "#365967",
-          "cornerRadius": 6
+          "width": 273,
+          "height": 233
         },
         {
           "type": "rectangle",
           "id": "window-divider",
           "x": 461,
           "y": 109,
-          "width": 5,
-          "height": 233,
           "fill": "#203841",
-          "cornerRadius": 0
+          "width": 5,
+          "height": 233
         },
         {
           "type": "rectangle",
           "id": "window-crossbar",
           "x": 332,
           "y": 227,
-          "width": 273,
-          "height": 5,
           "fill": "#203841",
-          "cornerRadius": 0
+          "width": 273,
+          "height": 5
         },
         {
           "type": "rectangle",
+          "cornerRadius": 18,
           "id": "sofa",
           "x": 75,
           "y": 233,
-          "width": 245,
-          "height": 94,
           "fill": "#724b3b",
-          "cornerRadius": 18
+          "width": 245,
+          "height": 94
         },
         {
           "type": "rectangle",
+          "cornerRadius": 14,
           "id": "sofa-seat",
           "x": 61,
           "y": 281,
-          "width": 272,
-          "height": 52,
           "fill": "#a57353",
-          "cornerRadius": 14
+          "width": 272,
+          "height": 52
         },
         {
           "type": "rectangle",
+          "cornerRadius": 8,
           "id": "caption",
           "x": 99,
           "y": 378,
-          "width": 492,
-          "height": 48,
           "fill": "#111b23",
-          "cornerRadius": 8
+          "width": 492,
+          "height": 48
         },
         {
           "type": "text",
           "id": "caption-text",
           "x": 130,
           "y": 390,
+          "fill": "#ecf0f0",
           "content": "I thought you were working late.",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 21,
-          "fontWeight": "bold",
-          "fill": "#ecf0f0"
+          "fontWeight": "bold"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 2,
           "id": "timeline",
           "x": 24,
           "y": 461,
-          "width": 642,
-          "height": 4,
           "fill": "#354652",
-          "cornerRadius": 2
+          "width": 642,
+          "height": 4
         },
         {
           "type": "rectangle",
+          "cornerRadius": 2,
           "id": "played",
           "x": 24,
           "y": 461,
-          "width": 212,
-          "height": 4,
           "fill": "#7adeaa",
-          "cornerRadius": 2
+          "width": 212,
+          "height": 4
         },
         {
           "type": "text",
           "id": "position",
           "x": 24,
           "y": 475,
+          "fill": "#aebbc4",
           "content": "08:24 / 25:31",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#aebbc4"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "prev-bg",
           "x": 24,
           "y": 518,
-          "width": 84,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 84,
+          "height": 35
         },
         {
           "type": "text",
           "id": "prev",
           "x": 35,
           "y": 525,
+          "fill": "#d3dee7",
           "content": "上一句",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "play-bg",
           "x": 117,
           "y": 518,
-          "width": 84,
-          "height": 35,
           "fill": "#244b3d",
-          "cornerRadius": 9
+          "width": 84,
+          "height": 35
         },
         {
           "type": "text",
           "id": "play",
           "x": 128,
           "y": 525,
+          "fill": "#a8f1c8",
           "content": "暂停",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#a8f1c8"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "next-bg",
           "x": 210,
           "y": 518,
-          "width": 84,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 84,
+          "height": 35
         },
         {
           "type": "text",
           "id": "next",
           "x": 221,
           "y": 525,
+          "fill": "#d3dee7",
           "content": "下一句",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "speed-bg",
           "x": 337,
           "y": 518,
-          "width": 77,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 77,
+          "height": 35
         },
         {
           "type": "text",
           "id": "speed",
           "x": 348,
           "y": 525,
+          "fill": "#d3dee7",
           "content": "1.0×",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "loop-bg",
           "x": 423,
           "y": 518,
-          "width": 98,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 98,
+          "height": 35
         },
         {
           "type": "text",
           "id": "loop",
           "x": 434,
           "y": 525,
+          "fill": "#d3dee7",
           "content": "单句循环",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "shadow-bg",
           "x": 530,
           "y": 518,
-          "width": 136,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 136,
+          "height": 35
         },
         {
           "type": "text",
           "id": "shadow",
           "x": 541,
           "y": 525,
+          "fill": "#d3dee7",
           "content": "跟读当前句",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 12,
           "id": "side",
           "x": 686,
           "y": 78,
-          "width": 414,
-          "height": 488,
           "fill": "#17232f",
-          "cornerRadius": 12
+          "width": 414,
+          "height": 488
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "tab-0-bg",
           "x": 699,
           "y": 87,
-          "width": 62,
-          "height": 35,
           "fill": "#244b3d",
-          "cornerRadius": 9
+          "width": 62,
+          "height": 35
         },
         {
           "type": "text",
           "id": "tab-0",
           "x": 710,
           "y": 94,
+          "fill": "#a8f1c8",
           "content": "字幕",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#a8f1c8"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "tab-1-bg",
           "x": 764,
           "y": 87,
-          "width": 62,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 62,
+          "height": 35
         },
         {
           "type": "text",
           "id": "tab-1",
           "x": 775,
           "y": 94,
+          "fill": "#d3dee7",
           "content": "跟读",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "tab-2-bg",
           "x": 829,
           "y": 87,
-          "width": 62,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 62,
+          "height": 35
         },
         {
           "type": "text",
           "id": "tab-2",
           "x": 840,
           "y": 94,
+          "fill": "#d3dee7",
           "content": "数字人",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "tab-3-bg",
           "x": 894,
           "y": 87,
-          "width": 62,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 62,
+          "height": 35
         },
         {
           "type": "text",
           "id": "tab-3",
           "x": 905,
           "y": 94,
+          "fill": "#d3dee7",
           "content": "听写",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "tab-4-bg",
           "x": 959,
           "y": 87,
-          "width": 62,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 62,
+          "height": 35
         },
         {
           "type": "text",
           "id": "tab-4",
           "x": 970,
           "y": 94,
+          "fill": "#d3dee7",
           "content": "练习",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "tab-5-bg",
           "x": 1024,
           "y": 87,
-          "width": 62,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 62,
+          "height": 35
         },
         {
           "type": "text",
           "id": "tab-5",
           "x": 1035,
           "y": 94,
+          "fill": "#d3dee7",
           "content": "背单词",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 10,
           "id": "row-0",
           "x": 701,
           "y": 139,
-          "width": 383,
-          "height": 80,
           "fill": "#202e3a",
-          "cornerRadius": 10
+          "width": 383,
+          "height": 80
         },
         {
           "type": "text",
           "id": "time-0",
           "x": 714,
           "y": 150,
+          "fill": "#adbcc6",
           "content": "08:19",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 13,
-          "fontWeight": "normal",
-          "fill": "#adbcc6"
+          "fontWeight": "normal"
         },
         {
           "type": "text",
           "id": "en-0",
           "x": 767,
           "y": 148,
+          "fill": "#f3f9f6",
           "content": "You’re home early.",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 17,
-          "fontWeight": "normal",
-          "fill": "#f3f9f6"
+          "fontWeight": "normal"
         },
         {
           "type": "text",
           "id": "zh-0",
           "x": 767,
           "y": 177,
+          "fill": "#c1d0d5",
           "content": "你回来得真早。",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 15,
-          "fontWeight": "normal",
-          "fill": "#c1d0d5"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 10,
           "id": "row-1",
           "x": 701,
           "y": 230,
-          "width": 383,
-          "height": 135,
           "fill": "#24483d",
-          "cornerRadius": 10
+          "width": 383,
+          "height": 135
         },
         {
           "type": "rectangle",
+          "cornerRadius": 2,
           "id": "current-marker",
           "x": 701,
           "y": 240,
-          "width": 3,
-          "height": 115,
           "fill": "#7adeaa",
-          "cornerRadius": 2
+          "width": 3,
+          "height": 115
         },
         {
           "type": "text",
           "id": "time-1",
           "x": 714,
           "y": 241,
+          "fill": "#a8f1c8",
           "content": "08:24",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 13,
-          "fontWeight": "normal",
-          "fill": "#a8f1c8"
+          "fontWeight": "normal"
         },
         {
           "type": "text",
           "id": "en-1",
           "x": 767,
           "y": 239,
+          "fill": "#f3f9f6",
           "content": "I thought you were working late.",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 17,
-          "fontWeight": "bold",
-          "fill": "#f3f9f6"
+          "fontWeight": "bold"
         },
         {
           "type": "text",
           "id": "zh-1",
           "x": 767,
           "y": 268,
+          "fill": "#c1d0d5",
           "content": "我以为你今天要加班。",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 15,
-          "fontWeight": "normal",
-          "fill": "#c1d0d5"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "replay-bg",
           "x": 767,
           "y": 313,
-          "width": 82,
-          "height": 35,
           "fill": "#244b3d",
-          "cornerRadius": 9
+          "width": 82,
+          "height": 35
         },
         {
           "type": "text",
           "id": "replay",
           "x": 778,
           "y": 320,
+          "fill": "#a8f1c8",
           "content": "重听本句",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#a8f1c8"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "save-bg",
           "x": 859,
           "y": 313,
-          "width": 86,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 86,
+          "height": 35
         },
         {
           "type": "text",
           "id": "save",
           "x": 870,
           "y": 320,
+          "fill": "#d3dee7",
           "content": "收藏句子",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 9,
           "id": "follow-bg",
           "x": 955,
           "y": 313,
-          "width": 83,
-          "height": 35,
           "fill": "#24313d",
-          "cornerRadius": 9
+          "width": 83,
+          "height": 35
         },
         {
           "type": "text",
           "id": "follow",
           "x": 966,
           "y": 320,
+          "fill": "#d3dee7",
           "content": "跟读",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 14,
-          "fontWeight": "normal",
-          "fill": "#d3dee7"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 10,
           "id": "row-2",
           "x": 701,
           "y": 377,
-          "width": 383,
-          "height": 80,
           "fill": "#202e3a",
-          "cornerRadius": 10
+          "width": 383,
+          "height": 80
         },
         {
           "type": "text",
           "id": "time-2",
           "x": 714,
           "y": 388,
+          "fill": "#adbcc6",
           "content": "08:28",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 13,
-          "fontWeight": "normal",
-          "fill": "#adbcc6"
+          "fontWeight": "normal"
         },
         {
           "type": "text",
           "id": "en-2",
           "x": 767,
           "y": 386,
+          "fill": "#f3f9f6",
           "content": "The meeting was called off.",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 17,
-          "fontWeight": "normal",
-          "fill": "#f3f9f6"
+          "fontWeight": "normal"
         },
         {
           "type": "text",
           "id": "zh-2",
           "x": 767,
           "y": 415,
+          "fill": "#c1d0d5",
           "content": "会议取消了。",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 15,
-          "fontWeight": "normal",
-          "fill": "#c1d0d5"
+          "fontWeight": "normal"
         },
         {
           "type": "rectangle",
+          "cornerRadius": 10,
           "id": "row-3",
           "x": 701,
           "y": 466,
-          "width": 383,
-          "height": 80,
           "fill": "#202e3a",
-          "cornerRadius": 10
+          "width": 383,
+          "height": 80
         },
         {
           "type": "text",
           "id": "time-3",
           "x": 714,
           "y": 477,
+          "fill": "#adbcc6",
           "content": "08:33",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 13,
-          "fontWeight": "normal",
-          "fill": "#adbcc6"
+          "fontWeight": "normal"
         },
         {
           "type": "text",
           "id": "en-3",
           "x": 767,
           "y": 475,
+          "fill": "#f3f9f6",
           "content": "Want me to make dinner?",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 17,
-          "fontWeight": "normal",
-          "fill": "#f3f9f6"
+          "fontWeight": "normal"
         },
         {
           "type": "text",
           "id": "zh-3",
           "x": 767,
           "y": 504,
+          "fill": "#c1d0d5",
           "content": "要我做晚饭吗？",
           "fontFamily": "Microsoft YaHei",
           "fontSize": 15,
-          "fontWeight": "normal",
-          "fill": "#c1d0d5"
+          "fontWeight": "normal"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "miWBr",
+      "x": 0,
+      "y": 664,
+      "name": "视频精听",
+      "clip": true,
+      "width": 1160,
+      "height": 760,
+      "fill": "#181921",
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 26,
+      "children": [
+        {
+          "type": "text",
+          "id": "YFWJo",
+          "name": "9:41",
+          "fill": "#B4B7C6",
+          "content": "9:41",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "h3Be7W",
+          "name": "‹    视频精听",
+          "fill": "#F5F5F8",
+          "content": "‹    视频精听",
+          "fontFamily": "Inter",
+          "fontSize": 24,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "S3QnTG",
+          "name": "主内容",
+          "width": "fill_container",
+          "height": "fill_container",
+          "gap": 20,
+          "children": [
+            {
+              "type": "frame",
+              "id": "j7xXa",
+              "name": "视频播放器",
+              "width": 640,
+              "height": "fill_container",
+              "fill": "#232530",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 18,
+              "padding": 22,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "AnACQ",
+                  "name": "Building Your English Brain",
+                  "fill": "#F5F5F8",
+                  "content": "Building Your English Brain",
+                  "fontFamily": "Inter",
+                  "fontSize": 20,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "xlVq8",
+                  "name": "视频画面",
+                  "width": "fill_container",
+                  "height": 335,
+                  "fill": "#111219",
+                  "cornerRadius": 12,
+                  "layout": "vertical",
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "F8CxX",
+                      "name": "▶",
+                      "fill": "#B9ABFF",
+                      "content": "▶",
+                      "fontFamily": "Inter",
+                      "fontSize": 44,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "text",
+                  "id": "Vk711",
+                  "name": "00:42  /  06:06     ━━━━━━━━━━━━━━━━━━",
+                  "fill": "#DAD4FF",
+                  "content": "00:42  /  06:06     ━━━━━━━━━━━━━━━━━━━━━",
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "DYRCT",
+                  "name": "双语字幕      0.8×      单句循环",
+                  "fill": "#F5F5F8",
+                  "content": "双语字幕      0.8×      单句循环",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "SfOA0",
+              "name": "字幕与练习",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#232530",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 18,
+              "padding": 22,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "PY6P9",
+                  "name": "字幕   ·   跟读   ·   听写",
+                  "fill": "#F5F5F8",
+                  "content": "字幕   ·   跟读   ·   听写",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "zGLCI",
+                  "name": "00:38",
+                  "width": "fill_container",
+                  "fill": "#292B37",
+                  "cornerRadius": 10,
+                  "layout": "vertical",
+                  "gap": 5,
+                  "padding": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "PFoL6",
+                      "name": "00:38",
+                      "fill": "#C7B9FF",
+                      "content": "00:38",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "L79hz",
+                      "name": "Give yourself time to think.",
+                      "fill": "#F5F5F8",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Give yourself time to think.",
+                      "lineHeight": 1.5,
+                      "fontFamily": "Inter",
+                      "fontSize": 18,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "GHIK6",
+                      "name": "给自己一点思考时间。",
+                      "fill": "#C8CAD5",
+                      "content": "给自己一点思考时间。",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "FwEHv",
+                  "name": "00:42",
+                  "width": "fill_container",
+                  "fill": "#36305E",
+                  "cornerRadius": 10,
+                  "layout": "vertical",
+                  "gap": 5,
+                  "padding": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "sxbsa",
+                      "name": "00:42",
+                      "fill": "#C7B9FF",
+                      "content": "00:42",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "AuYVt",
+                      "name": "Try to think in English.",
+                      "fill": "#F5F5F8",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Try to think in English.",
+                      "lineHeight": 1.5,
+                      "fontFamily": "Inter",
+                      "fontSize": 18,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "GHYaV",
+                      "name": "试着用英语思考。",
+                      "fill": "#C8CAD5",
+                      "content": "试着用英语思考。",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "g2fZB",
+                  "name": "00:46",
+                  "width": "fill_container",
+                  "fill": "#292B37",
+                  "cornerRadius": 10,
+                  "layout": "vertical",
+                  "gap": 5,
+                  "padding": 12,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "sRChf",
+                      "name": "00:46",
+                      "fill": "#C7B9FF",
+                      "content": "00:46",
+                      "fontFamily": "Inter",
+                      "fontSize": 12,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "jtT4f",
+                      "name": "Start with short sentences.",
+                      "fill": "#F5F5F8",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "Start with short sentences.",
+                      "lineHeight": 1.5,
+                      "fontFamily": "Inter",
+                      "fontSize": 18,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "gXQSg",
+                      "name": "从短句开始。",
+                      "fill": "#C8CAD5",
+                      "content": "从短句开始。",
+                      "fontFamily": "Inter",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "w4R5h",
+                  "name": "播放当前句",
+                  "fill": "#5737D5",
+                  "cornerRadius": 11,
+                  "layout": "vertical",
+                  "padding": [
+                    13,
+                    19
+                  ],
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "r9TIs",
+                      "name": "播放当前句",
+                      "fill": "#F5F5F8",
+                      "content": "播放当前句",
+                      "fontFamily": "Inter",
+                      "fontSize": 17,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "H8tyvO",
+      "x": 1220,
+      "y": 664,
+      "name": "英语阅读",
+      "clip": true,
+      "width": 1160,
+      "height": 760,
+      "fill": "#181921",
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 26,
+      "children": [
+        {
+          "type": "text",
+          "id": "iOJIp",
+          "name": "9:41",
+          "fill": "#B4B7C6",
+          "content": "9:41",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "G1XN5U",
+          "name": "‹    英语阅读",
+          "fill": "#F5F5F8",
+          "content": "‹    英语阅读",
+          "fontFamily": "Inter",
+          "fontSize": 24,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "rmtG7",
+          "name": "主内容",
+          "width": "fill_container",
+          "height": "fill_container",
+          "gap": 20,
+          "children": [
+            {
+              "type": "frame",
+              "id": "dmczE",
+              "name": "章节目录",
+              "width": 225,
+              "height": "fill_container",
+              "fill": "#232530",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 18,
+              "padding": 22,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "OHODf",
+                  "name": "章节目录",
+                  "fill": "#F5F5F8",
+                  "content": "章节目录",
+                  "fontFamily": "Inter",
+                  "fontSize": 18,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "PpxIF",
+                  "name": "第 1 节 · 风暴",
+                  "fill": "#D5D7E2",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "第 1 节 · 风暴",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "cuRqe",
+                  "name": "第 2 节 · 到达奥兹国",
+                  "fill": "#C7B9FF",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "第 2 节 · 到达奥兹国",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "U2pSM",
+                  "name": "第 3 节 · 稻草人",
+                  "fill": "#D5D7E2",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "第 3 节 · 稻草人",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "LsziZ",
+                  "name": "第 4 节 · 穿过森林",
+                  "fill": "#D5D7E2",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "第 4 节 · 穿过森林",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Inter",
+                  "fontSize": 15,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "H4ka7E",
+              "name": "阅读正文",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#232530",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 18,
+              "padding": 22,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "p5h5Z",
+                  "name": "The Wonderful Wizard of Oz",
+                  "fill": "#F5F5F8",
+                  "content": "The Wonderful Wizard of Oz",
+                  "fontFamily": "Inter",
+                  "fontSize": 27,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "e1VLl9",
+                  "name": "第 2 节 · 到达奥兹国",
+                  "fill": "#C7B9FF",
+                  "content": "第 2 节 · 到达奥兹国",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "rGJBl",
+                  "name": "A−      22      A+          ▶ 朗读本节    ",
+                  "fill": "#F5F5F8",
+                  "content": "A−      22      A+          ▶ 朗读本节       1×",
+                  "fontFamily": "Inter",
+                  "fontSize": 17,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "Llqkv",
+                  "name": "Dorothy opened the door and looked aro",
+                  "fill": "#F5F5F8",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Dorothy opened the door and looked around. The sun shone brightly, and the land was full of flowers.",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Inter",
+                  "fontSize": 23,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "VvqGy",
+                  "name": "She stood for a moment, listening to t",
+                  "fill": "#F5F5F8",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "She stood for a moment, listening to the birds. Everything looked different from her home in Kansas.",
+                  "lineHeight": 1.5,
+                  "fontFamily": "Inter",
+                  "fontSize": 23,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "L2zUR",
+                  "name": "‹ 上一节                       下一节 ›",
+                  "fill": "#C7B9FF",
+                  "content": "‹ 上一节                       下一节 ›",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "JpVBd",
+      "x": 0,
+      "y": 1474,
+      "name": "数字人口语",
+      "clip": true,
+      "width": 1160,
+      "height": 760,
+      "fill": "#181921",
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 26,
+      "children": [
+        {
+          "type": "text",
+          "id": "P0hPNj",
+          "name": "9:41",
+          "fill": "#B4B7C6",
+          "content": "9:41",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "lSCYQ",
+          "name": "‹    数字人口语",
+          "fill": "#F5F5F8",
+          "content": "‹    数字人口语",
+          "fontFamily": "Inter",
+          "fontSize": 24,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "hcsZH",
+          "name": "主内容",
+          "width": "fill_container",
+          "height": "fill_container",
+          "gap": 20,
+          "children": [
+            {
+              "type": "frame",
+              "id": "nK1Lz",
+              "name": "教练",
+              "width": 390,
+              "height": "fill_container",
+              "fill": "#232530",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 18,
+              "padding": 22,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "j6lZCn",
+                  "name": "Leo",
+                  "fill": "#F5F5F8",
+                  "content": "Leo",
+                  "fontFamily": "Inter",
+                  "fontSize": 26,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "jmTo5",
+                  "name": "清晰稳重 · 中英双语",
+                  "fill": "#C7B9FF",
+                  "content": "清晰稳重 · 中英双语",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "text",
+                  "id": "sXk83",
+                  "name": "换教练    场景    音色",
+                  "fill": "#F5F5F8",
+                  "content": "换教练    场景    音色",
+                  "fontFamily": "Inter",
+                  "fontSize": 16,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "aoxWh",
+              "name": "对话记录",
+              "width": "fill_container",
+              "height": "fill_container",
+              "fill": "#232530",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 18,
+              "padding": 22,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "AFXwn",
+                  "name": "对话记录",
+                  "fill": "#F5F5F8",
+                  "content": "对话记录",
+                  "fontFamily": "Inter",
+                  "fontSize": 19,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "klEDz",
+                  "name": "Leo",
+                  "width": "fill_container",
+                  "fill": "#292B37",
+                  "cornerRadius": 10,
+                  "layout": "vertical",
+                  "gap": 5,
+                  "padding": 14,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Vqj18",
+                      "name": "Leo",
+                      "fill": "#C7B9FF",
+                      "content": "Leo",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "W8xdf",
+                      "name": "What did you enjoy about the story?",
+                      "fill": "#F5F5F8",
+                      "content": "What did you enjoy about the story?",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "LQmpy",
+                  "name": "你",
+                  "width": "fill_container",
+                  "fill": "#36305E",
+                  "cornerRadius": 10,
+                  "layout": "vertical",
+                  "gap": 5,
+                  "padding": 14,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "XtUek",
+                      "name": "你",
+                      "fill": "#C7B9FF",
+                      "content": "你",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "MAF6R",
+                      "name": "I liked how Dorothy stayed curious.",
+                      "fill": "#F5F5F8",
+                      "content": "I liked how Dorothy stayed curious.",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "DSfPE",
+                  "name": "Leo",
+                  "width": "fill_container",
+                  "fill": "#292B37",
+                  "cornerRadius": 10,
+                  "layout": "vertical",
+                  "gap": 5,
+                  "padding": 14,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "Z0Ww0",
+                      "name": "Leo",
+                      "fill": "#C7B9FF",
+                      "content": "Leo",
+                      "fontFamily": "Inter",
+                      "fontSize": 13,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "text",
+                      "id": "g2LL2t",
+                      "name": "Nice! Can you give an example?",
+                      "fill": "#F5F5F8",
+                      "content": "Nice! Can you give an example?",
+                      "fontFamily": "Inter",
+                      "fontSize": 20,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "N8OAD",
+          "name": "🎙  按住说话",
+          "width": "fill_container",
+          "fill": "#5737D5",
+          "cornerRadius": 11,
+          "layout": "vertical",
+          "padding": [
+            13,
+            19
+          ],
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "MrczY",
+              "name": "🎙  按住说话",
+              "fill": "#F5F5F8",
+              "content": "🎙  按住说话",
+              "fontFamily": "Inter",
+              "fontSize": 17,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "OySJH",
+      "x": 1220,
+      "y": 1474,
+      "name": "英语阅读 · 分屏",
+      "clip": true,
+      "width": 560,
+      "height": 760,
+      "fill": "#181921",
+      "layout": "vertical",
+      "gap": 20,
+      "padding": 26,
+      "children": [
+        {
+          "type": "text",
+          "id": "NlYs2",
+          "name": "9:41",
+          "fill": "#B4B7C6",
+          "content": "9:41",
+          "fontFamily": "Inter",
+          "fontSize": 13,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "text",
+          "id": "J6vYRX",
+          "name": "‹    英语阅读 · 分屏",
+          "fill": "#F5F5F8",
+          "content": "‹    英语阅读 · 分屏",
+          "fontFamily": "Inter",
+          "fontSize": 24,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "Ned0o",
+          "name": "单栏正文",
+          "width": "fill_container",
+          "height": "fill_container",
+          "fill": "#232530",
+          "cornerRadius": 16,
+          "layout": "vertical",
+          "gap": 18,
+          "padding": 22,
+          "children": [
+            {
+              "type": "text",
+              "id": "OEKAn",
+              "name": "章节目录 ▾      A−   22   A+",
+              "fill": "#C7B9FF",
+              "content": "章节目录 ▾      A−   22   A+",
+              "fontFamily": "Inter",
+              "fontSize": 17,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "YmZ6e",
+              "name": "The Wonderful Wizard of Oz",
+              "fill": "#F5F5F8",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "The Wonderful Wizard of Oz",
+              "lineHeight": 1.5,
+              "fontFamily": "Inter",
+              "fontSize": 23,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "text",
+              "id": "eWreR",
+              "name": "Dorothy opened the door and looked aro",
+              "fill": "#F5F5F8",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "Dorothy opened the door and looked around. The sun shone brightly, and the land was full of flowers.",
+              "lineHeight": 1.5,
+              "fontFamily": "Inter",
+              "fontSize": 22,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "RlJTF",
+              "name": "▶ 朗读本节",
+              "fill": "#5737D5",
+              "cornerRadius": 11,
+              "layout": "vertical",
+              "padding": [
+                13,
+                19
+              ],
+              "children": [
+                {
+                  "type": "text",
+                  "id": "EfgcR",
+                  "name": "▶ 朗读本节",
+                  "fill": "#F5F5F8",
+                  "content": "▶ 朗读本节",
+                  "fontFamily": "Inter",
+                  "fontSize": 17,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "text",
+              "id": "zTJ0B",
+              "name": "‹ 上一节                         下一节 ›",
+              "fill": "#C7B9FF",
+              "content": "‹ 上一节                         下一节 ›",
+              "fontFamily": "Inter",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            }
+          ]
         }
       ]
     }
-  ]
+  ],
+  "fileToken": "6bd0ceab-2241-48e5-a1b9-9d464472c5e9"
 }

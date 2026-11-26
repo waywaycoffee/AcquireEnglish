@@ -41,6 +41,7 @@ import '../../shared/presentation/app_orientation.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../tv/presentation/tv_focus_button.dart';
+import '../../tv/presentation/tv_voice_ptt_bar.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../daily_path/presentation/oral_core_series_provider.dart';
 import '../../sync/data/personal_import_sync.dart';
@@ -3373,12 +3374,22 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                     primary: state.isLooping,
                                     onPressed: _handleToggleLoop,
                                   ),
-                                  TvFocusButton(
-                                    label: '跟读当前句',
-                                    onPressed: _handleToggleShadowing,
-                                  ),
                                 ],
                               ),
+                            ),
+                            const SizedBox(height: 12),
+                            TvVoicePttBar(
+                              referenceEnglish: activeLine.english,
+                              courseTitle: course?.title ?? '',
+                              episodeTitle: episode == null
+                                  ? ''
+                                  : '第 ${episode.numberStr} 集',
+                              onPausePlayback: () {
+                                if (state.isPlaying) {
+                                  _handleTogglePlaying();
+                                }
+                              },
+                              onOpenLegacyShadowing: _handleAssessVisibleLine,
                             ),
                           ] else ...<Widget>[
                             const SizedBox(height: 12),
