@@ -34,9 +34,17 @@ _CURATED_SHOW_TITLES: tuple[tuple[tuple[str, ...], str], ...] = (
     (("绝望的主妇", "绝望主妇", "desperate housewives"), "绝望主妇"),
     (("老友记", "friends", "f.r.i.e.n.d.s"), "老友记"),
     (("摩登家庭", "modern family"), "摩登家庭"),
-    (("生活大爆炸", "big bang theory", "tbbt"), "生活大爆炸"),
-    (("哈利·波特", "哈利波特", "harry potter"), "哈利·波特"),
-    (("王冠", "the crown"), "王冠"),
+    (
+        (
+            "生活大爆炸",
+            "big bang theory",
+            "the big bang theory",
+            "the.big.bang.theory",
+            "tbbt",
+        ),
+        "生活大爆炸",
+    ),
+    (("哈利·波特", "哈利波特", "harry potter", "harry.potter"), "哈利·波特"),
 )
 
 

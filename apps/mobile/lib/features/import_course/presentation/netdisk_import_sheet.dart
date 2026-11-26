@@ -12,8 +12,12 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../data/netdisk_local_download.dart';
 
-Future<void> showNetdiskImportSheet(BuildContext context, WidgetRef ref,
-    {String? initialProvider}) {
+Future<void> showNetdiskImportSheet(
+  BuildContext context,
+  WidgetRef ref, {
+  String? initialProvider,
+  String? initialSearch,
+}) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
@@ -23,15 +27,19 @@ Future<void> showNetdiskImportSheet(BuildContext context, WidgetRef ref,
       borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
     ),
     builder: (BuildContext sheetContext) {
-      return _NetdiskImportSheet(initialProvider: initialProvider);
+      return _NetdiskImportSheet(
+        initialProvider: initialProvider,
+        initialSearch: initialSearch,
+      );
     },
   );
 }
 
 class _NetdiskImportSheet extends ConsumerStatefulWidget {
-  const _NetdiskImportSheet({this.initialProvider});
+  const _NetdiskImportSheet({this.initialProvider, this.initialSearch});
 
   final String? initialProvider;
+  final String? initialSearch;
 
   @override
   ConsumerState<_NetdiskImportSheet> createState() =>
@@ -41,6 +49,7 @@ class _NetdiskImportSheet extends ConsumerStatefulWidget {
 class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   late String _provider;
   final TextEditingController _credential = TextEditingController();
+  final TextEditingController _search = TextEditingController();
   final List<String> _pathStack = <String>[];
   List<Map<String, dynamic>> _entries = const <Map<String, dynamic>>[];
   final Set<String> _selected = <String>{};
@@ -75,6 +84,13 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
             .contains(widget.initialProvider)
         ? widget.initialProvider!
         : 'baidu';
+    final String seed = (widget.initialSearch ?? '').trim();
+    if (seed.isNotEmpty) {
+      _search.text = seed;
+    }
+    _search.addListener(() {
+      if (mounted) setState(() {});
+    });
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_reloadStatus());
     });
@@ -84,7 +100,22 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
   void dispose() {
     _oauthPoll?.cancel();
     _credential.dispose();
+    _search.dispose();
     super.dispose();
+  }
+
+  List<Map<String, dynamic>> get _visibleEntries {
+    final String q = _search.text.trim().toLowerCase();
+    if (q.isEmpty) {
+      return _entries;
+    }
+    return _entries
+        .where((Map<String, dynamic> row) {
+          final String name = '${row['name'] ?? ''}'.toLowerCase();
+          final String path = '${row['path'] ?? ''}'.toLowerCase();
+          return name.contains(q) || path.contains(q);
+        })
+        .toList(growable: false);
   }
 
   String get _currentFolderPath {
@@ -776,6 +807,28 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                         ),
                       ],
                     ),
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 8),
+                      child: TextField(
+                        controller: _search,
+                        textInputAction: TextInputAction.search,
+                        decoration: InputDecoration(
+                          hintText: '搜索当前目录（剧名 / 文件夹）',
+                          prefixIcon: const Icon(Icons.search_rounded),
+                          suffixIcon: _search.text.isEmpty
+                              ? null
+                              : IconButton(
+                                  tooltip: '清除',
+                                  onPressed: () => _search.clear(),
+                                  icon: const Icon(Icons.close_rounded),
+                                ),
+                          isDense: true,
+                          border: OutlineInputBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                      ),
+                    ),
                     if (_listHint != null)
                       Padding(
                         padding: const EdgeInsets.only(bottom: 8),
@@ -798,12 +851,23 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                     Expanded(
                       child: _busy && _entries.isEmpty
                           ? const Center(child: CircularProgressIndicator())
+                          : _visibleEntries.isEmpty
+                              ? Center(
+                                  child: Text(
+                                    _search.text.trim().isEmpty
+                                        ? '此目录为空'
+                                        : '没有匹配「${_search.text.trim()}」的项目',
+                                    style: TextStyle(
+                                      color: AppDesignTokens.textSecondary,
+                                    ),
+                                  ),
+                                )
                           : ListView.builder(
-                              itemCount: _entries.length,
+                              itemCount: _visibleEntries.length,
                               itemBuilder:
                                   (BuildContext context, int index) {
                                 final Map<String, dynamic> row =
-                                    _entries[index];
+                                    _visibleEntries[index];
                                 final bool isDir = row['is_dir'] == true;
                                 final String name = '${row['name'] ?? ''}';
                                 final String path = '${row['path'] ?? ''}';

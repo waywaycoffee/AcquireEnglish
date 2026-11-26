@@ -118,12 +118,16 @@ List<LibraryCourseData> pruneSubsumedDramaFlats(
   }).toList(growable: false);
 }
 
-int _dramaCourseRank(LibraryCourseData course) {
+/// Higher = prefer when several imports match the same curated poster.
+int dramaCourseRank(LibraryCourseData course) {
   int score = course.episodes.length * 10;
   if (course.id.startsWith('netdisk-series-')) score += 1000;
+  if (course.id.startsWith('public-series-')) score += 200;
   if (_looksLikeNetdiskCourse(course)) score += 50;
   return score;
 }
+
+int _dramaCourseRank(LibraryCourseData course) => dramaCourseRank(course);
 
 /// Courses shown under「我的已导入」— curated shelf posters already cover these.
 List<LibraryCourseData> dramasOutsideCuratedShelf(

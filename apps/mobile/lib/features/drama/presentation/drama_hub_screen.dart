@@ -49,6 +49,8 @@ class DramaHubScreen extends ConsumerStatefulWidget {
 class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
   _DramaFilter _filter = _DramaFilter.all;
   String? _selectedCourseId;
+  /// Stable curated poster id — survives netdisk-series id flips on sync.
+  String? _selectedCatalogEntryId;
   bool _syncedDue = false;
   bool _coversPrefetched = false;
   String? _cacheScanCourseId;
@@ -96,14 +98,27 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
     }
 
     // Only show episodes after the user taps a poster (or picks 自建片源).
+    // Prefer catalog entry so HP/netdisk id changes do not wipe the episode list.
     LibraryCourseData? selected;
-    if (_selectedCourseId != null) {
+    if (_selectedCatalogEntryId != null) {
+      for (final DramaCatalogEntry entry in kDramaCatalog) {
+        if (entry.id != _selectedCatalogEntryId) {
+          continue;
+        }
+        selected = importedCourseForCatalogEntry(entry, dramas);
+        break;
+      }
+    }
+    if (selected == null && _selectedCourseId != null) {
       for (final LibraryCourseData c in dramas) {
         if (c.id == _selectedCourseId) {
           selected = c;
           break;
         }
       }
+    }
+    if (selected != null && selected.id != _selectedCourseId) {
+      _selectedCourseId = selected.id;
     }
     if (selected != null && selected.id != _cacheScanCourseId) {
       final LibraryCourseData scanTarget = selected;
@@ -183,16 +198,24 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
           height: 176,
           child: ListView.separated(
             scrollDirection: Axis.horizontal,
-            itemCount: kDramaCatalog.length,
+            itemCount: kDramaCatalog.length + 1,
             separatorBuilder: (_, __) => const SizedBox(width: 10),
             itemBuilder: (BuildContext context, int index) {
+              if (index >= kDramaCatalog.length) {
+                return _AddDramaPosterTile(
+                  onTap: () => showNetdiskImportSheet(context, ref),
+                );
+              }
               final DramaCatalogEntry entry = kDramaCatalog[index];
               final LibraryCourseData? owned =
                   importedCourseForCatalogEntry(entry, dramas);
+              final bool isSelected = owned != null &&
+                  ((_selectedCatalogEntryId == entry.id) ||
+                      (selected?.id == owned.id));
               return _CatalogPosterCard(
                 entry: entry,
-                owned: owned != null,
-                selected: selected?.id == owned?.id && owned != null,
+                owned: owned != null && (owned.episodes.isNotEmpty),
+                selected: isSelected,
                 episodeCount: owned?.episodes.length ?? 0,
                 onTap: () => _onCatalogTap(entry, owned),
               );
@@ -218,8 +241,8 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
           )
         else ...<Widget>[
           Text(
-            '${libraryCourseDisplayTitle(selected!)}  ·  '
-            '${selected!.episodes.length} 集',
+            '${libraryCourseDisplayTitle(selected)}  ·  '
+            '${selected.episodes.length} 集',
             style: Theme.of(context).textTheme.titleSmall?.copyWith(
                   fontWeight: FontWeight.w800,
                   color: AppDesignTokens.textPrimary,
@@ -243,8 +266,9 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          ..._filteredEpisodes(selected!, progressMap).map(
+          ..._filteredEpisodes(selected, progressMap).map(
             (LibraryEpisodeItem ep) {
+              // Local capture — closures drop promotion of [selected].
               final String courseId = selected!.id;
               final EpisodeStudyProgress p =
                   episodeProgressOf(progressMap, ep.id);
@@ -409,7 +433,10 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
             ],
             onChanged: (String? id) {
               if (id == null) return;
-              setState(() => _selectedCourseId = id);
+              setState(() {
+                _selectedCatalogEntryId = null;
+                _selectedCourseId = id;
+              });
             },
           ),
         ],
@@ -441,7 +468,10 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
     LibraryCourseData? owned,
   ) async {
     if (owned != null && owned.episodes.isNotEmpty) {
-      setState(() => _selectedCourseId = owned.id);
+      setState(() {
+        _selectedCatalogEntryId = entry.id;
+        _selectedCourseId = owned.id;
+      });
       return;
     }
     if (!mounted) return;
@@ -474,7 +504,8 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                 const SizedBox(height: 12),
                 Text(
                   '${entry.blurb}\n\n'
-                  '当前账号还没有这套剧。可下拉刷新同步公开片单，或添加自有授权网盘片源（不会立刻下载视频）。',
+                  '当前账号还没有这套剧。打开网盘后可用搜索定位「${entry.titleZh}」文件夹，'
+                  '再点「导入本文件夹为课程」。',
                   style: TextStyle(
                     color: AppDesignTokens.textPrimary,
                     height: 1.45,
@@ -484,7 +515,11 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
                 FilledButton.icon(
                   onPressed: () {
                     Navigator.of(ctx).pop();
-                    showNetdiskImportSheet(context, ref);
+                    showNetdiskImportSheet(
+                      context,
+                      ref,
+                      initialSearch: entry.titleZh,
+                    );
                   },
                   style: FilledButton.styleFrom(
                     backgroundColor: AppDesignTokens.primaryBlueDark,
@@ -552,6 +587,53 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
         }
       }
     }
+  }
+}
+
+class _AddDramaPosterTile extends StatelessWidget {
+  const _AddDramaPosterTile({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(14),
+        child: Ink(
+          width: 118,
+          decoration: BoxDecoration(
+            color: AppDesignTokens.appWhite,
+            borderRadius: BorderRadius.circular(14),
+            border: Border.all(
+              color: AppDesignTokens.borderGray,
+              width: 1.5,
+            ),
+          ),
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: <Widget>[
+              Icon(
+                Icons.add_rounded,
+                size: 42,
+                color: AppDesignTokens.primaryBlueDark,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                '导入美剧',
+                style: TextStyle(
+                  fontWeight: FontWeight.w800,
+                  fontSize: 13,
+                  color: AppDesignTokens.textPrimary,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 }
 

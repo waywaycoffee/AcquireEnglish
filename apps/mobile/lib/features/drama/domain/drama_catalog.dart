@@ -85,6 +85,9 @@ const List<DramaCatalogEntry> kDramaCatalog = <DramaCatalogEntry>[
     matchAliases: <String>[
       '生活大爆炸',
       'big bang theory',
+      'big.bang.theory',
+      'the big bang theory',
+      'the.big.bang.theory',
       'tbbt',
     ],
     accent: 0xFFC45C26,
@@ -96,27 +99,15 @@ const List<DramaCatalogEntry> kDramaCatalog = <DramaCatalogEntry>[
     blurb: '电影系列 · 叙事与场景英语',
     coverUrl: '$_kDramaCoverBase/harry-potter.jpg',
     matchAliases: <String>[
-      '哈利',
+      '哈利波特',
+      '哈利·波特',
       'harry potter',
       'harry.potter',
+      'harry_potter',
       'hp0',
     ],
     level: 'B1–C1',
     accent: 0xFF5C4B8A,
-  ),
-  DramaCatalogEntry(
-    id: 'the-crown',
-    titleZh: '王冠',
-    titleEn: 'The Crown',
-    blurb: '英式正剧 · 正式场合用语',
-    coverUrl: '$_kDramaCoverBase/the-crown.jpg',
-    matchAliases: <String>[
-      '王冠',
-      'the crown',
-      'the.crown',
-    ],
-    level: 'B2–C1',
-    accent: 0xFF6B5B4B,
   ),
 ];
 
@@ -172,14 +163,23 @@ LibraryCourseData? importedCourseForCatalogEntry(
   DramaCatalogEntry entry,
   Iterable<LibraryCourseData> courses,
 ) {
-  // Prefer exact public-series id, then netdisk-series with alias match.
+  // Prefer the richest matching course so a partial flat import cannot
+  // replace a full netdisk-series (HP "5集→消失" when prune/sync flips ids).
+  LibraryCourseData? best;
   for (final LibraryCourseData course in courses) {
-    if (course.id == 'public-series-${entry.id}') {
-      return course;
+    if (!catalogEntryMatchesCourse(entry, course)) {
+      continue;
+    }
+    if (best == null || _rank(course) > _rank(best)) {
+      best = course;
     }
   }
-  for (final LibraryCourseData course in courses) {
-    if (catalogEntryMatchesCourse(entry, course)) return course;
-  }
-  return null;
+  return best;
+}
+
+int _rank(LibraryCourseData course) {
+  int score = course.episodes.length * 10;
+  if (course.id.startsWith('netdisk-series-')) score += 1000;
+  if (course.id.startsWith('public-series-')) score += 200;
+  return score;
 }

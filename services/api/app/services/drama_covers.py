@@ -17,7 +17,6 @@ CURATED_SLUGS: tuple[str, ...] = (
     "modern-family",
     "the-big-bang-theory",
     "harry-potter",
-    "the-crown",
 )
 
 
