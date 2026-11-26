@@ -3,10 +3,10 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>iOS TestFlight 安装步骤 — 爱快英语</title>
+    <title>iPhone 怎么安装爱快英语 — 超简单三步</title>
     <meta
       name="description"
-      content="爱快英语 iOS 内测：通过 Apple TestFlight 安装。详细图文步骤，适合首次参与测试的用户。"
+      content="不会装 App 也没关系：按三步用苹果官方测试通道安装爱快英语。全程用手机 Safari 打开即可。"
     />
     <link rel="icon" href="/brand/app-icon.png" />
     <style>
@@ -24,231 +24,199 @@
       * { box-sizing: border-box; }
       body {
         margin: 0;
-        font-family: -apple-system, BlinkMacSystemFont, "SF Pro Text", "PingFang SC",
-          "Hiragino Sans GB", sans-serif;
+        font-family: -apple-system, BlinkMacSystemFont, "PingFang SC",
+          "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
         background: radial-gradient(1000px 500px at 80% -10%, #152238, var(--bg));
         color: var(--text);
-        line-height: 1.7;
+        line-height: 1.75;
       }
-      main { max-width: 760px; margin: 0 auto; padding: 36px 20px 88px; }
+      main { max-width: 720px; margin: 0 auto; padding: 28px 18px 88px; }
       img.logo { width: 56px; height: 56px; border-radius: 14px; }
-      h1 { font-size: clamp(26px, 5vw, 36px); letter-spacing: -0.03em; margin: 16px 0 8px; }
-      h2 { margin: 0 0 10px; font-size: 18px; }
-      .lead { color: var(--muted); margin: 0 0 20px; }
+      h1 { font-size: clamp(26px, 5.5vw, 34px); letter-spacing: -0.03em; margin: 14px 0 10px; }
+      h2 { margin: 0 0 10px; font-size: 19px; }
+      .lead { color: var(--muted); margin: 0 0 18px; font-size: 16px; }
       .card {
         background: var(--card);
         border: 1px solid var(--line);
         border-radius: 16px;
-        padding: 18px 18px 16px;
+        padding: 18px;
         margin: 14px 0;
       }
-      .badge {
-        display: inline-block;
-        padding: 4px 10px;
-        border-radius: 999px;
-        background: rgba(10, 132, 255, 0.18);
-        color: #9ec9ff;
-        font-size: 13px;
-        font-weight: 700;
-      }
-      .badge.ok {
-        background: rgba(61, 220, 132, 0.16);
-        color: #9af0c0;
-      }
-      .badge.warn {
-        background: rgba(251, 191, 36, 0.14);
-        color: #fde68a;
-      }
-      ol.steps { margin: 8px 0 0; padding-left: 1.25rem; }
-      ol.steps li { margin: 10px 0; color: var(--muted); }
-      ol.steps li strong { color: var(--text); }
-      .btn {
+      .step-num {
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        min-height: 48px;
-        padding: 0 20px;
+        width: 28px;
+        height: 28px;
         border-radius: 999px;
+        background: var(--ios);
+        color: #fff;
+        font-weight: 800;
+        margin-right: 8px;
+        font-size: 15px;
+      }
+      .btn {
+        display: block;
+        width: 100%;
+        text-align: center;
+        min-height: 52px;
+        line-height: 52px;
+        border-radius: 14px;
         text-decoration: none;
-        font-weight: 700;
-        margin: 8px 8px 0 0;
+        font-weight: 800;
+        font-size: 17px;
+        margin-top: 12px;
       }
       .btn.ios { background: var(--ios); color: #fff; }
       .btn.ghost {
         background: transparent;
         color: var(--accent);
         border: 1px solid #35507a;
+        line-height: 50px;
       }
-      .btn[disabled], .btn.is-disabled {
-        opacity: 0.45;
-        pointer-events: none;
+      .btn.is-disabled { opacity: 0.45; pointer-events: none; }
+      .warn {
+        background: rgba(251, 191, 36, 0.1);
+        border: 1px solid rgba(251, 191, 36, 0.35);
+        color: #fde68a;
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 15px;
+        margin: 12px 0;
       }
+      .ok {
+        background: rgba(61, 220, 132, 0.1);
+        border: 1px solid rgba(61, 220, 132, 0.3);
+        color: #9af0c0;
+        border-radius: 12px;
+        padding: 12px 14px;
+        font-size: 15px;
+        margin: 12px 0;
+      }
+      .muted { color: var(--muted); font-size: 14px; }
       code { color: #dbeafe; }
       a { color: var(--accent); }
-      .tip {
-        border-left: 3px solid var(--warn);
-        padding: 2px 0 2px 12px;
-        color: #fde68a;
-        margin: 10px 0;
-        font-size: 14px;
-      }
+      ul { margin: 8px 0 0; padding-left: 1.15rem; color: var(--muted); }
+      li { margin: 8px 0; }
       .meta { margin-top: 28px; color: var(--muted); font-size: 13px; }
-      #join-status { margin-top: 8px; color: var(--muted); font-size: 14px; }
+      #join-status { margin-top: 10px; color: var(--muted); font-size: 14px; }
     </style>
   </head>
   <body>
     <main>
       <img class="logo" src="/brand/app-icon.png" alt="爱快英语" />
-      <p>
-        <span class="badge ok" id="status-badge">TestFlight 外部测试已批准</span>
-      </p>
-      <h1>iOS 安装步骤（TestFlight）</h1>
+      <h1>iPhone 怎么安装爱快英语</h1>
       <p class="lead">
-        爱快英语目前<strong>未上架 App Store</strong>。iPhone / iPad 请用 Apple 官方
-        <strong>TestFlight</strong> 安装内测版（构建
-        <code id="build-label">0.2.250+269</code>）。不需要登记设备 UDID。
+        不用懂技术。因为 App 还没上苹果商店，需要先装一个苹果官方的「试用安装」小工具，再点一次按钮就能装上爱快英语。
       </p>
 
+      <div class="warn">
+        <strong>重要：请用手机自带的 Safari 浏览器打开本页。</strong><br />
+        不要用微信里直接点开（微信内置浏览器经常装不上）。若在微信里看到本页：点右上角
+        <strong>···</strong> → 选择 <strong>在 Safari 中打开</strong>。
+      </div>
+
       <section class="card">
-        <h2>一键加入（推荐）</h2>
-        <p style="color: var(--muted); margin: 0 0 8px; font-size: 14px">
-          用 Safari 打开下方按钮（不要用微信内置浏览器）。若未安装 TestFlight，系统会引导你先去 App Store 安装。
+        <h2><span class="step-num">1</span>先装「TestFlight」</h2>
+        <p class="muted" style="margin: 0">
+          这是苹果官方 App，专门用来装还没上架商店的试用版。名字叫 TestFlight（测试飞行），蓝色飞机图标。
         </p>
-        <a class="btn ios is-disabled" id="join-btn" href="#" aria-disabled="true">
-          加入 TestFlight 内测
-        </a>
         <a
           class="btn ghost"
           href="https://apps.apple.com/app/testflight/id899247664"
           target="_blank"
           rel="noopener"
         >
-          先安装 TestFlight App
+          去 App Store 安装 TestFlight
         </a>
-        <p id="join-status">正在读取邀请链接…</p>
-      </section>
-
-      <section class="card">
-        <h2>详细步骤（第一次安装）</h2>
-        <ol class="steps">
-          <li>
-            <strong>准备一台 iPhone 或 iPad</strong><br />
-            系统建议 iOS 15 及以上。用本人 Apple ID 登录 App Store。
-          </li>
-          <li>
-            <strong>安装 TestFlight</strong><br />
-            打开 App Store，搜索「TestFlight」（开发者 Apple），安装蓝色飞机图标应用。
-            也可点上方「先安装 TestFlight App」。
-          </li>
-          <li>
-            <strong>用 Safari 打开邀请链接</strong><br />
-            点本页「加入 TestFlight 内测」。若链接在微信里收到，请点右上角
-            「…」→「在 Safari 中打开」，否则可能无法调起 TestFlight。
-          </li>
-          <li>
-            <strong>接受邀请</strong><br />
-            页面会打开 TestFlight，显示「爱快英语」。点
-            <strong>接受 / Accept</strong>。
-          </li>
-          <li>
-            <strong>安装 App</strong><br />
-            接受后点 <strong>安装 / Install</strong>。桌面会出现「爱快英语」图标。
-            首次打开若提示「未受信任的企业级开发者」类提示，按系统引导允许即可（TestFlight
-            包一般为标准 Beta，通常不会出现）。
-          </li>
-          <li>
-            <strong>登录并反馈</strong><br />
-            打开 App → 可用邮箱等方式注册/登录（审核演示也可用邮箱路径）。
-            把<strong>注册 ID</strong>微信发给作者 <code>youyoufairytale</code>，
-            并扫码加入「佑佑爸粉丝交流群」反馈 bug。
-          </li>
-        </ol>
-      </section>
-
-      <section class="card">
-        <h2>更新内测版本</h2>
-        <ol class="steps">
-          <li>打开手机上的 <strong>TestFlight</strong> App。</li>
-          <li>在列表中点「爱快英语」。</li>
-          <li>若有新构建，点 <strong>更新 / Update</strong>。</li>
-        </ol>
-        <p class="tip">
-          TestFlight 内测包大约 90 天后过期；到期前我们会发新构建，你在 TestFlight 里更新即可。
+        <p class="muted" style="margin: 10px 0 0">
+          打开手机「App Store」→ 搜索「TestFlight」→ 点获取/安装。装好后先不用打开它。
         </p>
       </section>
 
       <section class="card">
-        <h2>常见问题</h2>
-        <ol class="steps">
-          <li>
-            <strong>点链接没反应 / 一直转圈？</strong><br />
-            换 Safari；确认已登录 Apple ID；先单独打开一次 TestFlight App 再点链接。
-          </li>
-          <li>
-            <strong>提示「无法加入 Beta」？</strong><br />
-            外测名额约 1 万；若已满请微信联系作者。或检查是否用错 Apple ID 地区账号。
-          </li>
-          <li>
-            <strong>能不能不装 TestFlight？</strong><br />
-            外人一般不行。只有已登记 UDID 的设备才能装 Ad Hoc 包；公开测试请统一走
-            TestFlight。
-          </li>
-          <li>
-            <strong>这是正式上架吗？</strong><br />
-            不是。当前是 TestFlight 外部 Beta。App Store 正式上架需另行提交审核。
-          </li>
-        </ol>
+        <h2><span class="step-num">2</span>点下面蓝色按钮加入</h2>
+        <p class="muted" style="margin: 0">
+          点完会跳到苹果页面，再点「开始测试 / Start Testing」或「接受」。
+        </p>
+        <a class="btn ios is-disabled" id="join-btn" href="#" aria-disabled="true">
+          点这里安装爱快英语
+        </a>
+        <p id="join-status">正在准备安装按钮…</p>
       </section>
 
       <section class="card">
-        <h2>内测须知</h2>
-        <ol class="steps">
-          <li>注册 ID 发给作者微信 <code>youyoufairytale</code></li>
-          <li>加入粉丝交流群报 bug（见<a href="/download.html#community">下载页二维码</a>）</li>
-          <li>社区上传学习资源，审核通过可赠 Pro 时长</li>
-          <li>违规敏感内容一经发现永久封号</li>
-        </ol>
-        <a class="btn ghost" href="/beta.html">阅读完整内测公告</a>
-        <a class="btn ghost" href="/download.html">Android APK 下载</a>
+        <h2><span class="step-num">3</span>回到桌面打开 App</h2>
+        <p class="muted" style="margin: 0">
+          安装完成后，手机桌面会出现「爱快英语」。点开登录即可。
+          请把你的<strong>注册 ID</strong>发给作者微信
+          <code>youyoufairytale</code>，方便开通协助和收反馈。
+        </p>
+        <div class="ok" style="margin-top: 12px">
+          以后有新版本：打开手机里的 TestFlight → 点「爱快英语」→ 点「更新」就行。
+        </div>
+      </section>
+
+      <section class="card">
+        <h2>卡住了？看这里</h2>
+        <ul>
+          <li>
+            <strong>微信里点了没反应：</strong>右上角 ··· → 在 Safari 中打开，再点蓝色按钮。
+          </li>
+          <li>
+            <strong>找不到 TestFlight：</strong>确认用的是中国区或你常用的 Apple
+            ID，在 App Store 搜索英文名 TestFlight。
+          </li>
+          <li>
+            <strong>提示无法加入：</strong>换个网络再试；或微信联系
+            <code>youyoufairytale</code>，作者可单独发邀请。
+          </li>
+          <li>
+            <strong>安卓手机：</strong>不用这套流程，请去
+            <a href="/download.html">下载页</a>直接装 APK。
+          </li>
+        </ul>
+      </section>
+
+      <section class="card">
+        <h2>还是不会？</h2>
+        <p class="muted" style="margin: 0">
+          加作者微信 <code>youyoufairytale</code>，发一句「我要装 iPhone」，作者会远程带你点。
+          也可以扫下载页的粉丝群二维码，群里问一声通常很快有人帮。
+        </p>
+        <a class="btn ghost" href="/download.html#community">去看粉丝群二维码</a>
       </section>
 
       <p class="meta">
-        <a href="/">返回官网</a>
+        <a href="/download.html">返回下载页</a>
         ·
-        <a href="/download.html">下载页</a>
+        <a href="/">官网首页</a>
         ·
-        <a href="/privacy.html">隐私政策</a>
-        · 支持邮箱
-        <a href="mailto:support@curlhairai.com">support@curlhairai.com</a>
+        <a href="/beta.html">内测公告</a>
       </p>
     </main>
     <script>
       (async function () {
         const btn = document.getElementById("join-btn");
         const status = document.getElementById("join-status");
-        const buildLabel = document.getElementById("build-label");
         try {
           const res = await fetch("/downloads/ios-testflight.json", {
             cache: "no-store",
           });
           const data = await res.json();
-          if (data.version && data.build) {
-            buildLabel.textContent = data.version + "+" + data.build;
-          }
           const url = (data.join_url || "").trim();
           if (url) {
             btn.href = url;
             btn.classList.remove("is-disabled");
             btn.removeAttribute("aria-disabled");
             status.textContent =
-              "当前邀请已开启。请用 Safari 打开上方蓝色按钮。";
+              "按钮已就绪。请确认第 1 步装好 TestFlight 后，再点蓝色按钮。";
           } else {
             status.innerHTML =
-              '公开邀请链接尚未写入官网。请先加作者微信 <code>youyoufairytale</code> 索取 TestFlight 邀请，或等待作者开启「公开链接」后刷新本页。';
+              '安装按钮暂未开放。请微信联系 <code>youyoufairytale</code> 获取邀请。';
           }
         } catch (e) {
-          status.textContent =
-            "读取邀请配置失败，请稍后刷新，或微信联系 youyoufairytale。";
+          status.textContent = "加载失败，请刷新页面，或微信联系 youyoufairytale。";
         }
       })();
     </script>
