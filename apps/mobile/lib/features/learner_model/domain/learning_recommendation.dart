@@ -11,7 +11,7 @@ class LearnCandidate {
     required this.contentBand,
     this.pursuit = false,
     this.interestMatch = false,
-    this.recentlySwapped = false,
+    this.notInterested = false,
     this.oralLineUsedRecently = false,
   });
 
@@ -22,7 +22,9 @@ class LearnCandidate {
   final String contentBand;
   final bool pursuit;
   final bool interestMatch;
-  final bool recentlySwapped;
+
+  /// 「不感兴趣」: hide for the demote window. A one-off swap does not set this.
+  final bool notInterested;
   final bool oralLineUsedRecently;
 }
 
@@ -56,18 +58,21 @@ LearnerSkill _skillFor(LearnModule module) => switch (module) {
 List<ScoredLearnCandidate> rankLearnCandidates({
   required List<LearnCandidate> candidates,
   required LearnerSkillProfile profile,
+  Map<LearnModule, int> difficultyShift = const <LearnModule, int>{},
 }) {
   final List<ScoredLearnCandidate> scored = <ScoredLearnCandidate>[];
   for (final LearnCandidate candidate in candidates) {
-    if (candidate.recentlySwapped || candidate.oralLineUsedRecently) {
+    if (candidate.notInterested || candidate.oralLineUsedRecently) {
       continue;
     }
     final SkillEstimate skill = profile.recommendationEstimate(
       _skillFor(candidate.module),
     );
+    final int shifted = learnerBandIndex(skill.band) +
+        (difficultyShift[candidate.module] ?? 0);
     final int distance = bandDistance(
       contentBand: candidate.contentBand,
-      skillBand: skill.band,
+      skillBand: learnerBandAt(shifted),
     );
     if (distance < 0 || distance > 2) continue;
     final bool slightlyHard = distance == 2;

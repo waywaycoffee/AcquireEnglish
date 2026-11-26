@@ -1,3 +1,4 @@
+import 'package:common_learn_english/features/learner_model/domain/journey_next_step.dart';
 import 'package:common_learn_english/features/learner_model/domain/learner_skill_profile.dart';
 import 'package:common_learn_english/features/learner_model/domain/learning_recommendation.dart';
 import 'package:flutter_test/flutter_test.dart';
@@ -209,6 +210,196 @@ void main() {
     expect(
       list.firstWhere((ScoredLearnCandidate s) => s.candidate.id == 'stretch').slightlyHard,
       isTrue,
+    );
+  });
+
+  test('due cards come first, then the next episode', () {
+    const JourneyTask episode4 = JourneyTask(
+      route: '/episodes/4',
+      title: '继续第 4 集',
+      module: LearnModule.video,
+    );
+    final JourneyNextStep before = resolveJourneyNext(
+      const JourneyNextRequest(
+        dueReviewCount: 12,
+        pursuit: episode4,
+      ),
+    );
+    expect(before.kind, JourneyNextKind.review);
+    expect(before.title, '复习到期内容');
+
+    final JourneyNextStep after = resolveJourneyNext(
+      const JourneyNextRequest(
+        dueReviewCount: 12,
+        reviewFinished: true,
+        pursuit: episode4,
+      ),
+    );
+    expect(after.kind, JourneyNextKind.continuePursuit);
+    expect(after.title, '继续第 4 集');
+    expect(after.route, '/episodes/4');
+  });
+
+  test('an unfinished explicit task stays ahead of due review', () {
+    final JourneyNextStep step = resolveJourneyNext(
+      const JourneyNextRequest(
+        paused: JourneyTask(
+          route: '/episodes/4',
+          title: '第 4 集',
+          module: LearnModule.video,
+        ),
+        dueReviewCount: 8,
+        pursuit: JourneyTask(
+          route: '/episodes/5',
+          title: '继续第 5 集',
+          module: LearnModule.video,
+        ),
+      ),
+    );
+    expect(step.kind, JourneyNextKind.paused);
+    expect(step.route, '/episodes/4');
+  });
+
+  test('episode 3 continues to episode 4, a one-off does not', () {
+    final JourneyTask? next = seriesContinueTarget(
+      const SeriesProgress(
+        itemCount: 10,
+        lastIndex: 2,
+        lastCompleted: true,
+        confirmed: false,
+        currentTitle: '继续第 3 集',
+        currentRoute: '/episodes/3',
+        nextTitle: '继续第 4 集',
+        nextRoute: '/episodes/4',
+      ),
+      enabled: true,
+      module: LearnModule.video,
+    );
+    expect(next?.title, '继续第 4 集');
+
+    expect(
+      seriesContinueTarget(
+        const SeriesProgress(
+          itemCount: 1,
+          lastIndex: 0,
+          lastCompleted: true,
+          confirmed: false,
+          currentTitle: '一条独立视频',
+          currentRoute: '/episodes/solo',
+          nextTitle: '',
+          nextRoute: '',
+        ),
+        enabled: true,
+        module: LearnModule.video,
+      ),
+      isNull,
+    );
+
+    expect(
+      seriesContinueTarget(
+        const SeriesProgress(
+          itemCount: 10,
+          lastIndex: 0,
+          lastCompleted: true,
+          confirmed: false,
+          currentTitle: '第 1 集',
+          currentRoute: '/episodes/1',
+          nextTitle: '继续第 2 集',
+          nextRoute: '/episodes/2',
+        ),
+        enabled: true,
+        module: LearnModule.video,
+      ),
+      isNull,
+    );
+  });
+
+  test('turning video off still leaves reading and review', () {
+    expect(
+      seriesContinueTarget(
+        const SeriesProgress(
+          itemCount: 10,
+          lastIndex: 2,
+          lastCompleted: true,
+          confirmed: false,
+          currentTitle: '继续第 3 集',
+          currentRoute: '/episodes/3',
+          nextTitle: '继续第 4 集',
+          nextRoute: '/episodes/4',
+        ),
+        enabled: false,
+        module: LearnModule.video,
+      ),
+      isNull,
+    );
+    final JourneyNextStep step = resolveJourneyNext(
+      const JourneyNextRequest(
+        dueReviewCount: 3,
+        reviewFinished: true,
+        pursuit: JourneyTask(
+          route: '/reading/book',
+          title: '继续读这本书',
+          module: LearnModule.reading,
+        ),
+      ),
+    );
+    expect(step.kind, JourneyNextKind.continuePursuit);
+    expect(step.route, '/reading/book');
+  });
+
+  test('no level match asks for a current-level pick', () {
+    final JourneyNextStep step = resolveJourneyNext(
+      const JourneyNextRequest(reviewFinished: true),
+    );
+    expect(step.kind, JourneyNextKind.chooseLevel);
+    expect(step.title, '选一条适合你水平的内容');
+  });
+
+  test('swap is this choice only, dislike lasts a week, difficulty shifts', () {
+    expect(effectFor(LearnFeedback.swap).sessionOnly, isTrue);
+    expect(effectFor(LearnFeedback.swap).demoteDays, 0);
+    expect(effectFor(LearnFeedback.notInterested).demoteDays, 7);
+    expect(effectFor(LearnFeedback.tooHard).difficultyShift, -1);
+    expect(effectFor(LearnFeedback.tooEasy).difficultyShift, 1);
+
+    final LearnerSkillProfile profile = LearnerSkillProfile.initial(
+      priorBand: 'B1',
+    );
+    const List<LearnCandidate> candidates = <LearnCandidate>[
+      LearnCandidate(
+        id: 'a2',
+        title: 'A2 视频',
+        route: '/episodes/a2',
+        module: LearnModule.video,
+        contentBand: 'A2',
+      ),
+      LearnCandidate(
+        id: 'b1',
+        title: 'B1 视频',
+        route: '/episodes/b1',
+        module: LearnModule.video,
+        contentBand: 'B1',
+      ),
+      LearnCandidate(
+        id: 'hidden',
+        title: '不感兴趣',
+        route: '/episodes/no',
+        module: LearnModule.video,
+        contentBand: 'B1',
+        notInterested: true,
+      ),
+    ];
+    final List<ScoredLearnCandidate> easier = rankLearnCandidates(
+      profile: profile,
+      candidates: candidates,
+      difficultyShift: <LearnModule, int>{
+        LearnModule.video: effectFor(LearnFeedback.tooHard).difficultyShift,
+      },
+    );
+    expect(easier.first.candidate.id, 'a2');
+    expect(
+      easier.any((ScoredLearnCandidate item) => item.candidate.id == 'hidden'),
+      isFalse,
     );
   });
 }

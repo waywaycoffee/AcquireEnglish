@@ -2,22 +2,24 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../../../router/app_router.dart';
 import '../../../authentication/presentation/account_storage.dart';
 import '../../../daily_path/data/today_journey_store.dart';
+import '../../../learner_model/domain/journey_next_step.dart';
 import '../../../learner_model/domain/learner_skill_profile.dart';
 import '../../../learner_model/domain/learning_recommendation.dart';
 import '../../../library/presentation/library_catalog_provider.dart';
 import '../../../library/presentation/library_mock_data.dart';
+import '../../../onboarding/domain/learning_tracks.dart';
 import '../../../onboarding/domain/onboarding_profile.dart';
 import '../../../onboarding/presentation/focus_recommendation.dart';
 import '../../../onboarding/presentation/onboarding_provider.dart';
 import '../../../player/presentation/learning_resume_provider.dart';
 import '../../../reading/domain/reading_doc.dart';
 import '../../../reading/presentation/reading_library_provider.dart';
+import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../sync/presentation/daily_feed_provider.dart';
 import '../../../words/presentation/learner_level_provider.dart';
-import '../../../words/presentation/vocabulary_placement_provider.dart';
+import '../../../words/presentation/word_book_provider.dart';
 import '../learning_dashboard_provider.dart';
 
 class TodayActivityCard extends ConsumerStatefulWidget {
@@ -33,11 +35,6 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
   DateTime _nextDay(DateTime today) =>
       DateTime(today.year, today.month, today.day + 1);
 
-  bool _assessed() {
-    final PlacementRow result = ref.read(vocabularyPlacementProvider);
-    return result['estimate'] is int && result['testedAt'] is String;
-  }
-
   Future<JourneyActivity?> _pick({bool tomorrow = false}) =>
       showModalBottomSheet<JourneyActivity>(
         context: context,
@@ -46,7 +43,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         builder: (_) => _TodayActivityPicker(tomorrow: tomorrow),
       );
 
-  Future<void> _runJourney({bool chooseAnother = false}) async {
+  Future<void> _runJourney() async {
     if (_busy) return;
     setState(() => _busy = true);
     final DateTime today = DateTime.now();
@@ -59,59 +56,61 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         DateUtils.isSameDay(today, DateTime.now());
 
     try {
-      // Review first: due cards do not need a vocabulary estimate.
-      // Placement is only required before learning new recommended content.
+      final JourneyNextStep step = _nextStep(store);
+      if (store.stage == JourneyStage.review ||
+          store.stage == JourneyStage.learn) {
+        if (step.kind == JourneyNextKind.review) {
+          final bool? completed = await context.push<bool>(step.route);
+          if (active() && (completed ?? false)) {
+            await store.saveStage(JourneyStage.learn);
+          }
+          return;
+        }
+        if (step.kind == JourneyNextKind.chooseLevel || step.route.isEmpty) {
+          final JourneyActivity? picked = await _pick();
+          if (!active() || picked == null) return;
+          await store.saveStage(JourneyStage.learn);
+          await store.saveActivity(picked);
+          if (!mounted) return;
+          await context.push(picked.route);
+          return;
+        }
+        final JourneyActivity activity = (
+          route: step.route,
+          title: step.title,
+        );
+        await store.saveStage(JourneyStage.learn);
+        await store.saveActivity(activity);
+        if (!mounted) return;
+        await context.push(activity.route);
+        if (!mounted) return;
+        final bool? completed = await showDialog<bool>(
+          context: context,
+          builder: (BuildContext dialogContext) => AlertDialog(
+            backgroundColor: AppDesignTokens.appWhite,
+            title: const Text('这关学完了吗？'),
+            content: Text(activity.title),
+            actions: <Widget>[
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('稍后继续'),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.of(dialogContext).pop(true),
+                child: const Text('完成本关'),
+              ),
+            ],
+          ),
+        );
+        if (active() && (completed ?? false)) {
+          await store.saveStage(JourneyStage.tomorrow);
+        }
+        return;
+      }
       switch (store.stage) {
         case JourneyStage.review:
-          final bool? completed = await context.push<bool>(
-            '${SGRoute.reviewSession.route}?due=1&journeyReview=1',
-          );
-          if (active() && completed == true) {
-            await store.saveStage(JourneyStage.learn);
-            if (active() && store.activity?.route.isNotEmpty != true) {
-              continue learn;
-            }
-          }
-        learn:
         case JourneyStage.learn:
-          if (!_assessed()) {
-            await context.push(
-              '${SGRoute.vocabularyPlacement.route}?journey=1',
-            );
-            if (!active() || !_assessed()) return;
-          }
-          final JourneyActivity? planned = store.activity;
-          final JourneyActivity? activity =
-              chooseAnother || planned == null || planned.route.isEmpty
-              ? await _pick()
-              : planned;
-          if (!active() || activity == null) return;
-          await store.saveActivity(activity);
-          if (!active()) return;
-          await context.push(activity.route);
-          if (!active()) return;
-          final bool? completed = await showDialog<bool>(
-            context: context,
-            builder: (BuildContext dialogContext) => AlertDialog(
-              title: const Text('这关学完了吗？'),
-              content: Text(activity.title),
-              actions: <Widget>[
-                TextButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(false),
-                  child: const Text('稍后继续'),
-                ),
-                FilledButton(
-                  onPressed: () => Navigator.of(dialogContext).pop(true),
-                  child: const Text('完成本关'),
-                ),
-              ],
-            ),
-          );
-          if (active() && completed == true) {
-            await store.saveStage(JourneyStage.tomorrow);
-            if (active()) continue chooseTomorrow;
-          }
-        chooseTomorrow:
+          return;
         case JourneyStage.tomorrow:
         case JourneyStage.done:
           final JourneyActivity? activity = await _pick(tomorrow: true);
@@ -127,35 +126,228 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     }
   }
 
+  Future<void> _swapOnce() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final DateTime today = DateTime.now();
+    final String account = ref.read(studyAccountProvider);
+    final TodayJourneyStore store = TodayJourneyStore(account, today);
+    try {
+      final JourneyActivity? picked = await _pick();
+      if (!mounted || picked == null) return;
+      await store.saveStage(JourneyStage.learn);
+      await store.saveActivity(picked);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  JourneyNextStep _nextStep(TodayJourneyStore store) {
+    final bool reviewFinished = store.stage != JourneyStage.review;
+    final JourneyActivity? pausedActivity = store.activity;
+    final JourneyTask? paused =
+        store.stage == JourneyStage.learn &&
+            pausedActivity != null &&
+            pausedActivity.route.isNotEmpty
+        ? JourneyTask(
+            route: pausedActivity.route,
+            title: pausedActivity.title,
+            module: LearnModule.vocab,
+          )
+        : null;
+    final int due = ref.read(wordBookProvider.notifier).dueCounts().dueReviews;
+    final Set<String> tracks = selectedLearningTracks(
+      ref.read(learningPreferencesProvider).tags,
+    );
+    final bool videoOn = tracks.contains(kTrackVideo);
+    final bool readingOn = tracks.contains(kTrackReading);
+    final ContinueLearningTarget? resume = ref.read(
+      continueLearningTargetProvider,
+    );
+    final JourneyTask? videoNext = _videoPursuit(resume, enabled: videoOn);
+    final ReadingDoc? book = ref.read(readingLibraryProvider).continueDoc;
+    final JourneyTask? readingNext = readingOn && book != null
+        ? JourneyTask(
+            route: '/reading/${Uri.encodeComponent(book.id)}',
+            title: '继续读${book.displayTitle}',
+            module: LearnModule.reading,
+          )
+        : null;
+    final String recent = ref.read(currentLearningKindProvider);
+    final JourneyTask? pursuit = recent == 'reading'
+        ? (readingNext ?? videoNext)
+        : (videoNext ?? readingNext);
+    final ScoredLearnCandidate? cold = pursuit == null
+        ? _coldRecommendation(videoOn: videoOn, readingOn: readingOn)
+        : null;
+    return resolveJourneyNext(
+      JourneyNextRequest(
+        paused: paused,
+        dueReviewCount: due,
+        reviewFinished: reviewFinished,
+        pursuit: pursuit,
+        recommendation: cold == null
+            ? null
+            : JourneyTask(
+                route: cold.candidate.route,
+                title: cold.candidate.title,
+                module: cold.candidate.module,
+              ),
+        recommendationReason: cold?.reason ?? '',
+      ),
+    );
+  }
+
+  JourneyTask? _videoPursuit(
+    ContinueLearningTarget? resume, {
+    required bool enabled,
+  }) {
+    if (!enabled || resume == null || resume.episode.videoMissing) return null;
+    final List<LibraryEpisodeItem> episodes = resume.course.episodes
+        .where((LibraryEpisodeItem episode) => !episode.videoMissing)
+        .toList();
+    final int index = episodes.indexWhere(
+      (LibraryEpisodeItem episode) => episode.id == resume.episode.id,
+    );
+    if (index < 0) return null;
+    final LibraryEpisodeItem current = episodes[index];
+    final LibraryEpisodeItem? next = index + 1 < episodes.length
+        ? episodes[index + 1]
+        : null;
+    String routeOf(LibraryEpisodeItem episode) =>
+        '/episodes/${Uri.encodeComponent(episode.id)}';
+    return seriesContinueTarget(
+      SeriesProgress(
+        itemCount: episodes.length,
+        lastIndex: index,
+        lastCompleted: current.completed,
+        confirmed: false,
+        currentTitle: '继续${current.title}',
+        currentRoute: routeOf(current),
+        nextTitle: next == null ? '' : '继续${next.title}',
+        nextRoute: next == null ? '' : routeOf(next),
+      ),
+      enabled: true,
+      module: LearnModule.video,
+    );
+  }
+
+  ScoredLearnCandidate? _coldRecommendation({
+    required bool videoOn,
+    required bool readingOn,
+  }) {
+    final String level = ref.read(adaptiveLearnerCefrProvider);
+    final LearnerSkillProfile profile = LearnerSkillProfile.initial(
+      priorBand: level,
+    );
+    final OnboardingProfile onboarding = ref.read(onboardingProvider);
+    final List<LearnCandidate> candidates = <LearnCandidate>[
+      if (selectedLearningTracks(
+        ref.read(learningPreferencesProvider).tags,
+      ).contains(kTrackVocab))
+        LearnCandidate(
+          id: 'vocab-next',
+          title: '背一组适合现在的词',
+          route: '/review/session?kind=word',
+          module: LearnModule.vocab,
+          contentBand: profile.estimate(LearnerSkill.vocab).band,
+          interestMatch: onboarding.focusId == 'vocab',
+        ),
+    ];
+    if (videoOn) {
+      final FocusRecommendation video = buildFocusRecommendation(
+        profile: onboarding.copyWith(focusId: 'video'),
+        prefs: ref.read(learningPreferencesProvider),
+        courses: ref.read(libraryCatalogProvider),
+        readingDocs: const <ReadingDoc>[],
+        activeBook: null,
+        levelOverride: profile
+            .recommendationEstimate(LearnerSkill.listening)
+            .band,
+      );
+      if (video.route.startsWith('/episodes/')) {
+        candidates.add(
+          LearnCandidate(
+            id: video.route,
+            title: video.title,
+            route: video.route,
+            module: LearnModule.video,
+            contentBand: profile
+                .recommendationEstimate(LearnerSkill.listening)
+                .band,
+            interestMatch: true,
+          ),
+        );
+      }
+    }
+    if (readingOn) {
+      final ReadingLibraryState reading = ref.read(readingLibraryProvider);
+      final FocusRecommendation article = buildFocusRecommendation(
+        profile: onboarding.copyWith(focusId: 'reading'),
+        prefs: ref.read(learningPreferencesProvider),
+        courses: const <LibraryCourseData>[],
+        readingDocs: reading.all,
+        activeBook: null,
+        levelOverride: profile.recommendationEstimate(LearnerSkill.reading).band,
+      );
+      if (article.route.startsWith('/reading/')) {
+        candidates.add(
+          LearnCandidate(
+            id: article.route,
+            title: article.title,
+            route: article.route,
+            module: LearnModule.reading,
+            contentBand: profile
+                .recommendationEstimate(LearnerSkill.reading)
+                .band,
+            interestMatch: true,
+          ),
+        );
+      }
+    }
+    return pickAimlessNext(
+      rankLearnCandidates(candidates: candidates, profile: profile),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final String account = ref.watch(studyAccountProvider);
+    ref
+      ..watch(wordBookProvider)
+      ..watch(continueLearningTargetProvider)
+      ..watch(readingLibraryProvider)
+      ..watch(learningPreferencesProvider)
+      ..watch(currentLearningKindProvider)
+      ..watch(libraryCatalogProvider);
     final DateTime today = DateTime.now();
     final TodayJourneyStore store = TodayJourneyStore(account, today);
     final JourneyStage stage = store.stage;
-    final JourneyActivity? planned = store.activity;
-    final String title = switch (stage) {
-      JourneyStage.review => '今天的英语之旅',
-      JourneyStage.learn => '学习新内容',
-      JourneyStage.tomorrow => '选明天学什么',
-      JourneyStage.done => '更换明天的内容',
-    };
+    final JourneyNextStep step = _nextStep(store);
+    final bool planning = stage == JourneyStage.review || stage == JourneyStage.learn;
+    final String title = planning
+        ? step.title
+        : switch (stage) {
+            JourneyStage.tomorrow => '选明天学什么',
+            JourneyStage.done => '更换明天的内容',
+            _ => step.title,
+          };
+    final String detail = planning
+        ? step.reason
+        : switch (stage) {
+            JourneyStage.tomorrow => '第 3 关 · 安排明天',
+            JourneyStage.done =>
+              '今日已完成 · 明天：${TodayJourneyStore(account, _nextDay(today)).activity?.title ?? '按你的水平再排一条'}',
+            _ => step.reason,
+          };
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
-            if (stage != JourneyStage.review)
-              Text('今天的英语之旅', style: Theme.of(context).textTheme.titleMedium),
-            Text(switch (stage) {
-              JourneyStage.review => '第 1 关 · 今日复习',
-              JourneyStage.learn =>
-                '第 2 关 · ${planned?.route.isNotEmpty == true ? planned!.title : '按兴趣学新内容'}',
-              JourneyStage.tomorrow => '第 3 关 · 安排明天',
-              JourneyStage.done =>
-                '今日已完成 · 明天：${TodayJourneyStore(account, _nextDay(today)).activity?.title ?? '系统推荐'}',
-            }),
+            Text('今天的英语之旅', style: Theme.of(context).textTheme.titleMedium),
+            Text(detail),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
@@ -170,12 +362,9 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                   label: Text(title),
                   onPressed: _busy ? null : () => _runJourney(),
                 ),
-                if (stage == JourneyStage.learn &&
-                    planned?.route.isNotEmpty == true)
+                if (planning && step.kind != JourneyNextKind.review)
                   TextButton(
-                    onPressed: _busy
-                        ? null
-                        : () => _runJourney(chooseAnother: true),
+                    onPressed: _busy ? null : _swapOnce,
                     child: const Text('换一个'),
                   ),
               ],
