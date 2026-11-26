@@ -114,14 +114,19 @@ String _reason(LearnCandidate candidate, SkillEstimate skill, int distance) {
   return level;
 }
 
-/// Aimless path: vocab, then video, then reading. Each step uses only the
-/// i+1 window for that skill.
-ScoredLearnCandidate? pickAimlessNext(List<ScoredLearnCandidate> ranked) {
-  for (final LearnModule module in <LearnModule>[
-    LearnModule.vocab,
+/// Aimless path: walk [preferOrder] (default video → reading → vocab).
+///
+/// Avoid always forcing vocab first — that made Journey feel stuck on
+/// 「背一组词」even when the learner was watching / reading.
+ScoredLearnCandidate? pickAimlessNext(
+  List<ScoredLearnCandidate> ranked, {
+  List<LearnModule> preferOrder = const <LearnModule>[
     LearnModule.video,
     LearnModule.reading,
-  ]) {
+    LearnModule.vocab,
+  ],
+}) {
+  for (final LearnModule module in preferOrder) {
     final List<ScoredLearnCandidate> pool =
         ranked
             .where(
@@ -134,6 +139,10 @@ ScoredLearnCandidate? pickAimlessNext(List<ScoredLearnCandidate> ranked) {
                 b.score.compareTo(a.score),
           );
     if (pool.isNotEmpty) return pool.first;
+  }
+  // Fallback: best eligible regardless of module.
+  for (final ScoredLearnCandidate item in ranked) {
+    if (item.eligibleDefault) return item;
   }
   return null;
 }

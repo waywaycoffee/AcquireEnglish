@@ -116,7 +116,8 @@ void main() {
       ],
     );
     final ScoredLearnCandidate? next = pickAimlessNext(ranked);
-    expect(next?.candidate.id, 'fit-word');
+    // Default order prefers video over vocab when both fit.
+    expect(next?.candidate.id, 'fit-video');
     expect(ranked.any((ScoredLearnCandidate s) => s.candidate.id == 'easy-word'), isFalse);
     expect(ranked.any((ScoredLearnCandidate s) => s.candidate.id == 'hard-video'), isFalse);
   });

@@ -361,7 +361,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         ? JourneyTask(
             route: pausedActivity.route,
             title: pausedActivity.title,
-            module: LearnModule.vocab,
+            module: learnModuleForRoute(pausedActivity.route),
           )
         : null;
     final int due = ref.read(wordBookProvider.notifier).dueCounts().dueReviews;
@@ -520,18 +520,20 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     final JourneyFeedbackStore feedback = JourneyFeedbackStore(
       ref.read(studyAccountProvider),
     );
+    // Due review is handled by resolveJourneyNext — cold path must not
+    // dump users into another review session as "new learning".
     final List<LearnCandidate> candidates = <LearnCandidate>[
       if (selectedLearningTracks(
         ref.read(learningPreferencesProvider).tags,
       ).contains(kTrackVocab))
         LearnCandidate(
-          id: 'vocab-next',
-          title: '背一组适合现在的词',
-          route: '/review/session?kind=word',
+          id: 'vocab-books',
+          title: '打开词书挑一组新词',
+          route: '/words',
           module: LearnModule.vocab,
           contentBand: profile.estimate(LearnerSkill.vocab).band,
           interestMatch: onboarding.focusId == 'vocab',
-          notInterested: feedback.isHidden('/review/session?kind=word'),
+          notInterested: feedback.isHidden('/words'),
         ),
     ];
     if (videoOn) {
@@ -556,7 +558,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               video.contentBand,
               profile.recommendationEstimate(LearnerSkill.listening).band,
             ),
-            interestMatch: true,
+            interestMatch: onboarding.focusId == 'video' ||
+                onboarding.focusId.isEmpty,
             notInterested: feedback.isHidden(video.route),
           ),
         );
@@ -584,29 +587,70 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               article.contentBand,
               profile.recommendationEstimate(LearnerSkill.reading).band,
             ),
-            interestMatch: true,
+            interestMatch: onboarding.focusId == 'reading',
             notInterested: feedback.isHidden(article.route),
           ),
         );
       }
     }
+    final String recent = ref.read(currentLearningKindProvider);
+    final List<LearnModule> order = switch (onboarding.focusId) {
+      'reading' => const <LearnModule>[
+          LearnModule.reading,
+          LearnModule.video,
+          LearnModule.vocab,
+        ],
+      'vocab' || 'exam' => const <LearnModule>[
+          LearnModule.vocab,
+          LearnModule.video,
+          LearnModule.reading,
+        ],
+      'oral' => const <LearnModule>[
+          LearnModule.video,
+          LearnModule.vocab,
+          LearnModule.reading,
+        ],
+      _ => recent == 'reading'
+          ? const <LearnModule>[
+              LearnModule.reading,
+              LearnModule.video,
+              LearnModule.vocab,
+            ]
+          : const <LearnModule>[
+              LearnModule.video,
+              LearnModule.reading,
+              LearnModule.vocab,
+            ],
+    };
     return pickAimlessNext(
       rankLearnCandidates(
         candidates: candidates,
         profile: profile,
         difficultyShift: feedback.difficultyShifts,
       ),
+      preferOrder: order,
     );
   }
 
   String _ctaLabel(JourneyNextStep step, JourneyStage stage) {
     if (stage == JourneyStage.tomorrow) return '就这样 · 明天见';
     if (stage == JourneyStage.done) return '更换明天的内容';
+    String shorten(String raw) {
+      final String t = raw
+          .replaceFirst(RegExp(r'^下一步 · '), '')
+          .replaceFirst(RegExp(r'^继续 · '), '')
+          .trim();
+      if (t.length <= 18) return t;
+      return '${t.substring(0, 17)}…';
+    }
+
     return switch (step.kind) {
       JourneyNextKind.review => '下一步：开始复习',
       JourneyNextKind.paused ||
-      JourneyNextKind.continuePursuit => '下一步：${step.title.replaceFirst(RegExp(r'^继续 · '), '')}',
-      JourneyNextKind.recommend => '下一步：打开学习',
+      JourneyNextKind.continuePursuit => '下一步：${shorten(step.title)}',
+      JourneyNextKind.recommend => step.title.trim().isEmpty
+          ? '下一步：打开学习'
+          : '下一步：${shorten(step.title)}',
       JourneyNextKind.chooseLevel => '下一步：选一条适合你的',
     };
   }
@@ -642,24 +686,6 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       account,
       _nextDay(today),
     ).activity;
-    final List<({String title, String label})> preview =
-        <({String title, String label})>[
-          if (due > 0 && stage == JourneyStage.review)
-            (title: '复习 $due 词', label: '到期优先'),
-          if (step.kind != JourneyNextKind.review)
-            (
-              title: step.title.replaceFirst(RegExp(r'^下一步 · '), ''),
-              label: step.reason,
-            ),
-          (
-            title: tomorrow?.title.isNotEmpty == true
-                ? tomorrow!.title
-                : '排明天',
-            label: tomorrow?.route.isNotEmpty == true
-                ? '明天已替你排好'
-                : '可跳过，系统代排',
-          ),
-        ];
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -791,47 +817,27 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
             ),
           ),
         ),
+        // One quiet escape hatch — not a second "today plan" competing with Journey.
         if (stage == JourneyStage.review || stage == JourneyStage.learn) ...<
           Widget
         >[
-          const SizedBox(height: 18),
-          Text(
-            '今天还会带你过',
-            style: TextStyle(
-              color: AppDesignTokens.textPrimary,
-              fontWeight: FontWeight.w700,
-              fontSize: 15,
-            ),
-          ),
           const SizedBox(height: 10),
-          for (final ({String title, String label}) item in preview)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppDesignTokens.appWhite,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: ListTile(
-                  leading: Icon(
-                    Icons.circle,
-                    size: 10,
-                    color: AppDesignTokens.brandGreen,
-                  ),
-                  title: Text(
-                    item.title,
-                    style: TextStyle(
-                      color: AppDesignTokens.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  subtitle: Text(
-                    item.label,
-                    style: TextStyle(color: AppDesignTokens.textSecondary),
-                  ),
-                ),
+          Align(
+            alignment: Alignment.center,
+            child: TextButton(
+              onPressed: _busy
+                  ? null
+                  : () => context.push(
+                        due > 0
+                            ? '/review/session?due=1'
+                            : '/review',
+                      ),
+              child: Text(
+                due > 0 ? '只想复习 · 到期 $due' : '自己去复习 / 词书',
+                style: TextStyle(color: AppDesignTokens.textSecondary),
               ),
             ),
+          ),
         ],
       ],
     );
