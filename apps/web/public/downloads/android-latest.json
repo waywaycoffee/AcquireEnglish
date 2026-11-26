@@ -1,11 +1,11 @@
 {
-  "version": "0.2.267",
-  "version_code": 287,
-  "apk_name": "AcquireEnglish-android-0.2.267+287.apk",
+  "version": "0.2.268",
+  "version_code": 288,
+  "apk_name": "AcquireEnglish-android-0.2.268+288.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "10d23b321130c8113a061c77d8eeefbf48c53bd42011bd6673860cd2424ed484",
+  "sha256": "4fac60e94b609e27882ba79fd2695edbbd30ae1079465915c681cdeee33fffc2",
   "force": true,
-  "min_version_code": 287,
-  "notes": "必须更新：模块示范已确认无掐尾；数字人远程/本机播放补齐句尾保留",
-  "published_at": "2026-11-26T12:40:00+08:00"
+  "min_version_code": 288,
+  "notes": "必须更新：首页推荐视频退出前会询问是否喜欢",
+  "published_at": "2026-11-26T13:15:00+08:00"
 }

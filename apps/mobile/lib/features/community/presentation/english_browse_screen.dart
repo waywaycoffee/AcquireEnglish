@@ -125,6 +125,14 @@ class _EnglishBrowseScreenState extends ConsumerState<EnglishBrowseScreen> {
   }
 
   Future<void> _openStored(EnglishBrowseEntry entry) async {
+    final AcquireDailyFeedItemDto feedItem = AcquireDailyFeedItemDto(
+      id: entry.bvid.isEmpty ? entry.watchUrl : entry.bvid,
+      bvid: entry.bvid,
+      title: entry.title,
+      watchUrl: entry.watchUrl,
+      author: entry.author,
+      coverUrl: entry.coverUrl.isEmpty ? null : entry.coverUrl,
+    );
     if (entry.episodeId.isNotEmpty) {
       final bool exists = ref.read(libraryCatalogProvider).any(
             (LibraryCourseData c) =>
@@ -139,21 +147,21 @@ class _EnglishBrowseScreenState extends ConsumerState<EnglishBrowseScreen> {
             'autoplay': '1',
           },
         );
+        if (!context.mounted) return;
+        // Replay from history still asks until the user likes / favorites.
+        if (!entry.inStudyList) {
+          await askEnglishBrowseLikeAfterPreview(
+            context,
+            ref,
+            item: feedItem,
+            episodeId: entry.episodeId,
+            courseId: entry.courseId,
+          );
+        }
         return;
       }
     }
-    await openEnglishBrowsePreview(
-      context,
-      ref,
-      item: AcquireDailyFeedItemDto(
-        id: entry.bvid.isEmpty ? entry.watchUrl : entry.bvid,
-        bvid: entry.bvid,
-        title: entry.title,
-        watchUrl: entry.watchUrl,
-        author: entry.author,
-        coverUrl: entry.coverUrl.isEmpty ? null : entry.coverUrl,
-      ),
-    );
+    await openEnglishBrowsePreview(context, ref, item: feedItem);
   }
 
   Widget _paneChips() {

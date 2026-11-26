@@ -7,6 +7,7 @@ import 'package:go_router/go_router.dart';
 import '../../../router/app_router.dart';
 import '../../authentication/presentation/account_hub_sheet.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../community/data/english_browse_actions.dart';
 import '../../drama/data/drama_cover_cache.dart';
 import '../../growth/presentation/growth_provider.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
@@ -422,14 +423,8 @@ class DailyRecommendSection extends ConsumerWidget {
                     ],
                   ),
                   onTap: () {
-                    unawaited(
-                      openBilibiliLearningOrImport(
-                        context,
-                        ref,
-                        watchUrl: item.watchUrl,
-                        startImportImmediately: true,
-                      ),
-                    );
+                    // Same as 全英可逛: online preview first, then ask if liked.
+                    unawaited(openEnglishBrowsePreview(context, ref, item: item));
                   },
                 ),
               );

@@ -158,7 +158,24 @@ Future<void> openEnglishBrowsePreview(
     queryParameters: <String, String>{'preview': '1', 'autoplay': '1'},
   );
   if (!context.mounted) return;
+  await askEnglishBrowseLikeAfterPreview(
+    context,
+    ref,
+    item: item,
+    episodeId: episodeId,
+    courseId: courseId,
+  );
+}
 
+/// After preview playback ends / user exits, ask whether to keep studying.
+Future<void> askEnglishBrowseLikeAfterPreview(
+  BuildContext context,
+  WidgetRef ref, {
+  required AcquireDailyFeedItemDto item,
+  required String episodeId,
+  String courseId = '',
+}) async {
+  if (!context.mounted) return;
   final bool? liked = await showDialog<bool>(
     context: context,
     builder: (BuildContext context) {
