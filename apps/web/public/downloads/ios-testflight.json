@@ -1,10 +1,10 @@
 {
   "app_name": "爱快英语",
   "bundle_id": "com.acquire.english",
-  "version": "0.2.250",
-  "build": 269,
-  "status": "beta_approved",
+  "version": "0.2.268",
+  "build": 289,
+  "status": "uploaded_processing",
   "join_url": "https://testflight.apple.com/join/DYKYp3HP",
-  "notes": "TestFlight 外部 Beta 已批准，公开邀请已开启。",
-  "updated_at": "2026-11-26T13:30:00+08:00"
+  "notes": "已上传与 Android 对齐的 0.2.268 (289)。处理完成后请在外部测试组选用该构建；公开链接不变。",
+  "updated_at": "2026-11-26T13:40:00+08:00"
 }
