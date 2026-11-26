@@ -1,4 +1,4 @@
-﻿import 'dart:io';
+import 'dart:io';
 
 import 'package:crypto/crypto.dart';
 import 'package:dio/dio.dart';
@@ -105,7 +105,8 @@ class AppUpdateService {
         : '${json['apk_name']}'.trim();
     final String sha = '${json['sha256'] ?? ''}'.trim();
     final String checksumUrl = '${json['checksum_url'] ?? ''}'.trim();
-    final bool forceFlag = json['force'] == true ||
+    final bool forceFlag =
+        json['force'] == true ||
         '${json['force'] ?? ''}'.trim().toLowerCase() == 'true';
     final int? minVersionCode = (json['min_version_code'] as num?)?.toInt();
 
@@ -136,43 +137,96 @@ class AppUpdateService {
     final File file = File(
       '${destination.path}${Platform.pathSeparator}${update.assetName}',
     );
+    final File partial = File('${file.path}.part');
+    final String downloadUrl = _immutableApkUrl(update);
 
-    try {
-      await _dio.download(
-        update.downloadUrl,
-        file.path,
-        options: Options(
-          headers: <String, String>{'Accept': 'application/octet-stream'},
-          connectTimeout: const Duration(seconds: 30),
-          sendTimeout: const Duration(seconds: 20),
-          // APK 较大，此超时表示连续两分钟未收到新数据。
-          receiveTimeout: const Duration(minutes: 2),
-        ),
-        onReceiveProgress: onProgress,
+    // Mobile networks often close a 130MB APK transfer midway. Keep the
+    // partial file and resume with HTTP Range instead of restarting at 0%.
+    DioException? lastError;
+    bool completed = false;
+    for (int attempt = 0; attempt < 5; attempt++) {
+      final int offset = partial.existsSync() ? partial.lengthSync() : 0;
+      try {
+        final Response<dynamic> response = await _dio.download(
+          downloadUrl,
+          partial.path,
+          deleteOnError: false,
+          fileAccessMode: offset > 0
+              ? FileAccessMode.append
+              : FileAccessMode.write,
+          options: Options(
+            headers: <String, String>{
+              'Accept': 'application/octet-stream',
+              'Accept-Encoding': 'identity',
+              if (offset > 0) 'Range': 'bytes=$offset-',
+            },
+            connectTimeout: const Duration(seconds: 30),
+            sendTimeout: const Duration(seconds: 20),
+            // This measures an idle gap, not total download duration.
+            receiveTimeout: const Duration(minutes: 2),
+          ),
+          onReceiveProgress: (int received, int total) {
+            onProgress?.call(
+              offset + received,
+              total > 0 ? offset + total : -1,
+            );
+          },
+        );
+        final int? status = response.statusCode;
+        if (offset > 0 && status != HttpStatus.partialContent) {
+          // A proxy ignored Range and sent the whole APK. Appending it would
+          // corrupt the package, so restart once from an empty file.
+          partial.deleteSync();
+          continue;
+        }
+        lastError = null;
+        completed = true;
+        break;
+      } on DioException catch (error) {
+        lastError = error;
+        if (attempt < 4) {
+          await Future<void>.delayed(Duration(seconds: attempt + 1));
+        }
+      }
+    }
+    if (!completed) {
+      final bool timeout =
+          lastError?.type == DioExceptionType.connectionTimeout ||
+          lastError?.type == DioExceptionType.receiveTimeout ||
+          lastError?.type == DioExceptionType.sendTimeout;
+      throw StateError(
+        timeout ? '连接官网超时，已保留下载进度，请重试继续下载。' : '网络中断，已保留下载进度，请重试继续下载。',
       );
-    } on DioException catch (error) {
-      if (await file.exists()) {
-        await file.delete();
-      }
-      final bool timeout = error.type == DioExceptionType.connectionTimeout ||
-          error.type == DioExceptionType.receiveTimeout ||
-          error.type == DioExceptionType.sendTimeout;
-      if (timeout) {
-        throw StateError('连接官网超时，请切换 Wi-Fi 或移动网络后重试。');
-      }
-      throw StateError('官网安装包下载失败，请稍后重试。');
     }
 
     final String? expected = await _expectedChecksum(update);
     if (expected != null && expected.isNotEmpty) {
-      final String actualChecksum = (await sha256.bind(file.openRead()).first)
-          .toString();
+      final String actualChecksum =
+          (await sha256.bind(partial.openRead()).first).toString();
       if (actualChecksum.toLowerCase() != expected.toLowerCase()) {
-        await file.delete();
+        await partial.delete();
         throw StateError('安装包校验失败，已删除下载文件。');
       }
     }
+    if (file.existsSync()) {
+      file.deleteSync();
+    }
+    await partial.rename(file.path);
     return file.path;
+  }
+
+  String _immutableApkUrl(AppUpdate update) {
+    final Uri latest = Uri.parse(update.downloadUrl);
+    // The manifest asset name is versioned. Downloading that immutable file
+    // prevents a release changing the `latest` symlink during a resumed range.
+    return latest
+        .replace(
+          pathSegments: <String>[
+            ...latest.pathSegments.take(latest.pathSegments.length - 1),
+            update.assetName,
+          ],
+        )
+        .toString();
   }
 
   Future<void> install(String path) async {

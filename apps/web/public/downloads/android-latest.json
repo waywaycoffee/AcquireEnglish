@@ -1,11 +1,11 @@
 {
-  "version": "0.2.263",
-  "version_code": 283,
-  "apk_name": "AcquireEnglish-android-0.2.263+283.apk",
+  "version": "0.2.264",
+  "version_code": 284,
+  "apk_name": "AcquireEnglish-android-0.2.264+284.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "058b07fe8f284e231593fa4c89e417dfe88b2e67ffa5386e671f56f15163fdae",
+  "sha256": "3cac7372f85490e5ed6b0e194e7e2792a37dee4ca1752e9cfc96dc04daaa2d14",
   "force": true,
-  "min_version_code": 283,
-  "notes": "必须更新：更新统一改为官网下载，修复 GitHub 连接超时；数字人进入页面即显示按住说话按钮",
-  "published_at": "2026-11-26T09:48:25+08:00"
+  "min_version_code": 284,
+  "notes": "必须更新：APK 下载支持断点续传与自动重试；我的页恢复爱快英语；数字人口语进入即显示长按说话按钮",
+  "published_at": "2026-11-26T11:55:00+08:00"
 }

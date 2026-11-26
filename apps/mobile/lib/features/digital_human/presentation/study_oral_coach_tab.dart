@@ -1542,30 +1542,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (mounted) setState(() => _coachSpeaking = true);
     _beginDigitalMouth(speak);
     try {
-      // Prefer LiveTalking: GPU TTS + wav2lip in one WebRTC stream.
-      if (_wantsLiveTalking(settings)) {
-        await _ensureLiveTalking(settings);
-        if (gen != _speakGen) return;
-        if (_liveTalking.isConnected) {
-          try {
-            if (mounted) {
-              setState(() => _voicePlaybackLabel = '数字人唇形 · LiveTalking');
-            }
-            await _liveTalking.speak(speak, type: 'echo', interrupt: true);
-            // Approximate lip-sync duration so mic unlocks after talk.
-            final int waitMs = (speak.length * 55).clamp(1200, 12000);
-            final int slices = (waitMs / 200).ceil();
-            for (int i = 0; i < slices; i++) {
-              if (gen != _speakGen || !mounted) return;
-              await Future<void>.delayed(const Duration(milliseconds: 200));
-            }
-            return;
-          } catch (_) {
-            // Fall through to pipeline / device TTS.
-          }
-        }
-      }
-
+      // LiveTalking's /human endpoint does not accept the selected TTS voice.
+      // Letting it synthesize here can replace a male coach with its default
+      // female voice. Keep the selected persona voice authoritative; realtime
+      // lip-sync may render the avatar but must not take over speech audio.
       final bool usesCloudVoice = _usesCloudVoice(settings.selectedDigitalHuman);
       String? remote = ttsUrl;
       String provider = '';
@@ -4128,93 +4108,45 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
-          if (_pendingResay != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: Material(
-                color: const Color(0xFF6D28D9),
-                borderRadius: BorderRadius.circular(14),
-                child: InkWell(
-                  borderRadius: BorderRadius.circular(14),
-                  onTapDown:
-                      _busy ? null : (_) => unawaited(_onHoldStart()),
-                  onTapUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
-                  onTapCancel:
-                      _busy ? null : () => unawaited(_onHoldEnd()),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 14,
-                      vertical: 12,
-                    ),
-                    child: Row(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: <Widget>[
-                        Icon(
-                          _recordingActive
-                              ? Icons.graphic_eq_rounded
-                              : Icons.mic_rounded,
-                          color: Colors.white,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(
-                          _recordingActive ? '松开发送跟读' : '按住再说一次',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
+          Material(
+            key: const ValueKey<String>('study-oral-coach-tutor-hold-to-talk'),
+            color: const Color(0xFF6D28D9),
+            borderRadius: BorderRadius.circular(14),
+            child: InkWell(
+              borderRadius: BorderRadius.circular(14),
+              onTapDown: _busy ? null : (_) => unawaited(_onHoldStart()),
+              onTapUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
+              onTapCancel: _busy ? null : () => unawaited(_onHoldEnd()),
+              child: Padding(
+                padding: const EdgeInsets.symmetric(
+                  horizontal: 14,
+                  vertical: 12,
                 ),
-              ),
-            )
-          else
-            Listener(
-              key: const ValueKey<String>('study-oral-coach-mic'),
-              behavior: HitTestBehavior.opaque,
-              onPointerDown:
-                  _busy ? null : (_) => unawaited(_onHoldStart()),
-              onPointerUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
-              onPointerCancel:
-                  _busy ? null : (_) => unawaited(_onHoldEnd()),
-              child: AnimatedBuilder(
-                animation: _orbPulse,
-                builder: (BuildContext context, Widget? child) {
-                  final double t = _recordingActive
-                      ? 0.55 + _orbPulse.value * 0.45
-                      : 0.35 + _orbPulse.value * 0.25;
-                  return Container(
-                    width: 54,
-                    height: 54,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      gradient: RadialGradient(
-                        colors: <Color>[
-                          Color.lerp(
-                                const Color(0xFF9B7CFF),
-                                const Color(0xFFE8DEFF),
-                                t,
-                              ) ??
-                              const Color(0xFFB9A6FF),
-                          const Color(0xFF5B3FD4),
-                          const Color(0xFF2A1B6A),
-                        ],
-                        stops: const <double>[0, 0.55, 1],
-                      ),
-                    ),
-                    child: Icon(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: <Widget>[
+                    Icon(
                       _recordingActive
                           ? Icons.graphic_eq_rounded
-                          : Icons.mic_none_rounded,
-                      color: Colors.white.withValues(alpha: 0.92),
-                      size: 28,
+                          : Icons.mic_rounded,
+                      color: Colors.white,
                     ),
-                  );
-                },
+                    const SizedBox(width: 8),
+                    Text(
+                      _recordingActive
+                          ? '松开发送'
+                          : (_pendingResay != null ? '按住再说一次' : '按住说话'),
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
+          ),
           const SizedBox(height: 4),
           Text(
             orbHint,

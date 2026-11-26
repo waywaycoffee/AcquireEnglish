@@ -85,7 +85,7 @@ class SettingsScreen extends ConsumerWidget {
 
     return PadScaffold(
       currentDestination: AppNavDestination.settings,
-      topBar: const PadTopBar(title: '英语学习休息室', subtitle: '我的'),
+      topBar: const PadTopBar(title: '爱快英语', subtitle: '我的'),
       body: ListView(
         padding: EdgeInsets.all(context.padPagePadding),
         children: <Widget>[
