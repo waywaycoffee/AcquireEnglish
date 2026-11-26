@@ -37,8 +37,10 @@ import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../shared/presentation/app_loading_overlay.dart';
+import '../../shared/presentation/app_orientation.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
+import '../../tv/presentation/tv_focus_button.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../daily_path/presentation/oral_core_series_provider.dart';
 import '../../sync/data/personal_import_sync.dart';
@@ -94,6 +96,7 @@ class PadLandscapePlayerScreen extends ConsumerStatefulWidget {
     this.initialStartTime,
     this.autoPlay = true,
     this.autoOpenFullscreen = false,
+    this.tvMode = false,
     super.key,
   });
 
@@ -101,6 +104,9 @@ class PadLandscapePlayerScreen extends ConsumerStatefulWidget {
   final String? initialStartTime;
   final bool autoPlay;
   final bool autoOpenFullscreen;
+
+  /// Dark 10-foot chrome + landscape lock (TV / 横屏学习).
+  final bool tvMode;
 
   @override
   ConsumerState<PadLandscapePlayerScreen> createState() =>
@@ -172,6 +178,9 @@ class PadLandscapePlayerScreenState
   @override
   void initState() {
     super.initState();
+    if (widget.tvMode) {
+      unawaited(unlockFullscreenLandscapeOrientation());
+    }
     _releaseGraphicsCache = PlayerGraphicsCache.acquire();
     state = PlayerMockState(initialStartTime: widget.initialStartTime);
     state.isPlaying = widget.autoPlay;
@@ -339,6 +348,9 @@ class PadLandscapePlayerScreenState
     unawaited(_disposeVideo().whenComplete(_releaseGraphicsCache));
     _transcriptReaderSession.dispose();
     _fullscreenVideoRevision.dispose();
+    if (widget.tvMode) {
+      unawaited(lockPortraitOrientation());
+    }
     super.dispose();
   }
 
@@ -3149,6 +3161,7 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       showContinueLearning: false,
       currentDestination: AppNavDestination.library,
       showNavigation: false,
+      backgroundColor: widget.tvMode ? const Color(0xFF101923) : null,
       topBar: PlayerTopBar(
               videoOptions: course == null || episode == null
                   ? null
@@ -3190,6 +3203,10 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
           );
         },
         onBack: () {
+          if (widget.tvMode) {
+            context.go('/tv');
+            return;
+          }
           if (context.canPop()) {
             context.pop();
             return;
@@ -3310,14 +3327,69 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                                   : _handleGenerateAiSubtitles,
                             ),
                           ),
-                          const SizedBox(height: 12),
-                          PlayerEpisodeStrip(
-                            episodes:
-                                course?.episodes ??
-                                const <LibraryEpisodeItem>[],
-                            activeEpisodeId: widget.episodeId,
-                            onOpenEpisode: _openEpisode,
-                          ),
+                          if (widget.tvMode) ...<Widget>[
+                            const SizedBox(height: 14),
+                            FocusTraversalGroup(
+                              child: Wrap(
+                                spacing: 12,
+                                runSpacing: 10,
+                                children: <Widget>[
+                                  TvFocusButton(
+                                    label: '上一句',
+                                    icon: Icons.skip_previous_rounded,
+                                    onPressed: _handlePreviousLine,
+                                  ),
+                                  TvFocusButton(
+                                    label: state.isPlaying ? '暂停' : '播放',
+                                    primary: true,
+                                    autofocus: true,
+                                    icon: state.isPlaying
+                                        ? Icons.pause_rounded
+                                        : Icons.play_arrow_rounded,
+                                    onPressed: _handleTogglePlaying,
+                                  ),
+                                  TvFocusButton(
+                                    label: '下一句',
+                                    icon: Icons.skip_next_rounded,
+                                    onPressed: _handleNextLine,
+                                  ),
+                                  TvFocusButton(
+                                    label: state.speed,
+                                    onPressed: () {
+                                      const List<String> speeds = <String>[
+                                        '0.75×',
+                                        '1.0×',
+                                        '1.25×',
+                                        '1.5×',
+                                      ];
+                                      final int i = speeds.indexOf(state.speed);
+                                      final String next =
+                                          speeds[(i + 1) % speeds.length];
+                                      _handleSpeedSelected(next);
+                                    },
+                                  ),
+                                  TvFocusButton(
+                                    label: state.isLooping ? '循环中' : '单句循环',
+                                    primary: state.isLooping,
+                                    onPressed: _handleToggleLoop,
+                                  ),
+                                  TvFocusButton(
+                                    label: '跟读当前句',
+                                    onPressed: _handleToggleShadowing,
+                                  ),
+                                ],
+                              ),
+                            ),
+                          ] else ...<Widget>[
+                            const SizedBox(height: 12),
+                            PlayerEpisodeStrip(
+                              episodes:
+                                  course?.episodes ??
+                                  const <LibraryEpisodeItem>[],
+                              activeEpisodeId: widget.episodeId,
+                              onOpenEpisode: _openEpisode,
+                            ),
+                          ],
                         ],
                       ),
                     ),
@@ -3326,19 +3398,42 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
                       child: Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(
-                          color: Colors.white,
+                          color: widget.tvMode
+                              ? const Color(0xFF15202B)
+                              : Colors.white,
                           borderRadius: BorderRadius.circular(24),
-                          border: Border.all(color: const Color(0xFFE2E8F0)),
-                          boxShadow: const <BoxShadow>[
-                            BoxShadow(
-                              color: Color(0x120F172A),
-                              blurRadius: 20,
-                              offset: Offset(0, 10),
-                            ),
-                          ],
+                          border: Border.all(
+                            color: widget.tvMode
+                                ? const Color(0xFF243044)
+                                : const Color(0xFFE2E8F0),
+                          ),
+                          boxShadow: widget.tvMode
+                              ? null
+                              : const <BoxShadow>[
+                                  BoxShadow(
+                                    color: Color(0x120F172A),
+                                    blurRadius: 20,
+                                    offset: Offset(0, 10),
+                                  ),
+                                ],
                         ),
                         child: Column(
                           children: <Widget>[
+                            if (widget.tvMode)
+                              Padding(
+                                padding: const EdgeInsets.only(bottom: 12),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Text(
+                                    '字幕',
+                                    style: TextStyle(
+                                      color: AppDesignTokens.brandGreen,
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                              ),
                             Expanded(
                               child: state.hasLines
                                   ? PlayerTranscriptPanel(

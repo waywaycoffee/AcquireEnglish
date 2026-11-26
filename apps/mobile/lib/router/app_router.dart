@@ -55,6 +55,7 @@ import '../features/import_course/presentation/import_course_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/phrases/presentation/phrases_screen.dart';
 import '../features/player/presentation/player_screen.dart';
+import '../features/tv/presentation/tv_home_screen.dart';
 import '../features/course_decompose/presentation/material_course_edit_screen.dart';
 import '../features/course_decompose/presentation/my_material_courses_screen.dart';
 import '../features/reading/domain/k12_textbook_catalog.dart';
@@ -785,6 +786,11 @@ GoRouter goRouter(Ref ref) {
           const ImportCourseScreen(),
     ).fade(),
     GoRoute(
+      path: TvHomeScreen.route,
+      builder: (BuildContext context, GoRouterState state) =>
+          const TvHomeScreen(),
+    ).fade(),
+    GoRoute(
       path: '/episodes/:episodeId',
       name: SGRoute.player.name,
       builder: (BuildContext context, GoRouterState state) {
@@ -804,6 +810,7 @@ GoRouter goRouter(Ref ref) {
           todayTaskId: state.uri.queryParameters['todayTask'],
           dramaPlan: state.uri.queryParameters['plan'] == 'drama',
           onlinePreview: state.uri.queryParameters['preview'] == '1',
+          tvMode: state.uri.queryParameters['tv'] == '1',
         );
       },
     ).fade(),

@@ -1,9 +1,10 @@
 import 'package:flutter/material.dart';
 
+import 'pad_landscape_player_screen.dart';
 import 'pad_portrait_player_screen.dart';
 
-/// Study player is always the portrait shell. Landscape UI is only used inside
-/// [PlayerFullscreenVideoScreen] after the user taps fullscreen.
+/// Portrait shell by default. [tvMode] opens the landscape TV study chrome
+/// (see `design/tv_study_landscape.pen`).
 class PlayerScreen extends StatelessWidget {
   const PlayerScreen({
     required this.episodeId,
@@ -19,6 +20,7 @@ class PlayerScreen extends StatelessWidget {
     this.todayTaskId,
     this.dramaPlan = false,
     this.onlinePreview = false,
+    this.tvMode = false,
     super.key,
   });
 
@@ -35,9 +37,20 @@ class PlayerScreen extends StatelessWidget {
   final String? todayTaskId;
   final bool dramaPlan;
   final bool onlinePreview;
+  final bool tvMode;
 
   @override
   Widget build(BuildContext context) {
+    if (tvMode) {
+      return PadLandscapePlayerScreen(
+        key: ValueKey<String>('tv-$episodeId'),
+        episodeId: episodeId,
+        initialStartTime: initialStartTime,
+        autoPlay: autoPlay,
+        autoOpenFullscreen: false,
+        tvMode: true,
+      );
+    }
     return PadPortraitPlayerScreen(
       key: ValueKey<String>(episodeId),
       episodeId: episodeId,

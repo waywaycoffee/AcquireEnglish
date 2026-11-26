@@ -313,6 +313,12 @@ class SettingsScreen extends ConsumerWidget {
                 },
               ),
               _ActionRow(
+                title: '电视横屏学习',
+                description: '大屏 / 遥控器：继续学习与精听（横屏）',
+                icon: Icons.tv_rounded,
+                onTap: () => context.go('/tv'),
+              ),
+              _ActionRow(
                 title: '授权与素材来源',
                 description: '哔哩哔哩、YouTube、网盘授权与导入',
                 icon: Icons.link_rounded,
