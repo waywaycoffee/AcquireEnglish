@@ -1279,16 +1279,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     if (!mounted || gen != _speakGen) return false;
     final Player player = Player();
     _speechPlayer = player;
+    bool started = false;
     try {
       // Fail fast on dead coach cache URLs (historically 404 → ~45s silence).
-      bool started = false;
       final StreamSubscription<bool> playingSub =
           player.stream.playing.listen((bool value) {
         if (value) started = true;
       });
       final Future<bool> completed = player.stream.completed
           .firstWhere((bool value) => value)
-          .timeout(const Duration(seconds: 20), onTimeout: () => false);
+          .timeout(const Duration(minutes: 2), onTimeout: () => false);
       await player.open(Media(url), play: startAt == Duration.zero);
       if (startAt != Duration.zero) {
         if (!mounted || gen != _speakGen) {
@@ -1312,9 +1312,16 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       final bool ok = await completed;
       await playingSub.cancel();
-      return ok && gen == _speakGen;
+      // A remote voice that has audibly started owns this utterance. Some
+      // Android players do not emit `completed` reliably for cached/streamed
+      // MP3, and long coach replies legitimately exceed the old 20 s timeout.
+      // Returning false here would start device TTS over the same sentence,
+      // which can sound like a male coach changes to a female coach midway.
+      return (ok || started) && gen == _speakGen;
     } catch (_) {
-      return false;
+      // Once audio was audible, never replay the utterance with a different
+      // fallback voice after a decoder/network completion error.
+      return started && gen == _speakGen;
     } finally {
       if (identical(_speechPlayer, player)) {
         _speechPlayer = null;
