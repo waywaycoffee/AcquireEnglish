@@ -3356,6 +3356,32 @@ class AcquireApiClient {
     }
   }
 
+  /// Shooter + Subliminal refill for an existing netdisk import.
+  Future<bool> fetchNetdiskOnlineSubtitles({
+    required int importId,
+    bool force = false,
+  }) async {
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.netdiskFetchOnlineSubtitles(importId),
+        queryParameters: <String, dynamic>{
+          if (force) 'force': true,
+        },
+        options: Options(
+          sendTimeout: const Duration(seconds: 90),
+          receiveTimeout: const Duration(seconds: 90),
+        ),
+      );
+      final Object? data = response.data;
+      if (data is Map && data['has_en'] == true) {
+        return true;
+      }
+      return false;
+    } on DioException {
+      return false;
+    }
+  }
+
   Future<SharedBilibiliSubtitleUpsertResult> putSharedBilibiliSubtitle({
     required String bvid,
     int page = 1,

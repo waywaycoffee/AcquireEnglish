@@ -154,6 +154,8 @@ class Endpoints {
   static const String netdiskImportSeries = 'api/netdisk/import-series';
   static String netdiskImportJob(String jobId) =>
       'api/netdisk/import-jobs/${Uri.encodeComponent(jobId)}';
+  static String netdiskFetchOnlineSubtitles(int importId) =>
+      'api/netdisk/imports/$importId/fetch-online-subtitles';
   static const String rewardsShare = 'api/rewards/share';
   static const String rewardsPoints = 'api/rewards/points';
   static const String rewardsInviteCode = 'api/rewards/invite-code';

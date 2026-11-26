@@ -56,6 +56,26 @@ _HARRY_POTTER_FILMS: dict[int, str] = {
     8: "Harry.Potter.and.the.Deathly.Hallows.Part.2.2011",
 }
 
+_HARRY_POTTER_TITLE_HINTS: tuple[tuple[str, int], ...] = (
+    ("魔法石", 1),
+    ("哲人石", 1),
+    ("sorcerer", 1),
+    ("philosopher", 1),
+    ("密室", 2),
+    ("chamber", 2),
+    ("阿兹卡班", 3),
+    ("azkaban", 3),
+    ("火焰杯", 4),
+    ("goblet", 4),
+    ("凤凰社", 5),
+    ("phoenix", 5),
+    ("混血王子", 6),
+    ("half-blood", 6),
+    ("half blood", 6),
+    ("死亡圣器", 7),  # refined by 上/下 below
+    ("deathly", 7),
+)
+
 _DEFAULT_SUBLIMINAL_PROVIDERS = (
     "opensubtitles",
     "podnapisi",
@@ -227,6 +247,31 @@ def _english_alias(title: str | None) -> str | None:
     return None
 
 
+def _infer_harry_potter_index(filename: str, episode_index: int | None) -> int | None:
+    stem = Path(filename or "").stem.lower()
+    # Prefer explicit Part markers for Deathly Hallows.
+    if re.search(r"(死.?亡.?圣器|deathly)", stem, re.I):
+        if re.search(r"(下|part\s*2|pt\.?\s*2)", stem, re.I):
+            return 8
+        if re.search(r"(上|part\s*1|pt\.?\s*1)", stem, re.I):
+            return 7
+    for hint, idx in _HARRY_POTTER_TITLE_HINTS:
+        if hint in stem:
+            if idx == 7 and re.search(r"(下|part\s*2|pt\.?\s*2)", stem, re.I):
+                return 8
+            return idx
+    m = re.search(r"(?:哈利.?波特|harry.?potter)\D{0,6}([1-8])", stem, re.I)
+    if m:
+        n = int(m.group(1))
+        # Filenames often keep "7" for both Deathly Hallows parts.
+        if n == 7 and re.search(r"(下|part\s*2|pt\.?\s*2)", stem, re.I):
+            return 8
+        return n
+    if episode_index in _HARRY_POTTER_FILMS:
+        return episode_index
+    return None
+
+
 def subliminal_candidate_names(
     filename: str,
     *,
@@ -244,22 +289,33 @@ def subliminal_candidate_names(
         if candidate not in names:
             names.append(candidate)
 
-    _add(base)
-    slug = _ascii_slug(stem)
-    if slug and slug != stem:
-        _add(f"{slug}{ext}")
-
     alias = _english_alias(series_title) or _english_alias(stem)
+    hp_idx = None
+    if alias and alias.lower() == "harry potter":
+        hp_idx = _infer_harry_potter_index(base, episode_index)
+        if hp_idx in _HARRY_POTTER_FILMS:
+            # Prefer precise film release names first — Chinese stems match junk.
+            _add(f"{_HARRY_POTTER_FILMS[hp_idx]}.1080p.BluRay.x264{ext}")
+            _add(f"{_HARRY_POTTER_FILMS[hp_idx]}{ext}")
+            return names
+
+    # English / Latin release names first when the file itself looks parseable.
+    if re.search(r"[A-Za-z]{3,}", stem):
+        _add(base)
+        slug = _ascii_slug(stem)
+        if slug and slug != stem:
+            _add(f"{slug}{ext}")
+
     if alias:
         alias_slug = _ascii_slug(alias)
-        if alias.lower() == "harry potter" and episode_index in _HARRY_POTTER_FILMS:
-            _add(f"{_HARRY_POTTER_FILMS[episode_index]}.1080p.BluRay.x264{ext}")
         if episode_index is not None and episode_index > 0:
-            # TV-style: Show.Name.S01E02 / Show.Name.E02
+            # TV-style: Show.Name.S01E02
             _add(f"{alias_slug}.S01E{episode_index:02d}{ext}")
             _add(f"{alias_slug}.E{episode_index:02d}{ext}")
         _add(f"{alias_slug}{ext}")
 
+    # Last resort: original basename (often Chinese).
+    _add(base)
     return names
 
 
@@ -345,14 +401,16 @@ def _search_subliminal_sync(
                     "opensubtitlescomvip": opensubtitles_hash,
                 }
             )
+        # Require a real title/year/hash match — min_score=0 returns junk.
+        min_score = 60
         try:
             best = download_best_subtitles(
                 {video},
                 lang_set,
                 providers=providers,
                 provider_configs=provider_configs or None,
-                only_one=False,
-                min_score=0,
+                only_one=True,
+                min_score=min_score,
             )
         except Exception as exc:  # noqa: BLE001
             logger.info("subliminal search failed for %s: %s", name, exc)
@@ -363,7 +421,8 @@ def _search_subliminal_sync(
             text = (sub.text or "").strip()
             if len(parse_srt_cues(text)) < 5:
                 continue
-            alpha2 = str(sub.language.alpha2) if sub.language else "en"
+            alpha2 = getattr(getattr(sub, "language", None), "alpha2", None) or "en"
+            alpha2 = str(alpha2)
             if alpha2 not in wanted and "en" in wanted and alpha2.startswith("en"):
                 alpha2 = "en"
             if alpha2 not in wanted:
@@ -501,9 +560,19 @@ async def fetch_and_cache_english_subtitle(
     uploader_user_id: int | None = None,
     series_title: str | None = None,
     episode_index: int | None = None,
+    force: bool = False,
+    prefer_subliminal: bool = False,
 ) -> str | None:
-    """Shooter fingerprint first, then Subliminal name/hash search; cache hits."""
+    """Shooter fingerprint first, then Subliminal name/hash search; cache hits.
+
+    For Chinese-named film packs (e.g. 哈利波特), set prefer_subliminal=True so
+    title/year matching runs before the often-empty Shooter hash lookup.
+    """
     file_hash: str | None = None
+    alias = _english_alias(series_title) or _english_alias(filename)
+    if alias and alias.lower() == "harry potter":
+        prefer_subliminal = True
+
     async with httpx.AsyncClient(follow_redirects=True, timeout=25) as client:
         try:
             file_hash = await compute_subfinder_hash(
@@ -512,7 +581,48 @@ async def fetch_and_cache_english_subtitle(
         except Exception as exc:  # noqa: BLE001
             logger.debug("shooter hash skipped: %s", exc)
 
-        if file_hash:
+        async def _via_subliminal() -> str | None:
+            try:
+                matches = await search_subliminal(
+                    filename=filename,
+                    file_size=file_size,
+                    raw_url=raw_url,
+                    languages=("en",),
+                    series_title=series_title,
+                    episode_index=episode_index,
+                    client=client,
+                )
+            except Exception as exc:  # noqa: BLE001
+                logger.info("subliminal search failed: %s", exc)
+                return None
+            if not matches:
+                return None
+            match = matches[0]
+            cache_hash = file_hash or match.file_hash
+            try:
+                row = await store_shared_media_subtitle(
+                    db,
+                    file_hash=cache_hash,
+                    file_size=file_size,
+                    duration_sec=None,
+                    title=title,
+                    language="en",
+                    subtitle_srt=match.srt,
+                    source_ref=match.source_ref,
+                    source_origin=match.source_origin,
+                    uploader_user_id=uploader_user_id,
+                    episode=episode_index,
+                )
+                return row.subtitle_srt
+            except Exception:
+                return match.srt
+
+        if prefer_subliminal:
+            srt = await _via_subliminal()
+            if srt:
+                return srt
+
+        if file_hash and not force:
             cached = await get_shared_media_subtitle(
                 db, file_hash=file_hash, language="en"
             )
@@ -520,6 +630,7 @@ async def fetch_and_cache_english_subtitle(
                 cached.hit_count = int(cached.hit_count or 0) + 1
                 return cached.subtitle_srt
 
+        if file_hash:
             try:
                 matches = await search_shooter(
                     file_hash=file_hash,
@@ -546,37 +657,6 @@ async def fetch_and_cache_english_subtitle(
                 )
                 return row.subtitle_srt
 
-        try:
-            matches = await search_subliminal(
-                filename=filename,
-                file_size=file_size,
-                raw_url=raw_url,
-                languages=("en",),
-                series_title=series_title,
-                episode_index=episode_index,
-                client=client,
-            )
-        except Exception as exc:  # noqa: BLE001
-            logger.info("subliminal search failed: %s", exc)
-            matches = []
-        if not matches:
-            return None
-        match = matches[0]
-        cache_hash = file_hash or match.file_hash
-        try:
-            row = await store_shared_media_subtitle(
-                db,
-                file_hash=cache_hash,
-                file_size=file_size,
-                duration_sec=None,
-                title=title,
-                language="en",
-                subtitle_srt=match.srt,
-                source_ref=match.source_ref,
-                source_origin=match.source_origin,
-                uploader_user_id=uploader_user_id,
-                episode=episode_index,
-            )
-            return row.subtitle_srt
-        except Exception:
-            return match.srt
+        if not prefer_subliminal:
+            return await _via_subliminal()
+        return None

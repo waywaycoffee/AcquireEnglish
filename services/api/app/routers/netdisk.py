@@ -985,6 +985,84 @@ async def get_netdisk_import_job(
     return job
 
 
+class NetdiskFetchSubtitlesOut(BaseModel):
+    import_id: int
+    has_en: bool
+    source: str | None = None
+    message: str
+
+
+@router.post(
+    "/imports/{import_id}/fetch-online-subtitles",
+    response_model=NetdiskFetchSubtitlesOut,
+)
+async def fetch_online_subtitles_for_import(
+    import_id: int,
+    force: bool = Query(False),
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> NetdiskFetchSubtitlesOut:
+    """Re-run Shooter + Subliminal for an existing netdisk import."""
+    _require_openlist()
+    result = await db.execute(
+        select(UserLinkCourse).where(
+            UserLinkCourse.id == import_id,
+            UserLinkCourse.user_id == user.id,
+        )
+    )
+    row = result.scalar_one_or_none()
+    if row is None or not str(row.source).endswith("_netdisk"):
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "网盘课程不存在")
+    if not force and (row.subtitle_en_srt or "").strip():
+        return NetdiskFetchSubtitlesOut(
+            import_id=import_id,
+            has_en=True,
+            source="existing",
+            message="已有英文字幕",
+        )
+    path = (row.watch_url or "").strip()
+    if not path.startswith("/"):
+        raise HTTPException(400, "网盘路径无效")
+    title = row.title or path.rsplit("/", 1)[-1]
+    try:
+        meta = await OpenListClient().fs_get(path)
+    except OpenListError as exc:
+        raise HTTPException(502, f"无法读取网盘文件：{exc}") from exc
+    raw_url = str(meta.get("raw_url") or "").strip() or public_raw_url(path)
+    file_size = int(meta.get("size") or 0)
+    from app.services.online_subtitles import fetch_and_cache_english_subtitle
+
+    try:
+        srt = await fetch_and_cache_english_subtitle(
+            db,
+            raw_url=raw_url,
+            file_size=file_size,
+            filename=title,
+            title=row.series_title or title,
+            uploader_user_id=user.id,
+            series_title=row.series_title,
+            episode_index=row.episode_index,
+            force=force,
+        )
+    except Exception as exc:  # noqa: BLE001
+        raise HTTPException(502, f"在线字幕检索失败：{exc}") from exc
+    if not srt:
+        return NetdiskFetchSubtitlesOut(
+            import_id=import_id,
+            has_en=False,
+            source=None,
+            message="未匹配到英文字幕",
+        )
+    row.subtitle_en_srt = srt
+    await db.commit()
+    return NetdiskFetchSubtitlesOut(
+        import_id=import_id,
+        has_en=True,
+        source="online",
+        message="已写入英文字幕",
+    )
+
+
 @router.get("/play/{import_id}")
 async def play_netdisk_video(
     import_id: int,

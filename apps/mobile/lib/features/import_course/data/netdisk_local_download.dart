@@ -968,10 +968,22 @@ Future<void> materializeNetdiskSoftsubs({
   if (resolvedId == null) {
     return;
   }
-  final String? enBody = await api.fetchPersonalImportSrt(
+  String? enBody = await api.fetchPersonalImportSrt(
     importId: resolvedId,
     lang: 'en',
   );
+  // Older imports may predate Subliminal — ask API to match online EN once.
+  if (enBody == null || enBody.trim().isEmpty) {
+    final bool filled = await api.fetchNetdiskOnlineSubtitles(
+      importId: resolvedId,
+    );
+    if (filled) {
+      enBody = await api.fetchPersonalImportSrt(
+        importId: resolvedId,
+        lang: 'en',
+      );
+    }
+  }
   final String? zhBody = await api.fetchPersonalImportSrt(
     importId: resolvedId,
     lang: 'zh',

@@ -167,13 +167,21 @@ async def test_remote_opensubtitles_hash_reads_head_and_tail():
 
 def test_subliminal_candidates_map_harry_potter_chinese_pack():
     names = subliminal_candidate_names(
-        "哈利波特01.mkv",
+        "哈利丶波特1与魔丶法石.加长版.mkv",
         series_title="哈利·波特",
         episode_index=1,
     )
-    joined = " | ".join(names)
-    assert "Philosophers.Stone" in joined
-    assert any(n.startswith("Harry.Potter") for n in names)
+    assert names
+    assert "Philosophers.Stone" in names[0]
+    # Chinese stem must not lead — it matches junk on OpenSubtitles.
+    assert not names[0].startswith("哈利")
+
+    part2 = subliminal_candidate_names(
+        "哈利丶波特7与死丶亡圣器(下).mkv",
+        series_title="哈利·波特",
+        episode_index=8,
+    )
+    assert "Deathly.Hallows.Part.2" in part2[0]
 
 
 @pytest.mark.asyncio
