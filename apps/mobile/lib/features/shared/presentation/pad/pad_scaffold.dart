@@ -63,8 +63,11 @@ class PadScaffold extends ConsumerWidget {
         bottomNavigationBar: SafeArea(
           top: false,
           child: FloatingBottomNav(
-            key: FeatureTourKeys.bottomNav,
+            // GlobalKeys must not span go_router page swaps — they reparent
+            // the bar off the new route and it can vanish (e.g. 社区).
+            key: tour.active ? FeatureTourKeys.bottomNav : null,
             current: currentDestination,
+            attachTourKeys: tour.active,
             forceShowScrollHint: suppressScrollHint ? false : null,
           ),
         ),

@@ -20,11 +20,16 @@ class FloatingBottomNav extends StatefulWidget {
   const FloatingBottomNav({
     required this.current,
     super.key,
+    this.attachTourKeys = false,
     this.forceShowScrollHint,
     this.onScrollHintDismissed,
   });
 
   final AppNavDestination current;
+
+  /// When true, attaches [FeatureTourKeys] to bar items. Only safe while a
+  /// single bottom bar is mounted (feature tour); never across route swaps.
+  final bool attachTourKeys;
 
   /// When non-null, overrides Hive-backed first-run hint visibility (tests).
   final bool? forceShowScrollHint;
@@ -258,7 +263,9 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
                                 itemBuilder: (BuildContext context, int index) {
                                   if (index == _moreIndex) {
                                     return SizedBox(
-                                      key: FeatureTourKeys.navMore,
+                                      key: widget.attachTourKeys
+                                          ? FeatureTourKeys.navMore
+                                          : null,
                                       width: itemWidth,
                                       child: _MoreNavItem(
                                         selected: moreSelected,
@@ -269,15 +276,17 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
                                   }
                                   final AppNavDestination destination =
                                       barDestinations[index];
-                                  final Key? tourKey = switch (destination) {
-                                    AppNavDestination.library =>
-                                      FeatureTourKeys.navLibrary,
-                                    AppNavDestination.reading =>
-                                      FeatureTourKeys.navReading,
-                                    AppNavDestination.oralCoach =>
-                                      FeatureTourKeys.navOral,
-                                    _ => null,
-                                  };
+                                  final Key? tourKey = widget.attachTourKeys
+                                      ? switch (destination) {
+                                          AppNavDestination.library =>
+                                            FeatureTourKeys.navLibrary,
+                                          AppNavDestination.reading =>
+                                            FeatureTourKeys.navReading,
+                                          AppNavDestination.oralCoach =>
+                                            FeatureTourKeys.navOral,
+                                          _ => null,
+                                        }
+                                      : null;
                                   return SizedBox(
                                     key: tourKey,
                                     width: itemWidth,
