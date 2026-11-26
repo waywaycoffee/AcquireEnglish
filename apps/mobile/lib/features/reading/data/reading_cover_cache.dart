@@ -110,6 +110,14 @@ String readingCoverCacheKey(String coverUrlOrDocId) {
   if (media != null) {
     return media.group(1)!.toLowerCase();
   }
+  // K12 textbook jackets: /media/reading/k12/{book_id}/cover.jpg
+  final RegExpMatch? k12 = RegExp(
+    r'/media/reading/k12/([a-z0-9_\-]+)/cover\.(?:jpe?g|png|webp)',
+    caseSensitive: false,
+  ).firstMatch(raw);
+  if (k12 != null) {
+    return 'k12_${k12.group(1)!.toLowerCase()}';
+  }
   // Doc id / arbitrary string → filesystem-safe key.
   final String cleaned = raw
       .toLowerCase()

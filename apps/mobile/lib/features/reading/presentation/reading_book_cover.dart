@@ -70,75 +70,17 @@ class ReadingBookCover extends StatelessWidget {
       return _RemoteJacket(url: url, fallback: cloth);
     }
 
-    final bool lightInk = color.computeLuminance() > 0.55;
-    final Color ink = lightInk ? const Color(0xFF3A2A18) : Colors.white;
-    final Color muted = lightInk
-        ? const Color(0xFF3A2A18).withValues(alpha: 0.7)
-        : Colors.white70;
-
+    final Widget flatFallback = _FlatClothCover(
+      title: title,
+      level: level,
+      color: color,
+    );
+    // K12 / ECS jackets: fill the flat shelf tile with the real cover art.
     return AspectRatio(
       aspectRatio: 0.68,
-      child: DecoratedBox(
-        decoration: BoxDecoration(
-          color: color,
-          borderRadius: BorderRadius.circular(3),
-          boxShadow: const <BoxShadow>[
-            BoxShadow(
-              color: Color(0x40000000),
-              blurRadius: 8,
-              offset: Offset(3, 4),
-            ),
-          ],
-          gradient: LinearGradient(
-            colors: <Color>[
-              Color.lerp(color, Colors.black, 0.18)!,
-              color,
-              Color.lerp(color, Colors.white, 0.06)!,
-            ],
-            stops: const <double>[0, 0.08, 1],
-          ),
-        ),
-        child: Container(
-          margin: const EdgeInsets.fromLTRB(6, 0, 0, 0),
-          padding: const EdgeInsets.fromLTRB(10, 12, 8, 10),
-          decoration: BoxDecoration(
-            border: Border(
-              left: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
-            ),
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Text(
-                level.isEmpty ? 'ENGLISH' : level,
-                style: TextStyle(color: muted, fontSize: 9, letterSpacing: 0.4),
-              ),
-              Expanded(
-                child: Align(
-                  alignment: Alignment.centerLeft,
-                  child: Text(
-                    title,
-                    maxLines: 4,
-                    overflow: TextOverflow.ellipsis,
-                    style: TextStyle(
-                      color: ink,
-                      fontFamily: 'serif',
-                      fontSize: 15,
-                      height: 1.15,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-              Divider(color: muted.withValues(alpha: 0.5), height: 8),
-              Text(
-                'ACQUIRE ENGLISH',
-                style: TextStyle(color: muted, fontSize: 7, letterSpacing: 0.3),
-              ),
-            ],
-          ),
-        ),
-      ),
+      child: url.isEmpty
+          ? flatFallback
+          : _RemoteFlatJacket(url: url, fallback: flatFallback),
     );
   }
 
@@ -185,6 +127,173 @@ const List<IconData> _glyphs = <IconData>[
   Icons.history_edu_outlined,
   Icons.pets_outlined,
 ];
+
+class _FlatClothCover extends StatelessWidget {
+  const _FlatClothCover({
+    required this.title,
+    required this.level,
+    required this.color,
+  });
+
+  final String title;
+  final String level;
+  final Color color;
+
+  @override
+  Widget build(BuildContext context) {
+    final bool lightInk = color.computeLuminance() > 0.55;
+    final Color ink = lightInk ? const Color(0xFF3A2A18) : Colors.white;
+    final Color muted = lightInk
+        ? const Color(0xFF3A2A18).withValues(alpha: 0.7)
+        : Colors.white70;
+
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        color: color,
+        borderRadius: BorderRadius.circular(3),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x40000000),
+            blurRadius: 8,
+            offset: Offset(3, 4),
+          ),
+        ],
+        gradient: LinearGradient(
+          colors: <Color>[
+            Color.lerp(color, Colors.black, 0.18)!,
+            color,
+            Color.lerp(color, Colors.white, 0.06)!,
+          ],
+          stops: const <double>[0, 0.08, 1],
+        ),
+      ),
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(6, 0, 0, 0),
+        padding: const EdgeInsets.fromLTRB(10, 12, 8, 10),
+        decoration: BoxDecoration(
+          border: Border(
+            left: BorderSide(color: Colors.white.withValues(alpha: 0.28)),
+          ),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              level.isEmpty ? 'ENGLISH' : level,
+              style: TextStyle(color: muted, fontSize: 9, letterSpacing: 0.4),
+            ),
+            Expanded(
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  title,
+                  maxLines: 4,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    color: ink,
+                    fontFamily: 'serif',
+                    fontSize: 15,
+                    height: 1.15,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ),
+            ),
+            Divider(color: muted.withValues(alpha: 0.5), height: 8),
+            Text(
+              'ACQUIRE ENGLISH',
+              style: TextStyle(color: muted, fontSize: 7, letterSpacing: 0.3),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Flat shelf tile jacket (K12 textbooks): cache then paint real cover art.
+class _RemoteFlatJacket extends StatefulWidget {
+  const _RemoteFlatJacket({required this.url, required this.fallback});
+
+  final String url;
+  final Widget fallback;
+
+  @override
+  State<_RemoteFlatJacket> createState() => _RemoteFlatJacketState();
+}
+
+class _RemoteFlatJacketState extends State<_RemoteFlatJacket> {
+  String? _localPath;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _localPath = cachedReadingCoverPathSync(widget.url);
+    if (_localPath == null) {
+      unawaited(_cache());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _RemoteFlatJacket oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _failed = false;
+      _localPath = cachedReadingCoverPathSync(widget.url);
+      if (_localPath == null) {
+        unawaited(_cache());
+      }
+    }
+  }
+
+  Future<void> _cache() async {
+    final String? path = await ensureReadingCoverCached(widget.url);
+    if (!mounted) return;
+    if (path != null && path.isNotEmpty) {
+      setState(() => _localPath = path);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String paint = (_localPath != null && _localPath!.isNotEmpty)
+        ? _localPath!
+        : resolveReadingCoverRemoteUrl(widget.url);
+    return DecoratedBox(
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(3),
+        boxShadow: const <BoxShadow>[
+          BoxShadow(
+            color: Color(0x40000000),
+            blurRadius: 8,
+            offset: Offset(3, 4),
+          ),
+        ],
+      ),
+      child: ClipRRect(
+        borderRadius: BorderRadius.circular(3),
+        child: _failed || paint.isEmpty
+            ? widget.fallback
+            : CoverImage(
+                path: paint,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (BuildContext context, Object error, StackTrace? st) {
+                  if (!_failed) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() => _failed = true);
+                      }
+                    });
+                  }
+                  return widget.fallback;
+                },
+              ),
+      ),
+    );
+  }
+}
 
 /// Foil gradient for gold stamping on dark cloth.
 const List<Color> _foil = <Color>[
