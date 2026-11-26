@@ -63,7 +63,7 @@ class LearningActivityStatsCard extends ConsumerWidget {
             const ReadAloudReportCard(),
             const SizedBox(height: 4),
             Text(
-              '与昨天对比；不依赖是否加入今日课程',
+              '与昨天对比；不依赖是否加入今日学习',
               style: Theme.of(context).textTheme.bodySmall?.copyWith(
                     color: AppDesignTokens.textSecondary,
                   ),

@@ -21,9 +21,9 @@ Future<void> scheduleJourneyReminder({
   if (kIsWeb) return;
   if (!(Platform.isAndroid || Platform.isIOS)) return;
   final String dayKey = _dayKey(day);
-  final String shortTitle = title.trim().isEmpty ? '英语之旅' : title.trim();
+  final String shortTitle = title.trim().isEmpty ? '今日学习' : title.trim();
   final String shortBody = body.trim().isEmpty
-      ? '点下一步，接着昨天替你排好的内容'
+      ? '点下一步，接着昨天继续学'
       : body.trim();
   try {
     if (!Hive.isBoxOpen('prefs')) {
@@ -65,8 +65,8 @@ Future<void> handleJourneyReminderBackgroundTask() async {
     // Fire on/after the planned day; skip if somehow early.
     if (day.compareTo(today) > 0) return;
     await _showJourneyNotification(
-      title: box.get(_kTitleKey) ?? '英语之旅',
-      body: box.get(_kBodyKey) ?? '点下一步，接着昨天替你排好的内容',
+      title: box.get(_kTitleKey) ?? '今日学习',
+      body: box.get(_kBodyKey) ?? '点下一步，接着昨天继续学',
     );
     await box.put(_kNotifiedDayKey, day);
   } catch (_) {}
@@ -104,8 +104,8 @@ Future<void> _showJourneyNotification({
   );
   const AndroidNotificationDetails androidDetails = AndroidNotificationDetails(
     'journey_reminder',
-    '英语之旅提醒',
-    channelDescription: '提醒你接着昨天排好的下一步',
+    '今日学习提醒',
+    channelDescription: '提醒你接着昨天继续学',
   );
   await plugin.show(
     id: 4203,

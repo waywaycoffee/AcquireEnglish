@@ -81,4 +81,80 @@ void main() {
     expect(store.planned, isFalse);
     expect(store.reason, isNull);
   });
+
+  test('quotas and progress track three study rails', () async {
+    final Directory directory = await Directory.systemTemp.createTemp(
+      'today_journey_quotas',
+    );
+    addTearDown(() async {
+      await Hive.close();
+      await directory.delete(recursive: true);
+    });
+    Hive.init(directory.path);
+    await Hive.openBox<String>('prefs');
+
+    final TodayJourneyStore store = TodayJourneyStore(
+      'learner',
+      DateTime(2026, 11, 26),
+    );
+    expect(store.studyPlan.quotasConfigured, isFalse);
+
+    await store.saveQuotas(videoMinutes: 20, vocabCount: 10, readingWords: 0);
+    TodayStudyPlan plan = store.studyPlan;
+    expect(plan.quotasConfigured, isTrue);
+    expect(plan.videoMinutes, 20);
+    expect(plan.vocabCount, 10);
+    expect(plan.readingWords, 0);
+    expect(plan.readingDone, isTrue);
+    expect(plan.allTracksDone, isFalse);
+    expect(plan.nextTrack, TodayStudyTrack.video);
+
+    await store.saveProgress(
+      videoDoneMs: 20 * 60 * 1000,
+      vocabDone: 4,
+      lastTrack: TodayStudyTrack.vocab,
+    );
+    plan = store.studyPlan;
+    expect(plan.videoDone, isTrue);
+    expect(plan.vocabTrackDone, isFalse);
+    expect(plan.nextTrack, TodayStudyTrack.vocab);
+    expect(plan.lastTrack, TodayStudyTrack.vocab);
+
+    await store.saveProgress(vocabDone: 10);
+    plan = store.studyPlan;
+    expect(plan.allTracksDone, isTrue);
+    expect(plan.nextTrack, isNull);
+
+    final TodayJourneyStore tomorrow = TodayJourneyStore(
+      'learner',
+      DateTime(2026, 11, 27),
+    );
+    await store.copyQuotasTo(tomorrow, reason: '接着昨天继续学');
+    final TodayStudyPlan carried = tomorrow.studyPlan;
+    expect(carried.quotasConfigured, isTrue);
+    expect(carried.videoMinutes, 20);
+    expect(carried.vocabCount, 10);
+    expect(carried.readingWords, 0);
+  });
+
+  test('nextTrack prefers lastTrack among unfinished quotas', () {
+    const TodayStudyPlan plan = TodayStudyPlan(
+      videoMinutes: 15,
+      vocabCount: 20,
+      readingWords: 300,
+      videoDoneMs: 0,
+      vocabDone: 0,
+      readingWordsDone: 0,
+      lastTrack: TodayStudyTrack.reading,
+      quotasConfigured: true,
+    );
+    expect(
+      plan.unfinishedOrdered(),
+      <TodayStudyTrack>[
+        TodayStudyTrack.reading,
+        TodayStudyTrack.video,
+        TodayStudyTrack.vocab,
+      ],
+    );
+  });
 }

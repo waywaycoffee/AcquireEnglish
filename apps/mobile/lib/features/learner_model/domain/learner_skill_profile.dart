@@ -32,6 +32,40 @@ String contentBandOrFallback(String raw, String fallback) =>
     tryParseLearnerBand(raw) ??
     (tryParseLearnerBand(fallback) ?? learnerBandAt(learnerBandIndex(fallback)));
 
+/// Map syllabus book examTag / title hints onto an App vocab band.
+///
+/// Active word books strongly set [LearnerSkill.vocab]; unknown tags return null
+/// so callers can keep the current estimate.
+String? bandFromSyllabusExamTag(String examTag, {String title = ''}) {
+  final String raw = '${examTag.trim()} ${title.trim()}'.toUpperCase();
+  if (raw.trim().isEmpty) return null;
+  final String? direct = tryParseLearnerBand(examTag);
+  if (direct != null) return direct;
+  if (RegExp(r'FOUNDATION|零基础|PHONIC|IPA|PRIMARY|小学|一年级|二年级|三年级')
+      .hasMatch(raw)) {
+    return 'A1';
+  }
+  if (RegExp(r'四年级|五年级|六年级|初一|七年级').hasMatch(raw)) {
+    return 'A2';
+  }
+  if (RegExp(r'中考|ZHONGKAO|JK\b|JUNIOR|初中|初二|初三|八年级|九年级')
+      .hasMatch(raw)) {
+    return 'A2';
+  }
+  if (RegExp(r'高考|GK\b|SENIOR|高中|高一|高二|高三|CET[-_]?4|四级')
+      .hasMatch(raw)) {
+    return 'B1';
+  }
+  if (RegExp(r'CET[-_]?6|六级|KAOYAN|考研|IELTS|雅思|TOEFL|托福|GRE')
+      .hasMatch(raw)) {
+    return 'B2';
+  }
+  if (RegExp(r'C1|专八|高级|ADV').hasMatch(raw)) return 'C1';
+  if (RegExp(r'C2|精通|PROF').hasMatch(raw)) return 'C2';
+  if (RegExp(r'PATTERN|句型').hasMatch(raw)) return 'B1';
+  return null;
+}
+
 /// Score how well [contentLevel] fits [learnerLevel] for ranking.
 /// Strongly rejects material more than one band below the learner
 /// (e.g. 小学三年级 A1 for a C2 profile).

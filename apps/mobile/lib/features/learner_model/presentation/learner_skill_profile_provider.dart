@@ -41,6 +41,19 @@ class LearnerSkillProfileNotifier extends Notifier<LearnerSkillProfile> {
     );
   }
 
+  /// Active syllabus book CEFR / examTag strongly sets the vocab skill band.
+  Future<void> alignVocabBandFromSyllabus({
+    required String examTag,
+    String title = '',
+  }) async {
+    final String? band = bandFromSyllabusExamTag(examTag, title: title);
+    if (band == null) return;
+    final String prior = ref.read(adaptiveLearnerCefrProvider);
+    state = await ref
+        .read(learnerSkillProfileStoreProvider)
+        .setVocabBandStrongly(band: band, priorBand: prior);
+  }
+
   Future<void> recordProbe({
     required LearnerSkill skill,
     required String itemId,

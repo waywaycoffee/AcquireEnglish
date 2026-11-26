@@ -237,9 +237,9 @@ class _VocabularyPlacementScreenState
                                         ? '保存测试结果'
                                         : '保存结果并生成推荐词库')
                                   : (widget.firstOpen
-                                        ? '开始英语之旅'
+                                        ? '开始今日学习'
                                         : widget.forJourney
-                                        ? '继续英语之旅'
+                                        ? '继续今日学习'
                                         : '前往背单词'),
                             ),
                           ),

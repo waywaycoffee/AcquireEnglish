@@ -2,10 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../domain/course_plan.dart';
-import '../domain/oral_core_series.dart';
 import '../domain/today_task.dart';
-import 'course_plan_provider.dart';
 import 'daily_path_runner.dart';
 import 'today_path_provider.dart';
 
@@ -18,13 +15,9 @@ class TodayPathCard extends ConsumerWidget {
     final int dueWords = path.tasks
         .where((TodayTask task) => task.kind == TodayTaskKind.vocabDue)
         .fold(0, (int total, TodayTask task) => total + task.count);
-    final int newWords = path.tasks
-        .where((TodayTask task) => task.kind == TodayTaskKind.vocabNew)
-        .fold(0, (int total, TodayTask task) => total + task.count);
     final int dueClips = path.tasks
         .where((TodayTask task) => task.kind == TodayTaskKind.clipDue)
         .fold(0, (int total, TodayTask task) => total + task.count);
-    final CoursePlan? active = ref.watch(coursePlanProvider).active;
     final bool dark = Theme.of(context).brightness == Brightness.dark;
     final Color accent = dark ? const Color(0xFFB7D894) : const Color(0xFF284F39);
     final Color ink = dark ? const Color(0xFFEEEEEE) : const Color(0xFF292929);
@@ -42,7 +35,7 @@ class TodayPathCard extends ConsumerWidget {
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Text(
-              '今日课程路径',
+              '今日复习',
               style: TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w700,
@@ -51,14 +44,14 @@ class TodayPathCard extends ConsumerWidget {
             ),
             const SizedBox(height: 8),
             Text(
-              '在下方技能模块点「核心口语9000句」，或在视频/阅读页开启课程学习模式。',
+              '只显示到期复习（词卡 / 剧句 / 课程逾期）。新学请走上方「今日学习」。',
               style: TextStyle(fontSize: 13, color: muted, height: 1.4),
             ),
             if (path.tasks.isNotEmpty) ...<Widget>[
               Text(
                   dueClips > 0
-                      ? '单词：$dueWords 待复习 · $newWords 可新学 · 剧句 $dueClips'
-                      : '单词：$dueWords 条待复习 · $newWords 条可新学',
+                      ? '到期：单词 $dueWords · 剧句 $dueClips'
+                      : '到期：单词 $dueWords 条',
                   style: TextStyle(fontSize: 12, color: muted)),
               const SizedBox(height: 12),
               _taskPreview(context, ref, path, accent, ink, muted),
@@ -105,7 +98,7 @@ class TodayPathCard extends ConsumerWidget {
             children: <Widget>[
               Expanded(
                 child: Text(
-                  path.courseTitle.isEmpty ? '今日课程路径' : path.courseTitle,
+                  path.courseTitle.isEmpty ? '今日复习' : path.courseTitle,
                   style: TextStyle(
                     fontSize: 17,
                     fontWeight: FontWeight.w700,
@@ -138,32 +131,13 @@ class TodayPathCard extends ConsumerWidget {
                 : '今日共 ${path.total} 项 · 已完成 ${path.doneCount}',
             style: TextStyle(fontSize: 13, color: muted),
           ),
-          if (dueWords > 0 || newWords > 0) ...<Widget>[
+          if (dueWords > 0 || dueClips > 0) ...<Widget>[
             const SizedBox(height: 4),
-            Text('单词：$dueWords 条待复习 · $newWords 条可新学',
-                style: TextStyle(fontSize: 12, color: muted)),
-          ],
-          if (active != null &&
-              active.courseId == OralCoreSeries.kSeriesId) ...<Widget>[
-            const SizedBox(height: 10),
-            Text('今日新课节数', style: TextStyle(fontSize: 12, color: muted)),
-            const SizedBox(height: 6),
-            Wrap(
-              spacing: 8,
-              children: <int>[1, 2, 3, 5]
-                  .map(
-                    (int n) => ChoiceChip(
-                      label: Text('$n'),
-                      selected: active.params.dailyLessons == n,
-                      onSelected: (_) async {
-                        await ref
-                            .read(coursePlanProvider.notifier)
-                            .setDailyLessons(n);
-                        ref.read(todayPathProvider.notifier).refresh();
-                      },
-                    ),
-                  )
-                  .toList(),
+            Text(
+              dueClips > 0
+                  ? '到期：单词 $dueWords · 剧句 $dueClips'
+                  : '到期：单词 $dueWords 条',
+              style: TextStyle(fontSize: 12, color: muted),
             ),
           ],
           if (path.total > 0) ...<Widget>[

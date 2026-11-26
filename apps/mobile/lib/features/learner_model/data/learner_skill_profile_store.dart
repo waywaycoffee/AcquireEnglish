@@ -103,6 +103,27 @@ class LearnerSkillProfileStore {
     await _prefs?.put('$_key:probes', jsonEncode(rows));
   }
 
+  /// Strongly align vocab band with an active syllabus book (not a weak prior).
+  Future<LearnerSkillProfile> setVocabBandStrongly({
+    required String band,
+    String priorBand = 'B1',
+  }) async {
+    final String nextBand = learnerBandAt(learnerBandIndex(band));
+    final LearnerSkillProfile current = load(priorBand: priorBand);
+    final SkillEstimate currentVocab = current.estimate(LearnerSkill.vocab);
+    if (currentVocab.band == nextBand && !currentVocab.calibrating) {
+      return current;
+    }
+    final LearnerSkillProfile next = LearnerSkillProfile(
+      skills: <LearnerSkill, SkillEstimate>{
+        ...current.skills,
+        LearnerSkill.vocab: SkillEstimate(band: nextBand, calibrating: false),
+      },
+    );
+    await save(next);
+    return next;
+  }
+
   Future<LearnerSkillProfile> recordProbe({
     required ProbeAttempt attempt,
     String priorBand = 'B1',

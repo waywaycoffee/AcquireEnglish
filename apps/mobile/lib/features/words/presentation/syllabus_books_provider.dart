@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/account_storage.dart';
+import '../../learner_model/presentation/learner_skill_profile_provider.dart';
 import '../domain/syllabus_book.dart';
 
 const String kSyllabusStateKey = 'syllabus_books_v1';
@@ -200,12 +201,18 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
   }
 
   Future<void> setActiveBook(String bookId) async {
-    if (state.bookById(bookId) == null) return;
+    final SyllabusBook? book = state.bookById(bookId);
+    if (book == null) return;
     ref.read(currentLearningKindProvider.notifier).record('book');
     if (Hive.isBoxOpen('prefs'))
       await Hive.box<String>('prefs').put('current_learning_kind', 'book');
     state = state.copyWith(activeBookId: bookId);
     await _persist();
+    // Active syllabus book CEFR strongly sets vocab skill band.
+    await ref.read(learnerSkillProfileProvider.notifier).alignVocabBandFromSyllabus(
+          examTag: book.examTag,
+          title: book.title,
+        );
   }
 
   Future<void> recordLearned(String bookId, String word) async {
@@ -275,6 +282,10 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
       activeBookId: book.id,
     );
     await _persist();
+    await ref.read(learnerSkillProfileProvider.notifier).alignVocabBandFromSyllabus(
+          examTag: book.examTag,
+          title: book.title,
+        );
     return book;
   }
 

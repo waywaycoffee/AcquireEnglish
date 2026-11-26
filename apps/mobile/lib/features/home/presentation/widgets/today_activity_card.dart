@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,10 @@ import 'package:go_router/go_router.dart';
 import '../../../authentication/presentation/account_storage.dart';
 import '../../../daily_path/data/journey_reminder.dart';
 import '../../../daily_path/data/today_journey_store.dart';
+import '../../../daily_path/domain/today_task.dart';
+import '../../../daily_path/presentation/today_path_provider.dart';
+import '../../../daily_review/presentation/daily_review_provider.dart';
+import '../../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../../learner_model/data/journey_feedback_store.dart';
 import '../../../learner_model/domain/journey_completion.dart';
 import '../../../learner_model/domain/journey_next_step.dart';
@@ -15,7 +20,6 @@ import '../../../learner_model/domain/learning_recommendation.dart';
 import '../../../learner_model/presentation/learner_skill_profile_provider.dart';
 import '../../../library/presentation/library_catalog_provider.dart';
 import '../../../library/presentation/library_mock_data.dart';
-import '../../../onboarding/domain/learning_tracks.dart';
 import '../../../onboarding/domain/onboarding_profile.dart';
 import '../../../onboarding/presentation/focus_recommendation.dart';
 import '../../../onboarding/presentation/onboarding_provider.dart';
@@ -26,8 +30,8 @@ import '../../../settings/presentation/settings_provider.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/presentation/daily_feed_provider.dart';
-import '../../../words/presentation/learner_level_provider.dart';
-import '../../../words/presentation/word_book_provider.dart';
+import '../../../words/domain/syllabus_book.dart';
+import '../../../words/presentation/syllabus_books_provider.dart';
 import '../learning_dashboard_provider.dart';
 
 class TodayActivityCard extends ConsumerStatefulWidget {
@@ -39,554 +43,140 @@ class TodayActivityCard extends ConsumerStatefulWidget {
 
 class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
   bool _busy = false;
-  bool _skippingEmptyReview = false;
+  bool _syncScheduled = false;
 
   DateTime _nextDay(DateTime today) =>
       DateTime(today.year, today.month, today.day + 1);
 
-  Future<JourneyActivity?> _pick({bool tomorrow = false}) =>
-      showModalBottomSheet<JourneyActivity>(
-        context: context,
-        isScrollControlled: true,
-        showDragHandle: true,
-        backgroundColor: AppDesignTokens.appWhite,
-        builder: (_) => _TodayActivityPicker(tomorrow: tomorrow),
+  /// Unified FSRS due count via todayPath (reviewSources), not wordBook SM2.
+  int _unifiedDueCount() {
+    final TodayPathState path = ref.read(todayPathProvider);
+    int total = 0;
+    for (final TodayTask task in path.tasks) {
+      if (task.doneToday) continue;
+      if (task.count > 0) {
+        total += task.count;
+      } else {
+        total += 1;
+      }
+    }
+    return total;
+  }
+  Future<bool> _syncProgress(TodayJourneyStore store) async {
+    final TodayStudyPlan plan = store.studyPlan;
+    if (!plan.quotasConfigured) return false;
+    final LearningDailyRecord today = ref.read(learningActivityProvider).today;
+    final int videoMs = math.max(plan.videoDoneMs, today.videoStudyMilliseconds);
+    // ~25s per graded card heuristic + any stored session count.
+    final int vocabFromActivity = today.vocabStudyMilliseconds ~/ 25000;
+    final int vocab = math.max(plan.vocabDone, vocabFromActivity);
+    int readingWords = plan.readingWordsDone;
+    final ReadingLibraryState library = ref.read(readingLibraryProvider);
+    for (final String key in today.readArticleKeys) {
+      final ReadingDoc? doc = library.docById(key);
+      if (doc == null) continue;
+      final ReadingProgress? progress = library.progressFor(doc.id);
+      final double pct = (progress?.percent ?? 0).clamp(0.0, 1.0);
+      readingWords = math.max(
+        readingWords,
+        (doc.wordCount * pct).round(),
       );
-
-  Future<void> _ensureEmptyReviewSkipped(TodayJourneyStore store) async {
-    if (_skippingEmptyReview || store.stage != JourneyStage.review) return;
-    final int due = ref.read(wordBookProvider.notifier).dueCounts().dueReviews;
-    if (due > 0) return;
-    _skippingEmptyReview = true;
-    await store.saveStage(JourneyStage.learn);
-    if (mounted) setState(() => _skippingEmptyReview = false);
+    }
+    final ReadingDoc? cont = library.continueDoc;
+    if (cont != null) {
+      final ReadingProgress? progress = library.progressFor(cont.id);
+      final double pct = (progress?.percent ?? 0).clamp(0.0, 1.0);
+      readingWords = math.max(readingWords, (cont.wordCount * pct).round());
+    }
+    if (videoMs != plan.videoDoneMs ||
+        vocab != plan.vocabDone ||
+        readingWords != plan.readingWordsDone) {
+      await store.saveProgress(
+        videoDoneMs: videoMs,
+        vocabDone: vocab,
+        readingWordsDone: readingWords,
+      );
+      return true;
+    }
+    return false;
   }
 
-  Future<void> _runJourney() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    final DateTime today = DateTime.now();
-    final String account = ref.read(studyAccountProvider);
-    final TodayJourneyStore store = TodayJourneyStore(account, today);
-
-    bool active() =>
-        mounted &&
-        account == ref.read(studyAccountProvider) &&
-        DateUtils.isSameDay(today, DateTime.now());
-
-    try {
-      await _ensureEmptyReviewSkipped(store);
+  void _scheduleProgressSync(TodayJourneyStore store) {
+    if (_syncScheduled) return;
+    _syncScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      _syncScheduled = false;
       if (!mounted) return;
-      final JourneyNextStep step = _nextStep(store);
-      if (store.stage == JourneyStage.review ||
-          store.stage == JourneyStage.learn) {
-        if (step.kind == JourneyNextKind.review) {
-          final bool? completed = await context.push<bool>(step.route);
-          if (active() && (completed ?? false)) {
-            await store.saveStage(JourneyStage.learn);
-            // Rebuild immediately so CTA flips to planned / pursuit.
-            if (mounted) setState(() {});
-          }
-          return;
-        }
-        if (step.kind == JourneyNextKind.chooseLevel || step.route.isEmpty) {
-          final JourneyActivity? picked = await _pick();
-          if (!active() || picked == null) return;
-          await store.saveStage(JourneyStage.learn);
-          await store.saveActivity(picked);
-          if (!mounted) return;
-          await context.push(picked.route);
-          return;
-        }
-        final JourneyActivity activity = (
-          route: step.route,
-          title: step.title,
-        );
-        await store.saveStage(JourneyStage.learn);
-        await store.saveActivity(activity);
-        if (!mounted) return;
-        final LearnModule module = learnModuleForRoute(activity.route);
-        final JourneyProgressSnapshot before = _progressSnapshot(
-          activity.route,
-          module,
-        );
-        await context.push(activity.route);
-        if (!mounted) return;
-        final JourneyCompletionResult gate = evaluateJourneyCompletion(
-          module: module,
-          before: before,
-          after: _progressSnapshot(activity.route, module),
-        );
-        final bool? completed = await showDialog<bool>(
-          context: context,
-          builder: (BuildContext dialogContext) => AlertDialog(
-            backgroundColor: AppDesignTokens.appWhite,
-            title: Text(
-              '这关学完了吗？',
-              style: TextStyle(color: AppDesignTokens.textPrimary),
-            ),
-            content: Text(
-              gate.allowed
-                  ? activity.title
-                  : '${activity.title}\n\n${gate.hint}',
-              style: TextStyle(color: AppDesignTokens.textSecondary),
-            ),
-            actions: <Widget>[
-              TextButton(
-                onPressed: () => Navigator.of(dialogContext).pop(false),
-                child: const Text('稍后继续'),
-              ),
-              FilledButton(
-                onPressed: gate.allowed
-                    ? () => Navigator.of(dialogContext).pop(true)
-                    : null,
-                child: const Text('完成本关'),
-              ),
-            ],
-          ),
-        );
-        if (active() && (completed ?? false)) {
-          await store.clearPausedFlag();
-          await _seedTomorrowIfNeeded(account, today);
-          await store.saveStage(JourneyStage.tomorrow);
-          if (active()) await _maybeOfferSkillProbe(module);
-        } else if (active() && completed == false) {
-          // 「稍后继续」— keep this route as the explicit pause target.
-          await store.saveActivity(activity, pausedExplicitly: true);
-          await store.saveStage(JourneyStage.learn);
-        }
-        return;
-      }
-      switch (store.stage) {
-        case JourneyStage.review:
-        case JourneyStage.learn:
-          return;
-        case JourneyStage.tomorrow:
-          await _confirmTomorrowAndMaybeRemind(account, today);
-          await store.saveStage(JourneyStage.done);
-          return;
-        case JourneyStage.done:
-          return;
-      }
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
+      final bool changed = await _syncProgress(store);
+      if (changed && mounted) setState(() {});
+    });
   }
 
-  Future<void> _seedTomorrowIfNeeded(String account, DateTime today) async {
-    final TodayJourneyStore tomorrow = TodayJourneyStore(
-      account,
-      _nextDay(today),
-    );
-    if (tomorrow.activity?.route.isNotEmpty ?? false) return;
-    final ({JourneyActivity activity, String reason})? seeded =
-        _materializeTomorrowPlan();
-    if (seeded == null) return;
-    await tomorrow.saveActivity(
-      seeded.activity,
-      planned: true,
-      reason: seeded.reason,
-    );
-  }
-
-  /// Concrete route+title+reason for Gate3 — never an empty「系统推荐」row.
-  ({JourneyActivity activity, String reason})? _materializeTomorrowPlan() {
-    final JourneyTask? pursuit = _currentPursuit();
-    final Set<String> tracks = selectedLearningTracks(
-      ref.read(learningPreferencesProvider).tags,
-    );
-    final ScoredLearnCandidate? coldScored = _coldRecommendation(
-      videoOn: tracks.contains(kTrackVideo),
-      readingOn: tracks.contains(kTrackReading),
-    );
-    final JourneyTask? cold = coldScored == null
-        ? null
-        : JourneyTask(
-            route: coldScored.candidate.route,
-            title: coldScored.candidate.title,
-            module: coldScored.candidate.module,
-          );
-    final JourneyNextStep preview = resolveJourneyNext(
-      JourneyNextRequest(
-        dueReviewCount: 0,
-        reviewFinished: true,
-        pursuit: pursuit,
-        recommendation: cold,
-        recommendationReason: coldScored?.reason ?? '',
-      ),
-    );
-    if (preview.route.isEmpty) return null;
-    final String title = preview.title
-        .replaceFirst(RegExp(r'^下一步 · '), '')
-        .trim();
-    final bool chase = preview.kind == JourneyNextKind.continuePursuit ||
-        (pursuit != null && pursuit.route == preview.route);
-    final String reason = chase
-        ? _pursuitPlanReason(pursuit?.title ?? title)
-        : (coldScored?.reason.trim().isNotEmpty == true
-              ? coldScored!.reason.trim()
-              : (preview.reason.trim().isNotEmpty
-                    ? preview.reason.trim()
-                    : '按你的水平排好了'));
-    return (
-      activity: (route: preview.route, title: title),
-      reason: reason,
-    );
-  }
-
-  String _pursuitPlanReason(String title) {
-    final Match? ep = RegExp(r'第\s*(\d+)\s*集').firstMatch(title);
-    if (ep != null) return '接着第${ep.group(1)}集';
-    final String cleaned = title
-        .replaceFirst(RegExp(r'^继续 · '), '')
-        .replaceFirst(RegExp(r'^继续'), '')
-        .trim();
-    return cleaned.isEmpty ? '接着追你正在学的' : '接着$cleaned';
-  }
-
-  Future<void> _confirmTomorrowAndMaybeRemind(
-    String account,
-    DateTime today,
-  ) async {
-    final DateTime tomorrowDay = _nextDay(today);
-    final TodayJourneyStore tomorrow = TodayJourneyStore(account, tomorrowDay);
-    final JourneyActivity? activity = tomorrow.activity;
-    if (activity == null || activity.route.isEmpty) return;
-    if (!ref.read(learningSettingsProvider).reminder) return;
-    await scheduleJourneyReminder(
-      day: tomorrowDay,
-      title: activity.title,
-      body: tomorrow.reason ?? '点下一步，接着昨天替你排好的内容',
-    );
-  }
-
-  JourneyTask? _currentPursuit() {
-    final Set<String> tracks = selectedLearningTracks(
-      ref.read(learningPreferencesProvider).tags,
-    );
-    // If they already opened an episode this install, always allow resume —
-    // don't let a toggled-off track erase「接着看第4集」.
-    final bool hasResumeEpisode =
-        (ref.read(lastLearningEpisodeProvider) ?? '').isNotEmpty;
-    final JourneyTask? videoNext = _videoPursuit(
-      ref.read(continueLearningTargetProvider),
-      enabled: tracks.contains(kTrackVideo) || hasResumeEpisode,
-    );
-    final ReadingDoc? book = ref.read(readingLibraryProvider).continueDoc;
-    final String readingBand = ref
-        .read(learnerSkillProfileProvider)
-        .recommendationEstimate(LearnerSkill.reading)
-        .band;
-    // Don't keep pulling a 小学课本 back as "继续读" for a C2 profile.
-    final bool readingLevelOk = book != null &&
-        levelFitScore(book.level, readingBand) >= -1;
-    final JourneyTask? readingNext =
-        tracks.contains(kTrackReading) && readingLevelOk
-        ? JourneyTask(
-            route: '/reading/${Uri.encodeComponent(book.id)}',
-            title: '继续读${book.displayTitle}',
-            module: LearnModule.reading,
-          )
-        : null;
-    final String recent = ref.read(currentLearningKindProvider);
-    return recent == 'reading'
-        ? (readingNext ?? videoNext)
-        : (videoNext ?? readingNext);
-  }
-
-  JourneyTask? _coldTask() {
-    final Set<String> tracks = selectedLearningTracks(
-      ref.read(learningPreferencesProvider).tags,
-    );
-    final ScoredLearnCandidate? cold = _coldRecommendation(
-      videoOn: tracks.contains(kTrackVideo),
-      readingOn: tracks.contains(kTrackReading),
-    );
-    if (cold == null) return null;
-    return JourneyTask(
-      route: cold.candidate.route,
-      title: cold.candidate.title,
-      module: cold.candidate.module,
-    );
-  }
-
-  Future<void> _changeTomorrow() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    final DateTime today = DateTime.now();
-    final String account = ref.read(studyAccountProvider);
-    try {
-      final JourneyActivity? picked = await _pick(tomorrow: true);
-      if (!mounted || picked == null) return;
-      JourneyActivity activity = picked;
-      String reason = '你选好了明天的内容';
-      if (activity.route.isEmpty) {
-        final ({JourneyActivity activity, String reason})? seeded =
-            _materializeTomorrowPlan();
-        if (seeded == null) return;
-        activity = seeded.activity;
-        reason = seeded.reason;
-      } else if (activity.title.contains('第') && activity.title.contains('集')) {
-        reason = _pursuitPlanReason(activity.title);
-      }
-      await TodayJourneyStore(account, _nextDay(today)).saveActivity(
-        activity,
-        planned: true,
-        reason: reason,
-      );
-      await TodayJourneyStore(account, today).saveStage(JourneyStage.done);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  Future<void> _openFeedback() async {
-    final TodayJourneyStore store = TodayJourneyStore(
-      ref.read(studyAccountProvider),
-      DateTime.now(),
-    );
-    final JourneyNextStep step = _nextStep(store);
-    if (step.kind == JourneyNextKind.review || step.route.isEmpty) {
-      await _swapOnce();
-      return;
-    }
-    final LearnFeedback? feedback = await showModalBottomSheet<LearnFeedback>(
-      context: context,
-      backgroundColor: AppDesignTokens.appWhite,
-      showDragHandle: true,
-      builder: (BuildContext context) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            ListTile(
-              title: Text(
-                '换一个',
-                style: TextStyle(color: AppDesignTokens.textPrimary),
-              ),
-              subtitle: Text(
-                '只改这一次，不记成长期偏好',
-                style: TextStyle(color: AppDesignTokens.textSecondary),
-              ),
-              onTap: () => Navigator.pop(context, LearnFeedback.swap),
-            ),
-            ListTile(
-              title: Text(
-                '不感兴趣',
-                style: TextStyle(color: AppDesignTokens.textPrimary),
-              ),
-              subtitle: Text(
-                '七天内不再默认推荐这条',
-                style: TextStyle(color: AppDesignTokens.textSecondary),
-              ),
-              onTap: () => Navigator.pop(context, LearnFeedback.notInterested),
-            ),
-            ListTile(
-              title: Text(
-                '太难了',
-                style: TextStyle(color: AppDesignTokens.textPrimary),
-              ),
-              subtitle: Text(
-                '同类内容以后略降一档',
-                style: TextStyle(color: AppDesignTokens.textSecondary),
-              ),
-              onTap: () => Navigator.pop(context, LearnFeedback.tooHard),
-            ),
-            ListTile(
-              title: Text(
-                '太简单了',
-                style: TextStyle(color: AppDesignTokens.textPrimary),
-              ),
-              subtitle: Text(
-                '同类内容以后略升一档',
-                style: TextStyle(color: AppDesignTokens.textSecondary),
-              ),
-              onTap: () => Navigator.pop(context, LearnFeedback.tooEasy),
-            ),
-          ],
-        ),
-      ),
-    );
-    if (!mounted || feedback == null) return;
-    final LearnModule module = step.route.startsWith('/reading/')
-        ? LearnModule.reading
-        : step.route.contains('review')
-        ? LearnModule.vocab
-        : LearnModule.video;
-    await JourneyFeedbackStore(
-      ref.read(studyAccountProvider),
-    ).apply(id: step.route, module: module, feedback: feedback);
-    if (!mounted) return;
-    final String toast = switch (feedback) {
-      LearnFeedback.swap => '换一条试试',
-      LearnFeedback.notInterested => '七天内不再默认推荐这条',
-      LearnFeedback.tooHard => '已记下偏难，换一条更容易的',
-      LearnFeedback.tooEasy => '已记下偏简单，换一条更有挑战的',
-    };
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(toast)),
-    );
-    // Difficulty feedback also means “not this one” — always open the picker.
-    await _swapOnce();
-  }
-
-  Future<void> _swapOnce() async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    final DateTime today = DateTime.now();
-    final String account = ref.read(studyAccountProvider);
-    final TodayJourneyStore store = TodayJourneyStore(account, today);
-    try {
-      final JourneyActivity? picked = await _pick();
-      if (!mounted || picked == null) return;
-      await store.saveStage(JourneyStage.learn);
-      await store.saveActivity(picked);
-    } finally {
-      if (mounted) setState(() => _busy = false);
-    }
-  }
-
-  JourneyNextStep _nextStep(TodayJourneyStore store) {
-    final bool reviewFinished = store.stage != JourneyStage.review;
-    final JourneyActivity? stored = store.activity;
-    // Only honor explicit「稍后继续」. Auto-saved cold picks must not hide
-    // 「继续第4集」.
-    final JourneyTask? paused =
-        store.pausedExplicitly &&
-            store.stage == JourneyStage.learn &&
-            stored != null &&
-            stored.route.isNotEmpty
-        ? JourneyTask(
-            route: stored.route,
-            title: stored.title,
-            module: learnModuleForRoute(stored.route),
-          )
-        : null;
-    // Yesterday's Gate3 plan (planned=true) — not every auto-saved activity.
-    final JourneyTask? planned =
-        !store.pausedExplicitly &&
-            store.planned &&
-            stored != null &&
-            stored.route.isNotEmpty
-        ? JourneyTask(
-            route: stored.route,
-            title: stored.title,
-            module: learnModuleForRoute(stored.route),
-          )
-        : null;
-    final int due = ref.read(wordBookProvider.notifier).dueCounts().dueReviews;
-    final JourneyTask? pursuit = _currentPursuit();
-    return resolveJourneyNext(
-      JourneyNextRequest(
-        paused: paused,
-        dueReviewCount: due,
-        reviewFinished: reviewFinished,
-        planned: planned,
-        plannedReason: store.reason ?? '',
-        pursuit: pursuit,
-        recommendation: _coldTask(),
-        recommendationReason: _coldRecommendation(
-              videoOn: selectedLearningTracks(
-                ref.read(learningPreferencesProvider).tags,
-              ).contains(kTrackVideo),
-              readingOn: selectedLearningTracks(
-                ref.read(learningPreferencesProvider).tags,
-              ).contains(kTrackReading),
-            )?.reason ??
-            '',
-      ),
-    );
-  }
-
-  Future<void> _maybeOfferSkillProbe(LearnModule module) async {
-    final LearnerSkill? skill = switch (module) {
-      LearnModule.video => LearnerSkill.listening,
-      LearnModule.reading => LearnerSkill.reading,
-      LearnModule.vocab || LearnModule.oral => null,
-    };
-    if (skill == null || !mounted) return;
-    final SkillEstimate estimate = ref
-        .read(learnerSkillProfileProvider)
-        .estimate(skill);
-    if (!estimate.calibrating) return;
-    final bool? go = await showDialog<bool>(
-      context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        backgroundColor: AppDesignTokens.appWhite,
-        title: Text(
-          skill == LearnerSkill.listening ? '来一道听力小测？' : '来一道阅读小测？',
-          style: TextStyle(color: AppDesignTokens.textPrimary),
-        ),
-        content: Text(
-          '只记第一次作答，用来校准约 ${estimate.band}。可以跳过。',
-          style: TextStyle(color: AppDesignTokens.textSecondary),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('先跳过'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('开始'),
-          ),
-        ],
-      ),
-    );
-    if (!mounted || go != true) return;
-    await context.push('/skill-probe?skill=${skill.name}');
-  }
-
-  JourneyProgressSnapshot _progressSnapshot(String route, LearnModule module) {
-    final LearningDailyRecord today = ref
-        .read(learningActivityProvider)
-        .today;
-    switch (module) {
-      case LearnModule.video:
-        final String id = Uri.tryParse(route)?.pathSegments.lastOrNull ?? '';
-        final String episodeId = Uri.decodeComponent(id);
-        ContinueLearningTarget? match;
-        for (final LibraryCourseData course
-            in ref.read(libraryCatalogProvider)) {
-          for (final LibraryEpisodeItem episode in course.episodes) {
-            if (episode.id == episodeId) {
-              match = ContinueLearningTarget(course: course, episode: episode);
-              break;
-            }
-          }
-          if (match != null) break;
-        }
-        return JourneyProgressSnapshot(
-          videoWatchMs: today.videoStudyMilliseconds,
-          shadowSentenceCount: today.shadowedSentenceKeys.length,
-          episodeCompleted: match?.episode.completed ?? false,
-          episodeProgressPercent: match?.episode.progressPercent ?? 0,
-        );
-      case LearnModule.reading:
-        final String id = Uri.tryParse(route)?.pathSegments.lastOrNull ?? '';
-        final String docId = Uri.decodeComponent(id);
-        final ReadingProgress? progress = ref
-            .read(readingLibraryProvider)
-            .progressFor(docId);
-        return JourneyProgressSnapshot(
-          readingPercent: progress?.percent ?? 0,
-          readingCompleted: progress?.completed ?? false,
-        );
-      case LearnModule.vocab:
-        return JourneyProgressSnapshot(
-          vocabGraded: today.vocabStudyMilliseconds ~/ 25000,
-        );
-      case LearnModule.oral:
-        return JourneyProgressSnapshot(
-          oralBubbleCount: today.shadowingCount + today.savedSentenceCount,
-        );
-    }
-  }
-
-  JourneyTask? _videoPursuit(
-    ContinueLearningTarget? resume, {
-    required bool enabled,
+  Future<({int videoMinutes, int vocabCount, int readingWords})?>
+      _askQuotas({
+    int videoMinutes = 20,
+    int vocabCount = 20,
+    int readingWords = 500,
   }) {
-    if (!enabled || resume == null) return null;
+    return showModalBottomSheet<
+        ({int videoMinutes, int vocabCount, int readingWords})>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppDesignTokens.appWhite,
+      builder: (_) => _TodayQuotaSheet(
+        videoMinutes: videoMinutes,
+        vocabCount: vocabCount,
+        readingWords: readingWords,
+      ),
+    );
+  }
+
+  Future<void> _ensureQuotas(TodayJourneyStore store) async {
+    final TodayStudyPlan plan = store.studyPlan;
+    if (plan.quotasConfigured) return;
+    // Carry yesterday quotas when present.
+    final TodayJourneyStore yesterday = TodayJourneyStore(
+      ref.read(studyAccountProvider),
+      DateTime.now().subtract(const Duration(days: 1)),
+    );
+    final TodayStudyPlan y = yesterday.studyPlan;
+    final ({int videoMinutes, int vocabCount, int readingWords})? picked =
+        await _askQuotas(
+      videoMinutes: y.quotasConfigured ? y.videoMinutes : 20,
+      vocabCount: y.quotasConfigured ? y.vocabCount : 20,
+      readingWords: y.quotasConfigured ? y.readingWords : 500,
+    );
+    if (picked == null || !mounted) return;
+    await store.saveQuotas(
+      videoMinutes: picked.videoMinutes,
+      vocabCount: picked.vocabCount,
+      readingWords: picked.readingWords,
+    );
+    if (mounted) setState(() {});
+  }
+
+  Future<void> _editQuotas(TodayJourneyStore store) async {
+    final TodayStudyPlan plan = store.studyPlan;
+    final ({int videoMinutes, int vocabCount, int readingWords})? picked =
+        await _askQuotas(
+      videoMinutes: plan.videoMinutes,
+      vocabCount: plan.vocabCount,
+      readingWords: plan.readingWords,
+    );
+    if (picked == null || !mounted) return;
+    await store.saveQuotas(
+      videoMinutes: picked.videoMinutes,
+      vocabCount: picked.vocabCount,
+      readingWords: picked.readingWords,
+    );
+    if (mounted) setState(() {});
+  }
+
+  JourneyTask? _videoPursuit() {
+    final ContinueLearningTarget? resume =
+        ref.read(continueLearningTargetProvider);
+    if (resume == null) return null;
     final List<LibraryEpisodeItem> episodes = resume.course.episodes
         .where((LibraryEpisodeItem episode) => !episode.videoMissing)
         .toList();
@@ -594,7 +184,6 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     int index = episodes.indexWhere(
       (LibraryEpisodeItem episode) => episode.id == resume.episode.id,
     );
-    // Last watched marked missing → still try to offer the next playable.
     if (index < 0) {
       if (resume.episode.videoMissing) {
         final int rawIndex = resume.course.episodes.indexWhere(
@@ -604,7 +193,9 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           for (int i = rawIndex + 1; i < resume.course.episodes.length; i++) {
             final LibraryEpisodeItem candidate = resume.course.episodes[i];
             if (candidate.videoMissing) continue;
-            index = episodes.indexWhere((LibraryEpisodeItem e) => e.id == candidate.id);
+            index = episodes.indexWhere(
+              (LibraryEpisodeItem e) => e.id == candidate.id,
+            );
             break;
           }
         }
@@ -612,9 +203,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       if (index < 0) return null;
     }
     final LibraryEpisodeItem current = episodes[index];
-    final LibraryEpisodeItem? next = index + 1 < episodes.length
-        ? episodes[index + 1]
-        : null;
+    final LibraryEpisodeItem? next =
+        index + 1 < episodes.length ? episodes[index + 1] : null;
     String routeOf(LibraryEpisodeItem episode) =>
         '/episodes/${Uri.encodeComponent(episode.id)}';
     String episodeLabel(LibraryEpisodeItem episode, int episodeIndex) {
@@ -623,12 +213,9 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       return '继续第${episodeIndex + 1}集 · $raw';
     }
 
-    // Treat any resumed multi-ep series as confirmed pursuit (watched before).
-    final bool confirmedSeries =
-        index >= 1 ||
+    final bool confirmedSeries = index >= 1 ||
         resume.course.completedEpisodes >= 1 ||
         (ref.read(lastLearningEpisodeProvider) ?? '').isNotEmpty;
-
     return seriesContinueTarget(
       SeriesProgress(
         itemCount: episodes.length,
@@ -645,187 +232,383 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     );
   }
 
-  ScoredLearnCandidate? _coldRecommendation({
-    required bool videoOn,
-    required bool readingOn,
-  }) {
+  JourneyTask? _vocabPursuit() {
+    final SyllabusBook? book =
+        ref.read(syllabusBooksProvider).activeBook;
+    if (book != null) {
+      return JourneyTask(
+        route: syllabusBookSessionRoute(book.id),
+        title: '背词 · ${book.title}',
+        module: LearnModule.vocab,
+      );
+    }
+    return const JourneyTask(
+      route: '/words',
+      title: '打开词书挑一组新词',
+      module: LearnModule.vocab,
+    );
+  }
+
+  JourneyTask? _readingPursuit() {
+    final ReadingDoc? book = ref.read(readingLibraryProvider).continueDoc;
+    if (book != null) {
+      return JourneyTask(
+        route: '/reading/${Uri.encodeComponent(book.id)}',
+        title: '继续读${book.displayTitle}',
+        module: LearnModule.reading,
+      );
+    }
+    final LearnerSkillProfile profile = ref.read(learnerSkillProfileProvider);
+    final FocusRecommendation article = buildFocusRecommendation(
+      profile: ref.read(onboardingProvider).copyWith(focusId: 'reading'),
+      prefs: ref.read(learningPreferencesProvider),
+      courses: const <LibraryCourseData>[],
+      readingDocs: ref.read(readingLibraryProvider).all,
+      activeBook: null,
+      levelOverride: profile.recommendationEstimate(LearnerSkill.reading).band,
+    );
+    if (article.route.startsWith('/reading/')) {
+      return JourneyTask(
+        route: article.route,
+        title: article.title,
+        module: LearnModule.reading,
+      );
+    }
+    return const JourneyTask(
+      route: '/reading',
+      title: '打开书库选一篇',
+      module: LearnModule.reading,
+    );
+  }
+
+  JourneyTask? _pursuitFor(TodayStudyTrack track) {
+    return switch (track) {
+      TodayStudyTrack.video => _videoPursuit(),
+      TodayStudyTrack.vocab => _vocabPursuit(),
+      TodayStudyTrack.reading => _readingPursuit(),
+    };
+  }
+
+  String _trackLabel(TodayStudyTrack track) => switch (track) {
+        TodayStudyTrack.video => '视频',
+        TodayStudyTrack.vocab => '背单词',
+        TodayStudyTrack.reading => '阅读',
+      };
+
+  Future<void> _seedTomorrow(
+    String account,
+    DateTime today,
+    TodayJourneyStore store,
+  ) async {
+    final TodayJourneyStore tomorrow = TodayJourneyStore(
+      account,
+      _nextDay(today),
+    );
+    if (tomorrow.studyPlan.quotasConfigured) return;
+    final TodayStudyPlan plan = store.studyPlan;
+    await tomorrow.saveQuotas(
+      videoMinutes: plan.videoMinutes,
+      vocabCount: plan.vocabCount,
+      readingWords: plan.readingWords,
+    );
+    final TodayStudyTrack? last = plan.lastTrack ?? plan.nextTrack;
+    final JourneyTask? pursuit =
+        last == null ? null : _pursuitFor(last);
+    if (pursuit != null) {
+      await tomorrow.saveActivity(
+        (route: pursuit.route, title: pursuit.title),
+        planned: true,
+        reason: '接着昨天继续${_trackLabel(last!)}',
+      );
+    }
+    if (ref.read(learningSettingsProvider).reminder && pursuit != null) {
+      await scheduleJourneyReminder(
+        day: _nextDay(today),
+        title: pursuit.title,
+        body: '点下一步，接着昨天继续学',
+      );
+    }
+  }
+
+  Future<void> _runNext() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final DateTime today = DateTime.now();
+    final String account = ref.read(studyAccountProvider);
+    final TodayJourneyStore store = TodayJourneyStore(account, today);
+    try {
+      await _ensureQuotas(store);
+      if (!mounted) return;
+      await _syncProgress(store);
+      final TodayStudyPlan plan = store.studyPlan;
+      if (!plan.quotasConfigured) return;
+      if (plan.allTracksDone) {
+        await _seedTomorrow(account, today, store);
+        await store.saveStage(JourneyStage.done);
+        if (mounted) setState(() {});
+        await _openRefreshBatch();
+        return;
+      }
+      // Honor explicit pause first.
+      final JourneyActivity? stored = store.activity;
+      if (store.pausedExplicitly &&
+          stored != null &&
+          stored.route.isNotEmpty) {
+        await context.push(stored.route);
+        if (!mounted) return;
+        await _syncProgress(store);
+        if (mounted) setState(() {});
+        return;
+      }
+      // Planned from yesterday.
+      if (store.planned && stored != null && stored.route.isNotEmpty) {
+        final TodayStudyTrack track = learnModuleForRoute(stored.route) ==
+                LearnModule.reading
+            ? TodayStudyTrack.reading
+            : learnModuleForRoute(stored.route) == LearnModule.vocab
+                ? TodayStudyTrack.vocab
+                : TodayStudyTrack.video;
+        await store.saveProgress(lastTrack: track);
+        await store.saveActivity(stored); // clear planned flag on open
+        await context.push(stored.route);
+        if (!mounted) return;
+        await _syncProgress(store);
+        if (mounted) setState(() {});
+        return;
+      }
+      final TodayStudyTrack? track = plan.nextTrack;
+      if (track == null) return;
+      final JourneyTask? task = _pursuitFor(track);
+      if (task == null || task.route.isEmpty) {
+        await _openRefreshBatch(trackHint: track);
+        return;
+      }
+      await store.saveProgress(lastTrack: track);
+      await store.saveActivity((route: task.route, title: task.title));
+      await store.saveStage(JourneyStage.learn);
+      if (!mounted) return;
+      await context.push(task.route);
+      if (!mounted) return;
+      await _syncProgress(store);
+      final TodayStudyPlan after = store.studyPlan;
+      if (after.allTracksDone) {
+        await _seedTomorrow(account, today, store);
+        await store.saveStage(JourneyStage.done);
+      }
+      if (mounted) setState(() {});
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openRefreshBatch({TodayStudyTrack? trackHint}) async {
+    final List<ScoredLearnCandidate> picks = _refreshCandidates();
+    if (!mounted) return;
+    final ScoredLearnCandidate? chosen =
+        await showModalBottomSheet<ScoredLearnCandidate>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: AppDesignTokens.appWhite,
+      builder: (_) => _RefreshBatchSheet(
+        candidates: picks,
+        onFeedback: (ScoredLearnCandidate item, LearnFeedback feedback) async {
+          await JourneyFeedbackStore(
+            ref.read(studyAccountProvider),
+          ).apply(
+            id: item.candidate.route,
+            module: item.candidate.module,
+            feedback: feedback,
+          );
+        },
+      ),
+    );
+    if (!mounted || chosen == null) return;
+    final TodayJourneyStore store = TodayJourneyStore(
+      ref.read(studyAccountProvider),
+      DateTime.now(),
+    );
+    final TodayStudyTrack track = switch (chosen.candidate.module) {
+      LearnModule.video => TodayStudyTrack.video,
+      LearnModule.vocab => TodayStudyTrack.vocab,
+      LearnModule.reading || LearnModule.oral => TodayStudyTrack.reading,
+    };
+    await store.saveProgress(lastTrack: trackHint ?? track);
+    await store.saveActivity((
+      route: chosen.candidate.route,
+      title: chosen.candidate.title,
+    ));
+    await context.push(chosen.candidate.route);
+    if (mounted) setState(() {});
+  }
+
+  List<ScoredLearnCandidate> _refreshCandidates() {
     final LearnerSkillProfile profile = ref.read(learnerSkillProfileProvider);
     final OnboardingProfile onboarding = ref.read(onboardingProvider);
     final JourneyFeedbackStore feedback = JourneyFeedbackStore(
       ref.read(studyAccountProvider),
     );
-    // Due review is handled by resolveJourneyNext — cold path must not
-    // dump users into another review session as "new learning".
-    final List<LearnCandidate> candidates = <LearnCandidate>[
-      if (selectedLearningTracks(
-        ref.read(learningPreferencesProvider).tags,
-      ).contains(kTrackVocab))
-        LearnCandidate(
-          id: 'vocab-books',
-          title: '打开词书挑一组新词',
-          route: '/words',
-          module: LearnModule.vocab,
-          contentBand: profile.estimate(LearnerSkill.vocab).band,
-          interestMatch: onboarding.focusId == 'vocab',
-          notInterested: feedback.isHidden('/words'),
-        ),
-    ];
-    if (videoOn) {
-      final FocusRecommendation video = buildFocusRecommendation(
-        profile: onboarding.copyWith(focusId: 'video'),
-        prefs: ref.read(learningPreferencesProvider),
-        courses: ref.read(libraryCatalogProvider),
-        readingDocs: const <ReadingDoc>[],
-        activeBook: null,
-        levelOverride: profile
-            .recommendationEstimate(LearnerSkill.listening)
-            .band,
-      );
-      if (video.route.startsWith('/episodes/')) {
-        candidates.add(
+    final AcquirePreferencesDto prefs = ref.read(learningPreferencesProvider);
+    final List<LibraryCourseData> courses = ref.read(libraryCatalogProvider);
+    final ReadingLibraryState reading = ref.read(readingLibraryProvider);
+    final List<LearnCandidate> candidates = <LearnCandidate>[];
+
+    // Up to 5 video picks via level + interest ranking.
+    final List<LearnCandidate> videoPool = <LearnCandidate>[];
+    for (final LibraryCourseData course in courses) {
+      for (final LibraryEpisodeItem episode in course.episodes) {
+        if (episode.videoMissing) continue;
+        final String route = '/episodes/${Uri.encodeComponent(episode.id)}';
+        if (feedback.isHidden(route)) continue;
+        videoPool.add(
           LearnCandidate(
-            id: video.route,
-            title: video.title,
-            route: video.route,
+            id: route,
+            title: episode.title,
+            route: route,
             module: LearnModule.video,
             contentBand: contentBandOrFallback(
-              video.contentBand,
+              course.level,
               profile.recommendationEstimate(LearnerSkill.listening).band,
             ),
             interestMatch: onboarding.focusId == 'video' ||
                 (onboarding.focusId?.isEmpty ?? true),
-            notInterested: feedback.isHidden(video.route),
           ),
         );
       }
     }
-    if (readingOn) {
-      final ReadingLibraryState reading = ref.read(readingLibraryProvider);
+    final List<ScoredLearnCandidate> rankedVideo = rankLearnCandidates(
+      candidates: videoPool,
+      profile: profile,
+      difficultyShift: feedback.difficultyShifts,
+    );
+    for (final ScoredLearnCandidate item in rankedVideo.take(5)) {
+      candidates.add(item.candidate);
+    }
+
+    // Reading candidates (several).
+    final List<LearnCandidate> readingPool = <LearnCandidate>[];
+    for (final ReadingDoc doc in reading.all) {
+      final String route = '/reading/${Uri.encodeComponent(doc.id)}';
+      if (feedback.isHidden(route)) continue;
+      readingPool.add(
+        LearnCandidate(
+          id: route,
+          title: doc.displayTitle,
+          route: route,
+          module: LearnModule.reading,
+          contentBand: contentBandOrFallback(
+            doc.level,
+            profile.recommendationEstimate(LearnerSkill.reading).band,
+          ),
+          interestMatch: onboarding.focusId == 'reading',
+          pursuit: reading.continueDoc?.id == doc.id,
+        ),
+      );
+    }
+    if (readingPool.isEmpty) {
       final FocusRecommendation article = buildFocusRecommendation(
         profile: onboarding.copyWith(focusId: 'reading'),
-        prefs: ref.read(learningPreferencesProvider),
+        prefs: prefs,
         courses: const <LibraryCourseData>[],
         readingDocs: reading.all,
         activeBook: null,
-        levelOverride: profile.recommendationEstimate(LearnerSkill.reading).band,
+        levelOverride:
+            profile.recommendationEstimate(LearnerSkill.reading).band,
       );
       if (article.route.startsWith('/reading/')) {
-        candidates.add(
+        readingPool.add(
           LearnCandidate(
             id: article.route,
             title: article.title,
             route: article.route,
             module: LearnModule.reading,
-            // Use the document band — never stamp the learner's C2 onto A1 K12.
             contentBand: contentBandOrFallback(
               article.contentBand,
               profile.recommendationEstimate(LearnerSkill.reading).band,
             ),
-            interestMatch: onboarding.focusId == 'reading',
-            notInterested: feedback.isHidden(article.route),
+            interestMatch: true,
           ),
         );
       }
     }
-    final String recent = ref.read(currentLearningKindProvider);
-    final List<LearnModule> order = switch (onboarding.focusId) {
-      'reading' => const <LearnModule>[
-          LearnModule.reading,
-          LearnModule.video,
-          LearnModule.vocab,
-        ],
-      'vocab' || 'exam' => const <LearnModule>[
-          LearnModule.vocab,
-          LearnModule.video,
-          LearnModule.reading,
-        ],
-      'oral' => const <LearnModule>[
-          LearnModule.video,
-          LearnModule.vocab,
-          LearnModule.reading,
-        ],
-      _ => recent == 'reading'
-          ? const <LearnModule>[
-              LearnModule.reading,
-              LearnModule.video,
-              LearnModule.vocab,
-            ]
-          : const <LearnModule>[
-              LearnModule.video,
-              LearnModule.reading,
-              LearnModule.vocab,
-            ],
-    };
-    return pickAimlessNext(
-      rankLearnCandidates(
-        candidates: candidates,
-        profile: profile,
-        difficultyShift: feedback.difficultyShifts,
+    final List<ScoredLearnCandidate> rankedReading = rankLearnCandidates(
+      candidates: readingPool,
+      profile: profile,
+      difficultyShift: feedback.difficultyShifts,
+    );
+    for (final ScoredLearnCandidate item in rankedReading.take(5)) {
+      candidates.add(item.candidate);
+    }
+
+    // Vocab: prefer active book level band.
+    final SyllabusBook? active = ref.read(syllabusBooksProvider).activeBook;
+    candidates.add(
+      LearnCandidate(
+        id: active?.id ?? 'vocab-books',
+        title: active == null ? '打开词书挑一组新词' : '继续背 · ${active.title}',
+        route: active == null
+            ? '/words'
+            : syllabusBookSessionRoute(active.id),
+        module: LearnModule.vocab,
+        contentBand: profile.estimate(LearnerSkill.vocab).band,
+        interestMatch: onboarding.focusId == 'vocab',
+        pursuit: active != null,
+        notInterested: feedback.isHidden('/words'),
       ),
-      preferOrder: order,
+    );
+
+    return rankLearnCandidates(
+      candidates: candidates,
+      profile: profile,
+      difficultyShift: feedback.difficultyShifts,
     );
   }
 
-  String _ctaLabel(JourneyNextStep step, JourneyStage stage) {
-    if (stage == JourneyStage.tomorrow) return '就这样 · 明天见';
-    if (stage == JourneyStage.done) return '更换明天的内容';
-    String shorten(String raw) {
-      final String t = raw
-          .replaceFirst(RegExp(r'^下一步 · '), '')
-          .replaceFirst(RegExp(r'^继续 · '), '')
-          .trim();
-      if (t.length <= 18) return t;
-      return '${t.substring(0, 17)}…';
+  String _ctaLabel(TodayStudyPlan plan, TodayJourneyStore store) {
+    if (!plan.quotasConfigured) return '设定今日配额';
+    if (plan.allTracksDone) return '刷一批 · 换点新鲜的';
+    if (store.pausedExplicitly &&
+        (store.activity?.route.isNotEmpty ?? false)) {
+      return '下一步：${_short(store.activity!.title)}';
     }
-
-    return switch (step.kind) {
-      JourneyNextKind.review => '下一步：开始复习',
-      JourneyNextKind.paused ||
-      JourneyNextKind.planned ||
-      JourneyNextKind.continuePursuit => '下一步：${shorten(step.title)}',
-      JourneyNextKind.recommend => step.title.trim().isEmpty
-          ? '下一步：打开学习'
-          : '下一步：${shorten(step.title)}',
-      JourneyNextKind.chooseLevel => '下一步：选一条适合你的',
-    };
+    if (store.planned && (store.activity?.route.isNotEmpty ?? false)) {
+      return '下一步：${_short(store.activity!.title)}';
+    }
+    final TodayStudyTrack? track = plan.nextTrack;
+    if (track == null) return '刷一批';
+    final JourneyTask? task = _pursuitFor(track);
+    if (task == null) return '下一步：选${_trackLabel(track)}';
+    return '下一步：${_short(task.title)}';
   }
 
-  int _activeGate(JourneyStage stage, JourneyNextStep step) {
-    if (stage == JourneyStage.tomorrow || stage == JourneyStage.done) return 3;
-    if (step.kind == JourneyNextKind.review) return 1;
-    return 2;
+  String _short(String raw) {
+    final String t = raw
+        .replaceFirst(RegExp(r'^下一步 · '), '')
+        .replaceFirst(RegExp(r'^继续 · '), '')
+        .trim();
+    if (t.length <= 18) return t;
+    return '${t.substring(0, 17)}…';
   }
 
   @override
   Widget build(BuildContext context) {
     final String account = ref.watch(studyAccountProvider);
     ref
-      ..watch(wordBookProvider)
       ..watch(continueLearningTargetProvider)
       ..watch(readingLibraryProvider)
       ..watch(learningPreferencesProvider)
       ..watch(currentLearningKindProvider)
-      ..watch(libraryCatalogProvider);
+      ..watch(libraryCatalogProvider)
+      ..watch(learningActivityProvider)
+      ..watch(syllabusBooksProvider)
+      ..watch(todayPathProvider)
+      ..watch(dailyReviewProvider)
+      ..watch(learnerSkillProfileProvider);
     final DateTime today = DateTime.now();
     final TodayJourneyStore store = TodayJourneyStore(account, today);
-    final JourneyStage stage = store.stage;
-    final int due = ref.watch(wordBookProvider.notifier).dueCounts().dueReviews;
-    if (stage == JourneyStage.review && due == 0) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        unawaited(_ensureEmptyReviewSkipped(store));
-      });
-    }
-    final JourneyNextStep step = _nextStep(store);
-    final int gate = _activeGate(stage, step);
-    final TodayJourneyStore tomorrowStore = TodayJourneyStore(
-      account,
-      _nextDay(today),
-    );
-    final JourneyActivity? tomorrow = tomorrowStore.activity;
-    final bool hasPlannedToday =
-        store.planned &&
-        !store.pausedExplicitly &&
-        (store.activity?.route.isNotEmpty ?? false);
+    _scheduleProgressSync(store);
+    final TodayStudyPlan plan = store.studyPlan;
+    final int due = _unifiedDueCount();
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -842,7 +625,9 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  '今天 · 约 15 分钟',
+                  plan.quotasConfigured
+                      ? (plan.allTracksDone ? '今日配额已完成' : '按配额接着学')
+                      : '先定今天学多少',
                   style: TextStyle(
                     color: AppDesignTokens.brandGreen,
                     fontWeight: FontWeight.w700,
@@ -851,9 +636,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  stage == JourneyStage.tomorrow || stage == JourneyStage.done
-                      ? '今天打卡完成'
-                      : '英语之旅',
+                  '今日学习',
                   style: TextStyle(
                     color: AppDesignTokens.textPrimary,
                     fontWeight: FontWeight.w800,
@@ -862,94 +645,64 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                 ),
                 const SizedBox(height: 6),
                 Text(
-                  stage == JourneyStage.tomorrow || stage == JourneyStage.done
-                      ? '复习和今天的新学都过了。明天继续点「下一步」就行。'
-                      : hasPlannedToday
-                      ? '昨天替你排好了，点下一步接着追'
-                      : '不用想学什么。点下一步，把复习和感兴趣的内容一路做完。',
+                  plan.quotasConfigured
+                      ? (plan.allTracksDone
+                          ? '视频/单词/阅读都达标了。可以刷一批换点新鲜内容。'
+                          : '点下一步，优先接着昨天的剧、词书或小说。')
+                      : '设好视频分钟、背词个数、阅读词数；某一轨填 0 就跳过。',
                   style: TextStyle(
                     color: AppDesignTokens.textSecondary,
                     height: 1.45,
                     fontSize: 13,
                   ),
                 ),
-                const SizedBox(height: 16),
-                _GateRow(active: gate),
-                const SizedBox(height: 14),
-                if (stage == JourneyStage.tomorrow ||
-                    stage == JourneyStage.done)
-                  _TomorrowBanner(
-                    title: tomorrow?.title.isNotEmpty == true
-                        ? tomorrow!.title
-                        : '明天按你的水平再排一条',
-                    reason: tomorrowStore.reason ??
-                        (tomorrow?.route.isNotEmpty == true
-                            ? '明天已替你排好 · 可改'
-                            : '还没定明天 · 可现在选'),
-                  )
-                else
-                  _NextBanner(
-                    title: step.kind == JourneyNextKind.review
-                        ? '下一步 · 今日复习'
-                        : step.title.startsWith('下一步')
-                        ? step.title
-                        : '下一步 · ${step.title}',
-                    reason: step.kind == JourneyNextKind.review
-                        ? (() {
-                            final JourneyTask? chase = _currentPursuit();
-                            if (chase != null) {
-                              return '到期 $due 张 · 做完接着：${chase.title}';
-                            }
-                            return '到期 $due 张词卡 · 做完自动进新学';
-                          })()
-                        : step.reason,
+                if (plan.quotasConfigured) ...<Widget>[
+                  const SizedBox(height: 16),
+                  _QuotaProgressRow(
+                    label: '视频',
+                    detail: plan.videoMinutes <= 0
+                        ? '今日跳过'
+                        : '${(plan.videoDoneMs / 60000).floor()}/${plan.videoMinutes} 分钟',
+                    progress: plan.videoMinutes <= 0 ? 0 : plan.videoProgress,
+                    skipped: plan.videoMinutes <= 0,
+                    done: plan.videoDone,
                   ),
-                if (step.kind == JourneyNextKind.review &&
-                    _currentPursuit() != null) ...<Widget>[
                   const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: _busy
-                          ? null
-                          : () async {
-                              final JourneyTask? chase = _currentPursuit();
-                              if (chase == null) return;
-                              setState(() => _busy = true);
-                              try {
-                                await store.saveStage(JourneyStage.learn);
-                                await store.saveActivity((
-                                  route: chase.route,
-                                  title: chase.title,
-                                ));
-                                if (!mounted) return;
-                                await context.push(chase.route);
-                              } finally {
-                                if (mounted) setState(() => _busy = false);
-                              }
-                            },
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppDesignTokens.textPrimary,
-                        side: BorderSide(color: AppDesignTokens.borderGray),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: Text(
-                        '先接着看 · ${_currentPursuit()!.title}',
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ),
+                  _QuotaProgressRow(
+                    label: '单词',
+                    detail: plan.vocabCount <= 0
+                        ? '今日跳过'
+                        : '${plan.vocabDone}/${plan.vocabCount} 个',
+                    progress: plan.vocabCount <= 0 ? 0 : plan.vocabProgress,
+                    skipped: plan.vocabCount <= 0,
+                    done: plan.vocabTrackDone,
+                  ),
+                  const SizedBox(height: 8),
+                  _QuotaProgressRow(
+                    label: '阅读',
+                    detail: plan.readingWords <= 0
+                        ? '今日跳过'
+                        : '${plan.readingWordsDone}/${plan.readingWords} 词',
+                    progress:
+                        plan.readingWords <= 0 ? 0 : plan.readingProgress,
+                    skipped: plan.readingWords <= 0,
+                    done: plan.readingDone,
+                  ),
+                ],
+                if (store.planned &&
+                    !store.pausedExplicitly &&
+                    (store.activity?.route.isNotEmpty ?? false)) ...<Widget>[
+                  const SizedBox(height: 12),
+                  _NextBanner(
+                    title: '昨天替你排好了',
+                    reason: store.reason ?? store.activity!.title,
                   ),
                 ],
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _busy
-                        ? null
-                        : stage == JourneyStage.done
-                        ? _changeTomorrow
-                        : _runJourney,
+                    onPressed: _busy ? null : _runNext,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppDesignTokens.brandGreen,
                       foregroundColor: AppDesignTokens.onAccent,
@@ -959,7 +712,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                       ),
                     ),
                     child: Text(
-                      _ctaLabel(step, stage),
+                      _ctaLabel(plan, store),
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
@@ -967,121 +720,114 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                     ),
                   ),
                 ),
-                if (stage == JourneyStage.tomorrow) ...<Widget>[
+                if (plan.quotasConfigured) ...<Widget>[
                   const SizedBox(height: 8),
-                  SizedBox(
-                    width: double.infinity,
-                    child: OutlinedButton(
-                      onPressed: _busy ? null : _changeTomorrow,
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: AppDesignTokens.textPrimary,
-                        side: BorderSide(color: AppDesignTokens.borderGray),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                      child: const Text('换明天学别的'),
-                    ),
-                  ),
-                ] else if (stage == JourneyStage.review ||
-                    stage == JourneyStage.learn) ...<Widget>[
-                  if (step.kind != JourneyNextKind.review) ...<Widget>[
-                    const SizedBox(height: 8),
-                    Align(
-                      alignment: Alignment.center,
-                      child: TextButton(
-                        onPressed: _busy ? null : _openFeedback,
+                  Row(
+                    children: <Widget>[
+                      TextButton(
+                        onPressed: _busy ? null : () => _editQuotas(store),
                         child: Text(
-                          '换一个 / 反馈',
+                          '改配额',
                           style: TextStyle(
                             color: AppDesignTokens.textSecondary,
                           ),
                         ),
                       ),
-                    ),
-                  ],
+                      const Spacer(),
+                      TextButton(
+                        onPressed: _busy ? null : () => _openRefreshBatch(),
+                        child: Text(
+                          '刷一批',
+                          style: TextStyle(
+                            color: AppDesignTokens.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ],
               ],
             ),
           ),
         ),
-        // One quiet escape hatch — not a second "today plan" competing with Journey.
-        if (stage == JourneyStage.review || stage == JourneyStage.learn) ...<
-          Widget
-        >[
-          const SizedBox(height: 10),
-          Align(
-            alignment: Alignment.center,
-            child: TextButton(
-              onPressed: _busy
-                  ? null
-                  : () => context.push(
-                        due > 0
-                            ? '/review/session?due=1'
-                            : '/review',
-                      ),
-              child: Text(
-                due > 0 ? '只想复习 · 到期 $due' : '自己去复习 / 词书',
-                style: TextStyle(color: AppDesignTokens.textSecondary),
-              ),
+        const SizedBox(height: 10),
+        Align(
+          alignment: Alignment.center,
+          child: TextButton(
+            onPressed: _busy
+                ? null
+                : () => context.push(
+                      due > 0 ? '/review/session?due=1' : '/review',
+                    ),
+            child: Text(
+              due > 0 ? '去今日复习 · 到期 $due' : '自己去复习 / 词书',
+              style: TextStyle(color: AppDesignTokens.textSecondary),
             ),
           ),
-        ],
+        ),
       ],
     );
   }
 }
 
-class _GateRow extends StatelessWidget {
-  const _GateRow({required this.active});
+class _QuotaProgressRow extends StatelessWidget {
+  const _QuotaProgressRow({
+    required this.label,
+    required this.detail,
+    required this.progress,
+    required this.skipped,
+    required this.done,
+  });
 
-  final int active;
+  final String label;
+  final String detail;
+  final double progress;
+  final bool skipped;
+  final bool done;
 
   @override
   Widget build(BuildContext context) {
-    Widget chip(int n, String label) {
-      final bool on = active == n;
-      return Container(
-        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-        decoration: BoxDecoration(
-          color: on ? AppDesignTokens.successSoft : Colors.transparent,
-          borderRadius: BorderRadius.circular(999),
-          border: Border.all(
-            color: on ? AppDesignTokens.brandGreen : AppDesignTokens.borderGray,
-          ),
-        ),
-        child: Text(
-          '$n $label',
-          style: TextStyle(
-            color: on
-                ? AppDesignTokens.brandGreen
-                : AppDesignTokens.textSecondary,
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
-          ),
-        ),
-      );
-    }
-
     return Row(
       children: <Widget>[
-        chip(1, '复习'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Icon(
-            Icons.arrow_forward_ios_rounded,
-            size: 12,
-            color: AppDesignTokens.textSecondary,
+        SizedBox(
+          width: 40,
+          child: Text(
+            label,
+            style: TextStyle(
+              color: AppDesignTokens.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 13,
+            ),
           ),
         ),
-        chip(2, '新学'),
-        Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 6),
-          child: Icon(
-            Icons.arrow_forward_ios_rounded,
-            size: 12,
-            color: AppDesignTokens.textSecondary,
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(4),
+            child: LinearProgressIndicator(
+              value: skipped ? 0 : progress.clamp(0.0, 1.0),
+              minHeight: 8,
+              color: done
+                  ? AppDesignTokens.brandGreen
+                  : AppDesignTokens.brandGreen.withValues(alpha: 0.7),
+              backgroundColor: AppDesignTokens.borderGray.withValues(alpha: 0.4),
+            ),
           ),
         ),
-        chip(3, '明天'),
+        const SizedBox(width: 10),
+        SizedBox(
+          width: 88,
+          child: Text(
+            skipped ? '跳过' : (done ? '已完成' : detail),
+            textAlign: TextAlign.right,
+            style: TextStyle(
+              color: done
+                  ? AppDesignTokens.brandGreen
+                  : AppDesignTokens.textSecondary,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
       ],
     );
   }
@@ -1101,7 +847,9 @@ class _NextBanner extends StatelessWidget {
       decoration: BoxDecoration(
         color: AppDesignTokens.successSoft,
         borderRadius: BorderRadius.circular(14),
-        border: Border.all(color: AppDesignTokens.brandGreen.withValues(alpha: 0.35)),
+        border: Border.all(
+          color: AppDesignTokens.brandGreen.withValues(alpha: 0.35),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1129,198 +877,225 @@ class _NextBanner extends StatelessWidget {
   }
 }
 
-class _TomorrowBanner extends StatelessWidget {
-  const _TomorrowBanner({required this.title, required this.reason});
+class _TodayQuotaSheet extends StatefulWidget {
+  const _TodayQuotaSheet({
+    required this.videoMinutes,
+    required this.vocabCount,
+    required this.readingWords,
+  });
 
-  final String title;
-  final String reason;
+  final int videoMinutes;
+  final int vocabCount;
+  final int readingWords;
+
+  @override
+  State<_TodayQuotaSheet> createState() => _TodayQuotaSheetState();
+}
+
+class _TodayQuotaSheetState extends State<_TodayQuotaSheet> {
+  late int _video = widget.videoMinutes;
+  late int _vocab = widget.vocabCount;
+  late int _reading = widget.readingWords;
+
+  Widget _chipRow({
+    required String label,
+    required List<int> presets,
+    required int value,
+    required String unit,
+    required ValueChanged<int> onChanged,
+  }) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        Text(
+          label,
+          style: TextStyle(
+            color: AppDesignTokens.textPrimary,
+            fontWeight: FontWeight.w700,
+            fontSize: 14,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            ChoiceChip(
+              label: const Text('跳过'),
+              selected: value == 0,
+              onSelected: (_) => onChanged(0),
+            ),
+            for (final int preset in presets)
+              ChoiceChip(
+                label: Text('$preset$unit'),
+                selected: value == preset,
+                onSelected: (_) => onChanged(preset),
+              ),
+          ],
+        ),
+      ],
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppDesignTokens.selectedSurface,
-        borderRadius: BorderRadius.circular(14),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: TextStyle(
-              color: AppDesignTokens.textPrimary,
-              fontWeight: FontWeight.w800,
-              fontSize: 16,
+    final bool canSave = _video > 0 || _vocab > 0 || _reading > 0;
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: EdgeInsets.fromLTRB(
+          16,
+          0,
+          16,
+          16 + MediaQuery.viewInsetsOf(context).bottom,
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text(
+              '今天学多少？',
+              style: TextStyle(
+                color: AppDesignTokens.textPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: 20,
+              ),
             ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            reason,
-            style: TextStyle(
-              color: AppDesignTokens.textSecondary,
-              fontSize: 12,
-              height: 1.4,
+            const SizedBox(height: 6),
+            Text(
+              '三轨可同时开；填 0 表示今天不做这一轨。',
+              style: TextStyle(
+                color: AppDesignTokens.textSecondary,
+                fontSize: 13,
+              ),
             ),
-          ),
-        ],
+            const SizedBox(height: 16),
+            _chipRow(
+              label: '视频',
+              presets: const <int>[15, 20, 30],
+              value: _video,
+              unit: ' 分钟',
+              onChanged: (int v) => setState(() => _video = v),
+            ),
+            const SizedBox(height: 14),
+            _chipRow(
+              label: '背单词',
+              presets: const <int>[10, 20, 30],
+              value: _vocab,
+              unit: ' 个',
+              onChanged: (int v) => setState(() => _vocab = v),
+            ),
+            const SizedBox(height: 14),
+            _chipRow(
+              label: '阅读',
+              presets: const <int>[300, 500, 800],
+              value: _reading,
+              unit: ' 词',
+              onChanged: (int v) => setState(() => _reading = v),
+            ),
+            const SizedBox(height: 18),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: !canSave
+                    ? null
+                    : () => Navigator.pop(context, (
+                          videoMinutes: _video,
+                          vocabCount: _vocab,
+                          readingWords: _reading,
+                        )),
+                style: FilledButton.styleFrom(
+                  backgroundColor: AppDesignTokens.brandGreen,
+                  foregroundColor: AppDesignTokens.onAccent,
+                  padding: const EdgeInsets.symmetric(vertical: 14),
+                ),
+                child: const Text(
+                  '开始今日学习',
+                  style: TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
 }
 
-class _TodayActivityPicker extends ConsumerStatefulWidget {
-  const _TodayActivityPicker({required this.tomorrow});
+class _RefreshBatchSheet extends StatelessWidget {
+  const _RefreshBatchSheet({
+    required this.candidates,
+    required this.onFeedback,
+  });
 
-  final bool tomorrow;
-
-  @override
-  ConsumerState<_TodayActivityPicker> createState() =>
-      _TodayActivityPickerState();
-}
-
-class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
-  final Set<String> _skippedRoutes = <String>{};
+  final List<ScoredLearnCandidate> candidates;
+  final Future<void> Function(ScoredLearnCandidate, LearnFeedback) onFeedback;
 
   @override
   Widget build(BuildContext context) {
-    final List<LibraryCourseData> courses = ref.watch(libraryCatalogProvider);
-    final ReadingLibraryState reading = ref.watch(readingLibraryProvider);
-    final ReadingDoc? book = reading.continueDoc;
-    final ContinueLearningTarget? resume = ref.watch(
-      continueLearningTargetProvider,
-    );
-    final OnboardingProfile profile = ref.watch(onboardingProvider);
-    final AcquirePreferencesDto prefs = ref.watch(learningPreferencesProvider);
-    final String level = ref.watch(adaptiveLearnerCefrProvider);
-    final FocusRecommendation? readingSuggestion = book == null
-        ? buildFocusRecommendation(
-            profile: profile.copyWith(focusId: 'reading'),
-            prefs: prefs,
-            courses: const <LibraryCourseData>[],
-            readingDocs: reading.all,
-            activeBook: null,
-            levelOverride: level,
-          )
-        : null;
-    String videoRoute(LibraryEpisodeItem e) =>
-        '/episodes/${Uri.encodeComponent(e.id)}';
-    final FocusRecommendation recommended = buildFocusRecommendation(
-      profile: profile.copyWith(focusId: 'video'),
-      prefs: prefs,
-      courses: <LibraryCourseData>[
-        for (final LibraryCourseData course in courses)
-          course.copyWith(
-            episodes: course.episodes
-                .where(
-                  (LibraryEpisodeItem e) =>
-                      !e.videoMissing &&
-                      ((e.videoAsset ?? '').trim().isNotEmpty ||
-                          (e.sourceUrl ?? '').trim().isNotEmpty) &&
-                      !_skippedRoutes.contains(videoRoute(e)),
-                )
-                .toList(),
+    final List<ScoredLearnCandidate> videos = candidates
+        .where((ScoredLearnCandidate c) => c.candidate.module == LearnModule.video)
+        .take(5)
+        .toList();
+    final List<ScoredLearnCandidate> readings = candidates
+        .where(
+          (ScoredLearnCandidate c) => c.candidate.module == LearnModule.reading,
+        )
+        .take(5)
+        .toList();
+    final List<ScoredLearnCandidate> vocabs = candidates
+        .where((ScoredLearnCandidate c) => c.candidate.module == LearnModule.vocab)
+        .take(2)
+        .toList();
+
+    Widget section(String title, List<ScoredLearnCandidate> items) {
+      if (items.isEmpty) return const SizedBox.shrink();
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+            child: Text(
+              title,
+              style: TextStyle(
+                color: AppDesignTokens.textPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: 14,
+              ),
+            ),
           ),
-      ],
-      readingDocs: const <ReadingDoc>[],
-      activeBook: null,
-      levelOverride: level,
-    );
-    final bool hasVideo = recommended.route.startsWith('/episodes/');
-    final bool continuingVideo =
-        resume != null &&
-        !resume.episode.videoMissing &&
-        ref.watch(lastLearningEpisodeProvider) == resume.episode.id;
-    final bool purposeful = continuingVideo || book != null;
-    final LearnerSkillProfile skillProfile = ref.watch(
-      learnerSkillProfileProvider,
-    );
-    String asBand(String raw, String fallback) =>
-        contentBandOrFallback(raw, fallback);
-
-    final List<LearnCandidate> candidates = <LearnCandidate>[
-      LearnCandidate(
-        id: 'vocab-next',
-        title: '背一组适合现在的词',
-        route: '/review/session?kind=word',
-        module: LearnModule.vocab,
-        contentBand: skillProfile.estimate(LearnerSkill.vocab).band,
-        interestMatch: profile.focusId == 'vocab',
-      ),
-      if (hasVideo)
-        LearnCandidate(
-          id: recommended.route,
-          title: recommended.title,
-          route: recommended.route,
-          module: LearnModule.video,
-          contentBand: asBand(
-            level,
-            skillProfile.recommendationEstimate(LearnerSkill.listening).band,
-          ),
-          interestMatch: true,
-          pursuit:
-              continuingVideo &&
-              recommended.route == videoRoute(resume.episode),
-        ),
-      if (continuingVideo && recommended.route != videoRoute(resume.episode))
-        LearnCandidate(
-          id: videoRoute(resume.episode),
-          title: resume.episode.title,
-          route: videoRoute(resume.episode),
-          module: LearnModule.video,
-          contentBand: skillProfile
-              .recommendationEstimate(LearnerSkill.listening)
-              .band,
-          pursuit: true,
-        ),
-      LearnCandidate(
-        id: book?.id ?? 'reading-next',
-        title: book?.displayTitle ?? (readingSuggestion?.title ?? '选一篇来读'),
-        route: book == null
-            ? (readingSuggestion?.route ?? '/reading')
-            : '/reading/${Uri.encodeComponent(book.id)}',
-        module: LearnModule.reading,
-        contentBand: asBand(
-          book?.level ?? '',
-          skillProfile.recommendationEstimate(LearnerSkill.reading).band,
-        ),
-        pursuit: book != null,
-      ),
-    ];
-    final List<ScoredLearnCandidate> ranked = rankLearnCandidates(
-      candidates: candidates,
-      profile: skillProfile,
-    );
-    final ScoredLearnCandidate? aimless = pickAimlessNext(ranked);
-    final List<ScoredLearnCandidate> shortlist = purposefulShortlist(ranked);
-
-    void open(String route, String title) =>
-        Navigator.of(context).pop((route: route, title: title));
-
-    Widget activity(
-      IconData icon,
-      String title,
-      String subtitle,
-      String route,
-    ) => ListTile(
-      leading: Icon(icon, color: AppDesignTokens.brandGreen),
-      title: Text(title, style: TextStyle(color: AppDesignTokens.textPrimary)),
-      subtitle: Text(
-        subtitle,
-        style: TextStyle(color: AppDesignTokens.textSecondary),
-      ),
-      trailing: Icon(
-        Icons.chevron_right,
-        color: AppDesignTokens.textSecondary,
-      ),
-      onTap: () => open(
-        route,
-        route.startsWith('/episodes/') || route.startsWith('/reading/')
-            ? subtitle
-            : title,
-      ),
-    );
+          for (final ScoredLearnCandidate item in items)
+            ListTile(
+              title: Text(
+                item.candidate.title,
+                style: TextStyle(color: AppDesignTokens.textPrimary),
+              ),
+              subtitle: Text(
+                item.reason,
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+              trailing: IconButton(
+                icon: Icon(
+                  Icons.swap_horiz,
+                  color: AppDesignTokens.textSecondary,
+                ),
+                onPressed: () async {
+                  await onFeedback(item, LearnFeedback.swap);
+                },
+              ),
+              onLongPress: () async {
+                await onFeedback(item, LearnFeedback.notInterested);
+                if (context.mounted) {
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(content: Text('七天内不再默认推荐这条')),
+                  );
+                }
+              },
+              onTap: () => Navigator.pop(context, item),
+            ),
+        ],
+      );
+    }
 
     return SafeArea(
       top: false,
@@ -1330,103 +1105,38 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
         ),
         child: ListView(
           shrinkWrap: true,
-          padding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
           children: <Widget>[
             Padding(
-              padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
-                widget.tomorrow ? '明天想学什么？' : '想换一个也可以',
-                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                '刷一批',
+                style: TextStyle(
                   color: AppDesignTokens.textPrimary,
+                  fontWeight: FontWeight.w800,
+                  fontSize: 20,
                 ),
               ),
             ),
-            if (!purposeful && aimless != null)
-              activity(
-                Icons.arrow_forward_rounded,
-                '下一步 · ${aimless.candidate.title}',
-                aimless.reason,
-                aimless.candidate.route,
-              )
-            else if (purposeful)
-              for (int i = 0; i < shortlist.length; i++)
-                activity(
-                  i == 0 ? Icons.star_rounded : Icons.swap_horiz_rounded,
-                  i == 0
-                      ? '最可能 · ${shortlist[i].candidate.title}'
-                      : shortlist[i].candidate.title,
-                  shortlist[i].slightlyHard
-                      ? '稍难 · ${shortlist[i].reason}'
-                      : shortlist[i].reason,
-                  shortlist[i].candidate.route,
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                '按当前水平与兴趣推荐。点选一条开始；长按可「不感兴趣」。',
+                style: TextStyle(
+                  color: AppDesignTokens.textSecondary,
+                  fontSize: 13,
                 ),
-            if (hasVideo)
-              activity(
-                Icons.ondemand_video_outlined,
-                recommended.title,
-                '看一段推荐视频',
-                recommended.route,
               ),
-            if (book != null)
-              activity(
-                Icons.menu_book_outlined,
-                book.displayTitle,
-                '继续读正在看的书',
-                '/reading/${Uri.encodeComponent(book.id)}',
-              )
-            else if (readingSuggestion != null)
-              activity(
-                Icons.menu_book_outlined,
-                readingSuggestion.title,
-                '选一本书读',
-                readingSuggestion.route,
-              ),
-            if (widget.tomorrow)
-              ListTile(
-                leading: Icon(
-                  Icons.auto_awesome,
-                  color: AppDesignTokens.brandGreen,
-                ),
-                title: Text(
-                  '交给系统推荐',
-                  style: TextStyle(color: AppDesignTokens.textPrimary),
-                ),
-                subtitle: Text(
-                  aimless?.reason ??
-                      (shortlist.isNotEmpty
-                          ? shortlist.first.reason
-                          : (hasVideo
-                                ? '看一段推荐视频'
-                                : '明天再看适合你的内容')),
+            ),
+            section('视频 · 最多 5 条', videos),
+            section('阅读', readings),
+            section('背单词', vocabs),
+            if (videos.isEmpty && readings.isEmpty && vocabs.isEmpty)
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Text(
+                  '暂时没有匹配的推荐，去书库或视频库逛逛吧。',
                   style: TextStyle(color: AppDesignTokens.textSecondary),
                 ),
-                trailing: Icon(
-                  Icons.chevron_right,
-                  color: AppDesignTokens.textSecondary,
-                ),
-                onTap: () {
-                  final ScoredLearnCandidate? pick = aimless ??
-                      (shortlist.isNotEmpty ? shortlist.first : null);
-                  if (pick != null) {
-                    open(pick.candidate.route, pick.candidate.title);
-                    return;
-                  }
-                  if (hasVideo) {
-                    open(recommended.route, recommended.title);
-                    return;
-                  }
-                  if (book != null) {
-                    open(
-                      '/reading/${Uri.encodeComponent(book.id)}',
-                      book.displayTitle,
-                    );
-                    return;
-                  }
-                  if (readingSuggestion != null &&
-                      readingSuggestion.route.isNotEmpty) {
-                    open(readingSuggestion.route, readingSuggestion.title);
-                  }
-                },
               ),
           ],
         ),

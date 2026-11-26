@@ -116,9 +116,9 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
 
     final List<TodayTask> overdue = <TodayTask>[];
     final List<TodayTask> dueReview = <TodayTask>[];
-    final List<TodayTask> courseNew = <TodayTask>[];
 
-    if (wantVideo && plan != null) {
+    // Course unit reviews (due / overdue) stay on 今日复习; 新课 does not.
+    if (plan != null && (wantVideo || wantReading)) {
       for (final CourseUnit unit in plan.units) {
         final bool studiedOffline = !unit.isLearned &&
             videoUnitStudiedInActivity(
@@ -156,80 +156,26 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
           }
         }
       }
-
-      if (!plan.stoppedAdding) {
-        // User-configurable N new units/day (default 1).
-        final int quota = plan.params.dailyLessons.clamp(1, 10);
-        int added = 0;
-        for (final CourseUnit unit in plan.units) {
-          final bool studiedOffline = videoUnitStudiedInActivity(
-            plan: plan,
-            unit: unit,
-            learnedKeys: learnedKeys,
-          );
-          // Already covered by player study → review task above, not 新课.
-          if (unit.isLearned || studiedOffline) continue;
-          final String id = 'course-new:${plan.courseId}:${unit.unitId}';
-          // Skip units already completed today when counting quota slots.
-          if (doneIds.contains(id)) {
-            courseNew.add(
-              TodayTask(
-                id: id,
-                kind: TodayTaskKind.courseNew,
-                title: '新课 · ${unit.topic}',
-                subtitle: plan.title,
-                route:
-                    '/daily-path/unit?courseId=${Uri.encodeComponent(plan.courseId)}&unitId=${Uri.encodeComponent(unit.unitId)}&mode=new',
-                doneToday: true,
-                courseId: plan.courseId,
-                unitId: unit.unitId,
-              ),
-            );
-            added += 1;
-            if (added >= quota) break;
-            continue;
-          }
-          courseNew.add(
-            TodayTask(
-              id: id,
-              kind: TodayTaskKind.courseNew,
-              title: '新课 · ${unit.topic}',
-              subtitle: plan.title,
-              route:
-                  '/daily-path/unit?courseId=${Uri.encodeComponent(plan.courseId)}&unitId=${Uri.encodeComponent(unit.unitId)}&mode=new',
-              doneToday: false,
-              courseId: plan.courseId,
-              unitId: unit.unitId,
-            ),
-          );
-          added += 1;
-          if (added >= quota) break;
-        }
-      }
     }
 
-    final List<TodayTask> vocab =
-        wantVocab ? _vocabTasks(now, doneIds) : const <TodayTask>[];
-    final List<TodayTask> reading =
-        wantReading ? _readingTasks(doneIds) : const <TodayTask>[];
+    // 今日复习 = FSRS due only. vocabNew / CoursePlan 新课 / 继续阅读 go to 今日学习.
+    final List<TodayTask> vocabDue = wantVocab
+        ? _vocabTasks(now, doneIds)
+            .where((TodayTask t) => t.kind == TodayTaskKind.vocabDue)
+            .toList(growable: false)
+        : const <TodayTask>[];
     final List<TodayTask> clipDue =
         wantVideo ? _clipDueTasks(now, doneIds) : const <TodayTask>[];
-    final List<TodayTask> examTasks = _examTasks(doneIds);
-
-    final List<TodayTask> videoTasks = wantVideo
-        ? _videoPracticeTasks(doneIds)
-        : const <TodayTask>[];
+    final List<TodayTask> examDue = _examTasks(doneIds)
+        .where((TodayTask t) => t.kind == TodayTaskKind.examDue)
+        .toList(growable: false);
 
     final List<TodayTask> merged = <TodayTask>[
       ...overdue,
       ...dueReview,
-      ...examTasks,
+      ...examDue,
       ...clipDue,
-      ...vocab.where((TodayTask t) => t.kind == TodayTaskKind.vocabDue),
-      ...courseNew,
-      ...videoTasks,
-      ...vocab.where((TodayTask t) => t.kind == TodayTaskKind.vocabNew),
-      ...reading,
+      ...vocabDue,
     ];
 
     final TodayPathStatus status = _status(
@@ -244,40 +190,6 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
       hasActiveCourse: plan != null,
       status: status,
     );
-  }
-
-  List<TodayTask> _videoPracticeTasks(Set<String> doneIds) {
-    final ContinueLearningTarget? video = ref.read(continueLearningTargetProvider);
-    if (video == null || video.episode.videoMissing) return const <TodayTask>[];
-    final String episodeId = video.episode.id;
-    final bool hasStudyHistory =
-        ref.read(lastLearningEpisodeProvider) == episodeId ||
-        video.episode.progressPercent > 0;
-    if (!hasStudyHistory) return const <TodayTask>[];
-
-    TodayTask task(String activity, TodayTaskKind kind, String title) {
-      final String id = 'video-$activity:$episodeId';
-      return TodayTask(
-        id: id,
-        kind: kind,
-        title: title,
-        subtitle: video.episode.title,
-        route: Uri(
-          pathSegments: <String>['', 'episodes', episodeId],
-          queryParameters: <String, String>{
-            'autoplay': '0',
-            'activity': activity,
-            'todayTask': id,
-          },
-        ).toString(),
-        doneToday: doneIds.contains(id),
-      );
-    }
-
-    return <TodayTask>[
-      task('words', TodayTaskKind.videoWords, '视频 · 背单词'),
-      task('practice', TodayTaskKind.videoPractice, '视频 · 练习'),
-    ];
   }
 
   List<TodayTask> _examTasks(Set<String> doneIds) {
@@ -377,45 +289,8 @@ class TodayPathNotifier extends Notifier<TodayPathState> {
         ),
       );
     }
-    if (plan.newAvailable > 0) {
-      const String id = 'vocab-new';
-      out.add(
-        TodayTask(
-          id: id,
-          kind: TodayTaskKind.vocabNew,
-          title: '新学 · ${plan.newAvailable} 词',
-          subtitle: 'i+1 · 今日额度内',
-          count: plan.newAvailable,
-          route: '/review/session?learn=1',
-          doneToday: doneIds.contains(id),
-        ),
-      );
-    }
+    // vocabNew intentionally omitted from 今日复习 — new learn is 今日学习 quota.
     return out;
-  }
-
-  List<TodayTask> _readingTasks(Set<String> doneIds) {
-    final reading = ref.read(readingLibraryProvider);
-    final String? contId = reading.continueDoc?.id;
-    final String route = contId == null
-        ? '/reading'
-        : '/reading/${Uri.encodeComponent(contId)}';
-    const String id = 'reading-continue';
-    // Any reading activity today counts — do not require finishing the article.
-    final bool engagedToday =
-        ref.read(learningActivityProvider).today.readArticleKeys.isNotEmpty;
-    return <TodayTask>[
-      TodayTask(
-        id: id,
-        kind: TodayTaskKind.courseNew,
-        title: contId == null ? '阅读 · 打开书库' : '继续阅读',
-        subtitle: contId == null
-            ? '按 i+1 选文 · 不必读完'
-            : '${reading.continueDoc!.displayTitle} · 打开即计学习',
-        route: route,
-        doneToday: doneIds.contains(id) || engagedToday,
-      ),
-    ];
   }
 
   TodayPathStatus _status({

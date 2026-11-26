@@ -98,7 +98,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
           style: TextStyle(color: AppDesignTokens.textPrimary),
         ),
         content: Text(
-          '测完后英语之旅的难度会更准。可以现在测，也可以稍后。',
+          '测完后今日学习的难度会更准。可以现在测，也可以稍后。',
           style: TextStyle(color: AppDesignTokens.textSecondary),
         ),
         actions: <Widget>[
@@ -386,7 +386,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
                           Text(
-                            '今日课程',
+                            '今日复习',
                             style: TextStyle(
                               color: AppDesignTokens.textPrimary,
                               fontWeight: FontWeight.w700,
@@ -395,7 +395,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '接着上次的课、到期复习、词书进度',
+                            '只复习到期内容 · 新学在上方「今日学习」',
                             style: TextStyle(color: muted, fontSize: 12),
                           ),
                           const SizedBox(height: 8),

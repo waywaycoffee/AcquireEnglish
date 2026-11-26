@@ -4,7 +4,91 @@ import 'package:hive_ce/hive.dart';
 
 enum JourneyStage { review, learn, tomorrow, done }
 
+enum TodayStudyTrack { video, vocab, reading }
+
 typedef JourneyActivity = ({String route, String title});
+
+/// Thin read model over [TodayJourneyStore] quota + progress fields.
+class TodayStudyPlan {
+  const TodayStudyPlan({
+    required this.videoMinutes,
+    required this.vocabCount,
+    required this.readingWords,
+    required this.videoDoneMs,
+    required this.vocabDone,
+    required this.readingWordsDone,
+    this.lastTrack,
+    this.quotasConfigured = false,
+  });
+
+  factory TodayStudyPlan.empty() => const TodayStudyPlan(
+        videoMinutes: 0,
+        vocabCount: 0,
+        readingWords: 0,
+        videoDoneMs: 0,
+        vocabDone: 0,
+        readingWordsDone: 0,
+      );
+
+  final int videoMinutes;
+  final int vocabCount;
+  final int readingWords;
+  final int videoDoneMs;
+  final int vocabDone;
+  final int readingWordsDone;
+  final TodayStudyTrack? lastTrack;
+  final bool quotasConfigured;
+
+  bool get hasAnyQuota =>
+      videoMinutes > 0 || vocabCount > 0 || readingWords > 0;
+
+  bool get videoDone =>
+      videoMinutes <= 0 || videoDoneMs >= videoMinutes * 60 * 1000;
+
+  bool get vocabTrackDone => vocabCount <= 0 || vocabDone >= vocabCount;
+
+  bool get readingDone =>
+      readingWords <= 0 || readingWordsDone >= readingWords;
+
+  bool get allTracksDone =>
+      quotasConfigured && hasAnyQuota && videoDone && vocabTrackDone && readingDone;
+
+  double get videoProgress {
+    if (videoMinutes <= 0) return 0;
+    return (videoDoneMs / (videoMinutes * 60 * 1000)).clamp(0.0, 1.0);
+  }
+
+  double get vocabProgress {
+    if (vocabCount <= 0) return 0;
+    return (vocabDone / vocabCount).clamp(0.0, 1.0);
+  }
+
+  double get readingProgress {
+    if (readingWords <= 0) return 0;
+    return (readingWordsDone / readingWords).clamp(0.0, 1.0);
+  }
+
+  /// Unfinished tracks in CTA order: lastTrack first, then video → vocab → reading.
+  List<TodayStudyTrack> unfinishedOrdered() {
+    final List<TodayStudyTrack> pending = <TodayStudyTrack>[
+      if (videoMinutes > 0 && !videoDone) TodayStudyTrack.video,
+      if (vocabCount > 0 && !vocabTrackDone) TodayStudyTrack.vocab,
+      if (readingWords > 0 && !readingDone) TodayStudyTrack.reading,
+    ];
+    if (pending.isEmpty) return pending;
+    final TodayStudyTrack? prefer = lastTrack;
+    if (prefer == null || !pending.contains(prefer)) return pending;
+    return <TodayStudyTrack>[
+      prefer,
+      ...pending.where((TodayStudyTrack t) => t != prefer),
+    ];
+  }
+
+  TodayStudyTrack? get nextTrack {
+    final List<TodayStudyTrack> ordered = unfinishedOrdered();
+    return ordered.isEmpty ? null : ordered.first;
+  }
+}
 
 class TodayJourneyStore {
   TodayJourneyStore(String account, DateTime date)
@@ -28,6 +112,17 @@ class TodayJourneyStore {
       }
     }
     return <String, Object?>{};
+  }
+
+  Future<void> _write(Map<String, Object?> next) async {
+    await _prefs?.put(_key, jsonEncode(next));
+  }
+
+  int _int(Map<String, Object?> record, String key, [int fallback = 0]) {
+    final Object? value = record[key];
+    if (value is int) return value;
+    if (value is num) return value.round();
+    return fallback;
   }
 
   JourneyStage get stage {
@@ -67,8 +162,36 @@ class TodayJourneyStore {
     return trimmed.isEmpty ? null : trimmed;
   }
 
+  TodayStudyPlan get studyPlan {
+    final Map<String, Object?> record = _read();
+    final bool configured = record['quotasConfigured'] == true ||
+        _int(record, 'videoMinutes') > 0 ||
+        _int(record, 'vocabCount') > 0 ||
+        _int(record, 'readingWords') > 0;
+    final String? trackName = record['lastTrack'] as String?;
+    TodayStudyTrack? lastTrack;
+    if (trackName != null) {
+      for (final TodayStudyTrack track in TodayStudyTrack.values) {
+        if (track.name == trackName) {
+          lastTrack = track;
+          break;
+        }
+      }
+    }
+    return TodayStudyPlan(
+      videoMinutes: _int(record, 'videoMinutes'),
+      vocabCount: _int(record, 'vocabCount'),
+      readingWords: _int(record, 'readingWords'),
+      videoDoneMs: _int(record, 'videoDoneMs'),
+      vocabDone: _int(record, 'vocabDone'),
+      readingWordsDone: _int(record, 'readingWordsDone'),
+      lastTrack: lastTrack,
+      quotasConfigured: configured,
+    );
+  }
+
   Future<void> saveStage(JourneyStage stage) async {
-    await _prefs?.put(_key, jsonEncode({..._read(), 'stage': stage.name}));
+    await _write(<String, Object?>{..._read(), 'stage': stage.name});
   }
 
   Future<void> saveActivity(
@@ -95,11 +218,69 @@ class TodayJourneyStore {
       // Fresh non-plan saves drop a stale Gate3 reason.
       next.remove('reason');
     }
-    await _prefs?.put(_key, jsonEncode(next));
+    await _write(next);
   }
 
   Future<void> clearPausedFlag() async {
-    final Map<String, Object?> next = {..._read()}..remove('pausedExplicitly');
-    await _prefs?.put(_key, jsonEncode(next));
+    final Map<String, Object?> next = <String, Object?>{..._read()}
+      ..remove('pausedExplicitly');
+    await _write(next);
+  }
+
+  Future<void> saveQuotas({
+    required int videoMinutes,
+    required int vocabCount,
+    required int readingWords,
+  }) async {
+    final Map<String, Object?> next = <String, Object?>{
+      ..._read(),
+      'videoMinutes': videoMinutes.clamp(0, 180),
+      'vocabCount': vocabCount.clamp(0, 200),
+      'readingWords': readingWords.clamp(0, 20000),
+      'quotasConfigured': true,
+      'stage': JourneyStage.learn.name,
+    };
+    await _write(next);
+  }
+
+  Future<void> saveProgress({
+    int? videoDoneMs,
+    int? vocabDone,
+    int? readingWordsDone,
+    TodayStudyTrack? lastTrack,
+  }) async {
+    final Map<String, Object?> next = <String, Object?>{..._read()};
+    if (videoDoneMs != null) {
+      next['videoDoneMs'] = videoDoneMs.clamp(0, 24 * 60 * 60 * 1000);
+    }
+    if (vocabDone != null) {
+      next['vocabDone'] = vocabDone.clamp(0, 10000);
+    }
+    if (readingWordsDone != null) {
+      next['readingWordsDone'] = readingWordsDone.clamp(0, 500000);
+    }
+    if (lastTrack != null) {
+      next['lastTrack'] = lastTrack.name;
+    }
+    await _write(next);
+  }
+
+  /// Copy today's quotas onto [other] (typically tomorrow) for continuity.
+  Future<void> copyQuotasTo(TodayJourneyStore other, {String? reason}) async {
+    final TodayStudyPlan plan = studyPlan;
+    if (!plan.quotasConfigured) return;
+    await other.saveQuotas(
+      videoMinutes: plan.videoMinutes,
+      vocabCount: plan.vocabCount,
+      readingWords: plan.readingWords,
+    );
+    final JourneyActivity? act = activity;
+    if (act != null && act.route.isNotEmpty) {
+      await other.saveActivity(
+        act,
+        planned: true,
+        reason: reason ?? this.reason ?? '接着昨天继续学',
+      );
+    }
   }
 }
