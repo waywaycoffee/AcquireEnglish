@@ -1,11 +1,11 @@
 {
-  "version": "0.2.274",
-  "version_code": 297,
-  "apk_name": "AcquireEnglish-android-0.2.274+297.apk",
+  "version": "0.2.275",
+  "version_code": 298,
+  "apk_name": "AcquireEnglish-android-0.2.275+298.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "a8383c1740f5950e4f0ac37d57820d2a9dd3fa58397a4d9dfcfaccb86a98aaf1",
+  "sha256": "9093fb9975129e3d574c07980c2ec535f9b0f2e727cb7d58e5e74977d08e5a5b",
   "force": true,
   "min_version_code": 293,
-  "notes": "改善背词发音启动与切卡播放，自动补查缺失的中文释义，并压缩手机上的卡片布局。",
-  "published_at": "2026-11-26T21:20:33+08:00"
+  "notes": "首页改为「今日学习」配额；词书架扁平化与开源分类直达；K12 教材封面与 PDF 翻页同步朗读；影集字幕匹配与复习打分按钮可见性修复。",
+  "published_at": "2026-11-27T06:06:12+08:00"
 }
