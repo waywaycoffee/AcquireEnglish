@@ -11,6 +11,8 @@ class K12TextbookLesson {
     required this.audioUrl,
     this.unit,
     this.lesson,
+    this.section = '',
+    this.sourceName = '',
   });
 
   final int seq;
@@ -21,6 +23,8 @@ class K12TextbookLesson {
   final String title;
   final String audioKey;
   final String audioUrl;
+  final String section;
+  final String sourceName;
 
   String get displayTitle {
     if (kind == 'letters') {
@@ -42,6 +46,8 @@ class K12TextbookLesson {
         title: '${json['title'] ?? ''}'.trim(),
         audioKey: '${json['audio_key'] ?? ''}'.trim(),
         audioUrl: '${json['audio_url'] ?? ''}'.trim(),
+        section: '${json['section'] ?? ''}'.trim(),
+        sourceName: '${json['source_name'] ?? ''}'.trim(),
       );
 }
 

@@ -9,6 +9,7 @@ import 'package:pdfrx/pdfrx.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/k12_textbook_audio_cache.dart';
+import '../domain/k12_pdf_audio_sync.dart';
 import '../domain/k12_textbook_media.dart';
 
 class K12TextbookStudyScreen extends ConsumerStatefulWidget {
@@ -32,32 +33,73 @@ class _K12TextbookStudyScreenState
   String? _error;
   bool _loading = true;
   bool _caching = false;
+  bool _aligning = false;
+  bool _followPages = true;
   int? _playingSeq;
   bool _playing = false;
+  int _pageNumber = 1;
+  K12PdfAudioSyncMap _sync = const K12PdfAudioSyncMap(
+    pageToSeq: <int, int>{},
+    seqToStartPage: <int, int>{},
+  );
   late final Player _player;
+  late final PdfViewerController _pdfController;
+  StreamSubscription<bool>? _completedSub;
 
   @override
   void initState() {
     super.initState();
     _player = Player();
+    _pdfController = PdfViewerController();
+    _pdfController.addListener(_onPdfChanged);
     _player.stream.playing.listen((bool value) {
       if (!mounted) return;
       setState(() => _playing = value);
     });
-    _player.stream.completed.listen((bool done) {
-      if (!mounted || !done) return;
-      setState(() {
-        _playing = false;
-        _playingSeq = null;
-      });
+    _completedSub = _player.stream.completed.listen((bool done) {
+      if (!done || !mounted) return;
+      unawaited(_onTrackCompleted());
     });
     unawaited(_load());
   }
 
   @override
   void dispose() {
+    _pdfController.removeListener(_onPdfChanged);
+    unawaited(_completedSub?.cancel() ?? Future<void>.value());
     unawaited(_player.dispose());
     super.dispose();
+  }
+
+  void _onPdfChanged() {
+    final int? page = _pdfController.pageNumber;
+    if (page == null || page == _pageNumber) return;
+    _pageNumber = page;
+    if (!_followPages || _sync.isEmpty) {
+      if (mounted) setState(() {});
+      return;
+    }
+    final int? seq = _sync.seqForPage(page);
+    if (seq == null) {
+      if (mounted) setState(() {});
+      return;
+    }
+    if (seq == _playingSeq) {
+      if (mounted) setState(() {});
+      return;
+    }
+    final K12TextbookLesson? lesson = _lessonBySeq(seq);
+    if (lesson == null) return;
+    unawaited(_play(lesson, fromPageSync: true));
+  }
+
+  K12TextbookLesson? _lessonBySeq(int seq) {
+    final K12TextbookMedia? book = _book;
+    if (book == null) return null;
+    for (final K12TextbookLesson lesson in book.lessons) {
+      if (lesson.seq == seq) return lesson;
+    }
+    return null;
   }
 
   Future<void> _load() async {
@@ -77,10 +119,12 @@ class _K12TextbookStudyScreenState
         });
         return;
       }
+      final K12TextbookMedia book = K12TextbookMedia.fromJson(raw);
       setState(() {
-        _book = K12TextbookMedia.fromJson(raw);
+        _book = book;
         _loading = false;
       });
+      unawaited(_alignAudioToPdf(book));
     } catch (error) {
       if (!mounted) return;
       setState(() {
@@ -90,11 +134,53 @@ class _K12TextbookStudyScreenState
     }
   }
 
-  Future<void> _play(K12TextbookLesson lesson) async {
+  Future<void> _alignAudioToPdf(K12TextbookMedia book) async {
+    final String pdfUrl = book.pdfUrl.trim();
+    final Uri? uri = Uri.tryParse(pdfUrl);
+    if (uri == null || book.lessons.isEmpty) return;
+    if (mounted) setState(() => _aligning = true);
+    try {
+      final PdfDocument doc = await PdfDocument.openUri(uri);
+      try {
+        final List<String> texts = <String>[];
+        for (final PdfPage page in doc.pages) {
+          final PdfPageRawText? raw = await page.loadText();
+          texts.add(raw?.fullText ?? '');
+        }
+        final K12PdfAudioSyncMap sync = buildK12PdfAudioSyncMap(
+          lessons: book.lessons,
+          pageTexts: texts,
+        );
+        if (!mounted) return;
+        setState(() {
+          _sync = sync;
+          _aligning = false;
+        });
+        if (_followPages && !sync.isEmpty) {
+          final int page = _pdfController.pageNumber ?? 1;
+          final int? seq = sync.seqForPage(page);
+          final K12TextbookLesson? lesson =
+              seq == null ? null : _lessonBySeq(seq);
+          if (lesson != null) {
+            unawaited(_play(lesson, fromPageSync: true));
+          }
+        }
+      } finally {
+        unawaited(doc.dispose());
+      }
+    } catch (_) {
+      if (mounted) setState(() => _aligning = false);
+    }
+  }
+
+  Future<void> _play(
+    K12TextbookLesson lesson, {
+    bool fromPageSync = false,
+  }) async {
+    if (_caching && fromPageSync) return;
     setState(() {
       _playingSeq = lesson.seq;
       _caching = true;
-      _error = null;
     });
     try {
       final File cached = await ensureK12TextbookAudioCached(
@@ -104,18 +190,26 @@ class _K12TextbookStudyScreenState
         fallbackAudioUrl: lesson.audioUrl,
       );
       if (!mounted) return;
+      // Another page flip may have requested a newer track.
+      if (_playingSeq != lesson.seq) {
+        setState(() => _caching = false);
+        return;
+      }
       setState(() => _caching = false);
       await _player.open(Media(cached.uri.toString()));
       await _player.play();
+      if (mounted) setState(() {});
     } catch (error) {
       if (!mounted) return;
       setState(() {
         _caching = false;
-        _playingSeq = null;
+        if (_playingSeq == lesson.seq) _playingSeq = null;
       });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('音频下载失败，请重试：$error')),
-      );
+      if (!fromPageSync) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('音频下载失败，请重试：$error')),
+        );
+      }
     }
   }
 
@@ -130,6 +224,29 @@ class _K12TextbookStudyScreenState
       return;
     }
     await _play(lesson);
+  }
+
+  Future<void> _onTrackCompleted() async {
+    setState(() {
+      _playing = false;
+    });
+    if (!_followPages || _sync.isEmpty) {
+      setState(() => _playingSeq = null);
+      return;
+    }
+    final int page = _pageNumber;
+    final List<int> onPage = _sync.seqsStartingOnPage(page);
+    final int? current = _playingSeq;
+    if (current == null) return;
+    final int idx = onPage.indexOf(current);
+    if (idx >= 0 && idx + 1 < onPage.length) {
+      final K12TextbookLesson? next = _lessonBySeq(onPage[idx + 1]);
+      if (next != null) {
+        await _play(next, fromPageSync: true);
+        return;
+      }
+    }
+    setState(() => _playingSeq = null);
   }
 
   Future<void> _showAudioSheet() async {
@@ -170,6 +287,8 @@ class _K12TextbookStudyScreenState
         : (widget.catalogTitle.isEmpty ? '英语教材' : widget.catalogTitle);
     final String pdfUrl = book?.pdfUrl.trim() ?? '';
     final Uri? pdfUri = pdfUrl.isEmpty ? null : Uri.tryParse(pdfUrl);
+    final K12TextbookLesson? current =
+        _playingSeq == null ? null : _lessonBySeq(_playingSeq!);
 
     return Scaffold(
       backgroundColor: AppDesignTokens.softWhite,
@@ -178,10 +297,31 @@ class _K12TextbookStudyScreenState
         title: Text(title),
         actions: <Widget>[
           if (book != null && book.lessons.isNotEmpty)
+            IconButton(
+              tooltip: _followPages ? '翻页跟读：开' : '翻页跟读：关',
+              onPressed: () {
+                setState(() => _followPages = !_followPages);
+                if (_followPages) {
+                  final int? seq = _sync.seqForPage(_pageNumber);
+                  final K12TextbookLesson? lesson =
+                      seq == null ? null : _lessonBySeq(seq);
+                  if (lesson != null) unawaited(_play(lesson, fromPageSync: true));
+                }
+              },
+              icon: Icon(
+                _followPages
+                    ? Icons.sync_rounded
+                    : Icons.sync_disabled_rounded,
+                color: _followPages
+                    ? AppDesignTokens.brandGreen
+                    : AppDesignTokens.textSecondary,
+              ),
+            ),
+          if (book != null && book.lessons.isNotEmpty)
             TextButton(
               onPressed: _showAudioSheet,
               child: Text(
-                '课次音频',
+                '课次',
                 style: TextStyle(color: AppDesignTokens.textPrimary),
               ),
             ),
@@ -217,59 +357,116 @@ class _K12TextbookStudyScreenState
                 style: TextStyle(color: AppDesignTokens.textSecondary),
               ),
             )
-          : PdfViewer.uri(
-              pdfUri,
-              params: PdfViewerParams(
-                backgroundColor: AppDesignTokens.softWhite,
-                loadingBannerBuilder:
-                    (
-                      BuildContext context,
-                      int bytesDownloaded,
-                      int? totalBytes,
-                    ) {
-                      final double? progress = totalBytes == null || totalBytes <= 0
-                          ? null
-                          : bytesDownloaded / totalBytes;
-                      return Center(
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            SizedBox(
-                              width: 160,
-                              child: LinearProgressIndicator(value: progress),
+          : Column(
+              children: <Widget>[
+                if (_aligning || _caching || current != null)
+                  Material(
+                    color: AppDesignTokens.appWhite,
+                    child: Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+                      child: Row(
+                        children: <Widget>[
+                          if (_aligning || _caching)
+                            const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
                             ),
-                            const SizedBox(height: 12),
-                            Text(
-                              '正在加载课本 PDF…',
+                          if (_aligning || _caching) const SizedBox(width: 10),
+                          Expanded(
+                            child: Text(
+                              _aligning
+                                  ? '正在对齐课次音频与页码…'
+                                  : _caching
+                                  ? '正在下载本页音频…'
+                                  : '第 $_pageNumber 页 · ${current?.displayTitle ?? ''}',
                               style: TextStyle(
                                 color: AppDesignTokens.textSecondary,
+                                fontSize: 13,
                               ),
                             ),
-                          ],
-                        ),
-                      );
-                    },
-                errorBannerBuilder:
-                    (
-                      BuildContext context,
-                      Object error,
-                      StackTrace? stackTrace,
-                      PdfDocumentRef documentRef,
-                    ) {
-                      return Center(
-                        child: Padding(
-                          padding: const EdgeInsets.all(24),
-                          child: Text(
-                            'PDF 打开失败：$error',
-                            textAlign: TextAlign.center,
-                            style: TextStyle(
-                              color: AppDesignTokens.textPrimary,
-                            ),
                           ),
-                        ),
-                      );
-                    },
-              ),
+                          if (_playing)
+                            IconButton(
+                              onPressed: () => unawaited(_player.pause()),
+                              icon: Icon(
+                                Icons.pause_circle_filled,
+                                color: AppDesignTokens.brandGreen,
+                              ),
+                            )
+                          else if (current != null)
+                            IconButton(
+                              onPressed: () => unawaited(_player.play()),
+                              icon: Icon(
+                                Icons.play_circle_fill,
+                                color: AppDesignTokens.brandGreen,
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
+                  ),
+                Expanded(
+                  child: PdfViewer.uri(
+                    pdfUri,
+                    controller: _pdfController,
+                    params: PdfViewerParams(
+                      backgroundColor: AppDesignTokens.softWhite,
+                      loadingBannerBuilder:
+                          (
+                            BuildContext context,
+                            int bytesDownloaded,
+                            int? totalBytes,
+                          ) {
+                            final double? progress =
+                                totalBytes == null || totalBytes <= 0
+                                ? null
+                                : bytesDownloaded / totalBytes;
+                            return Center(
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: <Widget>[
+                                  SizedBox(
+                                    width: 160,
+                                    child: LinearProgressIndicator(
+                                      value: progress,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    '正在加载课本 PDF…',
+                                    style: TextStyle(
+                                      color: AppDesignTokens.textSecondary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            );
+                          },
+                      errorBannerBuilder:
+                          (
+                            BuildContext context,
+                            Object error,
+                            StackTrace? stackTrace,
+                            PdfDocumentRef documentRef,
+                          ) {
+                            return Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: Text(
+                                  'PDF 打开失败：$error',
+                                  textAlign: TextAlign.center,
+                                  style: TextStyle(
+                                    color: AppDesignTokens.textPrimary,
+                                  ),
+                                ),
+                              ),
+                            );
+                          },
+                    ),
+                  ),
+                ),
+              ],
             ),
       floatingActionButton: book != null && book.lessons.isNotEmpty
           ? FloatingActionButton.extended(
@@ -279,7 +476,7 @@ class _K12TextbookStudyScreenState
               icon: Icon(
                 _playing ? Icons.pause_rounded : Icons.headphones_rounded,
               ),
-              label: Text(_playing ? '播放中' : '听课'),
+              label: Text(_followPages ? '跟读中' : '听课'),
             )
           : null,
     );
@@ -323,7 +520,7 @@ class _AudioLessonList extends StatelessWidget {
         ),
         const SizedBox(height: 6),
         Text(
-          '点课程会下载配套 MP3 到本机后再播放。',
+          '翻页会自动播放本页课次；也可在这里手动点选。',
           style: TextStyle(color: AppDesignTokens.textSecondary, height: 1.35),
         ),
         if (caching) ...<Widget>[
