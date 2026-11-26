@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../library/domain/homepage_recommended_bvids.dart';
 import '../../words/presentation/learner_level_provider.dart';
 import '../data/acquire_api_client.dart';
 
@@ -25,6 +26,15 @@ dailyFeedProvider =
     NotifierProvider<DailyFeedNotifier, List<AcquireDailyFeedItemDto>>(
       DailyFeedNotifier.new,
     );
+
+/// BVids currently in the homepage daily recommendation pool.
+///
+/// Video-page rails should exclude these so the same clip is not recommended
+/// twice (home「推荐视频」 + library B站/全英可逛).
+final Provider<Set<String>> homepageRecommendedBvidsProvider =
+    Provider<Set<String>>((Ref ref) {
+  return homepageRecommendedBvidsFromFeed(ref.watch(dailyFeedProvider));
+});
 
 class LearningPreferencesNotifier extends Notifier<AcquirePreferencesDto> {
   @override

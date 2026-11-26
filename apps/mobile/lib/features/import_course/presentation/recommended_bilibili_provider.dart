@@ -1,6 +1,7 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../library/domain/homepage_recommended_bvids.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 
@@ -9,8 +10,11 @@ final FutureProvider<List<RecommendedBilibiliCreatorDto>>
     FutureProvider<List<RecommendedBilibiliCreatorDto>>((Ref ref) async {
   // Keep the rail warm across tab switches; invalidate only on pull-to-refresh.
   ref.keepAlive();
+  final Set<String> homepageBvids = ref.watch(homepageRecommendedBvidsProvider);
   try {
-    return await ref.read(acquireApiClientProvider).listRecommendedCreators();
+    final List<RecommendedBilibiliCreatorDto> creators =
+        await ref.read(acquireApiClientProvider).listRecommendedCreators();
+    return excludeHomepageRecommendedCreatorVideos(creators, homepageBvids);
   } catch (_) {
     return const <RecommendedBilibiliCreatorDto>[];
   }
