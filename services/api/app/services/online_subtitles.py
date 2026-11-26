@@ -306,10 +306,19 @@ def subliminal_candidate_names(
         if slug and slug != stem:
             _add(f"{slug}{ext}")
 
+    # Prefer season/episode parsed from the real filename (SE01 (1) / S06E02),
+    # not the flat series episode_index which spans multiple seasons.
+    from app.services.netdisk_episode_sort import parse_season_episode
+
+    parsed = parse_season_episode(filename) or parse_season_episode(base)
     if alias:
         alias_slug = _ascii_slug(alias)
-        if episode_index is not None and episode_index > 0:
-            # TV-style: Show.Name.S01E02
+        if parsed is not None:
+            season, ep = parsed
+            _add(f"{alias_slug}.S{season:02d}E{ep:02d}{ext}")
+            _add(f"{alias_slug}.S{season:02d}E{ep:02d}.720p{ext}")
+        elif episode_index is not None and episode_index > 0:
+            # Fallback only when the file itself has no SxxExx / SE## (N).
             _add(f"{alias_slug}.S01E{episode_index:02d}{ext}")
             _add(f"{alias_slug}.E{episode_index:02d}{ext}")
         _add(f"{alias_slug}{ext}")

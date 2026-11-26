@@ -9,6 +9,7 @@ from typing import Literal
 import httpx
 
 from app.link_import import _srt_looks_chinese, _vtt_to_srt
+from app.services.netdisk_episode_sort import parse_season_episode
 from app.services.openlist_client import OpenListClient, OpenListError, public_raw_url
 
 SUBTITLE_SUFFIXES = (".srt", ".vtt", ".ass", ".ssa")
@@ -60,6 +61,25 @@ def _token_lang(stem: str, video: str) -> Lang | None:
     return None
 
 
+def _lang_token_from_stem(stem: str) -> Lang | None:
+    """Detect trailing language markers like `Show.S01E01-EN` / `…chs`."""
+    lower = stem.lower().replace("_", "-")
+    # Prefer the last dotted / dashed token.
+    for sep in (".", "-", " "):
+        if sep in lower:
+            tail = lower.rsplit(sep, 1)[-1].strip()
+            packed = tail.replace("-", "")
+            if packed in _EN_TOKENS or tail in _EN_TOKENS:
+                return "en"
+            if packed in _ZH_TOKENS or tail in _ZH_TOKENS:
+                return "zh"
+            if "english" in tail:
+                return "en"
+            if any(t in tail for t in ("chinese", "简体", "中文", "chs", "cht")):
+                return "zh"
+    return None
+
+
 def assign_sidecar_paths(
     video_filename: str,
     sibling_names: list[str],
@@ -68,6 +88,7 @@ def assign_sidecar_paths(
 ) -> dict[Lang, str]:
     """Return {en|zh: sibling filename}. Uses text sniff for plain `.srt` when needed."""
     vstem = video_stem(video_filename)
+    video_ep = parse_season_episode(video_filename)
     out: dict[Lang, str] = {}
     plain: list[str] = []
     for name in sibling_names:
@@ -80,6 +101,14 @@ def assign_sidecar_paths(
         lang = _token_lang(stem, vstem)
         if lang and lang not in out:
             out[lang] = name
+            continue
+        # Episode-code match: SE01 (1).mkv ↔ SHDBZ S01E01-EN.srt
+        if video_ep is not None and parse_season_episode(name) == video_ep:
+            tagged = _lang_token_from_stem(stem)
+            if tagged and tagged not in out:
+                out[tagged] = name
+            else:
+                plain.append(name)
 
     bodies = plain_bodies or {}
     for name in plain:
@@ -210,18 +239,16 @@ async def load_sidecars_for_video(
         names = dir_cache[parent]
     else:
         try:
-            data = await client.fs_list(parent)
+            listing = await client.fs_list_all(parent)
         except OpenListError:
             return {}
-        content = data.get("content") if isinstance(data, dict) else None
         names = []
-        if isinstance(content, list):
-            for item in content:
-                if not isinstance(item, dict) or item.get("is_dir"):
-                    continue
-                name = str(item.get("name") or "")
-                if is_subtitle_name(name):
-                    names.append(name)
+        for item in listing:
+            if not isinstance(item, dict) or item.get("is_dir"):
+                continue
+            name = str(item.get("name") or "")
+            if is_subtitle_name(name):
+                names.append(name)
         if dir_cache is not None:
             dir_cache[parent] = names
     if not names:
@@ -229,11 +256,16 @@ async def load_sidecars_for_video(
 
     # First pass: tagged names without bodies.
     tentative = assign_sidecar_paths(video_name, names)
-    # Fetch all candidates that might be needed (tagged + plain same-stem).
+    # Fetch all candidates that might be needed (tagged + plain same-stem
+    # + same SxxExx / SE## (N) episode code).
     vstem = video_stem(video_name)
+    video_ep = parse_season_episode(video_name)
     candidates = set(tentative.values())
     for name in names:
         if video_stem(name).lower() == vstem.lower():
+            candidates.add(name)
+            continue
+        if video_ep is not None and parse_season_episode(name) == video_ep:
             candidates.add(name)
 
     bodies: dict[str, str] = {}

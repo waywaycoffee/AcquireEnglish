@@ -22,6 +22,18 @@ def test_assign_tagged_sidecars() -> None:
     assert got["zh"] == "lesson.zh.srt"
 
 
+def test_assign_by_episode_code() -> None:
+    got = assign_sidecar_paths(
+        "SE01 (1).mkv",
+        ["SHDBZ S01E01-EN.srt", "SHDBZ S01E01.srt", "SHDBZ S01E02-EN.srt"],
+        plain_bodies={
+            "SHDBZ S01E01.srt": "1\n00:00:00,000 --> 00:00:01,000\n你好\n",
+        },
+    )
+    assert got.get("en") == "SHDBZ S01E01-EN.srt"
+    assert got.get("zh") == "SHDBZ S01E01.srt"
+
+
 def test_assign_plain_sidecar_sniff() -> None:
     en = "1\n00:00:00,000 --> 00:00:01,000\nHello world\n"
     zh = "1\n00:00:00,000 --> 00:00:01,000\n你好世界\n"
