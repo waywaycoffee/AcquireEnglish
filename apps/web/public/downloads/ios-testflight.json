@@ -3,8 +3,8 @@
   "bundle_id": "com.acquire.english",
   "version": "0.2.268",
   "build": 289,
-  "status": "uploaded_processing",
+  "status": "synced_with_android",
   "join_url": "https://testflight.apple.com/join/DYKYp3HP",
-  "notes": "已上传与 Android 对齐的 0.2.268 (289)。处理完成后请在外部测试组选用该构建；公开链接不变。",
-  "updated_at": "2026-11-26T13:40:00+08:00"
+  "notes": "Android / iOS 同功能版本 0.2.268 (289)。公开链接不变；请在外部测试组选用构建 289 后更新。",
+  "updated_at": "2026-11-26T13:45:00+08:00"
 }
