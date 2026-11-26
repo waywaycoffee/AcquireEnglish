@@ -144,6 +144,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         if (active() && (completed ?? false)) {
           await _seedTomorrowIfNeeded(account, today);
           await store.saveStage(JourneyStage.tomorrow);
+          if (active()) await _maybeOfferSkillProbe(module);
         }
         return;
       }
@@ -369,6 +370,45 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
             '',
       ),
     );
+  }
+
+  Future<void> _maybeOfferSkillProbe(LearnModule module) async {
+    final LearnerSkill? skill = switch (module) {
+      LearnModule.video => LearnerSkill.listening,
+      LearnModule.reading => LearnerSkill.reading,
+      LearnModule.vocab || LearnModule.oral => null,
+    };
+    if (skill == null || !mounted) return;
+    final SkillEstimate estimate = ref
+        .read(learnerSkillProfileProvider)
+        .estimate(skill);
+    if (!estimate.calibrating) return;
+    final bool? go = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        backgroundColor: AppDesignTokens.appWhite,
+        title: Text(
+          skill == LearnerSkill.listening ? '来一道听力小测？' : '来一道阅读小测？',
+          style: TextStyle(color: AppDesignTokens.textPrimary),
+        ),
+        content: Text(
+          '只记第一次作答，用来校准约 ${estimate.band}。可以跳过。',
+          style: TextStyle(color: AppDesignTokens.textSecondary),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('先跳过'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('开始'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || go != true) return;
+    await context.push('/skill-probe?skill=${skill.name}');
   }
 
   JourneyProgressSnapshot _progressSnapshot(String route, LearnModule module) {

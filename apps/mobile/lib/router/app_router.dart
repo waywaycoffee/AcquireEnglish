@@ -52,6 +52,8 @@ import '../features/growth/presentation/growth_screen.dart';
 import '../features/guide/presentation/guide_screen.dart';
 import '../features/home/presentation/learning_home_screen.dart';
 import '../features/import_course/presentation/import_course_screen.dart';
+import '../features/learner_model/domain/learner_skill_profile.dart';
+import '../features/learner_model/presentation/skill_probe_screen.dart';
 import '../features/library/presentation/library_screen.dart';
 import '../features/phrases/presentation/phrases_screen.dart';
 import '../features/player/presentation/player_screen.dart';
@@ -515,6 +517,17 @@ GoRouter goRouter(Ref ref) {
       path: SGRoute.growth.route,
       builder: (BuildContext context, GoRouterState state) =>
           const GrowthScreen(),
+    ).fade(),
+    GoRoute(
+      path: '/skill-probe',
+      builder: (BuildContext context, GoRouterState state) {
+        final String raw = state.uri.queryParameters['skill'] ?? 'reading';
+        final LearnerSkill skill = LearnerSkill.values.firstWhere(
+          (LearnerSkill item) => item.name == raw,
+          orElse: () => LearnerSkill.reading,
+        );
+        return SkillProbeScreen(skill: skill);
+      },
     ).fade(),
     GoRoute(
       path: SGRoute.discover.route,

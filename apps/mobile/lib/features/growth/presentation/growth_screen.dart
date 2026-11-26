@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:lucide_flutter/lucide_flutter.dart';
 
+import '../../learner_model/presentation/skill_progress_panel.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
@@ -37,6 +38,8 @@ class GrowthScreen extends ConsumerWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: <Widget>[
                       _LevelMembershipCarousel(growth: growth),
+                      const SizedBox(height: 28),
+                      const SkillProgressPanel(),
                       const SizedBox(height: 34),
                       _SectionHeader(
                         title: '今日成长值',

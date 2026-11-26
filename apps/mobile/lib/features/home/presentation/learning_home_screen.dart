@@ -10,6 +10,8 @@ import '../../digital_human/presentation/digital_human_picker.dart';
 import '../../drama/data/drama_cover_cache.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
+import '../../learner_model/domain/learner_skill_profile.dart';
+import '../../learner_model/presentation/learner_skill_profile_provider.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../membership/presentation/welcome_pro_claim_host.dart';
@@ -29,7 +31,6 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../../words/presentation/estimated_vocabulary_provider.dart';
-import '../../words/presentation/learner_level_provider.dart';
 import '../../words/presentation/vocabulary_placement_provider.dart';
 import 'learning_dashboard_provider.dart';
 import 'widgets/today_activity_card.dart';
@@ -160,21 +161,20 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
         (PlacementRow profile) => profile['estimate'] as int?,
       ),
     );
-    final String adaptiveCefr = ref.watch(adaptiveLearnerCefrProvider);
+    final LearnerSkillProfile skillProfile = ref.watch(
+      learnerSkillProfileProvider,
+    );
+    final SkillEstimate vocabSkill = skillProfile.estimate(LearnerSkill.vocab);
     final String prefsLevel = prefs.level.trim();
     final String levelLabel = () {
-      if (vocabulary != null && placementEstimate != null) {
-        return '$adaptiveCefr · 词汇量 ≈ $vocabulary';
-      }
+      final String band = vocabSkill.label;
       if (vocabulary != null) {
-        final String band =
-            prefsLevel.isNotEmpty ? prefsLevel : adaptiveCefr;
-        return '$band · 已学约 $vocabulary 词';
+        return '$band · 词 ≈ $vocabulary';
       }
       if (prefsLevel.isNotEmpty) {
-        return '水平 $prefsLevel · 测词汇量';
+        return '$band · 先验 $prefsLevel';
       }
-      return '测词汇量定水平';
+      return '$band · 去成长页抽测';
     }();
     final readingLibrary = ref.watch(readingLibraryProvider);
     final AsyncValue<List<ReadingIPlus1Match>> iPlus1Async =
@@ -285,8 +285,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       borderRadius: BorderRadius.circular(16),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
-                        onTap: () =>
-                            context.push(SGRoute.vocabularyPlacement.route),
+                        onTap: () => context.push(SGRoute.growth.route),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
@@ -311,7 +310,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                                 ),
                               ),
                               text(
-                                placementEstimate == null ? '去测评' : '更新',
+                                placementEstimate == null ? '去看进步' : '进步',
                                 13,
                                 color: accent,
                                 bold: true,
