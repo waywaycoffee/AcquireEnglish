@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AcquireEnglish 运营后台</title>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="./styles.css?v=20261125e" />
+  <link rel="stylesheet" href="./styles.css?v=20261126a" />
 </head>
 <body>
   <div id="loginView" class="shell login-shell hidden">
@@ -186,6 +186,19 @@
     </section>
   </div>
 
-  <script src="./app.js?v=20261125e"></script>
+  <div id="notifyHost" class="notify-host" aria-live="polite"></div>
+  <div id="newUserModal" class="modal-backdrop hidden" role="dialog" aria-modal="true">
+    <div class="modal-card">
+      <p class="eyebrow">新用户注册</p>
+      <h2 id="newUserModalTitle">有新用户注册</h2>
+      <div id="newUserModalBody" class="modal-body"></div>
+      <div class="modal-actions">
+        <button id="newUserModalDismiss" class="btn ghost" type="button">知道了</button>
+        <button id="newUserModalOpen" class="btn primary" type="button">查看用户</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="./app.js?v=20261126a"></script>
 </body>
 </html>

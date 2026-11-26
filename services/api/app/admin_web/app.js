@@ -1,7 +1,9 @@
 (() => {
   const TOKEN_KEY = "ae_admin_token";
   const USER_KEY = "ae_admin_username";
+  const LAST_USER_ID_KEY = "ae_admin_last_seen_user_id";
   const TOKEN_FILENAME = "acquireenglish-admin-login.token";
+  const NEW_USER_POLL_MS = 30000;
   // Keep in sync with services/api/app/services/commerce/catalog.py MODULE_DEFS.
   const MODULE_DEFS = [
     { code: "exam_reading", title: "考试阅读" },
@@ -36,7 +38,9 @@
     selectedId: null,
     skus: [],
     tab: "dashboard",
+    pendingNewUsers: [],
   };
+  let userWatchTimer = null;
 
   const $ = (id) => document.getElementById(id);
   const loginView = $("loginView");
@@ -214,6 +218,146 @@
   function showApp() {
     loginView.classList.add("hidden");
     appView.classList.remove("hidden");
+  }
+
+  function pushToast(title, body, onOpen) {
+    const host = $("notifyHost");
+    if (!host) return;
+    const el = document.createElement("div");
+    el.className = "notify-toast";
+    el.innerHTML = `<strong>${escapeHtml(title)}</strong><p class="muted">${escapeHtml(body)}</p>`;
+    if (typeof onOpen === "function") {
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.textContent = "查看";
+      btn.addEventListener("click", () => {
+        el.remove();
+        onOpen();
+      });
+      el.appendChild(btn);
+    }
+    host.appendChild(el);
+    window.setTimeout(() => {
+      if (el.isConnected) el.remove();
+    }, 12000);
+  }
+
+  function hideNewUserModal() {
+    const modal = $("newUserModal");
+    if (modal) modal.classList.add("hidden");
+    state.pendingNewUsers = [];
+  }
+
+  function openPendingNewUsers() {
+    const users = state.pendingNewUsers.slice();
+    hideNewUserModal();
+    if (!users.length) return;
+    const newest = users[users.length - 1];
+    setTab("users");
+    state.q = "";
+    state.offset = 0;
+    if ($("searchInput")) $("searchInput").value = "";
+    state.selectedId = newest.id;
+    loadUsers()
+      .then(() => loadDetail(newest.id))
+      .catch((err) => alert(err.message));
+  }
+
+  function showNewUserPopup(users) {
+    if (!users || !users.length) return;
+    state.pendingNewUsers = users.slice();
+    const modal = $("newUserModal");
+    const title = $("newUserModalTitle");
+    const body = $("newUserModalBody");
+    if (!modal || !title || !body) {
+      const first = users[0];
+      alert(
+        users.length === 1
+          ? `新用户注册：${first.display_name || first.email || `#${first.id}`}`
+          : `有 ${users.length} 位新用户注册`
+      );
+      return;
+    }
+    title.textContent =
+      users.length === 1 ? "有新用户注册" : `有 ${users.length} 位新用户注册`;
+    body.innerHTML = users
+      .map((u) => {
+        const name = u.display_name || u.email || `用户 #${u.id}`;
+        const serial = u.member_no ? ` · ${u.member_no}` : "";
+        return `<div class="modal-user">
+          <strong>${escapeHtml(name)}${escapeHtml(serial)}</strong>
+          <div class="muted">ID ${u.id} · ${escapeHtml(u.email || "—")}</div>
+          <div class="muted">注册时间 ${escapeHtml(formatDateTime(u.created_at))}</div>
+        </div>`;
+      })
+      .join("");
+    modal.classList.remove("hidden");
+    const newest = users[users.length - 1];
+    pushToast(
+      users.length === 1 ? "新用户注册" : `${users.length} 位新用户`,
+      `${newest.display_name || newest.email || `#${newest.id}`}${
+        newest.member_no ? ` · ${newest.member_no}` : ""
+      }`,
+      openPendingNewUsers
+    );
+    if (window.Notification && Notification.permission === "granted") {
+      try {
+        new Notification("AcquireEnglish 运营后台", {
+          body:
+            users.length === 1
+              ? `新用户：${newest.display_name || newest.email || `#${newest.id}`}`
+              : `有 ${users.length} 位新用户注册`,
+        });
+      } catch {
+        /* ignore */
+      }
+    }
+  }
+
+  async function pollNewRegistrations({ seedOnly = false } = {}) {
+    if (!state.token) return;
+    try {
+      const data = await api("/users?limit=12&offset=0");
+      const items = Array.isArray(data.items) ? data.items : [];
+      if (!items.length) return;
+      const newestId = Math.max(...items.map((u) => Number(u.id) || 0));
+      const raw = localStorage.getItem(LAST_USER_ID_KEY);
+      const lastSeen = raw ? Number(raw) : 0;
+      if (seedOnly || !lastSeen || Number.isNaN(lastSeen)) {
+        localStorage.setItem(LAST_USER_ID_KEY, String(newestId));
+        return;
+      }
+      const fresh = items
+        .filter((u) => Number(u.id) > lastSeen)
+        .sort((a, b) => Number(a.id) - Number(b.id));
+      if (!fresh.length) return;
+      localStorage.setItem(LAST_USER_ID_KEY, String(newestId));
+      showNewUserPopup(fresh);
+      if (state.tab === "users") {
+        loadUsers().catch(() => {});
+      }
+    } catch (err) {
+      console.warn("pollNewRegistrations", err);
+    }
+  }
+
+  function startUserRegistrationWatch() {
+    stopUserRegistrationWatch();
+    pollNewRegistrations({ seedOnly: true }).finally(() => {
+      userWatchTimer = window.setInterval(() => {
+        pollNewRegistrations({ seedOnly: false });
+      }, NEW_USER_POLL_MS);
+    });
+    if (window.Notification && Notification.permission === "default") {
+      Notification.requestPermission().catch(() => {});
+    }
+  }
+
+  function stopUserRegistrationWatch() {
+    if (userWatchTimer) {
+      window.clearInterval(userWatchTimer);
+      userWatchTimer = null;
+    }
   }
 
   function setTab(tab) {
@@ -816,6 +960,8 @@
     }
   }
   function logout() {
+    stopUserRegistrationWatch();
+    hideNewUserModal();
     state.token = "";
     localStorage.removeItem(TOKEN_KEY);
     $("passwordInput").value = "";
@@ -866,6 +1012,7 @@
       loadCommunityPosts().catch((e) => console.warn(e));
     }
     if (state.selectedId) await loadDetail(state.selectedId);
+    startUserRegistrationWatch();
   }
 
   function formatBytes(n) {
@@ -2420,6 +2567,14 @@
     commerceState.offset = 0;
     loadCommerce().catch((err) => alert(err.message));
   });
+  on("newUserModalDismiss", "click", () => hideNewUserModal());
+  on("newUserModalOpen", "click", () => openPendingNewUsers());
+  const newUserModal = $("newUserModal");
+  if (newUserModal) {
+    newUserModal.addEventListener("click", (ev) => {
+      if (ev.target === newUserModal) hideNewUserModal();
+    });
+  }
 
   // Always show login gate (username + password + token). Prefill account/token only.
   showLogin();
