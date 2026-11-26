@@ -8,7 +8,8 @@ import shutil
 from datetime import datetime, timezone
 from pathlib import Path
 
-from parse_audio import find_pdf, scan_audio_folder
+from parse_audio import scan_audio_folder
+from scan_local import _pick_pdf
 
 
 def build_package(
@@ -28,7 +29,9 @@ def build_package(
 ) -> dict:
     source = source.resolve()
     tracks = scan_audio_folder(source)
-    pdf = find_pdf(source)
+    pdf = _pick_pdf(source)
+    if pdf is None:
+        raise FileNotFoundError(f"目录中没有 PDF：{source}")
 
     package = out_dir / book_id
     if package.exists():
