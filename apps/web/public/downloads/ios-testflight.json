@@ -1,10 +1,10 @@
 {
   "app_name": "爱快英语",
   "bundle_id": "com.acquire.english",
-  "version": "0.2.273",
-  "build": 296,
+  "version": "0.2.274",
+  "build": 297,
   "status": "pending_external_testing",
   "join_url": "https://testflight.apple.com/join/DYKYp3HP",
-  "notes": "新版安装资格以 TestFlight 显示为准。包含 iPad 大屏阅读和口语布局。",
-  "updated_at": "2026-11-26T17:24:00+08:00"
+  "notes": "包含背词发音、释义补查和卡片布局改进。可安装版本以 TestFlight 显示为准。",
+  "updated_at": "2026-11-26T21:20:33+08:00"
 }
