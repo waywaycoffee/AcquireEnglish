@@ -796,6 +796,161 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       });
     }
 
+    final Widget progressHeader = Padding(
+      padding: EdgeInsets.fromLTRB(
+        compact ? 28 : 64,
+        16,
+        compact ? 28 : 64,
+        0,
+      ),
+      child: Center(
+        child: ConstrainedBox(
+          constraints: const BoxConstraints(maxWidth: 840),
+          child: Column(
+            children: <Widget>[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: <Widget>[
+                  Text(
+                    finished
+                        ? (widget.practice
+                              ? '本轮已练习完'
+                              : '今天的复习，完成了')
+                        : '${widget.practice ? '自由练习' : '计划复习'} · ${index < 0 ? completed + 1 : index + 1}/${keys.length}',
+                    key: const Key('daily-review-session-progress'),
+                    style: const TextStyle(
+                      fontWeight: FontWeight.w800,
+                      color: ReviewRecallTheme.textPrimary,
+                    ),
+                  ),
+                  if (!finished)
+                    Text(
+                      '还剩 ${keys.length - completed}',
+                      style: const TextStyle(
+                        color: ReviewRecallTheme.textSecondary,
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              LinearProgressIndicator(
+                value: keys.isEmpty ? 0 : completed / keys.length,
+                minHeight: 6,
+                borderRadius: BorderRadius.circular(6),
+                backgroundColor: ReviewRecallTheme.border,
+                color: ReviewRecallTheme.lime,
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+
+    if (!finished && visible != null) {
+      return Column(
+        children: <Widget>[
+          progressHeader,
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                compact ? 12 : 32,
+                16,
+                compact ? 12 : 32,
+                8,
+              ),
+              child: Center(
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 840),
+                  child: AnimatedSwitcher(
+                    duration: duration,
+                    layoutBuilder:
+                        (Widget? currentChild, List<Widget> previousChildren) =>
+                            currentChild ?? const SizedBox.shrink(),
+                    switchInCurve: Curves.easeOutCubic,
+                    switchOutCurve: Curves.easeOutCubic,
+                    transitionBuilder:
+                        (Widget child, Animation<double> animation) =>
+                            FadeTransition(
+                              opacity: animation,
+                              child: SlideTransition(
+                                position: Tween<Offset>(
+                                  begin: Offset(_forward ? 0.06 : -0.06, 0),
+                                  end: Offset.zero,
+                                ).animate(animation),
+                                child: child,
+                              ),
+                            ),
+                    child: KeyedSubtree(
+                      key: ValueKey<String>(_currentKey!),
+                      child: _buildStudy(
+                        byKey[_currentKey]!,
+                        state.records[_currentKey]!,
+                        fillViewport: true,
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          SafeArea(
+            top: false,
+            child: Padding(
+              padding: EdgeInsets.fromLTRB(
+                compact ? 24 : 40,
+                8,
+                compact ? 24 : 40,
+                16,
+              ),
+              child: Center(
+                heightFactor: 1,
+                child: ConstrainedBox(
+                  constraints: const BoxConstraints(maxWidth: 776),
+                  child: Row(
+                    children: <Widget>[
+                      OutlinedButton.icon(
+                        key: const Key('daily-review-previous'),
+                        onPressed: _saving || index <= 0
+                            ? null
+                            : () => _moveCard(-1, keys),
+                        icon: const Icon(Icons.chevron_left_rounded),
+                        label: const Text('上一张'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                        ),
+                      ),
+                      Expanded(
+                        child: Text(
+                          '${index + 1} / ${keys.length}',
+                          textAlign: TextAlign.center,
+                          style: TextStyle(
+                            fontWeight: FontWeight.w800,
+                            color: AppDesignTokens.textSecondary,
+                          ),
+                        ),
+                      ),
+                      OutlinedButton.icon(
+                        key: const Key('daily-review-next'),
+                        onPressed: _saving || index >= keys.length - 1
+                            ? null
+                            : () => _moveCard(1, keys),
+                        iconAlignment: IconAlignment.end,
+                        icon: const Icon(Icons.chevron_right_rounded),
+                        label: const Text('下一张'),
+                        style: OutlinedButton.styleFrom(
+                          minimumSize: const Size(0, 48),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+          ),
+        ],
+      );
+    }
+
     return Column(
       children: <Widget>[
         Expanded(
@@ -804,61 +959,19 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             controller: _sessionScroll,
             padding: EdgeInsets.fromLTRB(
               compact ? 12 : 32,
-              16,
+              0,
               compact ? 12 : 32,
               compact ? 16 : 32,
             ),
             children: <Widget>[
+              progressHeader,
+              const SizedBox(height: 28),
               Center(
                 child: ConstrainedBox(
                   constraints: const BoxConstraints(maxWidth: 840),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.stretch,
                     children: <Widget>[
-                      Padding(
-                        padding: EdgeInsets.symmetric(
-                          horizontal: compact ? 16 : 32,
-                        ),
-                        child: Column(
-                          children: <Widget>[
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: <Widget>[
-                                Text(
-                                  finished
-                                      ? (widget.practice
-                                            ? '本轮已练习完'
-                                            : '今天的复习，完成了')
-                                      : '${widget.practice ? '自由练习' : '计划复习'} · ${index < 0 ? completed + 1 : index + 1}/${keys.length}',
-                                  key: const Key(
-                                    'daily-review-session-progress',
-                                  ),
-                                  style: const TextStyle(
-                                    fontWeight: FontWeight.w800,
-                                    color: ReviewRecallTheme.textPrimary,
-                                  ),
-                                ),
-                                if (!finished)
-                                  Text(
-                                    '还剩 ${keys.length - completed}',
-                                    style: const TextStyle(
-                                      color: ReviewRecallTheme.textSecondary,
-                                    ),
-                                  ),
-                              ],
-                            ),
-                            const SizedBox(height: 12),
-                            LinearProgressIndicator(
-                              value: keys.isEmpty ? 0 : completed / keys.length,
-                              minHeight: 6,
-                              borderRadius: BorderRadius.circular(6),
-                              backgroundColor: ReviewRecallTheme.border,
-                              color: ReviewRecallTheme.lime,
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 28),
                       if (finished)
                         Padding(
                           padding: EdgeInsets.symmetric(
@@ -1041,81 +1154,6 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                               ],
                             ),
                           ),
-                        )
-                      else
-                        Stack(
-                          children: <Widget>[
-                            Positioned.fill(
-                              top: 24,
-                              bottom: 24,
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.stretch,
-                                children: <Widget>[
-                                  Expanded(
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        color: AppDesignTokens.isDark
-                                            ? const Color(0xFF1C3038)
-                                            : const Color(0xFFE9F3E0),
-                                        borderRadius: BorderRadius.circular(24),
-                                      ),
-                                    ),
-                                  ),
-                                  const SizedBox(width: 40),
-                                  Expanded(
-                                    child: DecoratedBox(
-                                      decoration: BoxDecoration(
-                                        color: AppDesignTokens.isDark
-                                            ? const Color(0xFF1C3038)
-                                            : const Color(0xFFE9F3E0),
-                                        borderRadius: BorderRadius.circular(24),
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                            Padding(
-                              padding: EdgeInsets.symmetric(
-                                horizontal: compact ? 14 : 32,
-                              ),
-                              child: AnimatedSwitcher(
-                                duration: duration,
-                                layoutBuilder:
-                                    (
-                                      Widget? currentChild,
-                                      List<Widget> previousChildren,
-                                    ) =>
-                                        currentChild ?? const SizedBox.shrink(),
-                                switchInCurve: Curves.easeOutCubic,
-                                switchOutCurve: Curves.easeOutCubic,
-                                transitionBuilder:
-                                    (
-                                      Widget child,
-                                      Animation<double> animation,
-                                    ) => FadeTransition(
-                                      opacity: animation,
-                                      child: SlideTransition(
-                                        position: Tween<Offset>(
-                                          begin: Offset(
-                                            _forward ? 0.06 : -0.06,
-                                            0,
-                                          ),
-                                          end: Offset.zero,
-                                        ).animate(animation),
-                                        child: child,
-                                      ),
-                                    ),
-                                child: KeyedSubtree(
-                                  key: ValueKey<String>(_currentKey!),
-                                  child: _buildStudy(
-                                    byKey[_currentKey]!,
-                                    state.records[_currentKey]!,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
                         ),
                     ],
                   ),
@@ -1124,61 +1162,6 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
             ],
           ),
         ),
-        if (!finished)
-          SafeArea(
-            top: false,
-            child: Padding(
-              padding: EdgeInsets.fromLTRB(
-                compact ? 24 : 40,
-                12,
-                compact ? 24 : 40,
-                20,
-              ),
-              child: Center(
-                heightFactor: 1,
-                child: ConstrainedBox(
-                  constraints: const BoxConstraints(maxWidth: 776),
-                  child: Row(
-                    children: <Widget>[
-                      OutlinedButton.icon(
-                        key: const Key('daily-review-previous'),
-                        onPressed: _saving || index <= 0
-                            ? null
-                            : () => _moveCard(-1, keys),
-                        icon: const Icon(Icons.chevron_left_rounded),
-                        label: const Text('上一张'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                        ),
-                      ),
-                      Expanded(
-                        child: Text(
-                          '${index + 1} / ${keys.length}',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(
-                            fontWeight: FontWeight.w800,
-                            color: AppDesignTokens.textSecondary,
-                          ),
-                        ),
-                      ),
-                      OutlinedButton.icon(
-                        key: const Key('daily-review-next'),
-                        onPressed: _saving || index >= keys.length - 1
-                            ? null
-                            : () => _moveCard(1, keys),
-                        iconAlignment: IconAlignment.end,
-                        icon: const Icon(Icons.chevron_right_rounded),
-                        label: const Text('下一张'),
-                        style: OutlinedButton.styleFrom(
-                          minimumSize: const Size(0, 48),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          ),
       ],
     );
   }
@@ -1601,7 +1584,11 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     );
   }
 
-  Widget _buildStudy(ReviewSource rawSource, ReviewRecord record) {
+  Widget _buildStudy(
+    ReviewSource rawSource,
+    ReviewRecord record, {
+    bool fillViewport = false,
+  }) {
     final ReviewSource source = _displaySource(rawSource);
     final WordReviewSettings options = ref.watch(wordReviewSettingsProvider);
     final bool word = source.kind == ReviewKind.word;
@@ -1665,14 +1652,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               ? ' · ${mode.label} ${_modeStep + 1}/${modes.length}'
               : ' · ${mode.label}')
         : '';
-    return _ReviewSurface(
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          minHeight: word ? 0 : (MediaQuery.sizeOf(context).width < 600 ? 320 : 380),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: <Widget>[
+    final bool compactPhone = MediaQuery.sizeOf(context).width < 600;
+    final double sectionGap = fillViewport && compactPhone ? 10 : 20;
+    final bool stickyRatings = fillViewport &&
+        !completed &&
+        !_retryWord &&
+        !choiceMode &&
+        ((_revealed && !widget.practice) || speakStage);
+    final List<Widget> studyChildren = <Widget>[
             Row(
               children: <Widget>[
                 Expanded(
@@ -1706,7 +1693,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   fontWeight: FontWeight.w700,
                 ),
               ),
-            const SizedBox(height: 20),
+            SizedBox(height: sectionGap),
             Text(
               speakStage
                   ? '听示范后跟读，再自评发音把握'
@@ -1720,7 +1707,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               textAlign: TextAlign.center,
               style: TextStyle(fontSize: 14, color: Color(0xFF626262)),
             ),
-            const SizedBox(height: 18),
+            SizedBox(height: fillViewport && compactPhone ? 12 : 18),
             if (word &&
                 (_revealed ||
                     (!listenStage && !useCloze && !contrastStage)))
@@ -1883,14 +1870,16 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   color: AppDesignTokens.textSecondary,
                 ),
               ),
-              const SizedBox(height: 16),
-              _ratingButtons(
-                source: source,
-                record: record,
-                now: now,
-                practice: widget.practice,
-                speakHints: true,
-              ),
+              if (!stickyRatings) ...<Widget>[
+                const SizedBox(height: 16),
+                _ratingButtons(
+                  source: source,
+                  record: record,
+                  now: now,
+                  practice: widget.practice,
+                  speakHints: true,
+                ),
+              ],
               if (_saving)
                 const Padding(
                   padding: EdgeInsets.only(top: 12),
@@ -2105,7 +2094,8 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               if (!completed &&
                   !_retryWord &&
                   !choiceMode &&
-                  !widget.practice) ...<Widget>[
+                  !widget.practice &&
+                  !stickyRatings) ...<Widget>[
                 const SizedBox(height: 16),
                 const Text(
                   '按真实回忆情况选择',
@@ -2157,18 +2147,93 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   child: LinearProgressIndicator(),
                 ),
             ],
-            const SizedBox(height: 20),
+            if (!stickyRatings) ...<Widget>[
+              const SizedBox(height: 20),
+              Text(
+                completed
+                    ? (widget.practice
+                          ? '本轮已练习，不影响原有复习计划'
+                          : '已完成，这张卡片的进度已保存')
+                    : widget.practice
+                    ? '先回忆，再揭晓；随时都能再练一轮'
+                    : '先回忆，再揭晓；如实反馈就好',
+                textAlign: TextAlign.center,
+                style: TextStyle(fontSize: 12, color: Color(0xFF626262)),
+              ),
+            ],
+    ];
+
+    final List<Widget> stickyFooter = stickyRatings
+        ? <Widget>[
+            const Divider(height: 16),
             Text(
-              completed
-                  ? (widget.practice ? '本轮已练习，不影响原有复习计划' : '已完成，这张卡片的进度已保存')
-                  : widget.practice
-                  ? '先回忆，再揭晓；随时都能再练一轮'
-                  : '先回忆，再揭晓；如实反馈就好',
-              textAlign: TextAlign.center,
-              style: TextStyle(fontSize: 12, color: Color(0xFF626262)),
+              speakStage ? '按真实跟读情况选择' : '按真实回忆情况选择',
+              style: const TextStyle(
+                fontSize: 13,
+                height: 1.4,
+                fontWeight: FontWeight.w700,
+                color: ReviewRecallTheme.textSecondary,
+              ),
             ),
-          ],
+            const SizedBox(height: 8),
+            _ratingButtons(
+              source: source,
+              record: record,
+              now: now,
+              practice: widget.practice,
+              speakHints: speakStage,
+            ),
+            const SizedBox(height: 4),
+            const Text(
+              '点一下即保存并进入下一条。',
+              style: TextStyle(
+                fontSize: 11,
+                color: ReviewRecallTheme.textMuted,
+              ),
+            ),
+            if (widget.journeyReview && !speakStage) ...<Widget>[
+              const SizedBox(height: 8),
+              OutlinedButton(
+                onPressed: _saving
+                    ? null
+                    : () => _leaveSession(journeyCompleted: true),
+                child: const Text('跳过剩余 · 去学新'),
+              ),
+            ],
+          ]
+        : const <Widget>[];
+
+    final Widget body = Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: studyChildren,
+    );
+
+    if (!fillViewport) {
+      return _ReviewSurface(
+        child: ConstrainedBox(
+          constraints: BoxConstraints(
+            minHeight: word
+                ? 0
+                : (compactPhone ? 320 : 380),
+          ),
+          child: body,
         ),
+      );
+    }
+
+    return _ReviewSurface(
+      compact: compactPhone,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.only(bottom: stickyFooter.isEmpty ? 8 : 4),
+              child: body,
+            ),
+          ),
+          if (stickyFooter.isNotEmpty) ...stickyFooter,
+        ],
       ),
     );
   }
@@ -3313,18 +3378,26 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
 final ButtonStyle _primaryButtonStyle = ReviewRecallTheme.primaryButton;
 
 class _ReviewSurface extends StatelessWidget {
-  const _ReviewSurface({required this.child});
+  const _ReviewSurface({required this.child, this.compact = false});
   final Widget child;
+  final bool compact;
   @override
-  Widget build(BuildContext context) => Container(
-    padding: EdgeInsets.all(MediaQuery.sizeOf(context).width < 600 ? 22 : 32),
-    decoration: BoxDecoration(
-      color: ReviewRecallTheme.card,
-      borderRadius: BorderRadius.circular(24),
-      border: Border.all(color: ReviewRecallTheme.border.withValues(alpha: 0.7)),
-    ),
-    child: child,
-  );
+  Widget build(BuildContext context) {
+    final bool narrow = MediaQuery.sizeOf(context).width < 600;
+    return Container(
+      padding: EdgeInsets.all(
+        compact || narrow ? (compact ? 14.0 : 18.0) : 32,
+      ),
+      decoration: BoxDecoration(
+        color: ReviewRecallTheme.card,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(
+          color: ReviewRecallTheme.border.withValues(alpha: 0.7),
+        ),
+      ),
+      child: child,
+    );
+  }
 }
 
 class _ReviewMetric extends StatelessWidget {
