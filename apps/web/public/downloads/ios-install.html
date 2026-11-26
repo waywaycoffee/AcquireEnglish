@@ -130,7 +130,7 @@
         不会技术也没关系。因为 App 还没上苹果商店，需要先装一个苹果官方小工具，再点一次按钮。
         下面每一步都有图，照着点就行。
       </p>
-      <p><span class="ver" id="ver-badge">当前内测版 0.2.268+289</span></p>
+      <p><span class="ver" id="ver-badge">可安装版本以 TestFlight 为准</span></p>
 
       <div class="warn">
         <strong>先看这张图：必须用 Safari 打开本页</strong>
@@ -245,8 +245,10 @@
           });
           const data = await res.json();
           if (data.version && data.build) {
-            ver.textContent =
-              "当前内测版 " + data.version + "+" + data.build;
+            const build = data.version + "+" + data.build;
+            ver.textContent = data.status === "pending_external_testing"
+              ? "新版 " + build + " 待开放测试"
+              : "当前内测版 " + build;
           }
           const url = (data.join_url || "").trim();
           if (url) {

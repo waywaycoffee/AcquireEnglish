@@ -1,11 +1,11 @@
 {
-  "version": "0.2.272",
-  "version_code": 293,
-  "apk_name": "AcquireEnglish-android-0.2.272+293.apk",
+  "version": "0.2.273",
+  "version_code": 296,
+  "apk_name": "AcquireEnglish-android-0.2.273+296.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "7459836d6b64cf0d7f0367ba6972edc9f84bec6fd20490f6cfac90c9c51a744a",
+  "sha256": "2e473ef3ec1fcf68863860b06fc621251392a99bff19f0047e2d86157ae31641",
   "force": true,
   "min_version_code": 293,
-  "notes": "必须更新：修复进社区后底栏消失；进社区仍可回到学习",
-  "published_at": "2026-11-26T16:30:00+08:00"
+  "notes": "更新推荐视频和免费学习素材。收藏的单词、短语和句子可在每日复习中按 FSRS 排程学习。",
+  "published_at": "2026-11-26T17:22:34+08:00"
 }
