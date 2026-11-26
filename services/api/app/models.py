@@ -314,6 +314,45 @@ class SharedBilibiliSubtitle(Base):
     )
 
 
+class SharedMediaSubtitle(Base):
+    """Reusable subtitle pack keyed by a real media-file fingerprint.
+
+    ``file_hash`` stores the four-block Shooter/subfinder fingerprint.  Unlike
+    the Bilibili cache this works for MKV/MP4 files from a user's own netdisk.
+    """
+
+    __tablename__ = "shared_media_subtitles"
+    __table_args__ = (
+        UniqueConstraint(
+            "file_hash", "language", name="uq_shared_media_hash_language"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    file_hash: Mapped[str] = mapped_column(String(160), index=True)
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
+    duration_sec: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    title: Mapped[str] = mapped_column(String(512), default="")
+    season: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    episode: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    language: Mapped[str] = mapped_column(String(16), default="en")
+    subtitle_srt: Mapped[str] = mapped_column(Text)
+    cue_count: Mapped[int] = mapped_column(Integer, default=0)
+    quality_score: Mapped[float] = mapped_column(Float, default=0.0)
+    source_origin: Mapped[str] = mapped_column(String(32), default="subfinder")
+    source_ref: Mapped[str] = mapped_column(String(1024), default="")
+    hit_count: Mapped[int] = mapped_column(Integer, default=0)
+    uploader_user_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="SET NULL"), nullable=True, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
 class UserLinkCourse(Base):
     """YouTube / Bilibili paste-link imports owned by a user."""
 

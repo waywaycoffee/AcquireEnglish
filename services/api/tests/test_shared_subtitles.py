@@ -15,7 +15,8 @@ from httpx import ASGITransport, AsyncClient
 import app.models  # noqa: F401
 from app.database import Base, SessionLocal, engine
 from app.main import app as fastapi_app
-from app.models import SharedBilibiliSubtitle
+from app.models import SharedBilibiliSubtitle, SharedMediaSubtitle
+from app.services.online_subtitles import compute_subfinder_hash
 from app.shared_subtitle_quality import evaluate_shared_pack
 
 
@@ -94,6 +95,70 @@ def test_quality_accepts_good_pack():
     assert result.passed is True
     assert result.score >= 0.55
     assert result.cue_count == 10
+
+
+@pytest.mark.asyncio
+async def test_remote_subfinder_hash_reads_only_four_blocks():
+    import hashlib
+    import httpx
+
+    size = 30_000
+    payload = bytes((i % 251 for i in range(size)))
+    seen: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        raw = request.headers["range"]
+        seen.append(raw)
+        start, end = (int(v) for v in raw.removeprefix("bytes=").split("-"))
+        return httpx.Response(
+            206,
+            content=payload[start : end + 1],
+            headers={"Content-Range": f"bytes {start}-{end}/{size}"},
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        actual = await compute_subfinder_hash(
+            "https://example.test/video.mkv", size, client=client
+        )
+    positions = [4096, size // 3 * 2, size // 3, size - 8192]
+    expected = ";".join(
+        hashlib.md5(payload[pos : pos + 4096]).hexdigest() for pos in positions
+    )
+    assert actual == expected
+    assert len(seen) == 4
+
+
+@pytest.mark.asyncio
+async def test_get_shared_media_subtitle_by_fingerprint():
+    media_hash = ";".join(["a" * 32, "b" * 32, "c" * 32, "d" * 32])
+    async with SessionLocal() as db:
+        db.add(
+            SharedMediaSubtitle(
+                file_hash=media_hash,
+                file_size=123456,
+                duration_sec=20,
+                title="Friends S01E01",
+                season=1,
+                episode=1,
+                language="en",
+                subtitle_srt=_sample_en_srt(),
+                cue_count=8,
+                quality_score=0.9,
+                source_origin="subfinder",
+            )
+        )
+        await db.commit()
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        response = await client.get(
+            "/api/shared-subtitles/media",
+            params={"file_hash": media_hash, "language": "en"},
+        )
+    assert response.status_code == 200, response.text
+    body = response.json()
+    assert body["title"] == "Friends S01E01"
+    assert body["episode"] == 1
+    assert "Hello world" in body["subtitle_srt"]
 
 
 @pytest.mark.asyncio

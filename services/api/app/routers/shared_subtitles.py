@@ -9,7 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.database import get_db
 from app.deps import get_current_user
-from app.models import SharedBilibiliSubtitle, User, UserLinkCourse
+from app.models import SharedBilibiliSubtitle, SharedMediaSubtitle, User, UserLinkCourse
 from app.shared_subtitle_store import (
     get_shared_bilibili_pack,
     preview_zh_from_srt,
@@ -77,6 +77,20 @@ class SharedBilibiliSubtitleListOut(BaseModel):
     items: list[SharedBilibiliSubtitleListItem]
 
 
+class SharedMediaSubtitleOut(BaseModel):
+    file_hash: str
+    file_size: int | None = None
+    duration_sec: int | None = None
+    title: str = ""
+    season: int | None = None
+    episode: int | None = None
+    language: str
+    subtitle_srt: str
+    cue_count: int = 0
+    quality_score: float = 0.0
+    source_origin: str = "subfinder"
+
+
 def _identity_title(row: SharedBilibiliSubtitle) -> str:
     title = (row.title or "").strip()
     if title:
@@ -134,6 +148,37 @@ def _list_item(row: SharedBilibiliSubtitle) -> SharedBilibiliSubtitleListItem:
         source_origin=row.source_origin or "asr",
         en_hits=int(row.en_hits or 0),
         zh_hits=int(row.zh_hits or 0),
+    )
+
+
+@router.get("/media", response_model=SharedMediaSubtitleOut)
+async def get_shared_media_subtitle_by_hash(
+    file_hash: str = Query(min_length=32, max_length=160),
+    language: str = Query(default="en", pattern=r"^(en|zh)$"),
+    db: AsyncSession = Depends(get_db),
+) -> SharedMediaSubtitleOut:
+    row = await db.scalar(
+        select(SharedMediaSubtitle).where(
+            SharedMediaSubtitle.file_hash == file_hash,
+            SharedMediaSubtitle.language == language,
+        )
+    )
+    if row is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Not found")
+    row.hit_count = int(row.hit_count or 0) + 1
+    await db.commit()
+    return SharedMediaSubtitleOut(
+        file_hash=row.file_hash,
+        file_size=row.file_size,
+        duration_sec=row.duration_sec,
+        title=row.title or "",
+        season=row.season,
+        episode=row.episode,
+        language=row.language,
+        subtitle_srt=row.subtitle_srt,
+        cue_count=int(row.cue_count or 0),
+        quality_score=float(row.quality_score or 0),
+        source_origin=row.source_origin or "subfinder",
     )
 
 
