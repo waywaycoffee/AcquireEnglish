@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../daily_path/presentation/today_path_card.dart';
 import '../../digital_human/presentation/digital_human_picker.dart';
 import '../../drama/data/drama_cover_cache.dart';
 import '../../exam/domain/exam_profile.dart';
@@ -377,9 +378,19 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       ),
                     ),
                     const SizedBox(height: 24),
+                    const TodayActivityCard(),
+                    const SizedBox(height: 12),
                     KeyedSubtree(
                       key: _vocabKey,
-                      child: const TodayActivityCard(),
+                      child: ExpansionTile(
+                        initiallyExpanded: false,
+                        title: const Text('之前学过的 · 课程与复习'),
+                        subtitle: Text(
+                          '接着上次的课、到期复习、词书进度',
+                          style: TextStyle(color: muted, fontSize: 12),
+                        ),
+                        children: const <Widget>[TodayPathCard()],
+                      ),
                     ),
                     const SizedBox(height: 24),
                     const SizedBox(height: 20),
