@@ -1,11 +1,11 @@
 {
-  "version": "0.2.268",
-  "version_code": 289,
-  "apk_name": "AcquireEnglish-android-0.2.268+289.apk",
+  "version": "0.2.269",
+  "version_code": 290,
+  "apk_name": "AcquireEnglish-android-0.2.269+290.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "58c2fdee0177a9e0e296959f753f8f9bfd89cd32aea458751c129d5867919a40",
+  "sha256": "1b63de0c1c6f84a97e23f8ad56d8119f23c1ae9e4958e682feb2d3bc37ed2d84",
   "force": true,
-  "min_version_code": 289,
-  "notes": "必须更新：与 iOS TestFlight 同步到 0.2.268；含首页推荐喜欢询问、阅读/模块句尾修复、数字人流畅问答",
-  "published_at": "2026-11-26T13:45:00+08:00"
+  "min_version_code": 290,
+  "notes": "必须更新：修复微信登录/注册（正式 AppID）；请重新下载安装后再用微信开号",
+  "published_at": "2026-11-26T15:05:00+08:00"
 }
