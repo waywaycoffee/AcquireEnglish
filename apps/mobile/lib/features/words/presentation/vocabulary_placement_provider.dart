@@ -2,14 +2,20 @@ import 'dart:convert';
 
 import 'package:dio/dio.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
+import '../../../constants/endpoints.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../domain/vocabulary_placement_estimate.dart';
 
 typedef PlacementRow = Map<String, dynamic>;
+
+const String _placementQuestionsCacheKey = 'vocabularyPlacementQuestions:v1';
+const String _fallbackAssetPath =
+    'assets/data/vocabulary_placement_fallback.json';
 
 /// Soft gate: estimate + testedAt must both exist.
 bool hasCompletedVocabularyPlacement(PlacementRow profile) =>
@@ -82,10 +88,33 @@ class VocabularyPlacement extends Notifier<PlacementRow> {
     }
   }
 
-  Future<List<PlacementRow>> loadQuestions() => _fetch(
+  Future<List<PlacementRow>> loadQuestions() async {
+    Object? lastError;
+    try {
+      final List<PlacementRow> remote = await _fetch(
         'placement',
         parameters: const <String, dynamic>{'per_band': 18},
       );
+      if (remote.isNotEmpty) {
+        await _cacheQuestions(remote);
+        return remote;
+      }
+    } catch (error) {
+      lastError = error;
+    }
+
+    final List<PlacementRow> cached = _readCachedQuestions();
+    if (cached.isNotEmpty) return cached;
+
+    final List<PlacementRow> bundled = await _loadBundledQuestions();
+    if (bundled.isNotEmpty) return bundled;
+
+    throw StateError(
+      lastError == null
+          ? '词库未返回测试题'
+          : '题目加载失败：${_shortError(lastError)}',
+    );
+  }
 
   Future<void> saveEstimate(int estimate, {bool requireRecommendations = true}) async {
     final String key = _key;
@@ -196,21 +225,73 @@ class VocabularyPlacement extends Notifier<PlacementRow> {
     String endpoint, {
     Map<String, dynamic>? parameters,
   }) async {
+    // Dedicated Dio: avoid MemCacheStore (placement is ORDER BY random())
+    // and use the same generous timeouts as the rest of the app.
     final Dio client = Dio(
       BaseOptions(
         baseUrl: ref.read(learningSettingsProvider).resolvedCloudApiBaseUrl,
-        connectTimeout: const Duration(seconds: 5),
-        receiveTimeout: const Duration(seconds: 8),
+        connectTimeout: Duration(milliseconds: Endpoints.connectionTimeout),
+        receiveTimeout: Duration(milliseconds: Endpoints.receiveTimeout),
+        headers: const <String, dynamic>{'Accept': 'application/json'},
       ),
     );
     try {
-      final Response<List<dynamic>> response = await client.get<List<dynamic>>(
+      final Response<dynamic> response = await client.get<dynamic>(
         'api/public-lexicon/$endpoint',
         queryParameters: parameters,
       );
-      return (response.data ?? const <dynamic>[]).cast<PlacementRow>();
+      return _parseListPayload(response.data);
     } finally {
-      client.close();
+      client.close(force: true);
     }
+  }
+
+  Future<void> _cacheQuestions(List<PlacementRow> rows) async {
+    if (!Hive.isBoxOpen('prefs') || rows.isEmpty) return;
+    try {
+      await Hive.box<String>('prefs').put(
+        _placementQuestionsCacheKey,
+        jsonEncode(rows),
+      );
+    } catch (_) {}
+  }
+
+  List<PlacementRow> _readCachedQuestions() {
+    if (!Hive.isBoxOpen('prefs')) return const <PlacementRow>[];
+    final String? raw =
+        Hive.box<String>('prefs').get(_placementQuestionsCacheKey);
+    if (raw == null || raw.isEmpty) return const <PlacementRow>[];
+    try {
+      return _parseListPayload(jsonDecode(raw));
+    } catch (_) {
+      return const <PlacementRow>[];
+    }
+  }
+
+  Future<List<PlacementRow>> _loadBundledQuestions() async {
+    try {
+      final String raw = await rootBundle.loadString(_fallbackAssetPath);
+      return _parseListPayload(jsonDecode(raw));
+    } catch (_) {
+      return const <PlacementRow>[];
+    }
+  }
+
+  List<PlacementRow> _parseListPayload(Object? data) {
+    if (data is! List) return const <PlacementRow>[];
+    return data
+        .whereType<Map>()
+        .map((Map row) => Map<String, dynamic>.from(row))
+        .toList(growable: false);
+  }
+
+  String _shortError(Object error) {
+    if (error is DioException) {
+      final int? code = error.response?.statusCode;
+      if (code != null) return 'HTTP $code';
+      return error.type.name;
+    }
+    final String text = error.toString();
+    return text.length > 80 ? '${text.substring(0, 80)}…' : text;
   }
 }

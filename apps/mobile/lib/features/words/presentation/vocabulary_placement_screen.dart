@@ -163,10 +163,28 @@ class _VocabularyPlacementScreenState
                     return const CircularProgressIndicator();
                   }
                   if (snapshot.hasError) {
-                    return FilledButton(
-                      onPressed: () =>
-                          setState(() => _engineFuture = _bootstrap()),
-                      child: const Text('题目加载失败，重新加载'),
+                    final String detail = snapshot.error.toString();
+                    return Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: <Widget>[
+                          FilledButton(
+                            onPressed: () => setState(
+                              () => _engineFuture = _bootstrap(),
+                            ),
+                            child: const Text('题目加载失败，重新加载'),
+                          ),
+                          const SizedBox(height: 12),
+                          Text(
+                            detail.length > 160
+                                ? '${detail.substring(0, 160)}…'
+                                : detail,
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.bodySmall,
+                          ),
+                        ],
+                      ),
                     );
                   }
                   final AdaptivePlacementEngine engine = snapshot.requireData;

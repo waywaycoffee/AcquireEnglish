@@ -156,6 +156,7 @@ flutter:
     - assets/reading/
     - assets/courses/
     - assets/translations/
+    - assets/data/
     - assets/img/
     - assets/img/bookshelf/
     - assets/img/digital_human/

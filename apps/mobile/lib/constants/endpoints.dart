@@ -10,12 +10,12 @@ class Endpoints {
   );
 
   /// Ensure trailing slash for Dio path joins (`api/auth/login` etc.).
+  /// Collapses accidental `//` so nginx does not 404 `/api` paths.
   static String normalizeBaseUrl(String raw) {
     final String trimmed = raw.trim();
-    if (trimmed.isEmpty) {
-      return baseUrl.endsWith('/') ? baseUrl : '$baseUrl/';
-    }
-    return trimmed.endsWith('/') ? trimmed : '$trimmed/';
+    final String source = trimmed.isEmpty ? baseUrl : trimmed;
+    final String withoutTrailing = source.replaceFirst(RegExp(r'/+$'), '');
+    return '$withoutTrailing/';
   }
 
   static const int receiveTimeout = 15000;
