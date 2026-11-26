@@ -49,6 +49,7 @@ class _FirstOpenOnboardingScreenState
     final bool hasPlacement = hasCompletedVocabularyPlacement(
       ref.read(vocabularyPlacementProvider),
     );
+    // Offer placement, but it is skippable from that screen.
     if (!hasPlacement) {
       context.go('${SGRoute.vocabularyPlacement.route}?firstOpen=1');
       return;

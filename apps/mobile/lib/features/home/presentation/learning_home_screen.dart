@@ -25,6 +25,7 @@ import '../../reading/data/reading_iplus1.dart';
 import '../../reading/domain/reading_doc.dart';
 import '../../reading/presentation/reading_iplus1_provider.dart';
 import '../../reading/presentation/reading_library_provider.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../../router/app_router.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -65,6 +66,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       unawaited(_pollFingerprintNotifications());
       _maybeStartFeatureTour();
+      unawaited(_maybeRemindVocabularyPlacement());
     });
   }
 
@@ -75,6 +77,44 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
     if (!readOnboardingCompletedSync()) return;
     if (readHomeFeatureTourSeen()) return;
     ref.read(featureTourProvider.notifier).start();
+  }
+
+  Future<void> _maybeRemindVocabularyPlacement() async {
+    if (!mounted) return;
+    final AuthSessionState auth = ref.read(authSessionProvider);
+    if (!auth.isLoggedIn) return;
+    final bool hasPlacement = hasCompletedVocabularyPlacement(
+      ref.read(vocabularyPlacementProvider),
+    );
+    if (!consumeVocabularyPlacementReminder(hasPlacement: hasPlacement)) {
+      return;
+    }
+    final bool? go = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        backgroundColor: AppDesignTokens.appWhite,
+        title: Text(
+          '还没测词汇量',
+          style: TextStyle(color: AppDesignTokens.textPrimary),
+        ),
+        content: Text(
+          '测完后英语之旅的难度会更准。可以现在测，也可以稍后。',
+          style: TextStyle(color: AppDesignTokens.textSecondary),
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(dialogContext).pop(false),
+            child: const Text('稍后'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(dialogContext).pop(true),
+            child: const Text('去测试'),
+          ),
+        ],
+      ),
+    );
+    if (!mounted || go != true) return;
+    await context.push('${SGRoute.vocabularyPlacement.route}?firstOpen=1');
   }
 
   Future<void> _pollFingerprintNotifications() async {
@@ -166,7 +206,13 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
     );
     final SkillEstimate vocabSkill = skillProfile.estimate(LearnerSkill.vocab);
     final String prefsLevel = prefs.level.trim();
+    final bool hasPlacement = hasCompletedVocabularyPlacement(
+      ref.watch(vocabularyPlacementProvider),
+    );
     final String levelLabel = () {
+      if (!hasPlacement) {
+        return '还没测词汇量 · 点这里去测';
+      }
       final String band = vocabSkill.label;
       if (vocabulary != null) {
         return '$band · 词 ≈ $vocabulary';
@@ -285,7 +331,11 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       borderRadius: BorderRadius.circular(16),
                       child: InkWell(
                         borderRadius: BorderRadius.circular(16),
-                        onTap: () => context.push(SGRoute.growth.route),
+                        onTap: () => context.push(
+                          hasPlacement
+                              ? SGRoute.growth.route
+                              : '${SGRoute.vocabularyPlacement.route}?firstOpen=1',
+                        ),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
                             horizontal: 14,
@@ -310,7 +360,9 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                                 ),
                               ),
                               text(
-                                placementEstimate == null ? '去看进步' : '进步',
+                                hasPlacement
+                                    ? '进步'
+                                    : '去测试',
                                 13,
                                 color: accent,
                                 bold: true,

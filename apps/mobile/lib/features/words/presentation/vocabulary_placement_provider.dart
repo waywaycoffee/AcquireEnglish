@@ -1,6 +1,7 @@
 import 'dart:convert';
 
 import 'package:dio/dio.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:hive_ce/hive.dart';
 
@@ -10,10 +11,25 @@ import '../domain/vocabulary_placement_estimate.dart';
 
 typedef PlacementRow = Map<String, dynamic>;
 
-/// First-open gate: estimate + testedAt must both exist.
+/// Soft gate: estimate + testedAt must both exist.
 bool hasCompletedVocabularyPlacement(PlacementRow profile) =>
     profile['estimate'] is int &&
     (profile['testedAt'] as String? ?? '').trim().isNotEmpty;
+
+/// Reminds once per app process while the user still has no estimate.
+bool _placementReminderShownThisSession = false;
+
+bool consumeVocabularyPlacementReminder({required bool hasPlacement}) {
+  if (hasPlacement) return false;
+  if (_placementReminderShownThisSession) return false;
+  _placementReminderShownThisSession = true;
+  return true;
+}
+
+@visibleForTesting
+void resetVocabularyPlacementReminderForTest() {
+  _placementReminderShownThisSession = false;
+}
 
 final vocabularyPlacementProvider =
     NotifierProvider<VocabularyPlacement, PlacementRow>(

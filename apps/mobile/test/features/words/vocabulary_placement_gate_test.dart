@@ -16,4 +16,21 @@ void main() {
       isTrue,
     );
   });
+
+  test('reminder fires once per session until placement exists', () {
+    resetVocabularyPlacementReminderForTest();
+    expect(
+      consumeVocabularyPlacementReminder(hasPlacement: false),
+      isTrue,
+    );
+    expect(
+      consumeVocabularyPlacementReminder(hasPlacement: false),
+      isFalse,
+    );
+    resetVocabularyPlacementReminderForTest();
+    expect(
+      consumeVocabularyPlacementReminder(hasPlacement: true),
+      isFalse,
+    );
+  });
 }
