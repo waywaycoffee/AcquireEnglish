@@ -49,6 +49,7 @@ def merge_catalog(existing: dict | None, book: dict, *, public_base: str) -> dic
         "audio_mode": book.get("audio_mode") or "ecs",
         "pdf_url": f"{prefix}/book.pdf",
         "book_json_url": f"{prefix}/book.json",
+        "cover_url": f"{prefix}/cover.jpg",
         "built_at": book.get("built_at"),
     }
     if book.get("source_share_url"):

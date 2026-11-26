@@ -15,8 +15,16 @@ void main() {
     expect(k12TextbookMediaBookId('bad'), isNull);
   });
 
-  test('merge prefers ECS media rows over local placeholders', () {
+  test('merge keeps only ECS-ready books and drops placeholders', () {
     final List<K12TextbookEntry> local = k12TextbooksForGrade('k12_g3');
+    expect(local, isNotEmpty);
+    final List<K12TextbookEntry> empty = mergeK12TextbookShelf(
+      gradeId: 'k12_g3',
+      local: local,
+      mediaRows: const <Map<String, dynamic>>[],
+    );
+    expect(empty, isEmpty);
+
     final List<K12TextbookEntry> merged = mergeK12TextbookShelf(
       gradeId: 'k12_g3',
       local: local,
@@ -31,17 +39,15 @@ void main() {
           'publisher': '人民教育出版社',
           'volume': '上册',
           'level': 'A1',
+          'cover_url':
+              'https://example.com/media/reading/k12/pep-y3-wuxin-g3-a/cover.jpg',
         },
       ],
     );
-    expect(
-      merged.any(
-        (K12TextbookEntry e) =>
-            e.id == 'k12-textbook:pep-y3-wuxin:k12_g3:a' &&
-            e.titleZh.contains('三年级'),
-      ),
-      isTrue,
-    );
+    expect(merged, hasLength(1));
+    expect(merged.single.id, 'k12-textbook:pep-y3-wuxin:k12_g3:a');
+    expect(merged.single.hasMedia, isTrue);
+    expect(merged.single.coverUrl, contains('cover.jpg'));
   });
 
   test('lesson display title prefers lesson number', () {

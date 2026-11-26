@@ -158,6 +158,11 @@ def _enrich_book(raw: dict[str, Any]) -> dict[str, Any]:
         "share_stage": detail.get("share_stage") or raw.get("share_stage"),
         "lesson_count": len(lessons_out),
         "pdf_url": _public_book_url(book_id, "book.pdf", root_name=root_name),
+        "cover_url": (
+            _public_book_url(book_id, "cover.jpg", root_name=root_name)
+            if (book_dir / "cover.jpg").is_file()
+            else None
+        ),
         "lessons": lessons_out,
         "built_at": detail.get("built_at"),
         "license_note": detail.get("license_note"),
@@ -201,6 +206,11 @@ async def list_textbooks(grade_id: str | None = None) -> dict[str, Any]:
             "book_json_url",
             _public_book_url(book_id, "book.json"),
         )
+        cover = _textbooks_root() / book_id / "cover.jpg"
+        if cover.is_file():
+            item["cover_url"] = _public_book_url(book_id, "cover.jpg")
+        else:
+            item.setdefault("cover_url", None)
         books.append(item)
     return {"version": catalog.get("version", 1), "count": len(books), "books": books}
 

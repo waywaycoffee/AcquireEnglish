@@ -36,6 +36,7 @@ class _K12TextbookShelfScreenState
   late String _gradeId;
   bool _opening = false;
   bool _loadingMedia = false;
+  bool _didAutoJumpGrade = false;
   /// catalog_id → ECS book_id for uploaded audio packages.
   Map<String, String> _readyBookIds = <String, String>{};
   List<Map<String, dynamic>> _mediaRows = const <Map<String, dynamic>>[];
@@ -66,6 +67,7 @@ class _K12TextbookShelfScreenState
     setState(() {
       _stage = stage;
       _gradeId = grades.isEmpty ? _gradeId : grades.first.id;
+      _didAutoJumpGrade = false;
     });
     unawaited(_refreshReadyBooks());
   }
@@ -90,6 +92,11 @@ class _K12TextbookShelfScreenState
         _readyBookIds = ready;
         _loadingMedia = false;
       });
+      // First open: skip empty grades so users land on real books.
+      if (ready.isEmpty && !_didAutoJumpGrade) {
+        _didAutoJumpGrade = true;
+        unawaited(_jumpToFirstReadyGrade());
+      }
     } catch (_) {
       if (!mounted || gradeId != _gradeId) return;
       setState(() {
@@ -97,6 +104,25 @@ class _K12TextbookShelfScreenState
         _readyBookIds = <String, String>{};
         _loadingMedia = false;
       });
+    }
+  }
+
+  Future<void> _jumpToFirstReadyGrade() async {
+    final List<ExamFamily> grades = k12TextbookGradesForStage(_stage);
+    for (final ExamFamily family in grades) {
+      if (family.id == _gradeId) continue;
+      try {
+        final List<Map<String, dynamic>> rows = await ref
+            .read(acquireApiClientProvider)
+            .listReadingTextbooks(gradeId: family.id);
+        if (!mounted) return;
+        if (rows.isEmpty) continue;
+        setState(() => _gradeId = family.id);
+        await _refreshReadyBooks();
+        return;
+      } catch (_) {
+        continue;
+      }
     }
   }
 
@@ -198,10 +224,8 @@ class _K12TextbookShelfScreenState
         children: <Widget>[
           Text(
             readyCount > 0
-                ? '本年级已上线 $readyCount 册有声教材（PDF + 课次音频）。'
-                    '点带「有声教材」标签的封面即可学习；其余为目录占位。'
-                : '按年级浏览教材目录。服务器上的有声课本会显示「有声教材」；'
-                    '未上传的仍是目录占位。当前年级暂无已上传册次时，可先切到三～六年级或初中。',
+                ? '本年级已上线 $readyCount 册有声教材（PDF + 课次音频）。点封面即可打开。'
+                : '本年级暂无已上线教材。可切换到三～六年级或初中查看已上传册次。',
             style: TextStyle(
               color: AppDesignTokens.textSecondary,
               height: 1.45,
@@ -262,7 +286,9 @@ class _K12TextbookShelfScreenState
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Text(
-                  '该年级暂无目录条目。',
+                  _loadingMedia
+                      ? '正在加载已上线教材…'
+                      : '该年级暂无已上线教材。',
                   style: TextStyle(color: AppDesignTokens.textSecondary),
                 ),
               ),
@@ -290,7 +316,6 @@ class _K12TextbookShelfScreenState
                           entry: books[i],
                           paletteIndex: i,
                           enabled: !_opening,
-                          hasAudio: _readyBookIds.containsKey(books[i].id),
                           onTap: () => unawaited(_openTextbook(books[i])),
                         ),
                       ),
@@ -309,18 +334,18 @@ class _TextbookTile extends StatelessWidget {
     required this.entry,
     required this.paletteIndex,
     required this.enabled,
-    required this.hasAudio,
     required this.onTap,
   });
 
   final K12TextbookEntry entry;
   final int paletteIndex;
   final bool enabled;
-  final bool hasAudio;
   final VoidCallback onTap;
 
   @override
   Widget build(BuildContext context) {
+    final String title =
+        entry.titleZh.isEmpty ? entry.title : entry.titleZh;
     return Material(
       color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(14),
@@ -333,14 +358,15 @@ class _TextbookTile extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: <Widget>[
               ReadingBookCover(
-                title: entry.titleZh.isEmpty ? entry.title : entry.titleZh,
+                title: title,
                 subtitle: entry.volume,
                 level: entry.level,
                 paletteIndex: paletteIndex,
+                coverUrl: entry.coverUrl,
               ),
               const SizedBox(height: 10),
               Text(
-                entry.titleZh.isEmpty ? entry.title : entry.titleZh,
+                title,
                 maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
@@ -370,27 +396,6 @@ class _TextbookTile extends StatelessWidget {
                   color: AppDesignTokens.textSecondary,
                 ),
               ),
-              if (hasAudio) ...<Widget>[
-                const SizedBox(height: 6),
-                Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 8,
-                    vertical: 3,
-                  ),
-                  decoration: BoxDecoration(
-                    color: AppDesignTokens.successSoft,
-                    borderRadius: BorderRadius.circular(999),
-                  ),
-                  child: Text(
-                    '有声教材',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: AppDesignTokens.brandGreenDark,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                ),
-              ],
             ],
           ),
         ),

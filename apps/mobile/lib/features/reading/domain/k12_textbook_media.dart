@@ -146,22 +146,20 @@ K12TextbookEntry? k12TextbookEntryFromMediaRow(Map<String, dynamic> row) {
     volume: '${row['volume'] ?? ''}'.trim(),
     publisher: '${row['publisher'] ?? ''}'.trim(),
     level: '${row['level'] ?? 'A1'}'.trim(),
+    coverUrl: '${row['cover_url'] ?? ''}'.trim(),
+    hasMedia: true,
   );
 }
 
-/// Merge local placeholders with ECS-ready books for one grade.
-/// Ready media rows win on the same catalog_id.
+/// Shelf for one grade: **only** ECS-ready books (no blank placeholders).
 List<K12TextbookEntry> mergeK12TextbookShelf({
   required String gradeId,
   required List<K12TextbookEntry> local,
   required List<Map<String, dynamic>> mediaRows,
 }) {
+  // [local] kept for call-site compatibility; placeholders are intentionally
+  // omitted so the shelf never shows empty catalog tiles.
   final Map<String, K12TextbookEntry> byId = <String, K12TextbookEntry>{};
-  for (final K12TextbookEntry entry in local) {
-    if (entry.gradeId == gradeId) {
-      byId[entry.id] = entry;
-    }
-  }
   for (final Map<String, dynamic> row in mediaRows) {
     if ('${row['grade_id'] ?? ''}'.trim() != gradeId) continue;
     final K12TextbookEntry? fromMedia = k12TextbookEntryFromMediaRow(row);

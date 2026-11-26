@@ -14,6 +14,8 @@ class K12TextbookEntry {
     required this.volume,
     required this.publisher,
     required this.level,
+    this.coverUrl = '',
+    this.hasMedia = false,
   });
 
   /// Stable id used as ReadingDoc.id when opening the ebook reader.
@@ -26,6 +28,12 @@ class K12TextbookEntry {
   final String volume;
   final String publisher;
   final String level;
+
+  /// ECS-hosted jacket (`/media/reading/k12/.../cover.jpg`).
+  final String coverUrl;
+
+  /// True when PDF + audio package exists on the API host.
+  final bool hasMedia;
 
   String get coverSubtitle => '$edition · $volume';
 
