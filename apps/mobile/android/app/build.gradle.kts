@@ -35,10 +35,20 @@ val patchMediaKitDisposeRace = tasks.register("patchMediaKitDisposeRace") {
                 .first { it.isNotBlank() }
                 .trim()
             if (source.lineSequence().any { it.trim() == marker }) return
-            require(source.contains(old)) {
+            // pub.dev may keep trailing spaces / CRLF; normalize before match.
+            fun normalize(text: String): String =
+                text.replace("\r\n", "\n")
+                    .replace("\r", "\n")
+                    .lineSequence()
+                    .joinToString("\n") { it.trimEnd() }
+            val normalizedSource = normalize(source)
+            val normalizedOld = normalize(old)
+            require(normalizedSource.contains(normalizedOld)) {
                 "media_kit source changed; refuse to apply stale crash patch to $target"
             }
-            target.writeText(source.replace(old, replacement))
+            target.writeText(
+                normalizedSource.replace(normalizedOld, normalize(replacement)),
+            )
         }
 
         patch(
@@ -51,7 +61,7 @@ val patchMediaKitDisposeRace = tasks.register("patchMediaKitDisposeRace") {
     // Clear the wakeup callback in libmpv before closing NativeCallable
     // to prevent libmpv from invoking a deleted callback
     mpv.mpv_set_wakeup_callback(ctx, nullptr, nullptr);
-    
+
     _wakeUpNativeCallables.remove(ctx.address)?.close();
   }
 """.trimIndent(),
