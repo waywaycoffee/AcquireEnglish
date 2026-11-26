@@ -117,12 +117,7 @@ class _ServerSyllabusCatalogScreenState
           item,
         ) {
           final hay = '${item.id} ${item.title} ${item.examTag}'.toLowerCase();
-          final topicMatch =
-              _kind != SyllabusBookKind.foundation ||
-              _topic.isEmpty ||
-              (_topic == 'ipa'
-                  ? hay.contains('ipa') || hay.contains('音标')
-                  : hay.contains('phonics') || hay.contains('拼读'));
+          final bool topicMatch = _topicMatches(_kind, _topic, hay);
           return topicMatch && hay.contains(_query.trim().toLowerCase());
         }).toList();
 
@@ -186,23 +181,27 @@ class _ServerSyllabusCatalogScreenState
               onChanged: (value) => setState(() => _query = value),
             ),
           ),
-          if (_kind == SyllabusBookKind.foundation)
-            Wrap(
-              spacing: 8,
-              children: [
-                for (final topic in ['', 'ipa', 'phonics'])
-                  ChoiceChip(
-                    label: Text(
-                      topic.isEmpty
-                          ? '全部'
-                          : topic == 'ipa'
-                          ? '国际音标'
-                          : '自然拼读',
-                    ),
-                    selected: _topic == topic,
-                    onSelected: (_) => setState(() => _topic = topic),
-                  ),
-              ],
+          if (_kind == SyllabusBookKind.foundation ||
+              _kind == SyllabusBookKind.word)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 10, 20, 0),
+              child: SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: <Widget>[
+                    for (final (String key, String label)
+                        in _topicsForKind(_kind))
+                      Padding(
+                        padding: const EdgeInsets.only(right: 8),
+                        child: ChoiceChip(
+                          label: Text(label),
+                          selected: _topic == key,
+                          onSelected: (_) => setState(() => _topic = key),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
             ),
           Expanded(
             child: _loading
@@ -292,4 +291,49 @@ class _ServerSyllabusCatalogScreenState
       ),
     );
   }
+}
+
+List<(String, String)> _topicsForKind(SyllabusBookKind kind) {
+  return switch (kind) {
+    SyllabusBookKind.foundation => const <(String, String)>[
+        ('', '全部'),
+        ('ipa', '国际音标'),
+        ('phonics', '自然拼读'),
+      ],
+    SyllabusBookKind.word => const <(String, String)>[
+        ('', '全部'),
+        ('高频|hf|常用', '高频'),
+        ('小学|pep3|pep', '小学'),
+        ('课标|k12|义务教育', '课标'),
+        ('初中|jh', '初中'),
+        ('高中|sh', '高中'),
+        ('高考|gk', '高考'),
+        ('考研|ky', '考研'),
+        ('四级|cet4', '四级'),
+        ('六级|cet6', '六级'),
+        ('雅思|ielts', '雅思'),
+        ('托福|toefl', '托福'),
+      ],
+    SyllabusBookKind.pattern => const <(String, String)>[
+        ('', '全部'),
+      ],
+  };
+}
+
+bool _topicMatches(SyllabusBookKind kind, String topic, String hay) {
+  if (topic.isEmpty) {
+    return true;
+  }
+  if (kind == SyllabusBookKind.foundation) {
+    return topic == 'ipa'
+        ? hay.contains('ipa') || hay.contains('音标')
+        : hay.contains('phonics') || hay.contains('拼读');
+  }
+  for (final String token in topic.split('|')) {
+    final String t = token.trim().toLowerCase();
+    if (t.isNotEmpty && hay.contains(t)) {
+      return true;
+    }
+  }
+  return false;
 }

@@ -7,9 +7,13 @@ from app.services import syllabus_books as sb
 
 def test_catalog_lists_packaged_books():
     catalog = sb.build_catalog(refresh=True)
-    assert catalog["count"] >= 10
+    assert catalog["count"] >= 20
     ids = {item["id"] for item in catalog["items"]}
     assert "cet4_core" in ids
+    assert "highfreq_2000" in ids
+    assert "pep3_start_band" in ids
+    assert "curriculum_k12" in ids
+    assert "gaokao_core" in ids
     assert "foundation_ipa_48" in ids
     assert "chunks_conversational_1000" in ids
 
