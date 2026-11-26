@@ -2,8 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../router/app_router.dart';
 import '../../community/presentation/adventure_ui.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../words/presentation/vocabulary_placement_provider.dart';
 import '../domain/onboarding_profile.dart';
 import 'focus_recommendation.dart';
 import 'onboarding_provider.dart';
@@ -41,6 +43,20 @@ class _FirstOpenOnboardingScreenState
       duration: const Duration(milliseconds: 280),
       curve: Curves.easeOutCubic,
     );
+  }
+
+  void _goAfterOnboarding({String? contentRoute}) {
+    final bool hasPlacement = hasCompletedVocabularyPlacement(
+      ref.read(vocabularyPlacementProvider),
+    );
+    if (!hasPlacement) {
+      context.go('${SGRoute.vocabularyPlacement.route}?firstOpen=1');
+      return;
+    }
+    context.go('/home');
+    if (contentRoute != null && contentRoute.isNotEmpty) {
+      context.push(contentRoute);
+    }
   }
 
   Future<void> _finish() async {
@@ -89,7 +105,7 @@ class _FirstOpenOnboardingScreenState
                                   .read(onboardingProvider.notifier)
                                   .skipForNow();
                               if (context.mounted) {
-                                context.go('/home');
+                                _goAfterOnboarding();
                               }
                             },
                       child: const Text('跳过'),
@@ -173,11 +189,10 @@ class _FirstOpenOnboardingScreenState
                     onStart: (String route) {
                       final String target =
                           ref.read(focusRecommendationProvider)?.route ?? route;
-                      // 8-page 启动页 already ran before this profile flow.
-                      context.go('/home');
-                      context.push(target);
+                      // Vocab placement is required before home on first open.
+                      _goAfterOnboarding(contentRoute: target);
                     },
-                    onHome: () => context.go('/home'),
+                    onHome: _goAfterOnboarding,
                     recommendation: ref.watch(focusRecommendationProvider),
                     onMap: () {
                       context.go('/discover');

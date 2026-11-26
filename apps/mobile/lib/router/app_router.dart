@@ -78,6 +78,7 @@ import '../features/words/presentation/server_syllabus_catalog_screen.dart';
 import '../features/words/presentation/syllabus_books_screen.dart';
 import '../features/words/presentation/favorite_word_book_screen.dart';
 import '../features/words/presentation/words_screen.dart';
+import '../features/words/presentation/vocabulary_placement_provider.dart';
 import '../features/words/presentation/vocabulary_placement_screen.dart';
 import 'fade_extension.dart';
 import '../features/membership/presentation/membership_screen.dart';
@@ -150,24 +151,33 @@ bool _isAuthOrLegalPath(String location) {
       location == SGRoute.userAgreement.route;
 }
 
+String _firstOpenPlacementRoute() =>
+    '${SGRoute.vocabularyPlacement.route}?firstOpen=1';
+
 @riverpod
 GoRouter goRouter(Ref ref) {
   final bool signedIn = ref.watch(authSessionProvider).isLoggedIn;
+  final bool hasPlacement = hasCompletedVocabularyPlacement(
+    ref.watch(vocabularyPlacementProvider),
+  );
+  String coldStart() {
+    if (!readSessionSplashDone()) return '/onboarding/auth-guide';
+    if (!signedIn) return SGRoute.login.route;
+    if (!readOnboardingCompletedSync()) return '/onboarding';
+    if (!hasPlacement) return _firstOpenPlacementRoute();
+    return SGRoute.home.route;
+  }
+
   return GoRouter(
-  // Cold start: one random cinematic page, once per process.
-  initialLocation: !readSessionSplashDone()
-      ? '/onboarding/auth-guide'
-      : (!signedIn
-          ? SGRoute.login.route
-          : (!readOnboardingCompletedSync()
-              ? '/onboarding'
-              : SGRoute.home.route)),
+  // Cold start: splash → login → onboarding → vocab placement → home.
+  initialLocation: coldStart(),
   redirect: (BuildContext context, GoRouterState state) {
     final bool done = readOnboardingCompletedSync();
     final bool splashDone = readSessionSplashDone();
     final String loc = state.matchedLocation;
     final bool onOnboarding = loc == '/onboarding';
     final bool onAuthGuide = loc == '/onboarding/auth-guide';
+    final bool onPlacement = loc == SGRoute.vocabularyPlacement.route;
     if (!splashDone && !onAuthGuide && !_isAuthOrLegalPath(loc)) {
       return '/onboarding/auth-guide';
     }
@@ -179,8 +189,19 @@ GoRouter goRouter(Ref ref) {
         !done &&
         !onOnboarding &&
         !onAuthGuide &&
+        !onPlacement &&
         !_isAuthOrLegalPath(loc)) {
       return '/onboarding';
+    }
+    if (signedIn &&
+        splashDone &&
+        done &&
+        !hasPlacement &&
+        !onPlacement &&
+        !onOnboarding &&
+        !onAuthGuide &&
+        !_isAuthOrLegalPath(loc)) {
+      return _firstOpenPlacementRoute();
     }
     return null;
   },
@@ -551,6 +572,7 @@ GoRouter goRouter(Ref ref) {
       builder: (BuildContext context, GoRouterState state) =>
           VocabularyPlacementScreen(
             forJourney: state.uri.queryParameters['journey'] == '1',
+            firstOpen: state.uri.queryParameters['firstOpen'] == '1',
           ),
     ).fade(),
     GoRoute(

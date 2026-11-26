@@ -10,6 +10,11 @@ import '../domain/vocabulary_placement_estimate.dart';
 
 typedef PlacementRow = Map<String, dynamic>;
 
+/// First-open gate: estimate + testedAt must both exist.
+bool hasCompletedVocabularyPlacement(PlacementRow profile) =>
+    profile['estimate'] is int &&
+    (profile['testedAt'] as String? ?? '').trim().isNotEmpty;
+
 final vocabularyPlacementProvider =
     NotifierProvider<VocabularyPlacement, PlacementRow>(
       VocabularyPlacement.new,

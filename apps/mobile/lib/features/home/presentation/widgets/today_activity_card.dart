@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../router/app_router.dart';
 import '../../../authentication/presentation/account_storage.dart';
 import '../../../daily_path/data/today_journey_store.dart';
 import '../../../learner_model/data/journey_feedback_store.dart';
@@ -25,6 +26,7 @@ import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/presentation/daily_feed_provider.dart';
 import '../../../words/presentation/learner_level_provider.dart';
+import '../../../words/presentation/vocabulary_placement_provider.dart';
 import '../../../words/presentation/word_book_provider.dart';
 import '../learning_dashboard_provider.dart';
 
@@ -60,8 +62,16 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     if (mounted) setState(() => _skippingEmptyReview = false);
   }
 
+  bool _hasPlacement() => hasCompletedVocabularyPlacement(
+    ref.read(vocabularyPlacementProvider),
+  );
+
   Future<void> _runJourney() async {
     if (_busy) return;
+    if (!_hasPlacement()) {
+      await context.push('${SGRoute.vocabularyPlacement.route}?firstOpen=1');
+      if (!mounted || !_hasPlacement()) return;
+    }
     setState(() => _busy = true);
     final DateTime today = DateTime.now();
     final String account = ref.read(studyAccountProvider);

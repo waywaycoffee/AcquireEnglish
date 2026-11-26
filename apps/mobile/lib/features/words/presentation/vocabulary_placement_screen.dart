@@ -11,9 +11,16 @@ import '../domain/vocabulary_placement_estimate.dart';
 import 'vocabulary_placement_provider.dart';
 
 class VocabularyPlacementScreen extends ConsumerStatefulWidget {
-  const VocabularyPlacementScreen({super.key, this.forJourney = false});
+  const VocabularyPlacementScreen({
+    super.key,
+    this.forJourney = false,
+    this.firstOpen = false,
+  });
 
   final bool forJourney;
+
+  /// First launch after onboarding: cannot skip; finish goes home.
+  final bool firstOpen;
 
   @override
   ConsumerState<VocabularyPlacementScreen> createState() =>
@@ -63,14 +70,20 @@ class _VocabularyPlacementScreenState
     try {
       await ref
           .read(vocabularyPlacementProvider.notifier)
-          .saveEstimate(estimate, requireRecommendations: !widget.forJourney);
+          .saveEstimate(
+            estimate,
+            // Journey-only retests can skip network word packs; first open loads them.
+            requireRecommendations: !widget.forJourney || widget.firstOpen,
+          );
       if (mounted) setState(() => _estimate = estimate);
     } catch (_) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(
-              widget.forJourney ? '测试结果保存失败，请重试。' : '推荐词库加载失败，请检查网络后重试。',
+                            content: Text(
+              _required
+                  ? '测试结果保存失败，请重试。'
+                  : '推荐词库加载失败，请检查网络后重试。',
             ),
           ),
         );
@@ -81,12 +94,18 @@ class _VocabularyPlacementScreenState
   }
 
   void _leave() {
+    if (widget.firstOpen) {
+      context.go(SGRoute.home.route);
+      return;
+    }
     if (context.canPop()) {
       context.pop();
     } else {
       context.go(SGRoute.home.route);
     }
   }
+
+  bool get _required => widget.forJourney || widget.firstOpen;
 
   Future<void> _answer({required bool correct, String? chosen}) async {
     final AdaptivePlacementEngine? engine = _engine;
@@ -122,9 +141,10 @@ class _VocabularyPlacementScreenState
     final String level = ref.watch(learningPreferencesProvider).level;
     return Scaffold(
       appBar: AppBar(
-        title: const Text('英语词汇量测试'),
+        title: Text(widget.firstOpen ? '先测一下词汇量' : '英语词汇量测试'),
+        automaticallyImplyLeading: !widget.firstOpen,
         actions: <Widget>[
-          if (!widget.forJourney)
+          if (!_required)
             TextButton(
               onPressed: _saving || _awaitingFeedback ? null : _leave,
               child: const Text('稍后测试'),
@@ -173,11 +193,20 @@ class _VocabularyPlacementScreenState
                             textAlign: TextAlign.center,
                           ),
                           const SizedBox(height: 16),
+                          if (widget.firstOpen) ...<Widget>[
+                            const Text(
+                              '第一次打开先测词汇量，后面的英语之旅会按你的水平来推。',
+                              textAlign: TextAlign.center,
+                            ),
+                            const SizedBox(height: 12),
+                          ],
                           FilledButton(
                             onPressed: _saving
                                 ? null
                                 : _estimate != null
-                                ? widget.forJourney
+                                ? widget.firstOpen
+                                      ? _leave
+                                      : widget.forJourney
                                       ? _leave
                                       : () => context.go(
                                           '${SGRoute.home.route}?focus=vocab',
@@ -185,14 +214,14 @@ class _VocabularyPlacementScreenState
                                 : () => _save(estimate),
                             child: Text(
                               _saving
-                                  ? (widget.forJourney
-                                        ? '正在保存结果'
-                                        : '正在加载推荐词')
+                                  ? (_required ? '正在保存结果' : '正在加载推荐词')
                                   : _estimate == null
-                                  ? (widget.forJourney
+                                  ? (_required
                                         ? '保存测试结果'
                                         : '保存结果并生成推荐词库')
-                                  : (widget.forJourney
+                                  : (widget.firstOpen
+                                        ? '开始英语之旅'
+                                        : widget.forJourney
                                         ? '继续英语之旅'
                                         : '前往背单词'),
                             ),
