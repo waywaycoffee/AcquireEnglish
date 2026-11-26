@@ -41,6 +41,13 @@ class LearningScenario {
       difficulty: 'B1',
     ),
     LearningScenario(
+      id: 'greetings_a1',
+      title: '简单打招呼',
+      goal: '用一两句问候并回答名字或近况',
+      prompt: 'Say hello and tell me your name. Then answer one easy question.',
+      difficulty: 'A1',
+    ),
+    LearningScenario(
       id: 'weekend',
       title: '描述周末',
       goal: '说清过去的活动、同行的人以及自己的感受或原因',
@@ -54,6 +61,14 @@ class LearningScenario {
       goal: '说明餐点和数量、饮品，再提出一个要求或问题',
       prompt:
           'You are at a cafe. Order food and a drink, then ask one question.',
+      difficulty: 'A2',
+    ),
+    LearningScenario(
+      id: 'directions_a2',
+      title: '问路与指路',
+      goal: '问怎么去一个地方，并听懂简单指路',
+      prompt:
+          'Ask for directions to the nearest subway station, then confirm one detail.',
       difficulty: 'A2',
     ),
     LearningScenario(
@@ -73,6 +88,14 @@ class LearningScenario {
       difficulty: 'B1',
     ),
     LearningScenario(
+      id: 'opinion_b1',
+      title: '表达看法',
+      goal: '对一个日常话题给出观点并说明一个理由',
+      prompt:
+          'Share your opinion about learning English with apps, and give one reason.',
+      difficulty: 'B1',
+    ),
+    LearningScenario(
       id: 'exam_interview',
       title: '考试口语考官',
       goal: '模拟考官提问：自我介绍、观点表达与追问，并给出简短纠错',
@@ -89,6 +112,14 @@ class LearningScenario {
           'Ask me to describe a familiar topic for one minute, then ask two follow-up questions '
           'like an oral exam examiner.',
       difficulty: 'B1',
+    ),
+    LearningScenario(
+      id: 'debate_b2',
+      title: '简短辩论',
+      goal: '对一个争议话题给出立场，并回应一次反驳',
+      prompt:
+          'Take a side on remote work vs office work. Defend it, then answer one counter-argument.',
+      difficulty: 'B2',
     ),
   ];
 }

@@ -16,8 +16,13 @@ import 'package:media_kit/media_kit.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../authentication/presentation/account_storage.dart';
 import '../../authentication/presentation/auth_session.dart';
 import '../../daily_review/presentation/daily_review_provider.dart';
+import '../../learner_model/data/oral_line_store.dart';
+import '../../learner_model/domain/learner_skill_profile.dart';
+import '../../learner_model/domain/oral_line_memory.dart';
+import '../../learner_model/presentation/learner_skill_profile_provider.dart';
 import '../../membership/domain/oral_explore_entitlements.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../player/data/pronunciation_providers.dart';
@@ -392,6 +397,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     List<LearningScenario> pool, {
     required bool preferVideo,
   }) {
+    if (pool.isEmpty) return null;
     final String want = (preferredId ?? '').trim();
     if (want.isNotEmpty) {
       for (final LearningScenario item in pool) {
@@ -403,10 +409,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
         if (item.isVideoGrounded) return item;
       }
     }
-    for (final LearningScenario item in pool) {
-      if (!item.isVideoGrounded) return item;
-    }
-    return pool.isEmpty ? null : pool.first;
+    final List<LearningScenario> nonVideo = pool
+        .where((LearningScenario item) => !item.isVideoGrounded)
+        .toList();
+    if (nonVideo.isEmpty) return pool.first;
+    return _pickScenarioForLevel(nonVideo);
   }
 
   Future<void> _bootstrapScenariosAndStart() async {
@@ -654,29 +661,88 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
 
   String _openingCoachPrompt(String coachName) {
     final LearningScenario? scenario = _activeScenario;
-    if (scenario != null && scenario.isFreeChat) {
-      return 'Hi, I\'m $coachName! Let\'s just chat in English — anything you like. '
-          'I\'ll correct grammar gently as we go. '
-          '${scenario.prompt} '
-          '(Say “用中文” anytime if you want Chinese.)';
-    }
+    final LearnerSkillProfile profile = ref.read(learnerSkillProfileProvider);
+    final SkillEstimate speaking = profile.recommendationEstimate(
+      LearnerSkill.speaking,
+    );
+    final OralLineStore lineStore = OralLineStore(
+      ref.read(studyAccountProvider),
+    );
+    final Set<String> used = lineStore.usedKeys();
+    final List<String> frontier = ref
+        .read(wordBookProvider)
+        .where((entry) => entry.isDue)
+        .map((entry) => entry.word)
+        .where((String word) => word.trim().isNotEmpty)
+        .take(2)
+        .toList();
+
     if (scenario != null && !scenario.isVideoGrounded) {
-      return 'Hi, I\'m $coachName! Today\'s scene is “${scenario.title}”. '
-          'Goal: ${scenario.goal}. '
-          'I\'ll role-play with you and correct grammar as we go. '
-          'Let\'s start: ${scenario.prompt} '
-          '(Say “用中文” anytime if you want Chinese.)';
+      final OralScenarioPick pick = OralScenarioPick(
+        id: scenario.id,
+        title: scenario.title,
+        goal: scenario.goal,
+        prompt: scenario.prompt,
+        difficulty: scenario.difficulty,
+      );
+      final String opening = buildOralOpening(
+        coachName: coachName,
+        scenario: pick,
+        skill: speaking,
+        frontierChunks: frontier,
+        usedLineKeys: used,
+      );
+      unawaited(lineStore.remember(oralLineKey(pick)));
+      unawaited(lineStore.remember(opening.trim().toLowerCase()));
+      return opening;
     }
     final String firstTopic = _talkTopics.isNotEmpty
         ? _talkTopics.first
         : (scenario?.prompt.isNotEmpty == true
               ? scenario!.prompt
               : 'What happened in the video?');
-    return 'Hi, I\'m $coachName! I already read the subtitles for “$_topicLabel” '
-        'and prepared ${_talkTopics.isEmpty ? 'some' : '${_talkTopics.length}'} '
-        'oral practice questions. '
-        'I\'ll correct grammar as we go. First: $firstTopic '
-        '(Say “用中文” anytime if you want Chinese.)';
+    final bool lowBand =
+        learnerBandIndex(speaking.band) <= learnerBandIndex('A2');
+    final String opening = lowBand
+        ? 'Hi, I\'m $coachName. Short question about “$_topicLabel”: $firstTopic '
+            'Stay near ${speaking.band}. '
+            '(Say “用中文” anytime.)'
+        : 'Hi, I\'m $coachName! I already read the subtitles for “$_topicLabel” '
+            'and prepared ${_talkTopics.isEmpty ? 'some' : '${_talkTopics.length}'} '
+            'oral practice questions. '
+            'I\'ll correct grammar as we go. First: $firstTopic '
+            'Stay near ${speaking.band}. '
+            '(Say “用中文” anytime if you want Chinese.)';
+    unawaited(lineStore.remember(opening.trim().toLowerCase()));
+    return opening;
+  }
+
+  LearningScenario _pickScenarioForLevel(List<LearningScenario> pool) {
+    final LearnerSkillProfile profile = ref.read(learnerSkillProfileProvider);
+    final OralLineStore lineStore = OralLineStore(
+      ref.read(studyAccountProvider),
+    );
+    final Set<String> used = lineStore.usedKeys();
+    final List<OralScenarioPick> filtered = filterOralScenarios(
+      pool: <OralScenarioPick>[
+        for (final LearningScenario item in pool)
+          OralScenarioPick(
+            id: item.id,
+            title: item.title,
+            goal: item.goal,
+            prompt: item.prompt,
+            difficulty: item.difficulty,
+          ),
+      ],
+      profile: profile,
+      usedLineKeys: used,
+    );
+    if (filtered.isEmpty) return pool.first;
+    final OralScenarioPick top = filtered.first;
+    return pool.firstWhere(
+      (LearningScenario item) => item.id == top.id,
+      orElse: () => pool.first,
+    );
   }
 
   List<String> _localHeuristicTalkTopics() {

@@ -7,9 +7,11 @@ import 'package:go_router/go_router.dart';
 import '../../../authentication/presentation/account_storage.dart';
 import '../../../daily_path/data/today_journey_store.dart';
 import '../../../learner_model/data/journey_feedback_store.dart';
+import '../../../learner_model/domain/journey_completion.dart';
 import '../../../learner_model/domain/journey_next_step.dart';
 import '../../../learner_model/domain/learner_skill_profile.dart';
 import '../../../learner_model/domain/learning_recommendation.dart';
+import '../../../learner_model/presentation/learner_skill_profile_provider.dart';
 import '../../../library/presentation/library_catalog_provider.dart';
 import '../../../library/presentation/library_mock_data.dart';
 import '../../../onboarding/domain/learning_tracks.dart';
@@ -24,6 +26,7 @@ import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/presentation/daily_feed_provider.dart';
 import '../../../words/presentation/learner_level_provider.dart';
 import '../../../words/presentation/word_book_provider.dart';
+import '../learning_dashboard_provider.dart';
 
 class TodayActivityCard extends ConsumerStatefulWidget {
   const TodayActivityCard({super.key});
@@ -98,8 +101,18 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         await store.saveStage(JourneyStage.learn);
         await store.saveActivity(activity);
         if (!mounted) return;
+        final LearnModule module = learnModuleForRoute(activity.route);
+        final JourneyProgressSnapshot before = _progressSnapshot(
+          activity.route,
+          module,
+        );
         await context.push(activity.route);
         if (!mounted) return;
+        final JourneyCompletionResult gate = evaluateJourneyCompletion(
+          module: module,
+          before: before,
+          after: _progressSnapshot(activity.route, module),
+        );
         final bool? completed = await showDialog<bool>(
           context: context,
           builder: (BuildContext dialogContext) => AlertDialog(
@@ -109,7 +122,9 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               style: TextStyle(color: AppDesignTokens.textPrimary),
             ),
             content: Text(
-              activity.title,
+              gate.allowed
+                  ? activity.title
+                  : '${activity.title}\n\n${gate.hint}',
               style: TextStyle(color: AppDesignTokens.textSecondary),
             ),
             actions: <Widget>[
@@ -118,7 +133,9 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                 child: const Text('稍后继续'),
               ),
               FilledButton(
-                onPressed: () => Navigator.of(dialogContext).pop(true),
+                onPressed: gate.allowed
+                    ? () => Navigator.of(dialogContext).pop(true)
+                    : null,
                 child: const Text('完成本关'),
               ),
             ],
@@ -354,6 +371,52 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     );
   }
 
+  JourneyProgressSnapshot _progressSnapshot(String route, LearnModule module) {
+    final LearningDailyRecord today = ref
+        .read(learningActivityProvider)
+        .today;
+    switch (module) {
+      case LearnModule.video:
+        final String id = Uri.tryParse(route)?.pathSegments.lastOrNull ?? '';
+        final String episodeId = Uri.decodeComponent(id);
+        ContinueLearningTarget? match;
+        for (final LibraryCourseData course
+            in ref.read(libraryCatalogProvider)) {
+          for (final LibraryEpisodeItem episode in course.episodes) {
+            if (episode.id == episodeId) {
+              match = ContinueLearningTarget(course: course, episode: episode);
+              break;
+            }
+          }
+          if (match != null) break;
+        }
+        return JourneyProgressSnapshot(
+          videoWatchMs: today.videoStudyMilliseconds,
+          shadowSentenceCount: today.shadowedSentenceKeys.length,
+          episodeCompleted: match?.episode.completed ?? false,
+          episodeProgressPercent: match?.episode.progressPercent ?? 0,
+        );
+      case LearnModule.reading:
+        final String id = Uri.tryParse(route)?.pathSegments.lastOrNull ?? '';
+        final String docId = Uri.decodeComponent(id);
+        final ReadingProgress? progress = ref
+            .read(readingLibraryProvider)
+            .progressFor(docId);
+        return JourneyProgressSnapshot(
+          readingPercent: progress?.percent ?? 0,
+          readingCompleted: progress?.completed ?? false,
+        );
+      case LearnModule.vocab:
+        return JourneyProgressSnapshot(
+          vocabGraded: today.vocabStudyMilliseconds ~/ 25000,
+        );
+      case LearnModule.oral:
+        return JourneyProgressSnapshot(
+          oralBubbleCount: today.shadowingCount + today.savedSentenceCount,
+        );
+    }
+  }
+
   JourneyTask? _videoPursuit(
     ContinueLearningTarget? resume, {
     required bool enabled,
@@ -392,10 +455,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     required bool videoOn,
     required bool readingOn,
   }) {
-    final String level = ref.read(adaptiveLearnerCefrProvider);
-    final LearnerSkillProfile profile = LearnerSkillProfile.initial(
-      priorBand: level,
-    );
+    final LearnerSkillProfile profile = ref.read(learnerSkillProfileProvider);
     final OnboardingProfile onboarding = ref.read(onboardingProvider);
     final JourneyFeedbackStore feedback = JourneyFeedbackStore(
       ref.read(studyAccountProvider),
@@ -926,8 +986,8 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
         !resume.episode.videoMissing &&
         ref.watch(lastLearningEpisodeProvider) == resume.episode.id;
     final bool purposeful = continuingVideo || book != null;
-    final LearnerSkillProfile skillProfile = LearnerSkillProfile.initial(
-      priorBand: level,
+    final LearnerSkillProfile skillProfile = ref.watch(
+      learnerSkillProfileProvider,
     );
     String asBand(String raw, String fallback) {
       final String upper = raw.trim().toUpperCase();

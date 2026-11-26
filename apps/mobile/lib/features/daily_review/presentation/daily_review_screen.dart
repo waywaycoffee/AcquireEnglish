@@ -30,6 +30,7 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
 import '../../home/presentation/learning_dashboard_provider.dart';
+import '../../learner_model/presentation/learner_skill_profile_provider.dart';
 import '../../sync/data/study_activity_service.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../words/domain/foundation_media.dart';
@@ -2850,10 +2851,25 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       _nextCard(source.key, complete: false);
       return;
     }
+    final bool wasNew = record.isNew;
     await ref
         .read(dailyReviewProvider.notifier)
         .grade(source.key, rating, expectedReviews: record.reviews);
     if (!mounted) return;
+    if (wasNew &&
+        source.kind == ReviewKind.word &&
+        !widget.practice) {
+      final String lemma = source.english.trim().toLowerCase();
+      if (lemma.isNotEmpty) {
+        unawaited(
+          ref.read(learnerSkillProfileProvider.notifier).recordVocabProbe(
+                lemma: lemma,
+                correct:
+                    rating == fsrs.Rating.good || rating == fsrs.Rating.easy,
+              ),
+        );
+      }
+    }
     unawaited(ref.read(studyActivityServiceProvider).touchReview());
     ref.read(learningActivityProvider.notifier).recordVocabDuration(
           duration: const Duration(seconds: 25),
