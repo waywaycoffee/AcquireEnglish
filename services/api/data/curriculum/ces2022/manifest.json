@@ -1,0 +1,17 @@
+{
+  "source": "义务教育英语课程标准（2022年版）附录3 词汇表",
+  "version": "2022",
+  "extract_method": "ocr",
+  "ocr_engine": "rapidocr-onnxruntime+easyocr",
+  "counts": {
+    "level2": 512,
+    "level3": 1616
+  },
+  "targets": {
+    "level2": 505,
+    "level3": 1600
+  },
+  "extracted_at": "2026-11-26T14:39:09.251483+00:00",
+  "notes": "level3 column-aware stop before 数词表/基数词/序数词; level2 lemmas merged into level3 CSV",
+  "compliance": "word-list strings only; no teaching-case body text stored"
+}

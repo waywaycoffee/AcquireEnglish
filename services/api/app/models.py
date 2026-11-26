@@ -1743,3 +1743,40 @@ class ReadAloudAttempt(Base):
     day: Mapped[date] = mapped_column(Date)
     duration_ms: Mapped[int] = mapped_column(Integer)
     weak_words: Mapped[list[str]] = mapped_column(JSON)
+
+
+class CurriculumVocabWord(Base):
+    """Global CES2022 appendix-3 whitelist (not user-scoped VocabItem)."""
+
+    __tablename__ = "curriculum_vocab_words"
+    __table_args__ = (
+        UniqueConstraint("lemma", name="uq_curriculum_vocab_lemma"),
+        Index("ix_curriculum_vocab_band", "band"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lemma: Mapped[str] = mapped_column(String(120), index=True)
+    surface: Mapped[str] = mapped_column(String(160))
+    # level2 | level3
+    band: Mapped[str] = mapped_column(String(16), default="level2")
+    source: Mapped[str] = mapped_column(String(64), default="ces2022_appendix3")
+    version: Mapped[str] = mapped_column(String(16), default="2022")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class CurriculumVocabExtend(Base):
+    """Optional school/publisher extend pool (phase-1 may be empty)."""
+
+    __tablename__ = "curriculum_vocab_extend"
+    __table_args__ = (UniqueConstraint("lemma", name="uq_curriculum_vocab_extend_lemma"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    lemma: Mapped[str] = mapped_column(String(120), index=True)
+    surface: Mapped[str] = mapped_column(String(160))
+    source: Mapped[str] = mapped_column(String(64), default="extend")
+    version: Mapped[str] = mapped_column(String(16), default="2022")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )

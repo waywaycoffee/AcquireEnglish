@@ -28,6 +28,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_user_member_no_column(conn)
     await _ensure_study_stats_star_columns(conn)
     await _ensure_published_netdisk_series_table(conn)
+    await _ensure_curriculum_vocab_tables(conn)
 
 
 async def ensure_user_auth_columns(conn: AsyncConnection) -> None:
@@ -516,3 +517,116 @@ async def _ensure_published_netdisk_series_table(conn: AsyncConnection) -> None:
                 "ON published_netdisk_series (series_key)"
             )
         )
+
+
+async def _ensure_curriculum_vocab_tables(conn: AsyncConnection) -> None:
+    """CES2022 appendix-3 whitelist + optional extend pool."""
+    existing = await _existing_columns(conn, "curriculum_vocab_words")
+    if existing is None:
+        dialect = _dialect_name(conn)
+        if dialect == "sqlite":
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS curriculum_vocab_words (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        lemma VARCHAR(120) NOT NULL,
+                        surface VARCHAR(160) NOT NULL,
+                        band VARCHAR(16) DEFAULT 'level2',
+                        source VARCHAR(64) DEFAULT 'ces2022_appendix3',
+                        version VARCHAR(16) DEFAULT '2022',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE (lemma)
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_curriculum_vocab_band "
+                    "ON curriculum_vocab_words (band)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_curriculum_vocab_words_lemma "
+                    "ON curriculum_vocab_words (lemma)"
+                )
+            )
+        else:
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS curriculum_vocab_words (
+                        id SERIAL PRIMARY KEY,
+                        lemma VARCHAR(120) NOT NULL,
+                        surface VARCHAR(160) NOT NULL,
+                        band VARCHAR(16) DEFAULT 'level2',
+                        source VARCHAR(64) DEFAULT 'ces2022_appendix3',
+                        version VARCHAR(16) DEFAULT '2022',
+                        created_at TIMESTAMPTZ DEFAULT NOW(),
+                        CONSTRAINT uq_curriculum_vocab_lemma UNIQUE (lemma)
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_curriculum_vocab_band "
+                    "ON curriculum_vocab_words (band)"
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_curriculum_vocab_words_lemma "
+                    "ON curriculum_vocab_words (lemma)"
+                )
+            )
+
+    extend_existing = await _existing_columns(conn, "curriculum_vocab_extend")
+    if extend_existing is None:
+        dialect = _dialect_name(conn)
+        if dialect == "sqlite":
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS curriculum_vocab_extend (
+                        id INTEGER PRIMARY KEY AUTOINCREMENT,
+                        lemma VARCHAR(120) NOT NULL,
+                        surface VARCHAR(160) NOT NULL,
+                        source VARCHAR(64) DEFAULT 'extend',
+                        version VARCHAR(16) DEFAULT '2022',
+                        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                        UNIQUE (lemma)
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_curriculum_vocab_extend_lemma "
+                    "ON curriculum_vocab_extend (lemma)"
+                )
+            )
+        else:
+            await conn.execute(
+                text(
+                    """
+                    CREATE TABLE IF NOT EXISTS curriculum_vocab_extend (
+                        id SERIAL PRIMARY KEY,
+                        lemma VARCHAR(120) NOT NULL,
+                        surface VARCHAR(160) NOT NULL,
+                        source VARCHAR(64) DEFAULT 'extend',
+                        version VARCHAR(16) DEFAULT '2022',
+                        created_at TIMESTAMPTZ DEFAULT NOW(),
+                        CONSTRAINT uq_curriculum_vocab_extend_lemma UNIQUE (lemma)
+                    )
+                    """
+                )
+            )
+            await conn.execute(
+                text(
+                    "CREATE INDEX IF NOT EXISTS ix_curriculum_vocab_extend_lemma "
+                    "ON curriculum_vocab_extend (lemma)"
+                )
+            )

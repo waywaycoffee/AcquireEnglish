@@ -66,6 +66,7 @@ from app.routers import (
     sync_status,
     usage,
     vocab,
+    curriculum_vocab,
     wordbook_backup,
 )
 
@@ -128,6 +129,7 @@ app.include_router(usage.router, prefix="/api")
 app.include_router(courses.router, prefix="/api")
 app.include_router(progress.router, prefix="/api")
 app.include_router(vocab.router, prefix="/api")
+app.include_router(curriculum_vocab.router, prefix="/api")
 app.include_router(phrases.router, prefix="/api")
 app.include_router(public_lexicon.router, prefix="/api")
 app.include_router(preferences.router, prefix="/api")
