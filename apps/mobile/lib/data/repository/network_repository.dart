@@ -42,11 +42,34 @@ class NetworkRepository extends _$NetworkRepository {
           },
         ),
       )
-      ..add(RetryInterceptor(dio: dio)) // dio_smart_retry
+      ..add(
+        // One-time auth codes (WeChat OAuth / SMS) must never be retried:
+        // a 502 + smart-retry burns the code and looks like "can't register".
+        RetryInterceptor(
+          dio: dio,
+          retryEvaluator: (DioException error, int attempt) {
+            final String path = error.requestOptions.path;
+            if (_isOneShotAuthPath(path)) {
+              return false;
+            }
+            return DefaultRetryEvaluator(
+              defaultRetryableStatuses,
+            ).evaluate(error, attempt);
+          },
+        ),
+      )
       ..add(
         DioCacheInterceptor(options: CacheOptions(store: MemCacheStore())),
       ); // dio_cache_interceptor
     return dio;
+  }
+
+  static bool _isOneShotAuthPath(String path) {
+    final String p = path.toLowerCase();
+    return p.contains('auth/wechat') ||
+        p.contains('auth/sms') ||
+        p.contains('auth/email') ||
+        (p.contains('/auth/') && p.endsWith('/login'));
   }
 
   void setBaseUrl(String baseUrl) {

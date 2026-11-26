@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -41,13 +42,14 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
   }
 
   Future<void> _bootstrap() async {
+    // Always show the consent / retry screen first.
+    // Auto-jumping into WeChat left Huawei/Harmony devices on a spinner when
+    // the process was killed mid-OAuth, and hid the "open WeChat" CTA.
     if (WechatAuthHelper.isConfigured) {
-      // Real SDK path: skip mock UI.
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          _submitRealWechat();
-        }
-      });
+      if (!mounted) {
+        return;
+      }
+      setState(() => _loadingCode = false);
       return;
     }
     final String code = await loadOrCreateWechatMockCode();
@@ -222,8 +224,10 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                               ),
                             ),
                             child: Text(
-                              '开发模拟：未配置 WECHAT_APP_ID 时不会跳转微信。'
-                              '同意后用模拟身份完成登录/自动注册。',
+                              kReleaseMode
+                                  ? '当前安装包未启用微信登录。请到官网下载最新版，或改用手机号登录。'
+                                  : '开发模拟：未配置 WECHAT_APP_ID 时不会跳转微信。'
+                                      '同意后用模拟身份完成登录/自动注册。',
                               style: TextStyle(
                                 color: AppDesignTokens.isDark
                                     ? const Color(0xFFFFD699)
@@ -245,7 +249,8 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                               ),
                             ),
                             child: Text(
-                              '将打开微信完成授权。新用户会自动创建账号并发放试用权益。',
+                              '将打开微信完成授权。新用户会自动创建账号并发放试用权益。'
+                              '授权后请回到本应用；华为等机型若未自动返回，从多任务切回即可。',
                               style: TextStyle(
                                 color: AppDesignTokens.textPrimary,
                                 height: 1.4,
@@ -381,15 +386,25 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                                   onPressed: _submitting
                                       ? null
                                       : () {
+                                          if (!WechatAuthHelper.isConfigured &&
+                                              kReleaseMode) {
+                                            _toast(
+                                              '当前安装包未启用微信登录，请更新官网最新版或改用手机号',
+                                            );
+                                            context.push(
+                                              SGRoute.loginPhone.route,
+                                            );
+                                            return;
+                                          }
+                                          if (!_agreedToTerms) {
+                                            setState(() {
+                                              _agreementError =
+                                                  '请先阅读并同意用户协议与版权声明';
+                                            });
+                                            _toast('请先勾选同意用户协议与版权声明');
+                                            return;
+                                          }
                                           if (WechatAuthHelper.isConfigured) {
-                                            if (!_agreedToTerms) {
-                                              setState(() {
-                                                _agreementError =
-                                                    '请先阅读并同意用户协议与版权声明';
-                                              });
-                                              _toast('请先勾选同意用户协议与版权声明');
-                                              return;
-                                            }
                                             unawaited(_submitRealWechat());
                                             return;
                                           }
@@ -414,7 +429,9 @@ class _WechatMockLoginScreenState extends ConsumerState<WechatMockLoginScreen> {
                                       : Text(
                                           WechatAuthHelper.isConfigured
                                               ? '打开微信授权'
-                                              : '同意并继续',
+                                              : (kReleaseMode
+                                                    ? '改用手机号登录'
+                                                    : '同意并继续'),
                                           style: const TextStyle(
                                             fontSize: 16,
                                             fontWeight: FontWeight.w900,

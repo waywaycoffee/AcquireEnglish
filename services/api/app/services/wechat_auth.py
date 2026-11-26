@@ -38,6 +38,10 @@ async def exchange_wechat_code(code: str) -> WeChatIdentity:
     if not settings.wechat_configured:
         raise ValueError("微信登录暂未配置")
 
+    # Production APK missing WECHAT_APP_ID used to send mock_* codes here.
+    if trimmed.startswith("mock_"):
+        raise ValueError("当前安装包未启用微信登录，请更新到官网最新版或改用手机号登录")
+
     async with httpx.AsyncClient(timeout=20) as client:
         response = await client.get(
             "https://api.weixin.qq.com/sns/oauth2/access_token",
@@ -51,7 +55,12 @@ async def exchange_wechat_code(code: str) -> WeChatIdentity:
         response.raise_for_status()
         data = response.json()
     if data.get("errcode"):
-        raise RuntimeError(f"微信登录失败：{data.get('errmsg') or data.get('errcode')}")
+        errcode = data.get("errcode")
+        errmsg = str(data.get("errmsg") or errcode)
+        # 40029 invalid code / 40163 code been used — client must re-auth, not retry same code.
+        if errcode in (40029, 40163) or "invalid code" in errmsg or "code been used" in errmsg:
+            raise ValueError("微信授权码无效或已使用，请重新点击微信登录")
+        raise RuntimeError(f"微信登录失败：{errmsg}")
     openid = str(data.get("openid") or "").strip()
     if not openid:
         raise RuntimeError("微信未返回 openid")
