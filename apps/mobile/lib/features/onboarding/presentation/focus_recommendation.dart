@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../../learner_model/domain/learner_skill_profile.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../membership/domain/free_trial_seeds.dart';
@@ -20,6 +21,7 @@ class FocusRecommendation {
     required this.subtitle,
     required this.route,
     required this.startLabel,
+    this.contentBand = '',
   });
 
   final LearningFocus focus;
@@ -27,6 +29,9 @@ class FocusRecommendation {
   final String subtitle;
   final String route;
   final String startLabel;
+
+  /// CEFR-ish band of the recommended content (not the learner's level).
+  final String contentBand;
 }
 
 const Map<String, List<String>> _topicKeywords = <String, List<String>>{
@@ -54,8 +59,9 @@ int _matchScore(
   );
   // Learners need audible English speech — EN softsubs alone are not enough
   // (game uploads often have Chinese VO + translated EN captions).
+  // Level fit rejects e.g. 小学三年级 (A1) for a C2 learner.
   return (topicMatch ? 2 : 0) +
-      (contentLevel.trim().toUpperCase() == level.toUpperCase() ? 3 : 0) +
+      levelFitScore(contentLevel, level) +
       (englishSpoken ? 10 : 0) +
       (freeTrialSeed ? 8 : 0) +
       (chineseSpoken && !englishSpoken ? -12 : 0);
@@ -129,13 +135,15 @@ FocusRecommendation buildFocusRecommendation({
   FocusRecommendation recommendation(
     String title,
     String subtitle,
-    String route,
-  ) => FocusRecommendation(
+    String route, {
+    String contentBand = '',
+  }) => FocusRecommendation(
     focus: focus,
     title: title,
     subtitle: subtitle,
     route: route,
     startLabel: focus.startLabel,
+    contentBand: contentBand,
   );
 
   switch (focus.id) {
@@ -184,26 +192,48 @@ FocusRecommendation buildFocusRecommendation({
       if (best == null) {
         return recommendation('选择一段视频', '从课程库选择或导入视频。', focus.route);
       }
+      final String videoBand =
+          tryParseLearnerBand(best.course.level) ?? '';
+      if (levelFitScore(best.course.level, level) < -1) {
+        return recommendation(
+          '选择一段接近 $level 的视频',
+          '库里暂无合适难度的内容，去课程库挑一段吧。',
+          focus.route,
+        );
+      }
       return recommendation(
         best.episode.title,
         best.course.title,
         '/episodes/${Uri.encodeComponent(best.episode.id)}',
+        contentBand: videoBand,
       );
     case 'reading':
-      final ReadingDoc? doc = _bestMatch(
-        readingDocs.where(
-          (ReadingDoc item) => item.plainText.trim().isNotEmpty,
-        ),
-        (ReadingDoc item) =>
-            _matchScore(item.title, item.level, level, preferredTopics),
-      );
-      if (doc == null) {
-        return recommendation('选择一篇短文', '打开阅读书库选一篇开始。', focus.route);
+      ReadingDoc? doc;
+      int bestReadingScore = -999;
+      for (final ReadingDoc item in readingDocs.where(
+        (ReadingDoc item) => item.plainText.trim().isNotEmpty,
+      )) {
+        final int score =
+            _matchScore(item.title, item.level, level, preferredTopics);
+        if (score > bestReadingScore) {
+          bestReadingScore = score;
+          doc = item;
+        }
       }
+      // Do not push 小学课本 (A1) onto B2/C1/C2 — send them to the library.
+      if (doc == null || bestReadingScore < 0) {
+        return recommendation(
+          '选择一篇适合你水平的短文',
+          '当前没有接近 $level 的读物，去书库挑一篇吧。',
+          focus.route,
+        );
+      }
+      final String readingBand = tryParseLearnerBand(doc.level) ?? '';
       return recommendation(
         doc.title,
         doc.level.isEmpty ? '阅读这篇短文' : '${doc.level} · 阅读这篇短文',
         '/reading/${Uri.encodeComponent(doc.id)}',
+        contentBand: readingBand,
       );
     case 'oral':
       final bool travel = preferredTopics.contains('travel');

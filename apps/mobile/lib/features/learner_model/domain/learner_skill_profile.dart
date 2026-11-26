@@ -11,6 +11,44 @@ int learnerBandIndex(String band) {
 String learnerBandAt(int index) =>
     kLearnerBands[index.clamp(0, kLearnerBands.length - 1)];
 
+/// Map free-form catalog labels onto app bands. Returns null when unknown
+/// so callers do not pretend A1 K12 text is the learner's C2 band.
+String? tryParseLearnerBand(String raw) {
+  final String upper = raw.trim().toUpperCase();
+  if (upper.isEmpty) return null;
+  if (kLearnerBands.contains(upper)) return upper;
+  return switch (upper) {
+    'ELE' || 'ELEMENTARY' || 'BEGINNER' || '初级' || '零基础' => 'A1',
+    'PRE-INT' || 'PREINT' || 'PRE-INTERMEDIATE' => 'A2',
+    'INT' || 'INTERMEDIATE' || '中级' => 'B1',
+    'UPPER-INT' || 'UPPERINT' || 'UPPER-INTERMEDIATE' => 'B2',
+    'ADV' || 'ADVANCED' || '高级' => 'C1',
+    'PROFICIENCY' || '精通' => 'C2',
+    _ => null,
+  };
+}
+
+String contentBandOrFallback(String raw, String fallback) =>
+    tryParseLearnerBand(raw) ??
+    (tryParseLearnerBand(fallback) ?? learnerBandAt(learnerBandIndex(fallback)));
+
+/// Score how well [contentLevel] fits [learnerLevel] for ranking.
+/// Strongly rejects material more than one band below the learner
+/// (e.g. 小学三年级 A1 for a C2 profile).
+int levelFitScore(String contentLevel, String learnerLevel) {
+  final String? content = tryParseLearnerBand(contentLevel);
+  final String skill =
+      tryParseLearnerBand(learnerLevel) ?? learnerBandAt(learnerBandIndex(learnerLevel));
+  if (content == null) return 0;
+  final int distance = bandDistance(contentBand: content, skillBand: skill);
+  if (distance < -1) return -25;
+  if (distance == -1) return 0;
+  if (distance == 0) return 3;
+  if (distance == 1) return 5;
+  if (distance == 2) return 1;
+  return -25;
+}
+
 /// One step up is i+1. Two steps up is "稍难". Further is out of window.
 int bandDistance({required String contentBand, required String skillBand}) =>
     learnerBandIndex(contentBand) - learnerBandIndex(skillBand);

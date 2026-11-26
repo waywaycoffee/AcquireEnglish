@@ -84,6 +84,65 @@ void main() {
     expect(rec.title, contains('Robot'));
   });
 
+  test('C2 learner is not pushed a grade-3 A1 textbook', () {
+    final FocusRecommendation rec = buildFocusRecommendation(
+      profile: const OnboardingProfile(
+        interestIds: <String>['campus'],
+        focusId: 'reading',
+        abilityId: 'complex',
+      ),
+      prefs: const AcquirePreferencesDto(level: 'C2'),
+      courses: const <LibraryCourseData>[],
+      readingDocs: const <ReadingDoc>[
+        ReadingDoc(
+          id: 'k12-textbook:pep-y3-wuxin:k12_g3:a',
+          title: '英语 三年级 上册',
+          sourceType: ReadingSourceType.catalog,
+          plainText: 'Hello! I am a pupil.',
+          level: 'A1',
+        ),
+        ReadingDoc(
+          id: 'builtin_c1_essay',
+          title: 'Why Cities Keep Changing',
+          sourceType: ReadingSourceType.builtin,
+          plainText: 'Urban planners negotiate competing interests.',
+          level: 'C1',
+          builtin: true,
+        ),
+      ],
+      activeBook: null,
+      levelOverride: 'C2',
+    );
+    expect(rec.route, '/reading/builtin_c1_essay');
+    expect(rec.contentBand, 'C1');
+    expect(rec.title, isNot(contains('三年级')));
+  });
+
+  test('C2 with only grade-3 text falls back to reading hub', () {
+    final FocusRecommendation rec = buildFocusRecommendation(
+      profile: const OnboardingProfile(
+        interestIds: <String>['campus'],
+        focusId: 'reading',
+        abilityId: 'complex',
+      ),
+      prefs: const AcquirePreferencesDto(level: 'C2'),
+      courses: const <LibraryCourseData>[],
+      readingDocs: const <ReadingDoc>[
+        ReadingDoc(
+          id: 'k12-g3',
+          title: '英语 三年级 上册',
+          sourceType: ReadingSourceType.catalog,
+          plainText: 'Hello!',
+          level: 'A1',
+        ),
+      ],
+      activeBook: null,
+      levelOverride: 'C2',
+    );
+    expect(rec.route, '/reading');
+    expect(rec.title, contains('适合你水平'));
+  });
+
   test('video recommendation prefers English speech over Chinese game footage', () {
     LibraryEpisodeItem ep({
       required String id,

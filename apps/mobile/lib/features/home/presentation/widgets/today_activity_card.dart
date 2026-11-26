@@ -194,8 +194,15 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       enabled: tracks.contains(kTrackVideo),
     );
     final ReadingDoc? book = ref.read(readingLibraryProvider).continueDoc;
+    final String readingBand = ref
+        .read(learnerSkillProfileProvider)
+        .recommendationEstimate(LearnerSkill.reading)
+        .band;
+    // Don't keep pulling a 小学课本 back as "继续读" for a C2 profile.
+    final bool readingLevelOk = book != null &&
+        levelFitScore(book.level, readingBand) >= -1;
     final JourneyTask? readingNext =
-        tracks.contains(kTrackReading) && book != null
+        tracks.contains(kTrackReading) && readingLevelOk
         ? JourneyTask(
             route: '/reading/${Uri.encodeComponent(book.id)}',
             title: '继续读${book.displayTitle}',
@@ -545,9 +552,10 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
             title: video.title,
             route: video.route,
             module: LearnModule.video,
-            contentBand: profile
-                .recommendationEstimate(LearnerSkill.listening)
-                .band,
+            contentBand: contentBandOrFallback(
+              video.contentBand,
+              profile.recommendationEstimate(LearnerSkill.listening).band,
+            ),
             interestMatch: true,
             notInterested: feedback.isHidden(video.route),
           ),
@@ -571,9 +579,11 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
             title: article.title,
             route: article.route,
             module: LearnModule.reading,
-            contentBand: profile
-                .recommendationEstimate(LearnerSkill.reading)
-                .band,
+            // Use the document band — never stamp the learner's C2 onto A1 K12.
+            contentBand: contentBandOrFallback(
+              article.contentBand,
+              profile.recommendationEstimate(LearnerSkill.reading).band,
+            ),
             interestMatch: true,
             notInterested: feedback.isHidden(article.route),
           ),
@@ -1042,10 +1052,8 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
     final LearnerSkillProfile skillProfile = ref.watch(
       learnerSkillProfileProvider,
     );
-    String asBand(String raw, String fallback) {
-      final String upper = raw.trim().toUpperCase();
-      return kLearnerBands.contains(upper) ? upper : fallback;
-    }
+    String asBand(String raw, String fallback) =>
+        contentBandOrFallback(raw, fallback);
 
     final List<LearnCandidate> candidates = <LearnCandidate>[
       LearnCandidate(
