@@ -1,0 +1,11 @@
+# APK: always release for device install
+
+When building an APK to sideload / overwrite-install onto a connected phone:
+
+1. **Always** use release: `flutter build apk --release --flavor prod --no-pub` (from `apps/mobile`).
+2. applicationId must stay `com.acquire.english` (prod flavor), never `.dev`.
+3. Signing must use upload keystore via `apps/mobile/android/key.properties` → `keystore/acquireenglish-upload.jks`. If missing, fail clearly — do not fall back to `team-debug.keystore` or `~/.android/debug.keystore` for install builds.
+4. Install with `adb install -r` to preserve app data. Never uninstall just to switch signatures.
+5. `team-debug.keystore` is for local debug runs only, not for covering a release-signed device install.
+
+This supersedes older AGENTS wording that used `--debug --flavor prod`.

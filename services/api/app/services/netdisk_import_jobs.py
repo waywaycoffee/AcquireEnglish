@@ -62,3 +62,18 @@ async def get_job(job_id: str) -> dict[str, Any] | None:
     async with _lock:
         job = _jobs.get(job_id)
         return dict(job) if job else None
+
+
+async def get_active_job(*, user_id: int) -> dict[str, Any] | None:
+    """Return the newest in-flight import so a reinstalled App can reattach."""
+    async with _lock:
+        matches = [
+            job
+            for job in _jobs.values()
+            if int(job.get("user_id") or 0) == user_id
+            and str(job.get("status") or "") in {"queued", "running"}
+        ]
+        if not matches:
+            return None
+        newest = max(matches, key=lambda row: str(row.get("updated_at") or ""))
+        return dict(newest)

@@ -985,6 +985,17 @@ async def get_netdisk_import_job(
     return job
 
 
+@router.get("/active-import-job")
+async def get_active_netdisk_import_job(
+    user: User = Depends(get_current_user),
+) -> dict[str, Any]:
+    """Let a restarted/reinstalled client reattach to its running import."""
+    from app.services import netdisk_import_jobs as jobs
+
+    job = await jobs.get_active_job(user_id=user.id)
+    return {"active": job is not None, "job": job}
+
+
 class NetdiskFetchSubtitlesOut(BaseModel):
     import_id: int
     has_en: bool

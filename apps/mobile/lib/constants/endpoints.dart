@@ -91,7 +91,8 @@ class Endpoints {
   static const String commerceTrialStatus = 'api/commerce/trial/status';
   static const String commerceTrialClaimWelcome =
       'api/commerce/trial/claim-welcome';
-  static const String commerceTrialClaimExtend = 'api/commerce/trial/claim-extend';
+  static const String commerceTrialClaimExtend =
+      'api/commerce/trial/claim-extend';
   static const String commercePoints = 'api/commerce/points';
   static const String commercePointsEarn = 'api/commerce/points/earn';
   static const String commercePointsSpend = 'api/commerce/points/spend';
@@ -133,12 +134,13 @@ class Endpoints {
       'api/oral-match/rooms/$roomId/messages';
   static String oralMatchReport(String roomId) =>
       'api/oral-match/rooms/$roomId/report';
-  static const String sharedSubtitlesBilibili =
-      'api/shared-subtitles/bilibili';
+  static const String sharedSubtitlesBilibili = 'api/shared-subtitles/bilibili';
   static const String sharedSubtitlesBilibiliList =
       'api/shared-subtitles/bilibili/list';
+
   /// ECS durable queue for GPU ASR + translate (Bilibili shared packs).
   static const String sharedSubtitlesJobs = 'api/shared-subtitles/jobs';
+
   /// EN exists, ZH missing → GPU EN→ZH only (no Whisper).
   static const String sharedSubtitlesTranslateJobs =
       'api/shared-subtitles/translate-jobs';
@@ -152,6 +154,7 @@ class Endpoints {
   static const String netdiskList = 'api/netdisk/list';
   static const String netdiskImport = 'api/netdisk/import';
   static const String netdiskImportSeries = 'api/netdisk/import-series';
+  static const String netdiskActiveImportJob = 'api/netdisk/active-import-job';
   static String netdiskImportJob(String jobId) =>
       'api/netdisk/import-jobs/${Uri.encodeComponent(jobId)}';
   static String netdiskFetchOnlineSubtitles(int importId) =>
@@ -163,6 +166,7 @@ class Endpoints {
   static const String foundationMediaManifest = 'api/foundation/media/manifest';
   static const String foundationMediaLookup = 'api/foundation/media/lookup';
   static const String foundationMediaUpload = 'api/foundation/media/upload';
+
   /// ECS-hosted A/V for any namespace (`foundation|reading|oral|course|misc`).
   static const String contentMediaManifest = 'api/content/media/manifest';
   static const String contentMediaLookup = 'api/content/media/lookup';
@@ -184,7 +188,8 @@ class Endpoints {
   static const String readingSpeechLookup = 'api/reading/speech/lookup';
   static const String readingSpeechPregen = 'api/reading/speech/pregen';
   static const String readingSpeechPack = 'api/reading/speech/pack';
-  static const String readingSpeechBookPregen = 'api/reading/speech/book-pregen';
+  static const String readingSpeechBookPregen =
+      'api/reading/speech/book-pregen';
   static const String readingSpeechBookPregenFallback =
       'api/reading/speech/book-pregen/fallback';
   static const String readingCoversEnsure = 'api/reading/covers/ensure';
@@ -201,8 +206,10 @@ class Endpoints {
   /// 素材指纹缓存复用（同源教材秒出课程包）。
   static const String fingerprintCacheConfig = 'api/fingerprint-cache/config';
   static const String fingerprintCacheSearch = 'api/fingerprint-cache/search';
-  static const String fingerprintCacheRegister = 'api/fingerprint-cache/register';
-  static const String fingerprintCacheMyCourses = 'api/fingerprint-cache/my-courses';
+  static const String fingerprintCacheRegister =
+      'api/fingerprint-cache/register';
+  static const String fingerprintCacheMyCourses =
+      'api/fingerprint-cache/my-courses';
   static const String fingerprintCacheConfirmBind =
       'api/fingerprint-cache/confirm-bind';
   static String fingerprintCacheAsset(String assetId) =>

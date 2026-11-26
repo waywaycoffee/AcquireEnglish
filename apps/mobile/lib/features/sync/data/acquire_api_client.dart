@@ -18,8 +18,9 @@ import '../../writing/domain/writing_models.dart';
 
 final Provider<AcquireApiClient> acquireApiClientProvider =
     Provider<AcquireApiClient>((Ref ref) {
-      final AcquireApiClient client =
-          AcquireApiClient(ref.watch(networkRepositoryProvider));
+      final AcquireApiClient client = AcquireApiClient(
+        ref.watch(networkRepositoryProvider),
+      );
       SoftsubAuthBridge.bindApiClient(client);
       return client;
     });
@@ -51,6 +52,7 @@ class AcquireUser {
   final String? phone;
   final bool wechatBound;
   final int pointsBalance;
+
   /// Public registration serial, e.g. AE-000123.
   final String? memberNo;
 }
@@ -149,12 +151,12 @@ class OralMatchContent {
   bool get hasTopic => topic.isNotEmpty;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        if (topic.isNotEmpty) 'topic': topic,
-        if (kind.isNotEmpty) 'content_kind': kind,
-        if (id.isNotEmpty) 'content_id': id,
-        if (title.isNotEmpty) 'content_title': title,
-        if (route.isNotEmpty) 'content_route': route,
-      };
+    if (topic.isNotEmpty) 'topic': topic,
+    if (kind.isNotEmpty) 'content_kind': kind,
+    if (id.isNotEmpty) 'content_id': id,
+    if (title.isNotEmpty) 'content_title': title,
+    if (route.isNotEmpty) 'content_route': route,
+  };
 }
 
 class OralMatchStatus {
@@ -364,8 +366,10 @@ class SharedSubtitleGpuJob {
   final String state;
   final int attempts;
   final String error;
+
   /// Optional 0–1 progress from the 5060 Ti worker heartbeat.
   final double? progressPct;
+
   /// Optional Chinese status line from the worker (e.g. 准备音频中…).
   final String? progressMessage;
 
@@ -375,10 +379,7 @@ class SharedSubtitleGpuJob {
 
 /// One beat of a continuous 口播 narration script.
 class PodcastGuideSegment {
-  const PodcastGuideSegment({
-    required this.text,
-    this.awaitUser = false,
-  });
+  const PodcastGuideSegment({required this.text, this.awaitUser = false});
 
   final String text;
 
@@ -421,7 +422,8 @@ class SharedBilibiliSubtitlePack {
         zhHits: (json['zh_hits'] as num?)?.toInt() ?? 0,
         sourceOrigin: '${json['source_origin'] ?? 'asr'}',
         hasEn: json['has_en'] != false,
-        hasZh: json['has_zh'] == true ||
+        hasZh:
+            json['has_zh'] == true ||
             ((json['subtitle_zh_srt'] as String?)?.trim().isNotEmpty ?? false),
       );
 
@@ -585,7 +587,9 @@ class FingerprintCacheSearchResult {
     final Map<String, dynamic> course = courseRaw is Map
         ? Map<String, dynamic>.from(courseRaw)
         : <String, dynamic>{};
-    final List<Map<String, dynamic>> lessons = _fingerprintLessonsFromAsset(asset);
+    final List<Map<String, dynamic>> lessons = _fingerprintLessonsFromAsset(
+      asset,
+    );
     final List<String> candidates = <String>[];
     final Object? candRaw = json['candidates'];
     if (candRaw is List) {
@@ -666,8 +670,7 @@ class FingerprintUploadTaskStatus {
       status == 'fingerprint_match' ||
       status == 'failed';
 
-  bool get isReady =>
-      status == 'success' || status == 'fingerprint_match';
+  bool get isReady => status == 'success' || status == 'fingerprint_match';
 }
 
 List<Map<String, dynamic>> _fingerprintLessonsFromAsset(
@@ -858,25 +861,26 @@ class AcquireDailyFeedItemDto {
   final String? description;
   final List<String> tags;
   final String source;
+
   /// `interest` | `followed`
   final String reason;
 
   bool get isFollowed => reason == 'followed' || tags.contains('followed');
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'id': id,
-        'bvid': bvid,
-        'title': title,
-        'author': author,
-        'authorId': authorId,
-        'coverUrl': coverUrl,
-        'durationSec': durationSec,
-        'watchUrl': watchUrl,
-        'description': description,
-        'tags': tags,
-        'source': source,
-        'reason': reason,
-      };
+    'id': id,
+    'bvid': bvid,
+    'title': title,
+    'author': author,
+    'authorId': authorId,
+    'coverUrl': coverUrl,
+    'durationSec': durationSec,
+    'watchUrl': watchUrl,
+    'description': description,
+    'tags': tags,
+    'source': source,
+    'reason': reason,
+  };
 }
 
 class FollowedCreatorDto {
@@ -904,12 +908,12 @@ class FollowedCreatorDto {
   final String? profileUrl;
 
   Map<String, dynamic> toJson() => <String, dynamic>{
-        'source': source,
-        'creator_id': creatorId,
-        'display_name': displayName,
-        if (avatarUrl != null) 'avatar_url': avatarUrl,
-        if (profileUrl != null) 'profile_url': profileUrl,
-      };
+    'source': source,
+    'creator_id': creatorId,
+    'display_name': displayName,
+    if (avatarUrl != null) 'avatar_url': avatarUrl,
+    if (profileUrl != null) 'profile_url': profileUrl,
+  };
 }
 
 class RecommendedBilibiliVideoDto {
@@ -964,8 +968,8 @@ class RecommendedBilibiliCreatorDto {
         if (row is Map) {
           final RecommendedBilibiliVideoDto video =
               RecommendedBilibiliVideoDto.fromJson(
-            Map<String, dynamic>.from(row),
-          );
+                Map<String, dynamic>.from(row),
+              );
           if (video.bvid.isNotEmpty && video.watchUrl.isNotEmpty) {
             videos.add(video);
           }
@@ -1047,11 +1051,11 @@ class AcquirePreferencesDto {
         notifyDailyFeed: json['notify_daily_feed'] as bool? ?? true,
         hasBilibiliCookie: json['has_bilibili_cookie'] == true,
         hasAsrApiKey: json['has_asr_api_key'] == true,
-        followedCreators: (json['followed_creators'] as List<dynamic>? ??
-                const <dynamic>[])
-            .whereType<Map<String, dynamic>>()
-            .map(FollowedCreatorDto.fromJson)
-            .toList(growable: false),
+        followedCreators:
+            (json['followed_creators'] as List<dynamic>? ?? const <dynamic>[])
+                .whereType<Map<String, dynamic>>()
+                .map(FollowedCreatorDto.fromJson)
+                .toList(growable: false),
       );
 
   final String level;
@@ -1060,6 +1064,7 @@ class AcquirePreferencesDto {
   final bool notifyDailyFeed;
   final bool hasBilibiliCookie;
   final bool hasAsrApiKey;
+
   /// Write-only: sent on PUT when non-null.
   final String? bilibiliCookie;
   final String? asrApiKey;
@@ -1115,21 +1120,22 @@ class AcquireVocabDto {
     this.dueAt,
   });
 
-  factory AcquireVocabDto.fromJson(Map<String, dynamic> json) => AcquireVocabDto(
-    id: json['id'] as int,
-    word: json['word'] as String,
-    context: json['context'] as String?,
-    courseId: json['course_id'] as String?,
-    lessonId: json['lesson_id'] as String?,
-    mastery: json['mastery'] as String? ?? 'new',
-    ease: (json['ease'] as num?)?.toDouble() ?? 2.5,
-    intervalDays: json['interval_days'] as int? ?? 0,
-    repetitions: json['repetitions'] as int? ?? 0,
-    dueAt: json['due_at'] == null
-        ? null
-        : DateTime.tryParse(json['due_at'] as String),
-    createdAt: DateTime.parse(json['created_at'] as String),
-  );
+  factory AcquireVocabDto.fromJson(Map<String, dynamic> json) =>
+      AcquireVocabDto(
+        id: json['id'] as int,
+        word: json['word'] as String,
+        context: json['context'] as String?,
+        courseId: json['course_id'] as String?,
+        lessonId: json['lesson_id'] as String?,
+        mastery: json['mastery'] as String? ?? 'new',
+        ease: (json['ease'] as num?)?.toDouble() ?? 2.5,
+        intervalDays: json['interval_days'] as int? ?? 0,
+        repetitions: json['repetitions'] as int? ?? 0,
+        dueAt: json['due_at'] == null
+            ? null
+            : DateTime.tryParse(json['due_at'] as String),
+        createdAt: DateTime.parse(json['created_at'] as String),
+      );
 
   final int id;
   final String word;
@@ -1254,13 +1260,12 @@ class AcquireApiClient {
     String token, {
     int? revision,
     Map<String, dynamic>? state,
-  }) =>
-      documentBackup(
-        Endpoints.reviewBackup,
-        token: token,
-        revision: revision,
-        state: state,
-      );
+  }) => documentBackup(
+    Endpoints.reviewBackup,
+    token: token,
+    revision: revision,
+    state: state,
+  );
 
   /// Revision-CAS document blob (reading / wordbook / settings / review).
   Future<({int revision, Map<String, dynamic>? state})> documentBackup(
@@ -1290,16 +1295,16 @@ class AcquireApiClient {
   }
 
   Future<Map<String, dynamic>> syncStatus({String? token}) async {
-    final Response<Map<String, dynamic>> response =
-        await _dio.get<Map<String, dynamic>>(
-      Endpoints.syncStatus,
-      options: Options(
-        headers: token == null || token.isEmpty
-            ? null
-            : <String, String>{'Authorization': 'Bearer $token'},
-        extra: _noCache.extra,
-      ),
-    );
+    final Response<Map<String, dynamic>> response = await _dio
+        .get<Map<String, dynamic>>(
+          Endpoints.syncStatus,
+          options: Options(
+            headers: token == null || token.isEmpty
+                ? null
+                : <String, String>{'Authorization': 'Bearer $token'},
+            extra: _noCache.extra,
+          ),
+        );
     return response.data ?? <String, dynamic>{};
   }
 
@@ -1355,9 +1360,7 @@ class AcquireApiClient {
       Endpoints.emailSend,
       data: <String, String>{'email': email},
     );
-    return AcquireSmsSendResult.fromJson(
-      response.data as Map<String, dynamic>,
-    );
+    return AcquireSmsSendResult.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<AcquireSmsSendResult> sendSmsCode({required String phone}) async {
@@ -1365,9 +1368,7 @@ class AcquireApiClient {
       Endpoints.smsSend,
       data: <String, String>{'phone': phone},
     );
-    return AcquireSmsSendResult.fromJson(
-      response.data as Map<String, dynamic>,
-    );
+    return AcquireSmsSendResult.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<AcquireTokenResult> loginWithSms({
@@ -1450,7 +1451,9 @@ class AcquireApiClient {
     final Response<dynamic> response = await _dio.get(
       Endpoints.preferences,
       options: Options(
-        extra: const <String, Object>{'dio_cache_interceptor_force_refresh': true},
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
       ),
     );
     return AcquirePreferencesDto.fromJson(
@@ -1465,7 +1468,9 @@ class AcquireApiClient {
       Endpoints.preferences,
       data: prefs.toJson(),
       options: Options(
-        extra: const <String, Object>{'dio_cache_interceptor_force_refresh': true},
+        extra: const <String, Object>{
+          'dio_cache_interceptor_force_refresh': true,
+        },
       ),
     );
     return AcquirePreferencesDto.fromJson(
@@ -1503,10 +1508,7 @@ class AcquireApiClient {
     if (q.isEmpty) return const <AcquireDailyFeedItemDto>[];
     final Response<dynamic> response = await _dio.get(
       Endpoints.bilibiliSearch,
-      queryParameters: <String, dynamic>{
-        'q': q,
-        'limit': limit.clamp(1, 20),
-      },
+      queryParameters: <String, dynamic>{'q': q, 'limit': limit.clamp(1, 20)},
       options: Options(
         receiveTimeout: const Duration(seconds: 14),
         extra: const <String, Object>{
@@ -1572,8 +1574,9 @@ class AcquireApiClient {
       Endpoints.youtubeBrowseMeta,
       queryParameters: <String, dynamic>{'level': level.trim()},
     );
-    final Map<String, dynamic> data =
-        Map<String, dynamic>.from(response.data as Map);
+    final Map<String, dynamic> data = Map<String, dynamic>.from(
+      response.data as Map,
+    );
     final List<dynamic> queries =
         data['queries'] as List<dynamic>? ?? const <dynamic>[];
     return queries
@@ -1624,9 +1627,7 @@ class AcquireApiClient {
     final Response<dynamic> response = await _dio.get(
       Endpoints.creatorsRecommended,
       // Allow short HTTP cache; server also keeps a 15‑minute payload cache.
-      options: Options(
-        receiveTimeout: const Duration(seconds: 20),
-      ),
+      options: Options(receiveTimeout: const Duration(seconds: 20)),
     );
     return (response.data as List<dynamic>)
         .cast<Map<String, dynamic>>()
@@ -1671,10 +1672,7 @@ class AcquireApiClient {
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.creatorsUnfollow,
-      data: <String, dynamic>{
-        'source': source,
-        'creator_id': creatorId,
-      },
+      data: <String, dynamic>{'source': source, 'creator_id': creatorId},
       options: Options(
         extra: const <String, Object>{
           'dio_cache_interceptor_force_refresh': true,
@@ -1735,7 +1733,9 @@ class AcquireApiClient {
 
   Future<List<LearningScenario>> fetchLearningTasks() async {
     try {
-      final Response<dynamic> response = await _dio.get(Endpoints.learningTasks);
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.learningTasks,
+      );
       final Object? data = response.data;
       if (data is! List) return LearningScenario.seeds;
       final List<LearningScenario> items = <LearningScenario>[];
@@ -1876,7 +1876,8 @@ class AcquireApiClient {
   }
 
   Future<Map<String, dynamic>> membershipRewards() async =>
-      (await _dio.get('${Endpoints.assets}/membership-rewards')).data as Map<String, dynamic>;
+      (await _dio.get('${Endpoints.assets}/membership-rewards')).data
+          as Map<String, dynamic>;
 
   Future<void> claimMembershipReward(String code) async {
     await _dio.post('${Endpoints.assets}/membership-rewards/$code/claim');
@@ -1887,19 +1888,23 @@ class AcquireApiClient {
   }
 
   Future<Map<String, dynamic>> commerceModuleAccess(String moduleCode) async {
-    final Response<dynamic> response =
-        await _dio.get(Endpoints.commerceModuleAccess(moduleCode));
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.commerceModuleAccess(moduleCode),
+    );
     return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> commerceCatalog() async {
-    final Response<dynamic> response = await _dio.get(Endpoints.commerceCatalog);
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.commerceCatalog,
+    );
     return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> commerceFreeTrialSeeds() async {
-    final Response<dynamic> response =
-        await _dio.get(Endpoints.commerceFreeTrialSeeds);
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.commerceFreeTrialSeeds,
+    );
     return response.data as Map<String, dynamic>;
   }
 
@@ -1950,20 +1955,23 @@ class AcquireApiClient {
   }
 
   Future<Map<String, dynamic>> commerceTrialStatus() async {
-    final Response<dynamic> response =
-        await _dio.get(Endpoints.commerceTrialStatus);
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.commerceTrialStatus,
+    );
     return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> commerceClaimWelcomePro() async {
-    final Response<dynamic> response =
-        await _dio.post(Endpoints.commerceTrialClaimWelcome);
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.commerceTrialClaimWelcome,
+    );
     return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> commerceClaimTrialExtend() async {
-    final Response<dynamic> response =
-        await _dio.post(Endpoints.commerceTrialClaimExtend);
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.commerceTrialClaimExtend,
+    );
     return response.data as Map<String, dynamic>;
   }
 
@@ -1973,8 +1981,9 @@ class AcquireApiClient {
   }
 
   Future<Map<String, dynamic>> commercePayStatus() async {
-    final Response<dynamic> response =
-        await _dio.get(Endpoints.commercePayStatus);
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.commercePayStatus,
+    );
     return response.data as Map<String, dynamic>;
   }
 
@@ -1985,10 +1994,7 @@ class AcquireApiClient {
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.examReadingParse,
-      data: <String, dynamic>{
-        'text': text,
-        'title': title,
-      },
+      data: <String, dynamic>{'text': text, 'title': title},
     );
     final Object? raw = response.data;
     final Map<String, dynamic> body = raw is Map
@@ -2027,9 +2033,7 @@ class AcquireApiClient {
         : const <dynamic>[];
     return quiz
         .whereType<Map<dynamic, dynamic>>()
-        .map(
-          (Map<dynamic, dynamic> item) => Map<String, dynamic>.from(item),
-        )
+        .map((Map<dynamic, dynamic> item) => Map<String, dynamic>.from(item))
         .toList(growable: false);
   }
 
@@ -2055,10 +2059,7 @@ class AcquireApiClient {
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.commercePointsSpend,
-      data: <String, dynamic>{
-        'item': item,
-        if (meta != null) 'meta': meta,
-      },
+      data: <String, dynamic>{'item': item, if (meta != null) 'meta': meta},
     );
     return response.data as Map<String, dynamic>;
   }
@@ -2067,7 +2068,8 @@ class AcquireApiClient {
     final Response<dynamic> response = await _dio.get(
       Endpoints.commerceQuotas,
       queryParameters: <String, dynamic>{
-        if (moduleCode != null && moduleCode.isNotEmpty) 'module_code': moduleCode,
+        if (moduleCode != null && moduleCode.isNotEmpty)
+          'module_code': moduleCode,
       },
     );
     return response.data as Map<String, dynamic>;
@@ -2080,7 +2082,8 @@ class AcquireApiClient {
     final Response<dynamic> response = await _dio.get(
       Endpoints.commerceQuotaMetric(metric),
       queryParameters: <String, dynamic>{
-        if (moduleCode != null && moduleCode.isNotEmpty) 'module_code': moduleCode,
+        if (moduleCode != null && moduleCode.isNotEmpty)
+          'module_code': moduleCode,
       },
     );
     return response.data as Map<String, dynamic>;
@@ -2103,8 +2106,9 @@ class AcquireApiClient {
   }
 
   Future<Map<String, dynamic>> commerceEntitlements() async {
-    final Response<dynamic> response =
-        await _dio.get(Endpoints.commerceEntitlements);
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.commerceEntitlements,
+    );
     return response.data as Map<String, dynamic>;
   }
 
@@ -2114,19 +2118,23 @@ class AcquireApiClient {
   }
 
   Future<Map<String, dynamic>> commerceCheckin() async {
-    final Response<dynamic> response = await _dio.post(Endpoints.commerceCheckin);
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.commerceCheckin,
+    );
     return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> commerceArenaStatus() async {
-    final Response<dynamic> response =
-        await _dio.get(Endpoints.commerceArenaStatus);
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.commerceArenaStatus,
+    );
     return response.data as Map<String, dynamic>;
   }
 
   Future<Map<String, dynamic>> commerceArenaStart() async {
-    final Response<dynamic> response =
-        await _dio.post(Endpoints.commerceArenaStart);
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.commerceArenaStart,
+    );
     return response.data as Map<String, dynamic>;
   }
 
@@ -2159,7 +2167,9 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> markAssetOrderPaid({required int orderId}) async {
+  Future<Map<String, dynamic>> markAssetOrderPaid({
+    required int orderId,
+  }) async {
     final Response<dynamic> response = await _dio.post(
       '${Endpoints.assetsOrders}/$orderId/mark-paid',
     );
@@ -2239,13 +2249,32 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<List<Map<String, dynamic>>> scanNetdiskEpubs({required String provider, required String path}) async {
-    final Response<dynamic> response = await _dio.get('api/netdisk/books/scan', queryParameters: <String, dynamic>{'provider': provider, 'path': path, 'epub_only': true});
-    return ((response.data as Map<String, dynamic>)['books'] as List<dynamic>).map((dynamic row) => Map<String, dynamic>.from(row as Map)).toList();
+  Future<List<Map<String, dynamic>>> scanNetdiskEpubs({
+    required String provider,
+    required String path,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      'api/netdisk/books/scan',
+      queryParameters: <String, dynamic>{
+        'provider': provider,
+        'path': path,
+        'epub_only': true,
+      },
+    );
+    return ((response.data as Map<String, dynamic>)['books'] as List<dynamic>)
+        .map((dynamic row) => Map<String, dynamic>.from(row as Map))
+        .toList();
   }
 
-  Future<Uint8List> downloadNetdiskEpub({required String provider, required String path}) async {
-    final Response<List<int>> response = await _dio.get<List<int>>('api/netdisk/books/file', queryParameters: <String, dynamic>{'provider': provider, 'path': path}, options: Options(responseType: ResponseType.bytes));
+  Future<Uint8List> downloadNetdiskEpub({
+    required String provider,
+    required String path,
+  }) async {
+    final Response<List<int>> response = await _dio.get<List<int>>(
+      'api/netdisk/books/file',
+      queryParameters: <String, dynamic>{'provider': provider, 'path': path},
+      options: Options(responseType: ResponseType.bytes),
+    );
     return Uint8List.fromList(response.data ?? <int>[]);
   }
 
@@ -2255,10 +2284,7 @@ class AcquireApiClient {
   }) async {
     final Response<dynamic> response = await _dio.post(
       Endpoints.netdiskBind,
-      data: <String, String>{
-        'provider': provider,
-        'credential': credential,
-      },
+      data: <String, String>{'provider': provider, 'credential': credential},
     );
     return response.data as Map<String, dynamic>;
   }
@@ -2370,9 +2396,24 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
+  Future<Map<String, dynamic>?> activeNetdiskImportJob() async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.netdiskActiveImportJob,
+    );
+    final Map<String, dynamic> body = response.data as Map<String, dynamic>;
+    final Object? raw = body['job'];
+    if (raw is Map<String, dynamic>) return raw;
+    if (raw is Map) {
+      return raw.map((Object? k, Object? v) => MapEntry('$k', v));
+    }
+    return null;
+  }
+
   Future<bool> liveKitConfigured() async {
     try {
-      final Response<dynamic> response = await _dio.get(Endpoints.livekitStatus);
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.livekitStatus,
+      );
       final Object? configured =
           (response.data as Map<String, dynamic>)['configured'];
       return configured == true || configured == 'true';
@@ -2388,9 +2429,7 @@ class AcquireApiClient {
         if (room != null && room.trim().isNotEmpty) 'room': room.trim(),
       },
     );
-    return AcquireLiveKitToken.fromJson(
-      response.data as Map<String, dynamic>,
-    );
+    return AcquireLiveKitToken.fromJson(response.data as Map<String, dynamic>);
   }
 
   /// Cloud VL refine for photo scene nouns (DashScope Qwen-VL on API host).
@@ -2426,8 +2465,9 @@ class AcquireApiClient {
         },
       ),
     );
-    final Map<String, dynamic> body =
-        Map<String, dynamic>.from(response.data as Map);
+    final Map<String, dynamic> body = Map<String, dynamic>.from(
+      response.data as Map,
+    );
     final List<dynamic> rows =
         (body['labels'] as List<dynamic>?) ?? const <dynamic>[];
     return rows
@@ -2579,13 +2619,12 @@ class AcquireApiClient {
     final List<OralMatchMessage> messages = raw is! List
         ? const <OralMatchMessage>[]
         : raw
-            .whereType<Map>()
-            .map(
-              (Map row) => OralMatchMessage.fromJson(
-                Map<String, dynamic>.from(row),
-              ),
-            )
-            .toList(growable: false);
+              .whereType<Map>()
+              .map(
+                (Map row) =>
+                    OralMatchMessage.fromJson(Map<String, dynamic>.from(row)),
+              )
+              .toList(growable: false);
     return OralMatchInbox(
       messages: messages,
       roomClosed: data['room_closed'] == true,
@@ -2970,8 +3009,9 @@ class AcquireApiClient {
         ),
       );
       if (response.data is! Map) return null;
-      final Map<String, dynamic> data =
-          Map<String, dynamic>.from(response.data as Map);
+      final Map<String, dynamic> data = Map<String, dynamic>.from(
+        response.data as Map,
+      );
       final Object? assetRaw = data['asset'];
       final Object? courseRaw = data['user_course_asset'];
       return FingerprintCacheSearchResult.fromJson(<String, dynamic>{
@@ -2979,8 +3019,7 @@ class AcquireApiClient {
         'message': '已确认复用疑似匹配课程',
         'asset_id': id,
         'asset': assetRaw is Map ? assetRaw : <String, dynamic>{},
-        'user_course_asset':
-            courseRaw is Map ? courseRaw : <String, dynamic>{},
+        'user_course_asset': courseRaw is Map ? courseRaw : <String, dynamic>{},
         'upload_task_id': uploadTaskId ?? '',
       });
     } catch (_) {
@@ -3082,7 +3121,11 @@ class AcquireApiClient {
     try {
       final Response<dynamic> response = await _dio.post<Object?>(
         Endpoints.sharedSubtitlesJobs,
-        data: <String, Object>{'bvid': id, 'page': page < 1 ? 1 : page, if (reserve) 'reserve': true},
+        data: <String, Object>{
+          'bvid': id,
+          'page': page < 1 ? 1 : page,
+          if (reserve) 'reserve': true,
+        },
         options: Options(
           validateStatus: (int? status) =>
               status != null && status >= 200 && status < 300,
@@ -3098,7 +3141,12 @@ class AcquireApiClient {
           Map<String, dynamic>.from(response.data as Map),
         );
       }
-      return SharedSubtitleGpuJob(id: '', bvid: id, page: page, state: 'queued');
+      return SharedSubtitleGpuJob(
+        id: '',
+        bvid: id,
+        page: page,
+        state: 'queued',
+      );
     } on DioException {
       if (reportErrors) rethrow;
       // Missing login or offline ECS must not block local fill / import.
@@ -3152,7 +3200,12 @@ class AcquireApiClient {
           Map<String, dynamic>.from(response.data as Map),
         );
       }
-      return SharedSubtitleGpuJob(id: '', bvid: id, page: page, state: 'queued');
+      return SharedSubtitleGpuJob(
+        id: '',
+        bvid: id,
+        page: page,
+        state: 'queued',
+      );
     } on DioException {
       if (reportErrors) rethrow;
       return null;
@@ -3223,7 +3276,7 @@ class AcquireApiClient {
 
   /// Community shared Bilibili packs (title + Chinese preview, no full SRT).
   Future<({int total, List<SharedBilibiliSubtitleListItem> items})>
-      listSharedBilibiliSubtitles({
+  listSharedBilibiliSubtitles({
     String? query,
     int limit = 50,
     int offset = 0,
@@ -3288,9 +3341,7 @@ class AcquireApiClient {
         },
       ),
     );
-    return PersonalImportAsset.fromJson(
-      response.data as Map<String, dynamic>,
-    );
+    return PersonalImportAsset.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<List<int>?> fetchPersonalImportCover({required int importId}) async {
@@ -3477,9 +3528,7 @@ class AcquireApiClient {
       return FoundationMediaManifest.fromJson(data);
     }
     if (data is Map) {
-      return FoundationMediaManifest.fromJson(
-        Map<String, dynamic>.from(data),
-      );
+      return FoundationMediaManifest.fromJson(Map<String, dynamic>.from(data));
     }
     return FoundationMediaManifest.empty;
   }
@@ -3491,10 +3540,7 @@ class AcquireApiClient {
     try {
       final Response<dynamic> response = await _dio.get(
         Endpoints.foundationMediaLookup,
-        queryParameters: <String, dynamic>{
-          'book_id': bookId,
-          'key': key,
-        },
+        queryParameters: <String, dynamic>{'book_id': bookId, 'key': key},
       );
       final Object? data = response.data;
       if (data is Map<String, dynamic>) {
@@ -3586,9 +3632,7 @@ class AcquireApiClient {
       return FoundationMediaManifest.fromJson(data);
     }
     if (data is Map) {
-      return FoundationMediaManifest.fromJson(
-        Map<String, dynamic>.from(data),
-      );
+      return FoundationMediaManifest.fromJson(Map<String, dynamic>.from(data));
     }
     return FoundationMediaManifest.empty;
   }
@@ -3768,10 +3812,7 @@ class AcquireApiClient {
     try {
       final Response<dynamic> response = await _dio.get(
         Endpoints.readingSpeechBookPregen,
-        queryParameters: <String, dynamic>{
-          'doc_id': id,
-          'voice': voice.trim(),
-        },
+        queryParameters: <String, dynamic>{'doc_id': id, 'voice': voice.trim()},
         options: Options(
           receiveTimeout: const Duration(seconds: 12),
           extra: const <String, Object>{
@@ -3830,10 +3871,7 @@ class AcquireApiClient {
     try {
       final Response<dynamic> response = await _dio.post(
         Endpoints.readingCoversEnsure,
-        data: <String, dynamic>{
-          'books': books,
-          'seed_classics': seedClassics,
-        },
+        data: <String, dynamic>{'books': books, 'seed_classics': seedClassics},
         options: Options(
           receiveTimeout: const Duration(seconds: 120),
           sendTimeout: const Duration(seconds: 30),
@@ -3953,10 +3991,8 @@ class AcquireApiClient {
   }
 
   Options get _noCache => Options(
-        extra: const <String, Object>{
-          'dio_cache_interceptor_force_refresh': true,
-        },
-      );
+    extra: const <String, Object>{'dio_cache_interceptor_force_refresh': true},
+  );
 
   Future<List<CommunityPostDto>> communityFeed({
     String? kind,
@@ -4011,8 +4047,7 @@ class AcquireApiClient {
         if (linkCover != null) 'link_cover': linkCover,
         if (embedWord != null && embedWord.trim().isNotEmpty)
           'embed_word': embedWord.trim(),
-        if (embedTimestampSec != null)
-          'embed_timestamp_sec': embedTimestampSec,
+        if (embedTimestampSec != null) 'embed_timestamp_sec': embedTimestampSec,
         if (oralAudioUrl != null && oralAudioUrl.trim().isNotEmpty)
           'oral_audio_url': oralAudioUrl.trim(),
         if (oralBookId != null && oralBookId.trim().isNotEmpty)
@@ -4200,10 +4235,7 @@ class AcquireApiClient {
     try {
       final Response<dynamic> response = await _dio.post(
         Endpoints.grammarAnalyze,
-        data: <String, dynamic>{
-          'sentence': text,
-          'chinese': chinese.trim(),
-        },
+        data: <String, dynamic>{'sentence': text, 'chinese': chinese.trim()},
         options: Options(
           extra: _noCache.extra,
           receiveTimeout: const Duration(seconds: 50),
@@ -4240,9 +4272,7 @@ class AcquireApiClient {
         receiveTimeout: const Duration(seconds: 90),
       ),
     );
-    return WritingGradeResult.fromJson(
-      response.data as Map<String, dynamic>,
-    );
+    return WritingGradeResult.fromJson(response.data as Map<String, dynamic>);
   }
 
   Future<ExamPack> examPack(String familyId) async {
@@ -4285,8 +4315,7 @@ class AcquireApiClient {
         if (videoSeconds != null) 'video_seconds': videoSeconds,
         if (readingSeconds != null) 'reading_seconds': readingSeconds,
         if (vocabSeconds != null) 'vocab_seconds': vocabSeconds,
-        if (vocabLearnedCount != null)
-          'vocab_learned_count': vocabLearnedCount,
+        if (vocabLearnedCount != null) 'vocab_learned_count': vocabLearnedCount,
       },
       options: _noCache,
     );
@@ -4311,48 +4340,121 @@ class AcquireApiClient {
   }
 
   Future<CommunityPostDto> setCommunityLike(int postId, bool enabled) async {
-    final Map<String, dynamic> data = await socialRequest('PUT', '/posts/$postId/like', data: <String, dynamic>{'enabled': enabled});
+    final Map<String, dynamic> data = await socialRequest(
+      'PUT',
+      '/posts/$postId/like',
+      data: <String, dynamic>{'enabled': enabled},
+    );
     return CommunityPostDto.fromJson(data);
   }
 
-  Future<Map<String, dynamic>> moderationRequest(String method, String path, String token, {Map<String, dynamic>? data}) async {
-    final Response<dynamic> response = await _dio.request<dynamic>('api/community-social/moderation$path', options: Options(method: method, headers: <String, String>{'X-Community-Admin-Token': token}, extra: _noCache.extra), data: data);
+  Future<Map<String, dynamic>> moderationRequest(
+    String method,
+    String path,
+    String token, {
+    Map<String, dynamic>? data,
+  }) async {
+    final Response<dynamic> response = await _dio.request<dynamic>(
+      'api/community-social/moderation$path',
+      options: Options(
+        method: method,
+        headers: <String, String>{'X-Community-Admin-Token': token},
+        extra: _noCache.extra,
+      ),
+      data: data,
+    );
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> socialRequest(String method, String path, {Map<String, dynamic>? data}) async {
-    final Response<dynamic> response = await _dio.request<dynamic>('api/community-social$path', options: Options(method: method, extra: _noCache.extra), data: data);
+  Future<Map<String, dynamic>> socialRequest(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+  }) async {
+    final Response<dynamic> response = await _dio.request<dynamic>(
+      'api/community-social$path',
+      options: Options(method: method, extra: _noCache.extra),
+      data: data,
+    );
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> learningCardRequest(String method, String path, {Map<String, dynamic>? data}) async {
-    final Response<dynamic> response = await _dio.request<dynamic>('api/learning-cards$path', options: Options(method: method, extra: _noCache.extra), data: data);
+  Future<Map<String, dynamic>> learningCardRequest(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+  }) async {
+    final Response<dynamic> response = await _dio.request<dynamic>(
+      'api/learning-cards$path',
+      options: Options(method: method, extra: _noCache.extra),
+      data: data,
+    );
     final Map<String, dynamic> result = response.data as Map<String, dynamic>;
-    if (result['public_path'] is String) result['share_url'] = Uri.parse(_dio.options.baseUrl).resolve(result['public_path'] as String).toString();
+    if (result['public_path'] is String)
+      result['share_url'] = Uri.parse(
+        _dio.options.baseUrl,
+      ).resolve(result['public_path'] as String).toString();
     return result;
   }
 
-  Future<Map<String,dynamic>> assessmentStatus() async {
-    final response = await _dio.get<dynamic>('api/pronunciation/status', options: _noCache);
-    return response.data as Map<String,dynamic>;
-  }
-  Future<Map<String,dynamic>> evaluateRecording(String reference, String pcm) async {
-    final response = await _dio.post<dynamic>('api/pronunciation/evaluate', data: {'reference':reference,'pcm_base64':pcm}, options: Options(receiveTimeout: const Duration(seconds:60)));
-    return response.data as Map<String,dynamic>;
-  }
-
-  Future<Map<String, dynamic>> moduleProgress(String kind, {Map<String, dynamic>? upload}) async {
-    final response = await _dio.request<dynamic>('api/learning-modules/$kind/progress', options: Options(method: upload == null ? 'GET' : 'PUT', extra: _noCache.extra), data: upload);
+  Future<Map<String, dynamic>> assessmentStatus() async {
+    final response = await _dio.get<dynamic>(
+      'api/pronunciation/status',
+      options: _noCache,
+    );
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> studyPlayRequest(String method, String path, {Map<String, dynamic>? data}) async {
-    final Response<dynamic> response = await _dio.request<dynamic>('api/study-play$path', options: Options(method: method, extra: _noCache.extra), data: data);
+  Future<Map<String, dynamic>> evaluateRecording(
+    String reference,
+    String pcm,
+  ) async {
+    final response = await _dio.post<dynamic>(
+      'api/pronunciation/evaluate',
+      data: {'reference': reference, 'pcm_base64': pcm},
+      options: Options(receiveTimeout: const Duration(seconds: 60)),
+    );
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> studyPkRequest(String method, String path, {Map<String, dynamic>? data}) async {
-    final Response<dynamic> response = await _dio.request<dynamic>('api/study-pk$path', options: Options(method: method, extra: _noCache.extra), data: data);
+  Future<Map<String, dynamic>> moduleProgress(
+    String kind, {
+    Map<String, dynamic>? upload,
+  }) async {
+    final response = await _dio.request<dynamic>(
+      'api/learning-modules/$kind/progress',
+      options: Options(
+        method: upload == null ? 'GET' : 'PUT',
+        extra: _noCache.extra,
+      ),
+      data: upload,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> studyPlayRequest(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+  }) async {
+    final Response<dynamic> response = await _dio.request<dynamic>(
+      'api/study-play$path',
+      options: Options(method: method, extra: _noCache.extra),
+      data: data,
+    );
+    return response.data as Map<String, dynamic>;
+  }
+
+  Future<Map<String, dynamic>> studyPkRequest(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+  }) async {
+    final Response<dynamic> response = await _dio.request<dynamic>(
+      'api/study-pk$path',
+      options: Options(method: method, extra: _noCache.extra),
+      data: data,
+    );
     return response.data as Map<String, dynamic>;
   }
 
@@ -4425,7 +4527,9 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<List<Map<String, dynamic>>> listCommunityGroupTasks(int groupId) async {
+  Future<List<Map<String, dynamic>>> listCommunityGroupTasks(
+    int groupId,
+  ) async {
     final Response<dynamic> response = await _dio.get(
       '${Endpoints.communityGroups}/$groupId/tasks',
       options: _noCache,
@@ -4480,9 +4584,17 @@ class AcquireApiClient {
     return response.data as Map<String, dynamic>;
   }
 
-  Future<Map<String, dynamic>> studyDeskRequest(String method, String path, {Map<String, dynamic>? data, Map<String, dynamic>? query}) async {
+  Future<Map<String, dynamic>> studyDeskRequest(
+    String method,
+    String path, {
+    Map<String, dynamic>? data,
+    Map<String, dynamic>? query,
+  }) async {
     final Response<dynamic> response = await _dio.request<dynamic>(
-      'api/study-desk$path', options: Options(method: method, extra: _noCache.extra), data: data, queryParameters: query,
+      'api/study-desk$path',
+      options: Options(method: method, extra: _noCache.extra),
+      data: data,
+      queryParameters: query,
     );
     return response.data as Map<String, dynamic>;
   }
@@ -4582,10 +4694,8 @@ class AcquireApiClient {
       Endpoints.communityMe,
       data: <String, dynamic>{
         if (bio != null) 'bio': bio,
-        if (lookingForPartner != null)
-          'looking_for_partner': lookingForPartner,
-        if (showOnLeaderboard != null)
-          'show_on_leaderboard': showOnLeaderboard,
+        if (lookingForPartner != null) 'looking_for_partner': lookingForPartner,
+        if (showOnLeaderboard != null) 'show_on_leaderboard': showOnLeaderboard,
         if (englishLevel != null) 'english_level': englishLevel,
       },
       options: _noCache,
@@ -4700,20 +4810,17 @@ class AcquireApiClient {
   }
 
   Future<AvatarMeDto> equipCosmeticSet(Map<String, String> loadout) async {
-    final Response<dynamic> response = await _dio.put<dynamic>('api/cosmetics/equip-set', data: <String, dynamic>{'loadout': loadout});
+    final Response<dynamic> response = await _dio.put<dynamic>(
+      'api/cosmetics/equip-set',
+      data: <String, dynamic>{'loadout': loadout},
+    );
     return AvatarMeDto.fromJson(response.data as Map<String, dynamic>);
   }
 
-  Future<AvatarMeDto> equipCosmetic({
-    required String slot,
-    String? sku,
-  }) async {
+  Future<AvatarMeDto> equipCosmetic({required String slot, String? sku}) async {
     final Response<dynamic> response = await _dio.put(
       Endpoints.cosmeticsEquip,
-      data: <String, dynamic>{
-        'slot': slot,
-        'sku': sku,
-      },
+      data: <String, dynamic>{'slot': slot, 'sku': sku},
       options: _noCache,
     );
     return AvatarMeDto.fromJson(response.data as Map<String, dynamic>);
