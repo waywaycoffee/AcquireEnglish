@@ -62,6 +62,12 @@ android {
                 keyPassword = keystoreProperties["keyPassword"] as String
                 storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
                 storePassword = keystoreProperties["storePassword"] as String
+                // Some OEM package installers (and Edge/sideload parsers) still
+                // require JAR v1 META-INF certs; v2-only APKs show
+                // "parser did not find any certificates".
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
         }
     }
