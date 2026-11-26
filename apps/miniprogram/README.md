@@ -15,7 +15,7 @@
 
 1. 安装[微信开发者工具](https://developers.weixin.qq.com/miniprogram/dev/devtools/download.html)  
 2. 导入目录：`apps/miniprogram`  
-3. 将 `project.config.json` 里 `appid` 换成公司主体小程序 AppID  
+3. 将 `project.config.json` 里 `appid`（当前占位 `touristappid`）换成公司主体小程序 AppID  
 4. 小程序后台 → 开发设置 → **服务器域名** 加入：  
    - `request` 合法域名：`https://acquireenglish.curlhairai.com`  
 5. 与 App / 公众号一并绑定到同一**微信开放平台**，以便 UnionID 打通账号  
@@ -24,11 +24,12 @@
 
 ## 环境变量（API）
 
-ECS / `.env`：
+ECS `.env` 已预留空占位：
 
 ```
-WECHAT_MP_APP_ID=小程序AppID
-WECHAT_MP_APP_SECRET=小程序AppSecret
+WECHAT_MP_APP_ID=
+WECHAT_MP_APP_SECRET=
 ```
 
-未配置时，非生产环境可走 mock（`code` 当作稳定 openid）。
+填入正式值后：`systemctl restart acquireenglish-api`。  
+未配置时生产返回 503；本地非生产可走 mock（`code` 当作稳定 openid）。

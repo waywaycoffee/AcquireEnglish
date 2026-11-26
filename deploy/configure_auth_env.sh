@@ -42,6 +42,8 @@ read -r -p "ALIYUN_SMS_SIGN_NAME: " SIGN
 read -r -p "ALIYUN_SMS_TEMPLATE_CODE: " TPL
 read -r -p "WECHAT_APP_ID (可空): " WX_ID
 read -r -p "WECHAT_APP_SECRET (可空): " WX_SECRET
+read -r -p "WECHAT_MP_APP_ID 小程序 (可空占位): " WX_MP_ID
+read -r -p "WECHAT_MP_APP_SECRET 小程序 (可空占位): " WX_MP_SECRET
 
 upsert AUTH_SMS_MOCK false
 upsert ALIYUN_SMS_ACCESS_KEY_ID "$AK"
@@ -56,6 +58,13 @@ if [[ -n "${WX_ID}" && -n "${WX_SECRET}" ]]; then
   upsert WECHAT_APP_SECRET "$WX_SECRET"
 else
   echo "WeChat secrets skipped — keep AUTH_WECHAT_MOCK as-is"
+fi
+
+# Always ensure MP keys exist (empty placeholder OK until 小程序 credentials arrive).
+upsert WECHAT_MP_APP_ID "${WX_MP_ID}"
+upsert WECHAT_MP_APP_SECRET "${WX_MP_SECRET}"
+if [[ -z "${WX_MP_ID}" || -z "${WX_MP_SECRET}" ]]; then
+  echo "WeChat MP placeholders written empty — fill later for /api/auth/wechat/mp-login"
 fi
 
 if systemctl list-unit-files | grep -q "^${SERVICE_NAME}"; then

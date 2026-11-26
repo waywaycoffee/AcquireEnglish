@@ -118,6 +118,20 @@ flutter build apk --dart-define=WECHAT_APP_ID=wx........ \
 未配置 AppID 时，App 仍走开发 mock code（仅联调）。  
 首次微信授权成功会自动建号并发放试用资产（见下节）。
 
+## 3a. 微信小程序登录（占位）
+
+小程序与移动应用 **AppID 不同**；服务端单独配：
+
+```bash
+# 先占位；拿到正式小程序凭证后再填，并重启 acquireenglish-api
+WECHAT_MP_APP_ID=
+WECHAT_MP_APP_SECRET=
+```
+
+- 接口：`POST /api/auth/wechat/mp-login`  
+- 工程：`apps/miniprogram/`（`project.config.json` 里 `appid` 暂为 `touristappid`）  
+- 未填时：生产返回 503；本地非生产可走 mock  
+
 ## 3b. 微信支付（App 支付）
 
 Open Platform AppID（`wx00b4272a8eabb1cd`）已配置；收款还需 [微信支付商户平台](https://pay.weixin.qq.com/)：
