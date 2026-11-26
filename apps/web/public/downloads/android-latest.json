@@ -1,11 +1,11 @@
 {
-  "version": "0.2.271",
-  "version_code": 292,
-  "apk_name": "AcquireEnglish-android-0.2.271+292.apk",
+  "version": "0.2.272",
+  "version_code": 293,
+  "apk_name": "AcquireEnglish-android-0.2.272+293.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "df906bddbf87b44a0251330100f4b177c377ca2c91a98948f506951d055b748e",
+  "sha256": "7459836d6b64cf0d7f0367ba6972edc9f84bec6fd20490f6cfac90c9c51a744a",
   "force": true,
-  "min_version_code": 292,
-  "notes": "必须更新：修复数字人口型立绘重影（只显示单格）",
-  "published_at": "2026-11-26T15:45:00+08:00"
+  "min_version_code": 293,
+  "notes": "必须更新：修复进社区后底栏消失；进社区仍可回到学习",
+  "published_at": "2026-11-26T16:30:00+08:00"
 }
