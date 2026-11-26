@@ -8,6 +8,7 @@ import 'package:hive_ce/hive.dart';
 import '../../../constants/endpoints.dart';
 import '../domain/reading_doc.dart';
 import '../domain/reading_title_zh.dart';
+import 'reading_cover_cache.dart';
 import 'reading_ingest.dart';
 
 enum ReadingCatalogKind {
@@ -754,6 +755,11 @@ class ReadingCatalogClient {
         }
         final String zh =
             readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
+        final String? cover =
+            featuredReadingCoverRelativeForTitle(entry.title) ??
+            (entry.id == kDefaultWizardOfOzEntry.id
+                ? kWizardOfOzCoverRelative
+                : null);
         return ReadingDoc(
           id: entry.stableDocId,
           title: readingDisplayTitle(entry.title, titleZh: zh),
@@ -764,6 +770,7 @@ class ReadingCatalogClient {
           sourceLabel: 'Standard Ebooks',
           courseTitle: '公版文本 · Standard Ebooks 排版（CC0）。仅供个人学习。',
           episodeTitle: entry.subtitle,
+          coverUrl: cover ?? '',
           createdAt: DateTime.now(),
         );
       } catch (e) {

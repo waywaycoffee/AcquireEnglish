@@ -106,15 +106,30 @@ ReadingLibrarySnapshot mergeReadingLibraries(
 }
 
 ReadingDoc _preferRicherDoc(ReadingDoc a, ReadingDoc b) {
-  if (a.hasBody && !b.hasBody) return a;
-  if (b.hasBody && !a.hasBody) return b;
-  if (a.plainText.length != b.plainText.length) {
-    return a.plainText.length >= b.plainText.length ? a : b;
+  ReadingDoc richer;
+  if (a.hasBody && !b.hasBody) {
+    richer = a;
+  } else if (b.hasBody && !a.hasBody) {
+    richer = b;
+  } else if (a.plainText.length != b.plainText.length) {
+    richer = a.plainText.length >= b.plainText.length ? a : b;
+  } else {
+    final DateTime? ac = a.createdAt;
+    final DateTime? bc = b.createdAt;
+    if (ac != null && bc != null) {
+      richer = ac.isAfter(bc) ? a : b;
+    } else {
+      richer = a;
+    }
   }
-  final DateTime? ac = a.createdAt;
-  final DateTime? bc = b.createdAt;
-  if (ac != null && bc != null) return ac.isAfter(bc) ? a : b;
-  return a;
+  final ReadingDoc other = identical(richer, a) ? b : a;
+  // Cloud backups often omit coverUrl; never wipe a local jacket pointer.
+  return richer.copyWith(
+    coverUrl: richer.coverUrl.trim().isNotEmpty
+        ? richer.coverUrl
+        : other.coverUrl,
+    titleZh: richer.titleZh.trim().isNotEmpty ? richer.titleZh : other.titleZh,
+  );
 }
 
 ReadingProgress _preferNewerProgress(ReadingProgress a, ReadingProgress b) {

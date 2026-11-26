@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
+import '../../shared/presentation/media/cover_image.dart';
+import '../data/reading_cover_cache.dart';
+
 /// Stable title-based cover for built-in and imported books.
-/// When [coverUrl] is set (ECS Open Library cache), show the real jacket
-/// and fall back to the cloth hardcover if the image fails.
+/// When [coverUrl] is set (ECS Open Library cache), download once then paint
+/// from Documents/reading_covers; fall back to cloth if the image fails.
 class ReadingBookCover extends StatelessWidget {
   const ReadingBookCover({
     required this.title,
@@ -198,12 +203,17 @@ const List<String> _serifFallback = <String>[
   'Source Han Serif SC',
 ];
 
-class _RemoteJacket extends StatelessWidget {
+class _RemoteJacket extends StatefulWidget {
   const _RemoteJacket({required this.url, required this.fallback});
 
   final String url;
   final Widget fallback;
 
+  @override
+  State<_RemoteJacket> createState() => _RemoteJacketState();
+}
+
+class _RemoteJacketState extends State<_RemoteJacket> {
   static const BorderRadius _radius = BorderRadius.only(
     topLeft: Radius.circular(2),
     bottomLeft: Radius.circular(2),
@@ -211,8 +221,45 @@ class _RemoteJacket extends StatelessWidget {
     bottomRight: Radius.circular(4),
   );
 
+  String? _localPath;
+  bool _failed = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _localPath = cachedReadingCoverPathSync(widget.url);
+    if (_localPath == null) {
+      unawaited(_cache());
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _RemoteJacket oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.url != widget.url) {
+      _failed = false;
+      _localPath = cachedReadingCoverPathSync(widget.url);
+      if (_localPath == null) {
+        unawaited(_cache());
+      }
+    }
+  }
+
+  Future<void> _cache() async {
+    final String? path = await ensureReadingCoverCached(widget.url);
+    if (!mounted) {
+      return;
+    }
+    if (path != null && path.isNotEmpty) {
+      setState(() => _localPath = path);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
+    final String paint = (_localPath != null && _localPath!.isNotEmpty)
+        ? _localPath!
+        : resolveReadingCoverRemoteUrl(widget.url);
     return DecoratedBox(
       decoration: const BoxDecoration(
         borderRadius: _radius,
@@ -232,27 +279,23 @@ class _RemoteJacket extends StatelessWidget {
       ),
       child: ClipRRect(
         borderRadius: _radius,
-        child: Image.network(
-          url,
-          fit: BoxFit.cover,
-          filterQuality: FilterQuality.medium,
-          errorBuilder: (BuildContext context, Object error, StackTrace? st) =>
-              fallback,
-          loadingBuilder: (
-            BuildContext context,
-            Widget child,
-            ImageChunkEvent? progress,
-          ) {
-            if (progress == null) return child;
-            return Stack(
-              fit: StackFit.expand,
-              children: <Widget>[
-                fallback,
-                const ColoredBox(color: Color(0x33000000)),
-              ],
-            );
-          },
-        ),
+        child: _failed || paint.isEmpty
+            ? widget.fallback
+            : CoverImage(
+                path: paint,
+                fit: BoxFit.cover,
+                errorBuilder:
+                    (BuildContext context, Object error, StackTrace? st) {
+                  if (!_failed) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (mounted) {
+                        setState(() => _failed = true);
+                      }
+                    });
+                  }
+                  return widget.fallback;
+                },
+              ),
       ),
     );
   }
