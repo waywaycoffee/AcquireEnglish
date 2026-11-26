@@ -97,7 +97,7 @@ class CourseEpisodeTile extends ConsumerWidget {
     // Hide download/reserve chrome once the episode is already on disk.
     final String? downloadLabel = !showDownload
         ? null
-        : (cache?.label ?? (reserved ? '已预约字幕' : '未下载'));
+        : (cache?.label ?? (reserved ? '已预约下载' : '未下载'));
 
     return Padding(
       padding: EdgeInsets.only(bottom: bottomPadding),
