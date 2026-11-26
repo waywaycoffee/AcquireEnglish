@@ -3961,12 +3961,6 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             ],
           );
 
-    final Widget coachColumn = _buildLegacyCoachColumn(
-      stage: stage,
-      persona: persona,
-      orbHint: orbHint,
-    );
-
     return ClipRRect(
       borderRadius: BorderRadius.circular(22),
       child: DecoratedBox(
@@ -3982,18 +3976,39 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             ],
           ),
         ),
-        child: _hasTutorMaterial
-            ? LayoutBuilder(
-                builder: (BuildContext context, BoxConstraints constraints) {
-                  return _buildTutorClassroomLayout(
-                    constraints: constraints,
-                    stage: stage,
-                    persona: persona,
-                    orbHint: orbHint,
-                  );
-                },
-              )
-            : coachColumn,
+        child: LayoutBuilder(
+          builder: (BuildContext context, BoxConstraints constraints) {
+            if (_hasTutorMaterial) {
+              return _buildTutorClassroomLayout(
+                constraints: constraints,
+                stage: stage,
+                persona: persona,
+                orbHint: orbHint,
+              );
+            }
+            final bool wide = constraints.maxWidth >= 800 && !widget.embedded;
+            final Widget conversation = _buildLegacyCoachColumn(
+              stage: wide ? null : stage,
+              persona: persona,
+              orbHint: orbHint,
+            );
+            if (!wide) return conversation;
+            return Column(
+              children: <Widget>[
+                Expanded(
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.stretch,
+                    children: <Widget>[
+                      Expanded(flex: 2, child: stage),
+                      Expanded(flex: 3, child: conversation),
+                    ],
+                  ),
+                ),
+                _buildHoldToTalkButton(),
+              ],
+            );
+          },
+        ),
       ),
     );
   }
@@ -4234,13 +4249,14 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
   }
 
   Widget _buildLegacyCoachColumn({
-    required Widget stage,
+    required Widget? stage,
     required DigitalHumanPersona persona,
     required String orbHint,
   }) {
     return Column(
       children: <Widget>[
-        Expanded(flex: _podcastLines.isNotEmpty ? 2 : 3, child: stage),
+        if (stage != null)
+          Expanded(flex: _podcastLines.isNotEmpty ? 2 : 3, child: stage),
         if (_podcastLines.isNotEmpty)
           Expanded(flex: 3, child: _buildPodcastScriptPane(persona)),
         Padding(
@@ -4433,48 +4449,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               },
             ),
           ),
-        Padding(
-          padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
-          child: Material(
-            key: const ValueKey<String>('study-oral-coach-hold-to-talk'),
-            color: const Color(0xFF6D28D9),
-            borderRadius: BorderRadius.circular(16),
-            child: InkWell(
-              borderRadius: BorderRadius.circular(16),
-              onTapDown: _busy ? null : (_) => unawaited(_onHoldStart()),
-              onTapUp: _busy ? null : (_) => unawaited(_onHoldEnd()),
-              onTapCancel: _busy ? null : () => unawaited(_onHoldEnd()),
-              child: Padding(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 14,
-                ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: <Widget>[
-                    Icon(
-                      _recordingActive
-                          ? Icons.graphic_eq_rounded
-                          : Icons.mic_rounded,
-                      color: Colors.white,
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      _recordingActive
-                          ? '松开发送'
-                          : (_pendingResay != null ? '按住再说一次' : '按住说话'),
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ),
-        ),
+        if (stage != null) _buildHoldToTalkButton(),
         if (_voicePlaybackLabel case final String label)
           Padding(
             padding: const EdgeInsets.only(top: 4),
@@ -4553,6 +4528,51 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           ),
         ),
       ],
+    );
+  }
+
+  Widget _buildHoldToTalkButton() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(14, 0, 14, 8),
+      child: Material(
+        key: const ValueKey<String>('study-oral-coach-hold-to-talk'),
+        color: const Color(0xFF6D28D9),
+        borderRadius: BorderRadius.circular(16),
+        child: Listener(
+          behavior: HitTestBehavior.opaque,
+          onPointerDown: _busy ? null : (_) => unawaited(_onHoldStart()),
+          onPointerUp: (_) => unawaited(_onHoldEnd()),
+          onPointerCancel: (_) => unawaited(_onHoldEnd()),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(
+              horizontal: 16,
+              vertical: 14,
+            ),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: <Widget>[
+                Icon(
+                  _recordingActive
+                      ? Icons.graphic_eq_rounded
+                      : Icons.mic_rounded,
+                  color: Colors.white,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _recordingActive
+                      ? '松开发送'
+                      : (_pendingResay != null ? '按住再说一次' : '按住说话'),
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.w800,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

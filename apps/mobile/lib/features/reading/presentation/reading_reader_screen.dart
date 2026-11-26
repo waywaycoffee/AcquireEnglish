@@ -161,36 +161,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
     });
   }
 
-  Future<void> _chooseFontSize() async {
-    final double? size = await showModalBottomSheet<double>(
-      context: context,
-      builder: (BuildContext sheetContext) => SafeArea(
-        minimum: const EdgeInsets.all(20),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text('阅读字号', style: Theme.of(sheetContext).textTheme.titleMedium),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 8,
-              runSpacing: 8,
-              children: <Widget>[
-                for (final double size in <double>[18, 20, 22, 24, 26, 28])
-                  ChoiceChip(
-                    label: Text(size.toInt().toString()),
-                    selected: _fontSize == size,
-                    onSelected: (_) => Navigator.of(sheetContext).pop(size),
-                  ),
-              ],
-            ),
-          ],
-        ),
-      ),
-    );
-    if (size != null && mounted) setState(() => _fontSize = size);
-  }
-
   Widget _buildPageNavigation(ReadingDoc doc) {
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
@@ -224,9 +194,10 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
   Widget _buildReaderLayout(ReadingDoc doc, Color background, Color foreground, Widget reader) {
     return LayoutBuilder(
       builder: (BuildContext context, BoxConstraints constraints) {
+        final bool wide = constraints.maxWidth >= 800;
         return Row(
           children: <Widget>[
-            if (constraints.maxWidth >= 800 && _pages.length > 1)
+            if (wide && _pages.length > 1)
               SizedBox(
                 width: 208,
                 height: double.infinity,
@@ -259,7 +230,66 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   ),
                 ),
               ),
-            Expanded(key: const ValueKey<String>('reader-content'), child: reader),
+            Expanded(
+              key: const ValueKey<String>('reader-content'),
+              child: ColoredBox(
+                color: background,
+                child: Column(
+                  children: <Widget>[
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                      child: Wrap(
+                        crossAxisAlignment: WrapCrossAlignment.center,
+                        children: <Widget>[
+                          if (!wide && _pages.length > 1)
+                            PopupMenuButton<int>(
+                              tooltip: '章节目录',
+                              initialValue: _pageIndex,
+                              icon: Icon(Icons.list_rounded, color: foreground),
+                              onSelected: (int index) async {
+                                if (index == _pageIndex) return;
+                                await _stopContinuous();
+                                if (mounted) _openPage(doc, index);
+                              },
+                              itemBuilder: (_) => <PopupMenuEntry<int>>[
+                                for (int index = 0; index < _pages.length; index++)
+                                  PopupMenuItem<int>(
+                                    value: index,
+                                    child: Text('第 ${index + 1} 节'),
+                                  ),
+                              ],
+                            ),
+                          IconButton(
+                            tooltip: '缩小字号',
+                            color: foreground,
+                            onPressed: _fontSize <= 18
+                                ? null
+                                : () => setState(() => _fontSize -= 2),
+                            icon: const Icon(Icons.remove_rounded),
+                          ),
+                          Text('${_fontSize.toInt()}', style: TextStyle(color: foreground)),
+                          IconButton(
+                            tooltip: '放大字号',
+                            color: foreground,
+                            onPressed: _fontSize >= 28
+                                ? null
+                                : () => setState(() => _fontSize += 2),
+                            icon: const Icon(Icons.add_rounded),
+                          ),
+                          TextButton.icon(
+                            style: TextButton.styleFrom(foregroundColor: foreground),
+                            onPressed: () => unawaited(_playContinuous(doc)),
+                            icon: Icon(_continuousPlaying ? Icons.stop_rounded : Icons.play_arrow_rounded),
+                            label: Text(_continuousPlaying ? '停止朗读' : '朗读'),
+                          ),
+                        ],
+                      ),
+                    ),
+                    Expanded(child: reader),
+                  ],
+                ),
+              ),
+            ),
           ],
         );
       },
@@ -1778,11 +1808,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
         leading: PadBackButton(onPressed: () => context.pop()),
         actions: <Widget>[
           IconButton(
-            tooltip: '阅读字号（当前 ${_fontSize.toInt()}）',
-            onPressed: _chooseFontSize,
-            icon: const Icon(Icons.format_size_rounded),
-          ),
-          IconButton(
             tooltip: '选择朗读音色（当前：${_ttsGender.labelCn}）',
             onPressed: () => unawaited(_toggleTtsGender()),
             icon: Icon(
@@ -1790,16 +1815,6 @@ class _ReadingReaderScreenState extends ConsumerState<ReadingReaderScreen> {
                   ? Icons.woman_rounded
                   : Icons.man_rounded,
               color: AppDesignTokens.brandGreenDark,
-            ),
-          ),
-          IconButton(
-            tooltip: _continuousPlaying ? '停止朗读' : '连续朗读',
-            onPressed: () => unawaited(_playContinuous(doc)),
-            icon: Icon(
-              _continuousPlaying
-                  ? Icons.stop_circle_outlined
-                  : Icons.play_circle_outline_rounded,
-              color: _continuousPlaying ? AppDesignTokens.brandGreenDark : null,
             ),
           ),
           IconButton(
