@@ -7,6 +7,8 @@ class AppUpdate {
     this.checksumUrl,
     this.sha256,
     this.notes = '',
+    this.force = false,
+    this.minVersionCode,
   });
 
   final String version;
@@ -16,6 +18,17 @@ class AppUpdate {
   final String? checksumUrl;
   final String? sha256;
   final String notes;
+  final bool force;
+  final int? minVersionCode;
+
+  bool isForcedForLocalBuild(int localBuildNumber) {
+    if (force) return true;
+    final int? minCode = minVersionCode;
+    if (minCode != null && minCode > 0 && localBuildNumber < minCode) {
+      return true;
+    }
+    return false;
+  }
 }
 
 class AppUpdateService {

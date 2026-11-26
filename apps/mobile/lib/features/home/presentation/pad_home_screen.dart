@@ -61,35 +61,45 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
     final AppUpdateState state = ref.read(appUpdateProvider);
     final update = state.update;
     if (!state.fromAutoCheck || update == null) return;
+    final bool forced = state.force;
     final String notes = update.notes.trim();
     final bool? go = await showDialog<bool>(
       context: context,
-      builder: (BuildContext dialogContext) => AlertDialog(
-        backgroundColor: AppDesignTokens.appWhite,
-        title: Text(
-          '发现新版本 v${update.version}',
-          style: TextStyle(color: AppDesignTokens.textPrimary),
-        ),
-        content: Text(
-          notes.isEmpty
-              ? '官网已发布更新包，建议立即下载安装以获得最新功能与修复。'
-              : notes,
-          style: TextStyle(color: AppDesignTokens.textSecondary, height: 1.5),
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(dialogContext).pop(false),
-            child: const Text('稍后'),
+      barrierDismissible: !forced,
+      builder: (BuildContext dialogContext) => PopScope(
+        canPop: !forced,
+        child: AlertDialog(
+          backgroundColor: AppDesignTokens.appWhite,
+          title: Text(
+            forced
+                ? '必须更新到 v${update.version}'
+                : '发现新版本 v${update.version}',
+            style: TextStyle(color: AppDesignTokens.textPrimary),
           ),
-          FilledButton(
-            onPressed: () => Navigator.of(dialogContext).pop(true),
-            child: const Text('立即更新'),
+          content: Text(
+            notes.isEmpty
+                ? (forced
+                      ? '当前版本过旧，请立即下载安装官网最新包后再继续使用。'
+                      : '官网已发布更新包，建议立即下载安装以获得最新功能与修复。')
+                : notes,
+            style: TextStyle(color: AppDesignTokens.textSecondary, height: 1.5),
           ),
-        ],
+          actions: <Widget>[
+            if (!forced)
+              TextButton(
+                onPressed: () => Navigator.of(dialogContext).pop(false),
+                child: const Text('稍后'),
+              ),
+            FilledButton(
+              onPressed: () => Navigator.of(dialogContext).pop(true),
+              child: const Text('立即更新'),
+            ),
+          ],
+        ),
       ),
     );
     if (!mounted) return;
-    if (go == true) {
+    if (go == true || forced) {
       await ref.read(appUpdateProvider.notifier).download();
       final AppUpdateState after = ref.read(appUpdateProvider);
       if (after.downloadedPath != null) {
@@ -99,6 +109,7 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
           context,
         ).showSnackBar(SnackBar(content: Text(after.message!)));
       }
+      // Forced update: if user backed out of installer, prompt again next open.
     } else {
       ref.read(appUpdateProvider.notifier).dismissPrompt();
     }

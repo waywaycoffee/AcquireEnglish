@@ -19,6 +19,8 @@ class AppUpdate {
     this.checksumUrl,
     this.sha256,
     this.notes = '',
+    this.force = false,
+    this.minVersionCode,
   });
 
   final String version;
@@ -28,6 +30,22 @@ class AppUpdate {
   final String? checksumUrl;
   final String? sha256;
   final String notes;
+
+  /// Manifest `force: true` — this release must be installed.
+  final bool force;
+
+  /// Manifest `min_version_code` — local builds below this must update.
+  final int? minVersionCode;
+
+  /// Whether the installed build is below the channel floor / forced.
+  bool isForcedForLocalBuild(int localBuildNumber) {
+    if (force) return true;
+    final int? minCode = minVersionCode;
+    if (minCode != null && minCode > 0 && localBuildNumber < minCode) {
+      return true;
+    }
+    return false;
+  }
 }
 
 class AppUpdateService {
@@ -76,6 +94,9 @@ class AppUpdateService {
         : '${json['apk_name']}'.trim();
     final String sha = '${json['sha256'] ?? ''}'.trim();
     final String checksumUrl = '${json['checksum_url'] ?? ''}'.trim();
+    final bool forceFlag = json['force'] == true ||
+        '${json['force'] ?? ''}'.trim().toLowerCase() == 'true';
+    final int? minVersionCode = (json['min_version_code'] as num?)?.toInt();
 
     return AppUpdate(
       version: latestVersion,
@@ -85,6 +106,8 @@ class AppUpdateService {
       checksumUrl: checksumUrl.isEmpty ? null : checksumUrl,
       sha256: sha.isEmpty ? null : sha,
       notes: '${json['notes'] ?? ''}'.trim(),
+      force: forceFlag,
+      minVersionCode: minVersionCode,
     );
   }
 

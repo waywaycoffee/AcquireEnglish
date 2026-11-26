@@ -4,8 +4,10 @@ import 'package:package_info_plus/package_info_plus.dart';
 
 import '../data/app_update_service.dart';
 
-const String kAppUpdateLastCheckDayKey = 'app_update_last_check_day_v1';
 const String kAppUpdateDismissedVersionKey = 'app_update_dismissed_version_v1';
+
+/// Legacy daily throttle key (kept for old installs; no longer gates checks).
+const String kAppUpdateLastCheckDayKey = 'app_update_last_check_day_v1';
 
 final FutureProvider<String> appVersionProvider = FutureProvider<String>((
   Ref ref,
@@ -28,6 +30,8 @@ class AppUpdateState {
     this.totalBytes,
     this.message,
     this.fromAutoCheck = false,
+    this.force = false,
+    this.localBuildNumber = 0,
   });
 
   final AppUpdate? update;
@@ -39,6 +43,8 @@ class AppUpdateState {
   final int? totalBytes;
   final String? message;
   final bool fromAutoCheck;
+  final bool force;
+  final int localBuildNumber;
 
   double? get downloadProgress => totalBytes == null || totalBytes! <= 0
       ? null
@@ -52,22 +58,32 @@ class AppUpdateNotifier extends Notifier<AppUpdateState> {
   Future<void> check({bool auto = false}) async {
     state = AppUpdateState(isChecking: true, fromAutoCheck: auto);
     try {
+      final PackageInfo packageInfo = await PackageInfo.fromPlatform();
+      final int localBuild = int.tryParse(packageInfo.buildNumber) ?? 0;
       final AppUpdate? update = await AppUpdateService().checkForUpdate();
-      if (auto) {
-        _markCheckedToday();
-        if (update != null && _isDismissed(update.version)) {
-          state = const AppUpdateState(
-            message: null,
-            fromAutoCheck: true,
-          );
-          return;
-        }
+      if (update == null) {
+        state = AppUpdateState(
+          fromAutoCheck: auto,
+          localBuildNumber: localBuild,
+          message: auto ? null : '当前已是最新版本。',
+        );
+        return;
+      }
+      final bool forced = update.isForcedForLocalBuild(localBuild);
+      if (auto && !forced && _isDismissed(update.version)) {
+        state = AppUpdateState(
+          fromAutoCheck: true,
+          localBuildNumber: localBuild,
+        );
+        return;
       }
       state = AppUpdateState(
         update: update,
         fromAutoCheck: auto,
-        message: update == null
-            ? (auto ? null : '当前已是最新版本。')
+        force: forced,
+        localBuildNumber: localBuild,
+        message: forced
+            ? '必须更新到 v${update.version} 才能继续使用。'
             : '发现 v${update.version}，可以下载更新。',
       );
     } catch (error) {
@@ -78,21 +94,23 @@ class AppUpdateNotifier extends Notifier<AppUpdateState> {
     }
   }
 
-  /// Silent daily check used on home launch.
+  /// Home launch: always hit the official manifest (tiny JSON). Soft prompts
+  /// still respect per-version dismiss; forced updates never do.
   Future<void> maybeAutoCheck() async {
-    if (_checkedToday()) return;
     await check(auto: true);
   }
 
   void dismissPrompt() {
     final AppUpdate? update = state.update;
-    if (update != null) {
+    if (update != null && !state.force) {
       _markDismissed(update.version);
     }
     state = AppUpdateState(
       update: update,
       downloadedPath: state.downloadedPath,
       fromAutoCheck: false,
+      force: state.force,
+      localBuildNumber: state.localBuildNumber,
       message: null,
     );
   }
@@ -102,7 +120,14 @@ class AppUpdateNotifier extends Notifier<AppUpdateState> {
     if (update == null) {
       return;
     }
-    state = AppUpdateState(update: update, isDownloading: true);
+    final bool forced = state.force;
+    final int localBuild = state.localBuildNumber;
+    state = AppUpdateState(
+      update: update,
+      isDownloading: true,
+      force: forced,
+      localBuildNumber: localBuild,
+    );
     try {
       final String path = await AppUpdateService().download(
         update,
@@ -112,16 +137,25 @@ class AppUpdateNotifier extends Notifier<AppUpdateState> {
             isDownloading: true,
             downloadedBytes: received,
             totalBytes: total > 0 ? total : null,
+            force: forced,
+            localBuildNumber: localBuild,
           );
         },
       );
       state = AppUpdateState(
         update: update,
         downloadedPath: path,
+        force: forced,
+        localBuildNumber: localBuild,
         message: '下载并校验完成，可以开始安装。',
       );
     } catch (error) {
-      state = AppUpdateState(update: update, message: '更新下载失败：$error');
+      state = AppUpdateState(
+        update: update,
+        force: forced,
+        localBuildNumber: localBuild,
+        message: '更新下载失败：$error',
+      );
     }
   }
 
@@ -131,22 +165,30 @@ class AppUpdateNotifier extends Notifier<AppUpdateState> {
     if (path == null || update == null) {
       return;
     }
+    final bool forced = state.force;
+    final int localBuild = state.localBuildNumber;
     state = AppUpdateState(
       update: update,
       downloadedPath: path,
       isInstalling: true,
+      force: forced,
+      localBuildNumber: localBuild,
     );
     try {
       await AppUpdateService().install(path);
       state = AppUpdateState(
         update: update,
         downloadedPath: path,
+        force: forced,
+        localBuildNumber: localBuild,
         message: '已打开安装包，请按系统提示完成安装。',
       );
     } catch (error) {
       state = AppUpdateState(
         update: update,
         downloadedPath: path,
+        force: forced,
+        localBuildNumber: localBuild,
         message: '无法打开安装包：$error',
       );
     }
@@ -155,21 +197,6 @@ class AppUpdateNotifier extends Notifier<AppUpdateState> {
   Box<String>? get _prefs {
     if (!Hive.isBoxOpen('prefs')) return null;
     return Hive.box<String>('prefs');
-  }
-
-  String _todayKey() {
-    final DateTime now = DateTime.now();
-    return '${now.year.toString().padLeft(4, '0')}-'
-        '${now.month.toString().padLeft(2, '0')}-'
-        '${now.day.toString().padLeft(2, '0')}';
-  }
-
-  bool _checkedToday() {
-    return _prefs?.get(kAppUpdateLastCheckDayKey) == _todayKey();
-  }
-
-  void _markCheckedToday() {
-    _prefs?.put(kAppUpdateLastCheckDayKey, _todayKey());
   }
 
   bool _isDismissed(String version) {

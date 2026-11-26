@@ -1,9 +1,11 @@
 {
-  "version": "0.2.260",
-  "version_code": 280,
-  "apk_name": "AcquireEnglish-android-0.2.260+280.apk",
+  "version": "0.2.261",
+  "version_code": 281,
+  "apk_name": "AcquireEnglish-android-0.2.261+281.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "82278ef927fd0c54816f2ac373243752276bc75f5f05ce2d019cfea4603b6a50",
-  "notes": "口语内容诊断：原文与改正相同时不再假修改 · 服务端过滤无效 diagnosis",
-  "published_at": "2026-11-26T08:33:45+08:00"
+  "sha256": "a30059c5299c706e6a374cfcd3cf1a9d61d55891434480c2346c4f222e7208cf",
+  "force": true,
+  "min_version_code": 281,
+  "notes": "必须更新：修复同日发版不弹窗 · 支持强制更新 · 口语诊断与签名安装修复",
+  "published_at": "2026-11-26T09:28:53+08:00"
 }
