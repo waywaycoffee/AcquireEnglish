@@ -377,7 +377,7 @@ class NetdiskEpisodeCacheInfo {
         if (p == null) return '未下完';
         return '未下完 ${(p * 100).round()}%';
       case NetdiskEpisodeCachePhase.scheduled:
-        return '已预约字幕';
+        return '已预约下载';
       case NetdiskEpisodeCachePhase.remote:
         return '未下载';
     }

@@ -501,7 +501,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 LibraryShelfTab.bilibili => 'B 站 / 本地短片 · 搜索或导入练耳朵',
                 LibraryShelfTab.englishBrowse =>
                   '点开在线试看 · 喜欢再下载预约 · 记录在「播放记录/我的学习」',
-                LibraryShelfTab.drama => '精选片单 · 预约字幕后空闲下载',
+                LibraryShelfTab.drama => '精选片单 · 预约下载后空闲拉取',
                 LibraryShelfTab.youtube => '英语教育精选 · 按难度 · 需自备梯子',
                 LibraryShelfTab.dubbing => '看过的视频切成 1–3 分钟 · 人声分离配音',
               },
