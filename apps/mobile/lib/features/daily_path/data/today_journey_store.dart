@@ -53,6 +53,20 @@ class TodayJourneyStore {
     return flag == true;
   }
 
+  /// Next-day plan written at Gate3 (or「换明天」). Distinct from [pausedExplicitly].
+  bool get planned {
+    final Object? flag = _read()['planned'];
+    return flag == true;
+  }
+
+  /// Why this planned activity was chosen (shown on Gate3 / next-day banner).
+  String? get reason {
+    final Object? value = _read()['reason'];
+    if (value is! String) return null;
+    final String trimmed = value.trim();
+    return trimmed.isEmpty ? null : trimmed;
+  }
+
   Future<void> saveStage(JourneyStage stage) async {
     await _prefs?.put(_key, jsonEncode({..._read(), 'stage': stage.name}));
   }
@@ -60,16 +74,28 @@ class TodayJourneyStore {
   Future<void> saveActivity(
     JourneyActivity activity, {
     bool pausedExplicitly = false,
+    bool planned = false,
+    String? reason,
   }) async {
-    await _prefs?.put(
-      _key,
-      jsonEncode({
-        ..._read(),
-        'route': activity.route,
-        'title': activity.title,
-        'pausedExplicitly': pausedExplicitly,
-      }),
-    );
+    final Map<String, Object?> next = <String, Object?>{
+      ..._read(),
+      'route': activity.route,
+      'title': activity.title,
+      'pausedExplicitly': pausedExplicitly,
+      'planned': planned && !pausedExplicitly,
+    };
+    if (reason != null) {
+      final String trimmed = reason.trim();
+      if (trimmed.isEmpty) {
+        next.remove('reason');
+      } else {
+        next['reason'] = trimmed;
+      }
+    } else if (!planned || pausedExplicitly) {
+      // Fresh non-plan saves drop a stale Gate3 reason.
+      next.remove('reason');
+    }
+    await _prefs?.put(_key, jsonEncode(next));
   }
 
   Future<void> clearPausedFlag() async {

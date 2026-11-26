@@ -15,7 +15,14 @@ class JourneyTask {
   final bool available;
 }
 
-enum JourneyNextKind { paused, review, continuePursuit, recommend, chooseLevel }
+enum JourneyNextKind {
+  paused,
+  review,
+  planned,
+  continuePursuit,
+  recommend,
+  chooseLevel,
+}
 
 class JourneyNextStep {
   const JourneyNextStep({
@@ -36,6 +43,8 @@ class JourneyNextRequest {
     this.paused,
     this.dueReviewCount = 0,
     this.reviewFinished = false,
+    this.planned,
+    this.plannedReason = '',
     this.pursuit,
     this.recommendation,
     this.recommendationReason = '',
@@ -47,6 +56,10 @@ class JourneyNextRequest {
   final int dueReviewCount;
   final bool reviewFinished;
 
+  /// Yesterday's Gate3 plan for today.
+  final JourneyTask? planned;
+  final String plannedReason;
+
   /// Next item of a series, book, or course the learner is already in.
   final JourneyTask? pursuit;
 
@@ -55,8 +68,7 @@ class JourneyNextRequest {
   final String recommendationReason;
 }
 
-/// One main button. Paused work, then due review, then the series they
-/// already started, then one recommendation.
+/// One main button. Paused → due review → planned → series → recommend.
 JourneyNextStep resolveJourneyNext(JourneyNextRequest request) {
   final JourneyTask? paused = request.paused;
   if (paused != null && paused.available && paused.route.isNotEmpty) {
@@ -75,6 +87,33 @@ JourneyNextStep resolveJourneyNext(JourneyNextRequest request) {
       title: '复习到期内容',
       route: '/review/session?due=1&journeyReview=1',
       reason: '有 ${request.dueReviewCount} 项到期，做完就回到正在学的内容',
+    );
+  }
+  final JourneyTask? planned = request.planned;
+  if (planned != null && planned.available && planned.route.isNotEmpty) {
+    final JourneyTask? pursuit = request.pursuit;
+    final bool sameAsPursuit =
+        pursuit != null &&
+        pursuit.available &&
+        pursuit.route.isNotEmpty &&
+        pursuit.route == planned.route;
+    final String chaseTitle = sameAsPursuit
+        ? pursuit.title
+        : (planned.title.startsWith('继续')
+              ? planned.title
+              : planned.title);
+    final String reason = request.plannedReason.trim().isNotEmpty
+        ? request.plannedReason.trim()
+        : (chaseTitle.contains('第')
+              ? '昨天替你排好了，接着追'
+              : '昨天替你排好了，点下一步接着做');
+    return JourneyNextStep(
+      kind: sameAsPursuit
+          ? JourneyNextKind.continuePursuit
+          : JourneyNextKind.planned,
+      title: chaseTitle,
+      route: planned.route,
+      reason: reason,
     );
   }
   final JourneyTask? pursuit = request.pursuit;

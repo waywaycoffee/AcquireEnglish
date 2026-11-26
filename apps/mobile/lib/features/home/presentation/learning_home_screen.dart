@@ -382,14 +382,25 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                     const SizedBox(height: 12),
                     KeyedSubtree(
                       key: _vocabKey,
-                      child: ExpansionTile(
-                        initiallyExpanded: false,
-                        title: const Text('之前学过的 · 课程与复习'),
-                        subtitle: Text(
-                          '接着上次的课、到期复习、词书进度',
-                          style: TextStyle(color: muted, fontSize: 12),
-                        ),
-                        children: const <Widget>[TodayPathCard()],
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            '今日课程',
+                            style: TextStyle(
+                              color: AppDesignTokens.textPrimary,
+                              fontWeight: FontWeight.w700,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            '接着上次的课、到期复习、词书进度',
+                            style: TextStyle(color: muted, fontSize: 12),
+                          ),
+                          const SizedBox(height: 8),
+                          const TodayPathCard(),
+                        ],
                       ),
                     ),
                     const SizedBox(height: 24),

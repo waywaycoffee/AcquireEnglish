@@ -46,7 +46,12 @@ void main() {
         child: MaterialApp.router(routerConfig: router),
       ),
     );
-    await tester.tap(find.text('今天的英语之旅'));
+    await tester.pumpAndSettle();
+
+    // CTA copy is「下一步：…」; Gate1 opens due review.
+    final Finder cta = find.textContaining('下一步');
+    expect(cta, findsWidgets);
+    await tester.tap(cta.first);
     await tester.pumpAndSettle();
 
     expect(find.text('复习 due=1 journey=1'), findsOneWidget);

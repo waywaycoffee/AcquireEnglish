@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../authentication/presentation/account_storage.dart';
+import '../../../daily_path/data/journey_reminder.dart';
 import '../../../daily_path/data/today_journey_store.dart';
 import '../../../learner_model/data/journey_feedback_store.dart';
 import '../../../learner_model/domain/journey_completion.dart';
@@ -21,6 +22,7 @@ import '../../../onboarding/presentation/onboarding_provider.dart';
 import '../../../player/presentation/learning_resume_provider.dart';
 import '../../../reading/domain/reading_doc.dart';
 import '../../../reading/presentation/reading_library_provider.dart';
+import '../../../settings/presentation/settings_provider.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/presentation/daily_feed_provider.dart';
@@ -82,6 +84,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           final bool? completed = await context.push<bool>(step.route);
           if (active() && (completed ?? false)) {
             await store.saveStage(JourneyStage.learn);
+            // Rebuild immediately so CTA flips to planned / pursuit.
+            if (mounted) setState(() {});
           }
           return;
         }
@@ -158,6 +162,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         case JourneyStage.learn:
           return;
         case JourneyStage.tomorrow:
+          await _confirmTomorrowAndMaybeRemind(account, today);
           await store.saveStage(JourneyStage.done);
           return;
         case JourneyStage.done:
@@ -174,20 +179,85 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       _nextDay(today),
     );
     if (tomorrow.activity?.route.isNotEmpty ?? false) return;
+    final ({JourneyActivity activity, String reason})? seeded =
+        _materializeTomorrowPlan();
+    if (seeded == null) return;
+    await tomorrow.saveActivity(
+      seeded.activity,
+      planned: true,
+      reason: seeded.reason,
+    );
+  }
+
+  /// Concrete route+title+reason for Gate3 — never an empty「系统推荐」row.
+  ({JourneyActivity activity, String reason})? _materializeTomorrowPlan() {
+    final JourneyTask? pursuit = _currentPursuit();
+    final Set<String> tracks = selectedLearningTracks(
+      ref.read(learningPreferencesProvider).tags,
+    );
+    final ScoredLearnCandidate? coldScored = _coldRecommendation(
+      videoOn: tracks.contains(kTrackVideo),
+      readingOn: tracks.contains(kTrackReading),
+    );
+    final JourneyTask? cold = coldScored == null
+        ? null
+        : JourneyTask(
+            route: coldScored.candidate.route,
+            title: coldScored.candidate.title,
+            module: coldScored.candidate.module,
+          );
     final JourneyNextStep preview = resolveJourneyNext(
       JourneyNextRequest(
         dueReviewCount: 0,
         reviewFinished: true,
-        pursuit: _currentPursuit(),
-        recommendation: _coldTask(),
-        recommendationReason: '',
+        pursuit: pursuit,
+        recommendation: cold,
+        recommendationReason: coldScored?.reason ?? '',
       ),
     );
-    if (preview.route.isEmpty) return;
-    await tomorrow.saveActivity((
-      route: preview.route,
-      title: preview.title.replaceFirst(RegExp(r'^下一步 · '), ''),
-    ));
+    if (preview.route.isEmpty) return null;
+    final String title = preview.title
+        .replaceFirst(RegExp(r'^下一步 · '), '')
+        .trim();
+    final bool chase = preview.kind == JourneyNextKind.continuePursuit ||
+        (pursuit != null && pursuit.route == preview.route);
+    final String reason = chase
+        ? _pursuitPlanReason(pursuit?.title ?? title)
+        : (coldScored?.reason.trim().isNotEmpty == true
+              ? coldScored!.reason.trim()
+              : (preview.reason.trim().isNotEmpty
+                    ? preview.reason.trim()
+                    : '按你的水平排好了'));
+    return (
+      activity: (route: preview.route, title: title),
+      reason: reason,
+    );
+  }
+
+  String _pursuitPlanReason(String title) {
+    final Match? ep = RegExp(r'第\s*(\d+)\s*集').firstMatch(title);
+    if (ep != null) return '接着第${ep.group(1)}集';
+    final String cleaned = title
+        .replaceFirst(RegExp(r'^继续 · '), '')
+        .replaceFirst(RegExp(r'^继续'), '')
+        .trim();
+    return cleaned.isEmpty ? '接着追你正在学的' : '接着$cleaned';
+  }
+
+  Future<void> _confirmTomorrowAndMaybeRemind(
+    String account,
+    DateTime today,
+  ) async {
+    final DateTime tomorrowDay = _nextDay(today);
+    final TodayJourneyStore tomorrow = TodayJourneyStore(account, tomorrowDay);
+    final JourneyActivity? activity = tomorrow.activity;
+    if (activity == null || activity.route.isEmpty) return;
+    if (!ref.read(learningSettingsProvider).reminder) return;
+    await scheduleJourneyReminder(
+      day: tomorrowDay,
+      title: activity.title,
+      body: tomorrow.reason ?? '点下一步，接着昨天替你排好的内容',
+    );
   }
 
   JourneyTask? _currentPursuit() {
@@ -248,7 +318,22 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     try {
       final JourneyActivity? picked = await _pick(tomorrow: true);
       if (!mounted || picked == null) return;
-      await TodayJourneyStore(account, _nextDay(today)).saveActivity(picked);
+      JourneyActivity activity = picked;
+      String reason = '你选好了明天的内容';
+      if (activity.route.isEmpty) {
+        final ({JourneyActivity activity, String reason})? seeded =
+            _materializeTomorrowPlan();
+        if (seeded == null) return;
+        activity = seeded.activity;
+        reason = seeded.reason;
+      } else if (activity.title.contains('第') && activity.title.contains('集')) {
+        reason = _pursuitPlanReason(activity.title);
+      }
+      await TodayJourneyStore(account, _nextDay(today)).saveActivity(
+        activity,
+        planned: true,
+        reason: reason,
+      );
       await TodayJourneyStore(account, today).saveStage(JourneyStage.done);
     } finally {
       if (mounted) setState(() => _busy = false);
@@ -362,18 +447,30 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
 
   JourneyNextStep _nextStep(TodayJourneyStore store) {
     final bool reviewFinished = store.stage != JourneyStage.review;
-    final JourneyActivity? pausedActivity = store.activity;
+    final JourneyActivity? stored = store.activity;
     // Only honor explicit「稍后继续」. Auto-saved cold picks must not hide
     // 「继续第4集」.
     final JourneyTask? paused =
         store.pausedExplicitly &&
             store.stage == JourneyStage.learn &&
-            pausedActivity != null &&
-            pausedActivity.route.isNotEmpty
+            stored != null &&
+            stored.route.isNotEmpty
         ? JourneyTask(
-            route: pausedActivity.route,
-            title: pausedActivity.title,
-            module: learnModuleForRoute(pausedActivity.route),
+            route: stored.route,
+            title: stored.title,
+            module: learnModuleForRoute(stored.route),
+          )
+        : null;
+    // Yesterday's Gate3 plan (planned=true) — not every auto-saved activity.
+    final JourneyTask? planned =
+        !store.pausedExplicitly &&
+            store.planned &&
+            stored != null &&
+            stored.route.isNotEmpty
+        ? JourneyTask(
+            route: stored.route,
+            title: stored.title,
+            module: learnModuleForRoute(stored.route),
           )
         : null;
     final int due = ref.read(wordBookProvider.notifier).dueCounts().dueReviews;
@@ -383,6 +480,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         paused: paused,
         dueReviewCount: due,
         reviewFinished: reviewFinished,
+        planned: planned,
+        plannedReason: store.reason ?? '',
         pursuit: pursuit,
         recommendation: _coldTask(),
         recommendationReason: _coldRecommendation(
@@ -682,6 +781,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     return switch (step.kind) {
       JourneyNextKind.review => '下一步：开始复习',
       JourneyNextKind.paused ||
+      JourneyNextKind.planned ||
       JourneyNextKind.continuePursuit => '下一步：${shorten(step.title)}',
       JourneyNextKind.recommend => step.title.trim().isEmpty
           ? '下一步：打开学习'
@@ -717,10 +817,15 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     }
     final JourneyNextStep step = _nextStep(store);
     final int gate = _activeGate(stage, step);
-    final JourneyActivity? tomorrow = TodayJourneyStore(
+    final TodayJourneyStore tomorrowStore = TodayJourneyStore(
       account,
       _nextDay(today),
-    ).activity;
+    );
+    final JourneyActivity? tomorrow = tomorrowStore.activity;
+    final bool hasPlannedToday =
+        store.planned &&
+        !store.pausedExplicitly &&
+        (store.activity?.route.isNotEmpty ?? false);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -759,6 +864,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                 Text(
                   stage == JourneyStage.tomorrow || stage == JourneyStage.done
                       ? '复习和今天的新学都过了。明天继续点「下一步」就行。'
+                      : hasPlannedToday
+                      ? '昨天替你排好了，点下一步接着追'
                       : '不用想学什么。点下一步，把复习和感兴趣的内容一路做完。',
                   style: TextStyle(
                     color: AppDesignTokens.textSecondary,
@@ -775,9 +882,10 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                     title: tomorrow?.title.isNotEmpty == true
                         ? tomorrow!.title
                         : '明天按你的水平再排一条',
-                    reason: tomorrow?.route.isNotEmpty == true
-                        ? '明天已替你排好 · 可改'
-                        : '还没定明天 · 可现在选',
+                    reason: tomorrowStore.reason ??
+                        (tomorrow?.route.isNotEmpty == true
+                            ? '明天已替你排好 · 可改'
+                            : '还没定明天 · 可现在选'),
                   )
                 else
                   _NextBanner(
@@ -1040,15 +1148,6 @@ class _TomorrowBanner extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
           Text(
-            '明天已替你排好',
-            style: TextStyle(
-              color: AppDesignTokens.brandGreen,
-              fontWeight: FontWeight.w700,
-              fontSize: 12,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
             title,
             style: TextStyle(
               color: AppDesignTokens.textPrimary,
@@ -1062,6 +1161,7 @@ class _TomorrowBanner extends StatelessWidget {
             style: TextStyle(
               color: AppDesignTokens.textSecondary,
               fontSize: 12,
+              height: 1.4,
             ),
           ),
         ],
@@ -1282,7 +1382,52 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
                 readingSuggestion.route,
               ),
             if (widget.tomorrow)
-              activity(Icons.auto_awesome, '交给系统推荐', '明天再看适合你的内容', ''),
+              ListTile(
+                leading: Icon(
+                  Icons.auto_awesome,
+                  color: AppDesignTokens.brandGreen,
+                ),
+                title: Text(
+                  '交给系统推荐',
+                  style: TextStyle(color: AppDesignTokens.textPrimary),
+                ),
+                subtitle: Text(
+                  aimless?.reason ??
+                      (shortlist.isNotEmpty
+                          ? shortlist.first.reason
+                          : (hasVideo
+                                ? '看一段推荐视频'
+                                : '明天再看适合你的内容')),
+                  style: TextStyle(color: AppDesignTokens.textSecondary),
+                ),
+                trailing: Icon(
+                  Icons.chevron_right,
+                  color: AppDesignTokens.textSecondary,
+                ),
+                onTap: () {
+                  final ScoredLearnCandidate? pick = aimless ??
+                      (shortlist.isNotEmpty ? shortlist.first : null);
+                  if (pick != null) {
+                    open(pick.candidate.route, pick.candidate.title);
+                    return;
+                  }
+                  if (hasVideo) {
+                    open(recommended.route, recommended.title);
+                    return;
+                  }
+                  if (book != null) {
+                    open(
+                      '/reading/${Uri.encodeComponent(book.id)}',
+                      book.displayTitle,
+                    );
+                    return;
+                  }
+                  if (readingSuggestion != null &&
+                      readingSuggestion.route.isNotEmpty) {
+                    open(readingSuggestion.route, readingSuggestion.title);
+                  }
+                },
+              ),
           ],
         ),
       ),

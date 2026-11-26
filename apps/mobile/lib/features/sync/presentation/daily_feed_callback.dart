@@ -2,6 +2,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:hive_ce/hive.dart';
 import 'package:workmanager/workmanager.dart';
 
+import '../../daily_path/data/journey_reminder.dart';
 import '../../idle_jobs/idle_job_scheduler.dart';
 import '../../subtitle_completion/subtitle_completion_background.dart';
 
@@ -12,6 +13,10 @@ void dailyFeedBackgroundDispatcher() {
   Workmanager().executeTask((String task, Map<String, dynamic>? inputData) async {
     if (task == kSubtitleCompletionTask) {
       await handleSubtitleCompletionBackgroundTask();
+      return true;
+    }
+    if (task == kJourneyReminderTask) {
+      await handleJourneyReminderBackgroundTask();
       return true;
     }
     if (task == kIdleJobsTask ||
