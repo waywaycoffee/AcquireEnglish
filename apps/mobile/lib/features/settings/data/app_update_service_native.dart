@@ -10,6 +10,13 @@ import 'package:path_provider/path_provider.dart';
 const String kOfficialAndroidManifestUrl =
     'https://acquireenglish.curlhairai.com/downloads/android-latest.json';
 
+bool isOfficialAndroidDownloadUrl(String raw) {
+  final Uri uri = Uri.tryParse(raw.trim()) ?? Uri();
+  return uri.scheme == 'https' &&
+      uri.host == 'acquireenglish.curlhairai.com' &&
+      uri.path.startsWith('/downloads/');
+}
+
 class AppUpdate {
   const AppUpdate({
     required this.version,
@@ -63,6 +70,7 @@ class AppUpdateService {
       kOfficialAndroidManifestUrl,
       options: Options(
         headers: <String, String>{'Accept': 'application/json'},
+        connectTimeout: const Duration(seconds: 20),
         receiveTimeout: const Duration(seconds: 12),
       ),
     );
@@ -88,6 +96,9 @@ class AppUpdateService {
     final String apkUrl = '${json['apk_url'] ?? ''}'.trim();
     if (apkUrl.isEmpty) {
       throw StateError('官网更新清单缺少 apk_url。');
+    }
+    if (!isOfficialAndroidDownloadUrl(apkUrl)) {
+      throw StateError('官网更新清单包含非官方下载地址。');
     }
     final String assetName = '${json['apk_name'] ?? ''}'.trim().isEmpty
         ? 'AcquireEnglish-android-latest.apk'
@@ -126,11 +137,31 @@ class AppUpdateService {
       '${destination.path}${Platform.pathSeparator}${update.assetName}',
     );
 
-    await _dio.download(
-      update.downloadUrl,
-      file.path,
-      onReceiveProgress: onProgress,
-    );
+    try {
+      await _dio.download(
+        update.downloadUrl,
+        file.path,
+        options: Options(
+          headers: <String, String>{'Accept': 'application/octet-stream'},
+          connectTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 20),
+          // APK 较大，此超时表示连续两分钟未收到新数据。
+          receiveTimeout: const Duration(minutes: 2),
+        ),
+        onReceiveProgress: onProgress,
+      );
+    } on DioException catch (error) {
+      if (await file.exists()) {
+        await file.delete();
+      }
+      final bool timeout = error.type == DioExceptionType.connectionTimeout ||
+          error.type == DioExceptionType.receiveTimeout ||
+          error.type == DioExceptionType.sendTimeout;
+      if (timeout) {
+        throw StateError('连接官网超时，请切换 Wi-Fi 或移动网络后重试。');
+      }
+      throw StateError('官网安装包下载失败，请稍后重试。');
+    }
 
     final String? expected = await _expectedChecksum(update);
     if (expected != null && expected.isNotEmpty) {
@@ -156,7 +187,13 @@ class AppUpdateService {
     if (inline != null && inline.isNotEmpty) return inline;
     final String? url = update.checksumUrl?.trim();
     if (url == null || url.isEmpty) return null;
-    final Response<String> response = await _dio.get<String>(url);
+    final Response<String> response = await _dio.get<String>(
+      url,
+      options: Options(
+        connectTimeout: const Duration(seconds: 20),
+        receiveTimeout: const Duration(seconds: 20),
+      ),
+    );
     for (final String rawLine in response.data?.split('\n') ?? <String>[]) {
       final String line = rawLine.trim();
       if (line.endsWith('  ${update.assetName}') ||

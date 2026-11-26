@@ -1,11 +1,11 @@
 {
-  "version": "0.2.262",
-  "version_code": 282,
-  "apk_name": "AcquireEnglish-android-0.2.262+282.apk",
+  "version": "0.2.263",
+  "version_code": 283,
+  "apk_name": "AcquireEnglish-android-0.2.263+283.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "96eecffaafbe76b549063b31e012c01ffaf37f371e66bf446836df982ab200f9",
+  "sha256": "058b07fe8f284e231593fa4c89e417dfe88b2e67ffa5386e671f56f15163fdae",
   "force": true,
-  "min_version_code": 282,
-  "notes": "必须更新：修复数字人长句播放时男老师中途切换女声的问题",
-  "published_at": "2026-11-26T09:37:50+08:00"
+  "min_version_code": 283,
+  "notes": "必须更新：更新统一改为官网下载，修复 GitHub 连接超时；数字人进入页面即显示按住说话按钮",
+  "published_at": "2026-11-26T09:48:25+08:00"
 }
