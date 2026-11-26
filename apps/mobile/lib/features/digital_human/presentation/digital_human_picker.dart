@@ -7,6 +7,7 @@ import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../settings/presentation/settings_provider.dart';
+import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../data/coach_english_voices.dart';
 import '../data/digital_human_catalog.dart';
@@ -104,30 +105,55 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
     }
   }
 
-  Future<bool> _playPreviewUrl(String url, int request) async {
+  Future<bool> _playPreviewUrl(
+    String url,
+    int request, {
+    String sourceText = '',
+  }) async {
     if (!mounted || request != _previewRequest) return false;
     final Player player = Player();
     final Completer<bool> done = Completer<bool>();
     _previewPlayer = player;
     _previewDone = done;
+    StreamSubscription<bool>? playingSub;
     StreamSubscription<bool>? completedSub;
     StreamSubscription<String>? errorSub;
+    bool started = false;
+    bool finishing = false;
+    final Duration endGrace = pronunciationEndGraceFor(sourceText);
+    void scheduleFinish(bool ok) {
+      if (done.isCompleted || finishing) return;
+      finishing = true;
+      unawaited(() async {
+        await Future<void>.delayed(endGrace);
+        if (!done.isCompleted) done.complete(ok);
+      }());
+    }
+
     try {
+      playingSub = player.stream.playing.listen((bool value) {
+        if (value) {
+          started = true;
+          return;
+        }
+        if (started) scheduleFinish(true);
+      });
       completedSub = player.stream.completed.listen((bool value) {
-        if (value && !done.isCompleted) done.complete(true);
+        if (value && started) scheduleFinish(true);
       });
       errorSub = player.stream.error.listen((String _) {
         if (!done.isCompleted) done.complete(false);
       });
       // Subscribe before open so short/cached clips cannot miss completion.
-      await player.open(Media(url), play: true);
+      await player.open(Media(url));
       if (!mounted || request != _previewRequest) return false;
       if (mounted) setState(() => _loadingPreview = false);
       return await done.future.timeout(
-        const Duration(seconds: 45),
-        onTimeout: () => false,
+        const Duration(seconds: 45) + endGrace,
+        onTimeout: () => started,
       );
     } finally {
+      await playingSub?.cancel();
       await completedSub?.cancel();
       await errorSub?.cancel();
       if (identical(_previewDone, done)) {
@@ -177,15 +203,17 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
       final String voice =
           saved ?? persona.recommendedVoiceId ?? persona.edgeVoiceEn;
       final bool bilingual = isBilingualCoachVoice(voice);
-      final result = await _pipeline.synthesizeSpeechWithProvider(
-        rawBaseUrl: baseUrl,
-        text: bilingual
-            ? '你好，很高兴见到你。 Hi! Let’s practise English together.'
-            : 'Hi! It’s nice to meet you. Let’s practise English together.',
-        digitalHumanId: persona.id,
-        ttsVoice: voice,
-        language: bilingual ? 'zh' : 'en',
-      );
+      final String previewText = bilingual
+          ? '你好，很高兴见到你。 Hi! Let’s practise English together.'
+          : 'Hi! It’s nice to meet you. Let’s practise English together.';
+      final ({String url, String provider})? result = await _pipeline
+          .synthesizeSpeechWithProvider(
+            rawBaseUrl: baseUrl,
+            text: previewText,
+            digitalHumanId: persona.id,
+            ttsVoice: voice,
+            language: bilingual ? 'zh' : 'en',
+          );
       if (!mounted || request != _previewRequest) return;
       if (result == null) throw StateError('Missing preview audio');
       if (result.provider == 'edge') {
@@ -193,7 +221,11 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
           context,
         ).showSnackBar(const SnackBar(content: Text('本次试听使用备用音色（Edge）')));
       }
-      final bool played = await _playPreviewUrl(result.url, request);
+      final bool played = await _playPreviewUrl(
+        result.url,
+        request,
+        sourceText: previewText,
+      );
       if (!mounted || request != _previewRequest) return;
       if (!played) failed = true;
     } catch (_) {

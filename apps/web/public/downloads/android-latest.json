@@ -1,11 +1,11 @@
 {
-  "version": "0.2.266",
-  "version_code": 286,
-  "apk_name": "AcquireEnglish-android-0.2.266+286.apk",
+  "version": "0.2.267",
+  "version_code": 287,
+  "apk_name": "AcquireEnglish-android-0.2.267+287.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "7a03ea8fbb5d524ecadfaae23e82495f6b70f7117d7e47aa98a69fc33b92b3a6",
+  "sha256": "10d23b321130c8113a061c77d8eeefbf48c53bd42011bd6673860cd2424ed484",
   "force": true,
-  "min_version_code": 286,
-  "notes": "必须更新：阅读连续朗读句尾不再被截断；数字人正常问答优先，云音色超时切本机音色",
-  "published_at": "2026-11-26T12:30:00+08:00"
+  "min_version_code": 287,
+  "notes": "必须更新：模块示范已确认无掐尾；数字人远程/本机播放补齐句尾保留",
+  "published_at": "2026-11-26T12:40:00+08:00"
 }

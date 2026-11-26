@@ -26,6 +26,7 @@ import '../../reading/data/reading_gloss.dart';
 import '../../reading/data/reading_vocab_lists.dart';
 import '../../reading/presentation/reading_iplus1_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
+import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/grammar_split_button.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/user_assets_service.dart';
@@ -1272,16 +1273,18 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     setState(() => _coachSpeaking = true);
     try {
       final LearningSettingsState settings = ref.read(learningSettingsProvider);
+      final String previewText = isBilingualCoachVoice(voice.id)
+          ? '很好，我们慢一点再说一遍。 Nice try! Let’s say it again, a little more slowly.'
+          : 'Nice try! Let’s say it again, a little more slowly.';
       final String? url = await _pipelineClient.synthesizeSpeech(
         rawBaseUrl: settings.oralCoachPipelineUrl,
-        text: isBilingualCoachVoice(voice.id)
-            ? '很好，我们慢一点再说一遍。 Nice try! Let’s say it again, a little more slowly.'
-            : 'Nice try! Let’s say it again, a little more slowly.',
+        text: previewText,
         language: isBilingualCoachVoice(voice.id) ? 'zh' : 'en',
         digitalHumanId: settings.selectedDigitalHuman.id,
         ttsVoice: voice.id,
       );
-      if (url == null || !await _playRemoteTts(url, gen: gen)) {
+      if (url == null ||
+          !await _playRemoteTts(url, gen: gen, sourceText: previewText)) {
         throw StateError('无试听音频');
       }
     } catch (_) {
@@ -1301,11 +1304,13 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
     String url, {
     required int gen,
     Duration startAt = Duration.zero,
+    String sourceText = '',
   }) async {
     if (!mounted || gen != _speakGen) return false;
     final Player player = Player();
     _speechPlayer = player;
     bool started = false;
+    final Duration endGrace = pronunciationEndGraceFor(sourceText);
     try {
       // Fail fast on dead coach cache URLs (historically 404 → ~45s silence).
       final StreamSubscription<bool> playingSub = player.stream.playing.listen((
@@ -1339,6 +1344,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       final bool ok = await completed;
       await playingSub.cancel();
+      // Hold past EOS so CosyVoice / Edge tails are not cut when we dispose.
+      if (gen == _speakGen) {
+        await Future<void>.delayed(endGrace);
+      }
       // A remote voice that has audibly started owns this utterance. Some
       // Android players do not emit `completed` reliably for cached/streamed
       // MP3, and long coach replies legitimately exceed the old 20 s timeout.
@@ -1493,6 +1502,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
           result.url,
           gen: ++_speakGen,
           startAt: _podcastOffset,
+          sourceText: text,
         );
         if (!mounted || generation != _podcastGeneration) return;
         if (!played) throw StateError('播客音频暂不可用');
@@ -1610,7 +1620,9 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
             _ => '在线音色',
           },
         );
-        if (await _playRemoteTts(remote, gen: gen)) return;
+        if (await _playRemoteTts(remote, gen: gen, sourceText: speak)) {
+          return;
+        }
       }
       if (!mounted || !_started || gen != _speakGen) return;
       setState(() => _voicePlaybackLabel = '流畅模式 · 本机音色');
@@ -1618,6 +1630,10 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       await _cartoonTts.awaitSpeakCompletion(true);
       if (!mounted || !_started || gen != _speakGen) return;
       await _cartoonTts.speak(speak).timeout(const Duration(seconds: 90));
+      // OEM onDone often fires before the last syllable finishes.
+      if (mounted && gen == _speakGen) {
+        await Future<void>.delayed(pronunciationEndGraceFor(speak));
+      }
     } catch (_) {
     } finally {
       if (gen == _speakGen) {
