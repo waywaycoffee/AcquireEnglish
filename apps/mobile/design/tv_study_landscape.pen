@@ -78,8 +78,8 @@
           "type": "rectangle",
           "cornerRadius": 6,
           "id": "window",
-          "x": 332,
-          "y": 109,
+          "x": 22,
+          "y": 35,
           "fill": "#365967",
           "width": 273,
           "height": 233
@@ -1543,7 +1543,1638 @@
           ]
         }
       ]
+    },
+    {
+      "type": "frame",
+      "id": "VNK0I",
+      "x": 2460,
+      "y": 0,
+      "name": "home-journey",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$canvas",
+      "cornerRadius": 28,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "pJcH1",
+          "name": "home-journey status",
+          "width": "fill_container",
+          "height": 54,
+          "padding": [
+            16,
+            20
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "f0q5E",
+              "name": "time",
+              "fill": "$text",
+              "content": "9:41",
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 15,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "mdw6W",
+              "name": "sys",
+              "fill": "$muted",
+              "content": "●●●  LTE",
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "P7NPM",
+          "name": "home-journey body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            8,
+            20,
+            24,
+            20
+          ],
+          "children": [
+            {
+              "type": "frame",
+              "id": "SvTxi",
+              "name": "journey hero",
+              "width": "fill_container",
+              "fill": "$card",
+              "cornerRadius": 20,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "layout": "vertical",
+              "gap": 14,
+              "padding": 20,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Dhz4s",
+                  "name": "eyebrow",
+                  "fill": "$green",
+                  "content": "今天 · 约 15 分钟",
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "text",
+                  "id": "KISEg",
+                  "name": "title",
+                  "fill": "$text",
+                  "content": "英语之旅",
+                  "fontFamily": "Manrope",
+                  "fontSize": 28,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "x8Kmv",
+                  "name": "sub",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "不用想学什么。点下一步，把复习和感兴趣的内容一路做完。",
+                  "lineHeight": 1.4,
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 14,
+                  "fontWeight": "normal"
+                },
+                {
+                  "type": "frame",
+                  "id": "hWf5F",
+                  "name": "steps",
+                  "width": "fill_container",
+                  "gap": 8,
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "xMmwU",
+                      "name": "pill 1 复习",
+                      "fill": "$softGreen",
+                      "cornerRadius": 999,
+                      "stroke": "$green",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        8,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "J7PV9",
+                          "name": "pill label",
+                          "fill": "$green",
+                          "content": "1 复习",
+                          "fontFamily": "IBM Plex Sans",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "dR9Vl",
+                      "name": "arrow1",
+                      "fill": "$muted",
+                      "content": "→",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "ud4n7",
+                      "name": "pill 2 新学",
+                      "fill": "$card",
+                      "cornerRadius": 999,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        8,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "QG8nw",
+                          "name": "pill label",
+                          "fill": "$muted",
+                          "content": "2 新学",
+                          "fontFamily": "IBM Plex Sans",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    },
+                    {
+                      "type": "text",
+                      "id": "OVjth",
+                      "name": "arrow2",
+                      "fill": "$muted",
+                      "content": "→",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    },
+                    {
+                      "type": "frame",
+                      "id": "T8rn87",
+                      "name": "pill 3 明天",
+                      "fill": "$card",
+                      "cornerRadius": 999,
+                      "stroke": "$border",
+                      "strokeWidth": 1,
+                      "gap": 6,
+                      "padding": [
+                        8,
+                        12
+                      ],
+                      "alignItems": "center",
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "eakIr",
+                          "name": "pill label",
+                          "fill": "$muted",
+                          "content": "3 明天",
+                          "fontFamily": "IBM Plex Sans",
+                          "fontSize": 12,
+                          "fontWeight": "600"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "ZaTrf",
+                  "name": "next preview",
+                  "width": "fill_container",
+                  "fill": "$softGreen",
+                  "cornerRadius": 14,
+                  "layout": "vertical",
+                  "gap": 6,
+                  "padding": 14,
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "SzX8p",
+                      "name": "next label",
+                      "fill": "$green",
+                      "content": "下一步 · 今日复习",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 12,
+                      "fontWeight": "700"
+                    },
+                    {
+                      "type": "text",
+                      "id": "o1COO",
+                      "name": "next detail",
+                      "fill": "$text",
+                      "textGrowth": "fixed-width",
+                      "width": "fill_container",
+                      "content": "到期 5 张词卡 · 做完自动进新学",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14,
+                      "fontWeight": "normal"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "p9HNg",
+                  "name": "cta 下一步：开始复习",
+                  "width": "fill_container",
+                  "fill": "$green",
+                  "cornerRadius": 16,
+                  "gap": 8,
+                  "padding": [
+                    18,
+                    20
+                  ],
+                  "justifyContent": "center",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "uR2ro",
+                      "name": "cta label",
+                      "fill": "#FFFFFF",
+                      "content": "下一步：开始复习",
+                      "fontFamily": "Manrope",
+                      "fontSize": 18,
+                      "fontWeight": "800"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "qrSvS",
+              "name": "today queue",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 10,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "eQ9Ha",
+                  "name": "queue title",
+                  "fill": "$muted",
+                  "content": "今天还会带你过",
+                  "fontFamily": "Manrope",
+                  "fontSize": 15,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "frame",
+                  "id": "M2YlH",
+                  "name": "q 复习 5 词",
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": 14,
+                  "gap": 12,
+                  "padding": [
+                    12,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "GaErp",
+                      "name": "dot",
+                      "width": 8,
+                      "height": 8,
+                      "fill": "$green",
+                      "cornerRadius": 99
+                    },
+                    {
+                      "type": "frame",
+                      "id": "I4VEC",
+                      "name": "col",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "RZZzz",
+                          "name": "qt",
+                          "fill": "$text",
+                          "content": "复习 5 词",
+                          "fontFamily": "IBM Plex Sans",
+                          "fontSize": 14,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "lyauD",
+                          "name": "qd",
+                          "fill": "$muted",
+                          "content": "到期优先",
+                          "fontFamily": "IBM Plex Sans",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "TeWqB",
+                  "name": "q 美式音标第 1 集",
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": 14,
+                  "gap": 12,
+                  "padding": [
+                    12,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "WRsLM",
+                      "name": "dot",
+                      "width": 8,
+                      "height": 8,
+                      "fill": "$green",
+                      "cornerRadius": 99
+                    },
+                    {
+                      "type": "frame",
+                      "id": "noPPI",
+                      "name": "col",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "w0uxe",
+                          "name": "qt",
+                          "fill": "$text",
+                          "content": "美式音标第 1 集",
+                          "fontFamily": "IBM Plex Sans",
+                          "fontSize": 14,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "SVfOo",
+                          "name": "qd",
+                          "fill": "$muted",
+                          "content": "按你的兴趣推荐",
+                          "fontFamily": "IBM Plex Sans",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "T5I4lU",
+                  "name": "q 排明天",
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": 14,
+                  "gap": 12,
+                  "padding": [
+                    12,
+                    14
+                  ],
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "frame",
+                      "id": "OjLvm",
+                      "name": "dot",
+                      "width": 8,
+                      "height": 8,
+                      "fill": "$green",
+                      "cornerRadius": 99
+                    },
+                    {
+                      "type": "frame",
+                      "id": "s46xy",
+                      "name": "col",
+                      "width": "fill_container",
+                      "layout": "vertical",
+                      "gap": 2,
+                      "children": [
+                        {
+                          "type": "text",
+                          "id": "XH38x",
+                          "name": "qt",
+                          "fill": "$text",
+                          "content": "排明天",
+                          "fontFamily": "IBM Plex Sans",
+                          "fontSize": 14,
+                          "fontWeight": "700"
+                        },
+                        {
+                          "type": "text",
+                          "id": "Vg3Oc",
+                          "name": "qd",
+                          "fill": "$muted",
+                          "content": "可跳过，系统代排",
+                          "fontFamily": "IBM Plex Sans",
+                          "fontSize": 12,
+                          "fontWeight": "normal"
+                        }
+                      ]
+                    }
+                  ]
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "LkuV2",
+      "x": 2890,
+      "y": 0,
+      "name": "review-step",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$canvas",
+      "cornerRadius": 28,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "CUxRI",
+          "name": "review-step status",
+          "width": "fill_container",
+          "height": 54,
+          "padding": [
+            16,
+            20
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "b7wZl",
+              "name": "time",
+              "fill": "$text",
+              "content": "9:41",
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 15,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "TrSln",
+              "name": "sys",
+              "fill": "$muted",
+              "content": "●●●  LTE",
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "VishN",
+          "name": "review-step body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            8,
+            20,
+            24,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "c6jxvl",
+              "name": "r stage",
+              "fill": "$green",
+              "content": "第 1 步 · 今日复习  2 / 5",
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "type": "text",
+              "id": "pUIJC",
+              "name": "r title",
+              "fill": "$text",
+              "content": "abandon",
+              "fontFamily": "Manrope",
+              "fontSize": 36,
+              "fontWeight": "800"
+            },
+            {
+              "type": "text",
+              "id": "H9iC34",
+              "name": "r meaning",
+              "fill": "$muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "v. 放弃；遗弃\n例句：Don't abandon hope.",
+              "lineHeight": 1.45,
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 16,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "kZHd0",
+              "name": "grades",
+              "width": "fill_container",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "RhW3l",
+                  "name": "g 忘了",
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": 12,
+                  "padding": [
+                    14,
+                    8
+                  ],
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "K8cjn2",
+                      "name": "gl",
+                      "fill": "$text",
+                      "content": "忘了",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "K4WsNy",
+                  "name": "g 难",
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": 12,
+                  "padding": [
+                    14,
+                    8
+                  ],
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "m8hQZp",
+                      "name": "gl",
+                      "fill": "$text",
+                      "content": "难",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "y6MHMG",
+                  "name": "g 还行",
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": 12,
+                  "padding": [
+                    14,
+                    8
+                  ],
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "ANGhC",
+                      "name": "gl",
+                      "fill": "$text",
+                      "content": "还行",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "O4tMF",
+                  "name": "g 记得",
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": 12,
+                  "padding": [
+                    14,
+                    8
+                  ],
+                  "justifyContent": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "n15z3",
+                      "name": "gl",
+                      "fill": "$text",
+                      "content": "记得",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 14,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "umfc2",
+              "name": "tip",
+              "width": "fill_container",
+              "fill": "$card",
+              "cornerRadius": 14,
+              "layout": "vertical",
+              "gap": 6,
+              "padding": 14,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "DdAWO",
+                  "name": "tip t",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "评完这张会自动下一张。也可以跳过剩余复习，直接去学新内容。",
+                  "lineHeight": 1.4,
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "gtRne",
+              "name": "flex grow",
+              "width": "fill_container",
+              "height": "fill_container"
+            },
+            {
+              "type": "frame",
+              "id": "rX3e2",
+              "name": "cta 下一张",
+              "width": "fill_container",
+              "fill": "$green",
+              "cornerRadius": 16,
+              "padding": [
+                18,
+                20
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "zlhJk",
+                  "name": "cta label",
+                  "fill": "#FFFFFF",
+                  "content": "下一张",
+                  "fontFamily": "Manrope",
+                  "fontSize": 18,
+                  "fontWeight": "800"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "KYDrP",
+              "name": "ghost 跳过剩余 · 去学新",
+              "width": "fill_container",
+              "fill": "$card",
+              "cornerRadius": 14,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "padding": [
+                14,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "W2ReJJ",
+                  "name": "ghost label",
+                  "fill": "$muted",
+                  "content": "跳过剩余 · 去学新",
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 15,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "zoPDe",
+      "x": 2890,
+      "y": -44,
+      "name": "review-step label wrap",
+      "width": 390,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "text",
+          "id": "E8HbYB",
+          "name": "review-step caption",
+          "fill": "$text",
+          "content": "02 · 复习中 · 底部永远「下一张」",
+          "fontFamily": "Manrope",
+          "fontSize": 17,
+          "fontWeight": "700"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "O7ftl1",
+      "x": 3320,
+      "y": 0,
+      "name": "learn-step",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$canvas",
+      "cornerRadius": 28,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "OZz1M",
+          "name": "learn-step status",
+          "width": "fill_container",
+          "height": 54,
+          "padding": [
+            16,
+            20
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "gIhyO",
+              "name": "time",
+              "fill": "$text",
+              "content": "9:41",
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 15,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "tGCLQ",
+              "name": "sys",
+              "fill": "$muted",
+              "content": "●●●  LTE",
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "AuxcP",
+          "name": "learn-step body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            8,
+            20,
+            24,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "I9qfA3",
+              "name": "l stage",
+              "fill": "$green",
+              "content": "第 2 步 · 学新内容",
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 13,
+              "fontWeight": "700"
+            },
+            {
+              "type": "frame",
+              "id": "x4mwYT",
+              "name": "picked",
+              "width": "fill_container",
+              "fill": "$card",
+              "cornerRadius": 18,
+              "stroke": "$green",
+              "strokeWidth": 1.5,
+              "layout": "vertical",
+              "gap": 10,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Sw1Lw",
+                  "name": "why",
+                  "fill": "$green",
+                  "content": "因为你偏好 · 发音 / 跟读",
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 12,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "Fauor",
+                  "name": "pt",
+                  "fill": "$text",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "Sounds American · 美式音标 第 1 集",
+                  "fontFamily": "Manrope",
+                  "fontSize": 20,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "doJcm",
+                  "name": "pd",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "约 8 分钟 · 看完或跟读 3 句即可点「完成本关」",
+                  "lineHeight": 1.4,
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "s1dO6n",
+              "name": "cta 打开学习",
+              "width": "fill_container",
+              "fill": "$green",
+              "cornerRadius": 16,
+              "padding": [
+                18,
+                20
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "VXhR4",
+                  "name": "cta label",
+                  "fill": "#FFFFFF",
+                  "content": "打开学习",
+                  "fontFamily": "Manrope",
+                  "fontSize": 18,
+                  "fontWeight": "800"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "iOpGr",
+              "name": "alts",
+              "width": "fill_container",
+              "layout": "vertical",
+              "gap": 8,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pcz7A",
+                  "name": "alt h",
+                  "fill": "$muted",
+                  "content": "想换一个也可以",
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 13,
+                  "fontWeight": "600"
+                },
+                {
+                  "type": "frame",
+                  "id": "Dves3",
+                  "name": "alt 老友记影子跟读 · 第 1 段",
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": 12,
+                  "padding": [
+                    12,
+                    14
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "EdvhI",
+                      "name": "at",
+                      "fill": "$text",
+                      "content": "老友记影子跟读 · 第 1 段",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "H2MuN",
+                      "name": "ach",
+                      "fill": "$blue",
+                      "content": "换",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "dJdW7",
+                  "name": "alt 口语 9000 句 · 第 1 课",
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": 12,
+                  "padding": [
+                    12,
+                    14
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "f9KTCF",
+                      "name": "at",
+                      "fill": "$text",
+                      "content": "口语 9000 句 · 第 1 课",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "INSQi",
+                      "name": "ach",
+                      "fill": "$blue",
+                      "content": "换",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                },
+                {
+                  "type": "frame",
+                  "id": "OsNOA",
+                  "name": "alt 阅读 · A Quiet Morning",
+                  "width": "fill_container",
+                  "fill": "$card",
+                  "cornerRadius": 12,
+                  "padding": [
+                    12,
+                    14
+                  ],
+                  "justifyContent": "space_between",
+                  "alignItems": "center",
+                  "children": [
+                    {
+                      "type": "text",
+                      "id": "agiS6",
+                      "name": "at",
+                      "fill": "$text",
+                      "content": "阅读 · A Quiet Morning",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 13,
+                      "fontWeight": "600"
+                    },
+                    {
+                      "type": "text",
+                      "id": "PeVxT",
+                      "name": "ach",
+                      "fill": "$blue",
+                      "content": "换",
+                      "fontFamily": "IBM Plex Sans",
+                      "fontSize": 13,
+                      "fontWeight": "700"
+                    }
+                  ]
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "yigqT",
+              "name": "grow2",
+              "width": "fill_container",
+              "height": "fill_container"
+            },
+            {
+              "type": "frame",
+              "id": "mFP0f",
+              "name": "ghost 稍后继续（进度保留）",
+              "width": "fill_container",
+              "fill": "$card",
+              "cornerRadius": 14,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "padding": [
+                14,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "r72dTd",
+                  "name": "ghost label",
+                  "fill": "$muted",
+                  "content": "稍后继续（进度保留）",
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 15,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "glBiC",
+      "x": 3320,
+      "y": -44,
+      "name": "learn-step label wrap",
+      "width": 390,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "text",
+          "id": "LEx5V",
+          "name": "learn-step caption",
+          "fill": "$text",
+          "content": "03 · 新学 · 已帮你选好，可换",
+          "fontFamily": "Manrope",
+          "fontSize": 17,
+          "fontWeight": "700"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "j9tGG6",
+      "x": 3750,
+      "y": 0,
+      "name": "done-step",
+      "clip": true,
+      "width": 390,
+      "height": 844,
+      "fill": "$canvas",
+      "cornerRadius": 28,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "frame",
+          "id": "ybGxR",
+          "name": "done-step status",
+          "width": "fill_container",
+          "height": 54,
+          "padding": [
+            16,
+            20
+          ],
+          "justifyContent": "space_between",
+          "alignItems": "center",
+          "children": [
+            {
+              "type": "text",
+              "id": "DTBUO",
+              "name": "time",
+              "fill": "$text",
+              "content": "9:41",
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 15,
+              "fontWeight": "600"
+            },
+            {
+              "type": "text",
+              "id": "DZqko",
+              "name": "sys",
+              "fill": "$muted",
+              "content": "●●●  LTE",
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 12,
+              "fontWeight": "normal"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "URxJt",
+          "name": "done-step body",
+          "width": "fill_container",
+          "height": "fill_container",
+          "layout": "vertical",
+          "gap": 16,
+          "padding": [
+            8,
+            20,
+            24,
+            20
+          ],
+          "children": [
+            {
+              "type": "text",
+              "id": "ssdc8",
+              "name": "d emoji",
+              "fill": "$text",
+              "content": "今天打卡完成",
+              "fontFamily": "Manrope",
+              "fontSize": 24,
+              "fontWeight": "800"
+            },
+            {
+              "type": "text",
+              "id": "K9Dk49",
+              "name": "d sub",
+              "fill": "$muted",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "复习 5 · 新学 1 关。明天继续点「下一步」就行。",
+              "lineHeight": 1.4,
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            },
+            {
+              "type": "frame",
+              "id": "QnFr2",
+              "name": "tomorrow plan",
+              "width": "fill_container",
+              "fill": "$softGreen",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "R9hLU",
+                  "name": "tm h",
+                  "fill": "$green",
+                  "content": "明天已替你排好",
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 12,
+                  "fontWeight": "700"
+                },
+                {
+                  "type": "text",
+                  "id": "c06Boc",
+                  "name": "tm t",
+                  "fill": "$text",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "继续美式音标第 2 集",
+                  "fontFamily": "Manrope",
+                  "fontSize": 18,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "ePMTb",
+                  "name": "tm why",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "因为今天学了同系列 · 可改",
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "n0Ofc",
+              "name": "cta 就这样 · 明天见",
+              "width": "fill_container",
+              "fill": "$green",
+              "cornerRadius": 16,
+              "padding": [
+                18,
+                20
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "OHV0J",
+                  "name": "cta label",
+                  "fill": "#FFFFFF",
+                  "content": "就这样 · 明天见",
+                  "fontFamily": "Manrope",
+                  "fontSize": 18,
+                  "fontWeight": "800"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "REbCv",
+              "name": "ghost 换明天学别的",
+              "width": "fill_container",
+              "fill": "$card",
+              "cornerRadius": 14,
+              "stroke": "$border",
+              "strokeWidth": 1,
+              "padding": [
+                14,
+                16
+              ],
+              "justifyContent": "center",
+              "alignItems": "center",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "QESIe",
+                  "name": "ghost label",
+                  "fill": "$muted",
+                  "content": "换明天学别的",
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 15,
+                  "fontWeight": "600"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "t0hPP",
+      "x": 3750,
+      "y": -44,
+      "name": "done-step label wrap",
+      "width": 390,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "text",
+          "id": "wfg89",
+          "name": "done-step caption",
+          "fill": "$text",
+          "content": "04 · 收工 · 一键排明天",
+          "fontFamily": "Manrope",
+          "fontSize": 17,
+          "fontWeight": "700"
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "uLjrL",
+      "x": 2460,
+      "y": 920,
+      "name": "principle-board",
+      "width": 1620,
+      "fill": "$card",
+      "cornerRadius": 24,
+      "stroke": "$border",
+      "strokeWidth": 1,
+      "layout": "vertical",
+      "gap": 18,
+      "padding": 28,
+      "children": [
+        {
+          "type": "text",
+          "id": "NzrSM",
+          "name": "board title",
+          "fill": "$text",
+          "content": "英语之旅 · 无脑下一步（设计原则）",
+          "fontFamily": "Manrope",
+          "fontSize": 26,
+          "fontWeight": "800"
+        },
+        {
+          "type": "text",
+          "id": "y1BCy",
+          "name": "board sub",
+          "fill": "$muted",
+          "textGrowth": "fixed-width",
+          "width": "fill_container",
+          "content": "核心目的：很多人进来不知道怎么用。只要一路点「下一步」，把需要复习的、感兴趣的都做一遍，就会慢慢熟悉全 App；每天也能自然花一小段时间学习。",
+          "lineHeight": 1.45,
+          "fontFamily": "IBM Plex Sans",
+          "fontSize": 15,
+          "fontWeight": "normal"
+        },
+        {
+          "type": "frame",
+          "id": "bo2fT",
+          "name": "principles row",
+          "width": "fill_container",
+          "gap": 14,
+          "children": [
+            {
+              "type": "frame",
+              "id": "fY3JP",
+              "name": "p 只留一个主按钮",
+              "width": "fill_container",
+              "fill": "$canvas",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "pTm7l",
+                  "name": "pt",
+                  "fill": "$green",
+                  "content": "只留一个主按钮",
+                  "fontFamily": "Manrope",
+                  "fontSize": 16,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "KixQR",
+                  "name": "pd",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "首页之旅卡片只有「下一步」。当前该复习就进复习，该学新就打开已选好的内容。",
+                  "lineHeight": 1.4,
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "ICapf",
+              "name": "p 队列自动串好",
+              "width": "fill_container",
+              "fill": "$canvas",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "uurhe",
+                  "name": "pt",
+                  "fill": "$green",
+                  "content": "队列自动串好",
+                  "fontFamily": "Manrope",
+                  "fontSize": 16,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "vL1RX",
+                  "name": "pd",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "复习到期 → 兴趣/课程新学 → 排明天。用户看到预告列表，但不必自己排程。",
+                  "lineHeight": 1.4,
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "ioZcm",
+              "name": "p 可换、可跳、不可空刷",
+              "width": "fill_container",
+              "fill": "$canvas",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "Y7mru",
+                  "name": "pt",
+                  "fill": "$green",
+                  "content": "可换、可跳、不可空刷",
+                  "fontFamily": "Manrope",
+                  "fontSize": 16,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "sF47C",
+                  "name": "pd",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "允许换内容、跳过剩余复习；学新关有最低完成门槛后才亮「完成本关」。",
+                  "lineHeight": 1.4,
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            },
+            {
+              "type": "frame",
+              "id": "UDdlw",
+              "name": "p 明天默认代排",
+              "width": "fill_container",
+              "fill": "$canvas",
+              "cornerRadius": 16,
+              "layout": "vertical",
+              "gap": 8,
+              "padding": 16,
+              "children": [
+                {
+                  "type": "text",
+                  "id": "B8mVd",
+                  "name": "pt",
+                  "fill": "$green",
+                  "content": "明天默认代排",
+                  "fontFamily": "Manrope",
+                  "fontSize": 16,
+                  "fontWeight": "800"
+                },
+                {
+                  "type": "text",
+                  "id": "rOazl",
+                  "name": "pd",
+                  "fill": "$muted",
+                  "textGrowth": "fixed-width",
+                  "width": "fill_container",
+                  "content": "收工页直接给出明天计划 + 一句理由；默认「就这样」，改选是次级。",
+                  "lineHeight": 1.4,
+                  "fontFamily": "IBM Plex Sans",
+                  "fontSize": 13,
+                  "fontWeight": "normal"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "lHucs",
+          "name": "flow",
+          "width": "fill_container",
+          "fill": "$softGreen",
+          "cornerRadius": 16,
+          "layout": "vertical",
+          "gap": 10,
+          "padding": 16,
+          "children": [
+            {
+              "type": "text",
+              "id": "JtLde",
+              "name": "flow t",
+              "fill": "$green",
+              "content": "点一下路径（目标态）",
+              "fontFamily": "Manrope",
+              "fontSize": 16,
+              "fontWeight": "800"
+            },
+            {
+              "type": "text",
+              "id": "RBBKn",
+              "name": "flow d",
+              "fill": "$text",
+              "textGrowth": "fixed-width",
+              "width": "fill_container",
+              "content": "打开 App → 下一步（复习，无到期则自动跳过）→ 下一张… → 下一步（已选好的新学）→ 达标后完成本关 → 就这样明天见。全程不要求用户先理解课程库 / 词书 / 社区。",
+              "lineHeight": 1.45,
+              "fontFamily": "IBM Plex Sans",
+              "fontSize": 14,
+              "fontWeight": "normal"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "type": "frame",
+      "id": "OLNWL",
+      "x": 2460,
+      "y": -44,
+      "name": "home-journey label wrap",
+      "width": 390,
+      "layout": "vertical",
+      "children": [
+        {
+          "type": "text",
+          "id": "nljdb",
+          "name": "home-journey caption",
+          "fill": "$text",
+          "content": "01 · 首页 · 只留一个「下一步」",
+          "fontFamily": "Manrope",
+          "fontSize": 17,
+          "fontWeight": "700"
+        }
+      ]
     }
   ],
+  "variables": {
+    "canvas": {
+      "type": "color",
+      "value": "#12141A"
+    },
+    "card": {
+      "type": "color",
+      "value": "#22252E"
+    },
+    "border": {
+      "type": "color",
+      "value": "#343845"
+    },
+    "text": {
+      "type": "color",
+      "value": "#F3F4F6"
+    },
+    "muted": {
+      "type": "color",
+      "value": "#9AA0AE"
+    },
+    "green": {
+      "type": "color",
+      "value": "#58CC02"
+    },
+    "greenDark": {
+      "type": "color",
+      "value": "#46A302"
+    },
+    "softGreen": {
+      "type": "color",
+      "value": "#1E3A28"
+    },
+    "yellow": {
+      "type": "color",
+      "value": "#FFC800"
+    },
+    "blue": {
+      "type": "color",
+      "value": "#4DBAF0"
+    }
+  },
   "fileToken": "6bd0ceab-2241-48e5-a1b9-9d464472c5e9"
 }
