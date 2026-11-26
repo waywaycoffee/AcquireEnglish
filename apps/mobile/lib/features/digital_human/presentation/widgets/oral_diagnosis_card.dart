@@ -25,6 +25,14 @@ class OralDiagnosisCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final bool showStrikeFix = diagnosis.hasLiteralFix;
+    final String clearLine = diagnosis.literalEn.isNotEmpty
+        ? diagnosis.literalEn
+        : diagnosis.idiomaticEn;
+    final String idiomaticLine = diagnosis.idiomaticEn.isNotEmpty
+        ? diagnosis.idiomaticEn
+        : diagnosis.literalEn;
+
     return Material(
       color: AppDesignTokens.appWhite,
       elevation: 10,
@@ -36,78 +44,56 @@ class OralDiagnosisCard extends StatelessWidget {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: <Widget>[
             _Section(
-              title: '内容诊断',
+              title: showStrikeFix ? '内容诊断' : '内容确认',
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text.rich(
-                    TextSpan(
-                      children: <InlineSpan>[
-                        TextSpan(
-                          text: diagnosis.source,
-                          style: const TextStyle(
-                            color: Color(0xFFE11D48),
-                            fontSize: 16,
-                            fontWeight: FontWeight.w700,
-                            decoration: TextDecoration.lineThrough,
-                            decorationColor: Color(0xFFE11D48),
-                            height: 1.35,
-                          ),
-                        ),
-                        if (diagnosis.literalEn.isNotEmpty) ...<InlineSpan>[
-                          const TextSpan(text: '  '),
+                  if (showStrikeFix)
+                    Text.rich(
+                      TextSpan(
+                        children: <InlineSpan>[
                           TextSpan(
-                            text: diagnosis.literalEn,
+                            text: diagnosis.source,
                             style: const TextStyle(
-                              color: Color(0xFF16A34A),
+                              color: Color(0xFFE11D48),
                               fontSize: 16,
-                              fontWeight: FontWeight.w800,
+                              fontWeight: FontWeight.w700,
+                              decoration: TextDecoration.lineThrough,
+                              decorationColor: Color(0xFFE11D48),
                               height: 1.35,
                             ),
                           ),
+                          if (clearLine.isNotEmpty) ...<InlineSpan>[
+                            const TextSpan(text: '  '),
+                            TextSpan(
+                              text: clearLine,
+                              style: const TextStyle(
+                                color: Color(0xFF16A34A),
+                                fontSize: 16,
+                                fontWeight: FontWeight.w800,
+                                height: 1.35,
+                              ),
+                            ),
+                          ],
                         ],
-                      ],
+                      ),
+                    )
+                  else
+                    Text(
+                      clearLine.isNotEmpty ? clearLine : diagnosis.source,
+                      style: const TextStyle(
+                        color: Color(0xFF111827),
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        height: 1.35,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  _ActionRow(
-                    onSpeak: onSpeakLiteral,
-                    onSave: onSave,
-                    onCopy: () => _copy(
-                      context,
-                      diagnosis.literalEn.isNotEmpty
-                          ? diagnosis.literalEn
-                          : diagnosis.idiomaticEn,
-                    ),
-                    onGrammar: onGrammar,
-                    saved: saved,
-                  ),
-                ],
-              ),
-            ),
-            const SizedBox(height: 14),
-            _Section(
-              title: '地道表达',
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Text(
-                    diagnosis.idiomaticEn.isNotEmpty
-                        ? diagnosis.idiomaticEn
-                        : (diagnosis.literalEn.isNotEmpty
-                              ? diagnosis.literalEn
-                              : '先用英文说清楚刚才的意思'),
-                    style: const TextStyle(
-                      color: Color(0xFF111827),
-                      fontSize: 17,
-                      fontWeight: FontWeight.w800,
-                      height: 1.35,
-                    ),
-                  ),
-                  if (diagnosis.tip.isNotEmpty) ...<Widget>[
+                  if (!showStrikeFix) ...<Widget>[
                     const SizedBox(height: 6),
                     Text(
-                      diagnosis.tip,
+                      diagnosis.tip.isNotEmpty
+                          ? diagnosis.tip
+                          : '这样说意思已经清楚，可继续对话。',
                       style: const TextStyle(
                         color: Color(0xFF6B7280),
                         fontSize: 12,
@@ -117,13 +103,11 @@ class OralDiagnosisCard extends StatelessWidget {
                   ],
                   const SizedBox(height: 10),
                   _ActionRow(
-                    onSpeak: onSpeakIdiomatic,
+                    onSpeak: onSpeakLiteral,
                     onSave: onSave,
                     onCopy: () => _copy(
                       context,
-                      diagnosis.idiomaticEn.isNotEmpty
-                          ? diagnosis.idiomaticEn
-                          : diagnosis.literalEn,
+                      clearLine.isNotEmpty ? clearLine : diagnosis.source,
                     ),
                     onGrammar: onGrammar,
                     saved: saved,
@@ -131,6 +115,48 @@ class OralDiagnosisCard extends StatelessWidget {
                 ],
               ),
             ),
+            if (diagnosis.hasIdiomaticPolish ||
+                (showStrikeFix && idiomaticLine.isNotEmpty)) ...<Widget>[
+              const SizedBox(height: 14),
+              _Section(
+                title: '地道表达',
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      idiomaticLine.isNotEmpty
+                          ? idiomaticLine
+                          : '先用英文说清楚刚才的意思',
+                      style: const TextStyle(
+                        color: Color(0xFF111827),
+                        fontSize: 17,
+                        fontWeight: FontWeight.w800,
+                        height: 1.35,
+                      ),
+                    ),
+                    if (diagnosis.tip.isNotEmpty && showStrikeFix) ...<Widget>[
+                      const SizedBox(height: 6),
+                      Text(
+                        diagnosis.tip,
+                        style: const TextStyle(
+                          color: Color(0xFF6B7280),
+                          fontSize: 12,
+                          height: 1.35,
+                        ),
+                      ),
+                    ],
+                    const SizedBox(height: 10),
+                    _ActionRow(
+                      onSpeak: onSpeakIdiomatic,
+                      onSave: onSave,
+                      onCopy: () => _copy(context, idiomaticLine),
+                      onGrammar: onGrammar,
+                      saved: saved,
+                    ),
+                  ],
+                ),
+              ),
+            ],
           ],
         ),
       ),

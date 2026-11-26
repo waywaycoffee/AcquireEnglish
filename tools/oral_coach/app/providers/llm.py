@@ -257,6 +257,18 @@ def _looks_chinese_heavy(text: str) -> bool:
     return han >= letters
 
 
+def _norm_oral_utt(text: str) -> str:
+    raw = (text or '').strip().lower().replace('’', "'").replace('`', "'")
+    raw = re.sub(r"[^a-z0-9\u4e00-\u9fff\s']", ' ', raw)
+    return re.sub(r'\s+', ' ', raw).strip()
+
+
+def _same_oral_utt(a: str, b: str) -> bool:
+    left = _norm_oral_utt(a)
+    right = _norm_oral_utt(b)
+    return bool(left) and bool(right) and left == right
+
+
 def _parse_diagnosis(raw: object, learner_text: str) -> dict[str, str] | None:
     source = (learner_text or '').strip()
     if isinstance(raw, dict):
@@ -279,6 +291,14 @@ def _parse_diagnosis(raw: object, learner_text: str) -> dict[str, str] | None:
                 out['tip'] = '先按住再说一次地道英文，再说给对方听。'
             if not out['source']:
                 out['source'] = source
+            # Drop fake "corrections" that only repeat the same English line.
+            if not _looks_chinese_heavy(out['source']):
+                lit_same = _same_oral_utt(out['source'], out['literal_en'])
+                id_same = _same_oral_utt(out['source'], out['idiomatic_en']) or _same_oral_utt(
+                    out['literal_en'], out['idiomatic_en']
+                )
+                if lit_same and id_same:
+                    return None
             return out
     if _looks_chinese_heavy(source):
         return {
@@ -528,9 +548,12 @@ class OpenAiLlm:
                 '"text" and list brief notes in "corrections". '
                 'If the learner spoke Chinese, mixed Chinese/English, or awkward English, '
                 'fill "diagnosis" with: source (their utterance), literal_en '
-                '(clear English meaning), idiomatic_en (natural spoken English), '
+                '(clear English meaning — must FIX real grammar/tense issues), '
+                'idiomatic_en (natural spoken English), '
                 'and tip (brief Chinese tip). Then in "text" ask them to hold the mic '
                 'and say the idiomatic sentence once. '
+                'If their English is already clear and correct, OMIT "diagnosis" '
+                '(do not repeat the same sentence as a fake rewrite). '
                 'Do not ask the learner to repeat a single subtitle line verbatim. '
                 'Default spoken language: English only. '
                 'Switch to Chinese only if the learner explicitly asks.'
@@ -572,7 +595,9 @@ class OpenAiLlm:
                         _coach_system(context, stuck=_is_stuck(learner_text))
                         + ' Reply as compact JSON. The "text" field must be English'
                         ' unless the learner asked for Chinese.'
-                        ' Include diagnosis when learner used Chinese or non-idiomatic English.'
+                        ' Include diagnosis only when learner used Chinese or English'
+                        ' that needs a real rewrite; never set literal_en/idiomatic_en'
+                        ' to the same text as source just to show a correction.'
                         ' You may append a short expression tag like 【表情：微笑】/'
                         '【表情：思考】/【表情：平静】 (never markdown).'
                     ),

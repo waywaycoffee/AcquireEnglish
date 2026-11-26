@@ -1,9 +1,9 @@
 {
-  "version": "0.2.259",
-  "version_code": 279,
-  "apk_name": "AcquireEnglish-android-0.2.259+279.apk",
+  "version": "0.2.260",
+  "version_code": 280,
+  "apk_name": "AcquireEnglish-android-0.2.260+280.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "3fb27fb0271270a22d1cc1a4aa6a200cbacf089706859e829f8fe5a200a829ba",
-  "notes": "修复部分手机安装提示找不到证书（补全 v1 签名）· 全英可逛试看与学习列表",
-  "published_at": "2026-11-26T08:21:05+08:00"
+  "sha256": "82278ef927fd0c54816f2ac373243752276bc75f5f05ce2d019cfea4603b6a50",
+  "notes": "口语内容诊断：原文与改正相同时不再假修改 · 服务端过滤无效 diagnosis",
+  "published_at": "2026-11-26T08:33:45+08:00"
 }
