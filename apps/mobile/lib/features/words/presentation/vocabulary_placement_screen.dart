@@ -8,6 +8,7 @@ import '../../../router/app_router.dart';
 import '../../sync/presentation/daily_feed_provider.dart';
 import '../domain/vocabulary_placement_adaptive.dart';
 import '../domain/vocabulary_placement_estimate.dart';
+import '../domain/vocabulary_placement_scoring.dart';
 import 'vocabulary_placement_provider.dart';
 
 class VocabularyPlacementScreen extends ConsumerStatefulWidget {
@@ -34,7 +35,7 @@ class _VocabularyPlacementScreenState
   PlacementQuestion? _question;
   bool _saving = false;
   int? _estimate;
-  bool? _lastCorrect;
+  PlacementAnswerKind? _lastKind;
   String? _feedbackCorrectDef;
   bool _awaitingFeedback = false;
 
@@ -104,17 +105,20 @@ class _VocabularyPlacementScreenState
     }
   }
 
-  Future<void> _answer({required bool correct, String? chosen}) async {
+  Future<void> _answer(PlacementAnswerKind kind) async {
     final AdaptivePlacementEngine? engine = _engine;
     final PlacementQuestion? question = _question;
     if (engine == null || question == null || _awaitingFeedback) return;
 
     setState(() {
       _awaitingFeedback = true;
-      _lastCorrect = correct;
-      _feedbackCorrectDef = correct ? null : question.definitionCn;
+      _lastKind = kind;
+      // Only reveal key after a wrong guess; 「不认识」 stays soft.
+      _feedbackCorrectDef = kind == PlacementAnswerKind.wrong
+          ? question.definitionCn
+          : null;
     });
-    engine.recordAnswer(question: question, correct: correct);
+    engine.recordAnswer(question: question, kind: kind);
 
     await Future<void>.delayed(const Duration(milliseconds: 750));
     if (!mounted) return;
@@ -125,7 +129,7 @@ class _VocabularyPlacementScreenState
     setState(() {
       _question = next;
       _awaitingFeedback = false;
-      _lastCorrect = null;
+      _lastKind = null;
       _feedbackCorrectDef = null;
       if (next == null) {
         _estimate = null; // force save CTA on result page
@@ -197,13 +201,14 @@ class _VocabularyPlacementScreenState
                         mainAxisSize: MainAxisSize.min,
                         children: <Widget>[
                           Text(
-                            '估计词汇量约 $estimate 个词形',
+                            '估计能认识约 $estimate 个词',
                             style: Theme.of(context).textTheme.headlineSmall,
                           ),
                           const SizedBox(height: 8),
                           Text(
                             '从你选择的水平「${level.isEmpty ? '未设置' : level}」起步，'
-                            '按答对/答错动态调整难度；共作答 ${engine.asked} 题。'
+                            '四选一 +「不认识」；猜错会压低瞎蒙，不认识不算蒙题。'
+                            '共作答 ${engine.asked} 题。'
                             '范围 $kPlacementEstimateMin–'
                             '${_formatEstimateCap(kPlacementEstimateMax)}。',
                             textAlign: TextAlign.center,
@@ -279,15 +284,19 @@ class _VocabularyPlacementScreenState
                         style: Theme.of(context).textTheme.bodySmall,
                       ),
                       const SizedBox(height: 12),
-                      if (_awaitingFeedback && _lastCorrect != null)
+                      if (_awaitingFeedback && _lastKind != null)
                         Padding(
                           padding: const EdgeInsets.only(bottom: 12),
                           child: DecoratedBox(
                             decoration: BoxDecoration(
-                              color: (_lastCorrect!
-                                      ? colors.primaryContainer
-                                      : colors.errorContainer)
-                                  .withValues(alpha: 0.85),
+                              color: switch (_lastKind!) {
+                                PlacementAnswerKind.correct =>
+                                  colors.primaryContainer,
+                                PlacementAnswerKind.wrong =>
+                                  colors.errorContainer,
+                                PlacementAnswerKind.unknown =>
+                                  colors.surfaceContainerHighest,
+                              }.withValues(alpha: 0.85),
                               borderRadius: BorderRadius.circular(12),
                             ),
                             child: Padding(
@@ -296,14 +305,22 @@ class _VocabularyPlacementScreenState
                                 vertical: 10,
                               ),
                               child: Text(
-                                _lastCorrect!
-                                    ? '正确'
-                                    : '不对，正确答案：${_feedbackCorrectDef ?? question.definitionCn}',
+                                switch (_lastKind!) {
+                                  PlacementAnswerKind.correct => '正确',
+                                  PlacementAnswerKind.wrong =>
+                                    '不对，正确答案：${_feedbackCorrectDef ?? question.definitionCn}',
+                                  PlacementAnswerKind.unknown => '已记为不认识',
+                                },
                                 style: TextStyle(
                                   fontWeight: FontWeight.w700,
-                                  color: _lastCorrect!
-                                      ? colors.onPrimaryContainer
-                                      : colors.onErrorContainer,
+                                  color: switch (_lastKind!) {
+                                    PlacementAnswerKind.correct =>
+                                      colors.onPrimaryContainer,
+                                    PlacementAnswerKind.wrong =>
+                                      colors.onErrorContainer,
+                                    PlacementAnswerKind.unknown =>
+                                      colors.onSurface,
+                                  },
                                 ),
                               ),
                             ),
@@ -317,9 +334,9 @@ class _VocabularyPlacementScreenState
                                 ? null
                                 : () => unawaited(
                                     _answer(
-                                      correct:
-                                          choice == question.definitionCn,
-                                      chosen: choice,
+                                      choice == question.definitionCn
+                                          ? PlacementAnswerKind.correct
+                                          : PlacementAnswerKind.wrong,
                                     ),
                                   ),
                             style: OutlinedButton.styleFrom(
@@ -339,7 +356,9 @@ class _VocabularyPlacementScreenState
                       TextButton(
                         onPressed: _awaitingFeedback
                             ? null
-                            : () => unawaited(_answer(correct: false)),
+                            : () => unawaited(
+                                _answer(PlacementAnswerKind.unknown),
+                              ),
                         child: const Text('不认识'),
                       ),
                     ],

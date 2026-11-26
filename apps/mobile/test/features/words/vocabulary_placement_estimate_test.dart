@@ -2,15 +2,16 @@ import 'package:common_learn_english/features/words/domain/vocabulary_placement_
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('placement estimate spans 100 through 60k', () {
+  test('placement estimate snaps within 100–38k lemma ceiling', () {
     expect(estimateVocabFromPlacementScore(0), kPlacementEstimateMin);
     expect(estimateVocabFromPlacementScore(80), 100);
-    expect(estimateVocabFromPlacementScore(125), 100);
-    expect(estimateVocabFromPlacementScore(20500), 20500);
-    expect(estimateVocabFromPlacementScore(32000), 32000);
+    expect(estimateVocabFromPlacementScore(125), 130);
+    expect(estimateVocabFromPlacementScore(2050), 2050);
+    expect(estimateVocabFromPlacementScore(20550), 20600);
     expect(
       estimateVocabFromPlacementScore(999999),
       kPlacementEstimateMax,
     );
+    expect(kPlacementEstimateMax, 38000);
   });
 }

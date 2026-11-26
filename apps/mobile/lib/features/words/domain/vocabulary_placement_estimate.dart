@@ -1,20 +1,31 @@
 import 'dart:math' as math;
 
-/// Placement test reportable range (word forms).
+/// Placement test reportable range (receptive dictionary headwords / lemmas).
+///
+/// Ceiling follows ARealMe counted-word scale (~38k after eligibility), not
+/// raw SUBTLEX form ranks.
 const int kPlacementEstimateMin = 100;
-const int kPlacementEstimateMax = 60000;
+const int kPlacementEstimateMax = 38000;
 
 /// Max MCQ definition buttons per item (not counting 「不认识」).
 const int kPlacementMaxChoices = 4;
 
-/// Convert weighted placement score → snapped vocabulary estimate.
-///
-/// Score is the sum of `band.size / itemsInBand` for each correct item.
-/// Always reports at least [kPlacementEstimateMin] after a finished test so
-/// beginner levels are visible; caps above 20k when high bands are cleared.
+/// Snap vocabulary estimate for display / persistence.
 int estimateVocabFromPlacementScore(double score) {
-  final int rounded = (score / 100).round() * 100;
-  return rounded.clamp(kPlacementEstimateMin, kPlacementEstimateMax);
+  final double clamped = score.clamp(
+    kPlacementEstimateMin.toDouble(),
+    kPlacementEstimateMax.toDouble(),
+  );
+  if (clamped < 10000) {
+    return ((clamped / 10).round() * 10).clamp(
+      kPlacementEstimateMin,
+      kPlacementEstimateMax,
+    );
+  }
+  return ((clamped / 100).round() * 100).clamp(
+    kPlacementEstimateMin,
+    kPlacementEstimateMax,
+  );
 }
 
 /// Build MCQ options: correct + up to 3 distractors ([kPlacementMaxChoices] total).

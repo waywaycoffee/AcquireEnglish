@@ -2,6 +2,7 @@ import 'dart:math' as math;
 
 import 'package:common_learn_english/features/words/domain/vocabulary_placement_adaptive.dart';
 import 'package:common_learn_english/features/words/domain/vocabulary_placement_estimate.dart';
+import 'package:common_learn_english/features/words/domain/vocabulary_placement_scoring.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 List<PlacementBandPool> _fullBands() {
@@ -96,7 +97,7 @@ void main() {
     for (int i = 0; i < 4; i++) {
       final PlacementQuestion? q = up.nextQuestion();
       expect(q, isNotNull);
-      up.recordAnswer(question: q!, correct: true);
+      up.recordAnswer(question: q!, kind: PlacementAnswerKind.correct);
     }
     expect(up.estimate, greaterThan(startUp));
   });
@@ -112,13 +113,44 @@ void main() {
     for (int i = 0; i < 5; i++) {
       final PlacementQuestion? q = engine.nextQuestion();
       expect(q, isNotNull);
-      engine.recordAnswer(question: q!, correct: false);
+      engine.recordAnswer(question: q!, kind: PlacementAnswerKind.wrong);
     }
     expect(engine.estimate, lessThan(start));
     expect(
       engine.finalEstimate,
       inInclusiveRange(kPlacementEstimateMin, kPlacementEstimateMax),
     );
+  });
+
+  test('unknown is softer than wrong at the same ranks', () {
+    final AdaptivePlacementEngine wrongEngine = AdaptivePlacementEngine(
+      bands: _fullBands(),
+      startingEstimate: 4000,
+      maxQuestions: 12,
+      random: math.Random(5),
+    );
+    final AdaptivePlacementEngine unknownEngine = AdaptivePlacementEngine(
+      bands: _fullBands(),
+      startingEstimate: 4000,
+      maxQuestions: 12,
+      random: math.Random(5),
+    );
+    for (int i = 0; i < 6; i++) {
+      final PlacementQuestion q = PlacementQuestion(
+        word: 'probe$i',
+        rank: 1800 + i * 50,
+        definitionCn: '义$i',
+        choices: const <String>['义', '干扰'],
+        bandLo: 1001,
+        bandHi: 2500,
+      );
+      wrongEngine.recordAnswer(question: q, kind: PlacementAnswerKind.wrong);
+      unknownEngine.recordAnswer(
+        question: q,
+        kind: PlacementAnswerKind.unknown,
+      );
+    }
+    expect(unknownEngine.estimate, greaterThan(wrongEngine.estimate));
   });
 
   test('easy-only corrects cannot keep an inflated C1 prior near 8k+', () {
@@ -128,7 +160,6 @@ void main() {
       maxQuestions: 12,
       random: math.Random(7),
     );
-    // Force only easy-band answers by recording fabricated easy questions.
     for (int i = 0; i < 6; i++) {
       engine.recordAnswer(
         question: PlacementQuestion(
@@ -139,7 +170,7 @@ void main() {
           bandLo: 101,
           bandHi: 1000,
         ),
-        correct: true,
+        kind: PlacementAnswerKind.correct,
       );
     }
     expect(engine.finalEstimate, lessThan(5000));
@@ -158,7 +189,7 @@ void main() {
       final PlacementQuestion? q = engine.nextQuestion();
       expect(q, isNotNull);
       ranks.add(q!.rank);
-      engine.recordAnswer(question: q, correct: true);
+      engine.recordAnswer(question: q, kind: PlacementAnswerKind.correct);
     }
     expect(ranks.any((int r) => r >= 2500), isTrue);
     expect(engine.stretchProbes, greaterThanOrEqualTo(2));

@@ -23,8 +23,8 @@ def _connect():
     return db
 
 
-# Band widths estimate recognized word forms from ~100 through 60k+.
-# Low bands resolve beginner levels; high bands unlock 20k+ ceilings.
+# Frequency bands for client Bayesian placement (ARealMe-style receptive size).
+# High band capped near counted-lemma ceiling (~38k), not raw 60k forms.
 PLACEMENT_BANDS = (
     (1, 100),
     (101, 400),
@@ -34,17 +34,20 @@ PLACEMENT_BANDS = (
     (5001, 9000),
     (9001, 14000),
     (14001, 20000),
-    (20001, 32000),
-    (32001, 50000),
+    (20001, 28000),
+    (28001, 38000),
 )
-# Sum of band widths ≈ 50,000 recognized forms (reportable 100–60,000).
 PLACEMENT_ESTIMATE_MIN = 100
-PLACEMENT_ESTIMATE_MAX = 60000
+PLACEMENT_ESTIMATE_MAX = 38000
 
 
 @router.get('/placement')
-def placement(per_band: int = Query(default=18, ge=3, le=30)):
-    """Frequency-band samples for adaptive client-side placement tests."""
+def placement(per_band: int = Query(default=20, ge=3, le=40)):
+    """Frequency-band samples for adaptive client-side placement tests.
+
+    Client scores MCQ + 「不认识」 with an ARealMe-style curve (guess rate g).
+    Prefer display_word=word rows (base orthography) as a lightweight lemma proxy.
+    """
     with closing(_connect()) as db:
         return [
             {
