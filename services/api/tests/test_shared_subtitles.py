@@ -16,7 +16,11 @@ import app.models  # noqa: F401
 from app.database import Base, SessionLocal, engine
 from app.main import app as fastapi_app
 from app.models import SharedBilibiliSubtitle, SharedMediaSubtitle
-from app.services.online_subtitles import compute_subfinder_hash
+from app.services.online_subtitles import (
+    compute_opensubtitles_hash,
+    compute_subfinder_hash,
+    subliminal_candidate_names,
+)
 from app.shared_subtitle_quality import evaluate_shared_pack
 
 
@@ -126,6 +130,50 @@ async def test_remote_subfinder_hash_reads_only_four_blocks():
     )
     assert actual == expected
     assert len(seen) == 4
+
+
+@pytest.mark.asyncio
+async def test_remote_opensubtitles_hash_reads_head_and_tail():
+    import struct
+    import httpx
+
+    size = 200_000
+    payload = bytes((i % 251 for i in range(size)))
+    seen: list[str] = []
+
+    async def handler(request: httpx.Request) -> httpx.Response:
+        raw = request.headers["range"]
+        seen.append(raw)
+        start, end = (int(v) for v in raw.removeprefix("bytes=").split("-"))
+        return httpx.Response(
+            206,
+            content=payload[start : end + 1],
+            headers={"Content-Range": f"bytes {start}-{end}/{size}"},
+        )
+
+    async with httpx.AsyncClient(transport=httpx.MockTransport(handler)) as client:
+        actual = await compute_opensubtitles_hash(
+            "https://example.test/video.mkv", size, client=client
+        )
+    filehash = size
+    for start in (0, size - 65536):
+        chunk = payload[start : start + 65536]
+        for i in range(0, 65536, 8):
+            (value,) = struct.unpack_from("<q", chunk, i)
+            filehash = (filehash + value) & 0xFFFFFFFFFFFFFFFF
+    assert actual == f"{filehash:016x}"
+    assert len(seen) == 2
+
+
+def test_subliminal_candidates_map_harry_potter_chinese_pack():
+    names = subliminal_candidate_names(
+        "哈利波特01.mkv",
+        series_title="哈利·波特",
+        episode_index=1,
+    )
+    joined = " | ".join(names)
+    assert "Philosophers.Stone" in joined
+    assert any(n.startswith("Harry.Potter") for n in names)
 
 
 @pytest.mark.asyncio

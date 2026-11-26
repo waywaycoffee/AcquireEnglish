@@ -104,6 +104,16 @@ class Settings(BaseSettings):
     baidu_netdisk_redirect_uri: str = (
         "https://acquireenglish.curlhairai.com/api/netdisk/baidu/oauth/callback"
     )
+
+    # Netdisk online EN subtitles: Shooter fingerprint + Subliminal (OpenSubtitles…).
+    subliminal_enabled: bool = True
+    subliminal_providers: str = "opensubtitles,podnapisi,gestdown,tvsubtitles"
+    opensubtitles_username: str = ""
+    opensubtitles_password: str = ""
+    opensubtitlescom_username: str = ""
+    opensubtitlescom_password: str = ""
+    opensubtitlescom_apikey: str = ""
+
     # Optional token for approving community reclassify requests (header X-Community-Admin-Token).
     community_admin_token: str = ""
     # Ops console (/admin + /api/admin/*): username + password + X-Admin-Token.

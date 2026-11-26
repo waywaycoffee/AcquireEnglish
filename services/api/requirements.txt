@@ -15,3 +15,5 @@ python-multipart==0.0.17
 httpx==0.28.1
 pytest==8.3.4
 pytest-asyncio==0.25.0
+# Netdisk online EN subtitles (OpenSubtitles / Podnapisi / …).
+subliminal==2.8.0

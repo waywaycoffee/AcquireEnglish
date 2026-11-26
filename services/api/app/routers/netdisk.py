@@ -263,49 +263,30 @@ async def _upsert_video_link(
             if need_zh and embedded.get("zh"):
                 link.subtitle_zh_srt = embedded["zh"]
 
-        # Before scheduling costly ASR, try the exact media fingerprint used by
-        # ausaki/subfinder. OpenList supports Range, so this reads only 16 KiB.
+        # Before scheduling costly ASR: Shooter fingerprint, then Subliminal
+        # (OpenSubtitles / Podnapisi / …). OpenList Range keeps hash I/O tiny.
         if not (link.subtitle_en_srt or "").strip():
             try:
                 from app.services.online_subtitles import (
-                    compute_subfinder_hash,
-                    get_shared_media_subtitle,
-                    search_shooter,
-                    store_shared_media_subtitle,
+                    fetch_and_cache_english_subtitle,
                 )
 
                 if not meta:
                     meta = await client.fs_get(path)
                 raw_url = str(meta.get("raw_url") or "").strip() or public_raw_url(path)
                 file_size = int(meta.get("size") or 0)
-                file_hash = await compute_subfinder_hash(raw_url, file_size)
-                cached = await get_shared_media_subtitle(
-                    db, file_hash=file_hash, language="en"
+                srt = await fetch_and_cache_english_subtitle(
+                    db,
+                    raw_url=raw_url,
+                    file_size=file_size,
+                    filename=title,
+                    title=series_title or title,
+                    uploader_user_id=user.id,
+                    series_title=series_title,
+                    episode_index=episode_index,
                 )
-                if cached is not None:
-                    cached.hit_count = int(cached.hit_count or 0) + 1
-                    link.subtitle_en_srt = cached.subtitle_srt
-                else:
-                    matches = await search_shooter(
-                        file_hash=file_hash,
-                        filename=title,
-                        languages=("en",),
-                    )
-                    if matches:
-                        match = matches[0]
-                        cached = await store_shared_media_subtitle(
-                            db,
-                            file_hash=file_hash,
-                            file_size=file_size,
-                            duration_sec=None,
-                            title=series_title or title,
-                            language="en",
-                            subtitle_srt=match.srt,
-                            source_ref=match.source_ref,
-                            uploader_user_id=user.id,
-                            episode=episode_index,
-                        )
-                        link.subtitle_en_srt = cached.subtitle_srt
+                if srt:
+                    link.subtitle_en_srt = srt
             except Exception:  # Online subtitles are best-effort; import must continue.
                 pass
 
