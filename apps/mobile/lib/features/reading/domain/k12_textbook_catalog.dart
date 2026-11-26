@@ -198,6 +198,12 @@ final List<K12TextbookEntry> kK12TextbookCatalog = <K12TextbookEntry>[
     publisher: '译林出版社',
     fromGrade: 3,
   ),
+  ..._primaryEdition(
+    editionKey: 'beijing',
+    edition: '北京版',
+    publisher: '北京出版社',
+    fromGrade: 1,
+  ),
   // —— 初中 ——
   ..._juniorEdition(
     editionKey: 'pep-go',

@@ -3484,6 +3484,43 @@ class AcquireApiClient {
     return null;
   }
 
+  Future<List<Map<String, dynamic>>> listReadingTextbooks({
+    String? gradeId,
+  }) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.readingTextbooks,
+      queryParameters: <String, dynamic>{
+        if (gradeId != null && gradeId.trim().isNotEmpty)
+          'grade_id': gradeId.trim(),
+      },
+    );
+    final Object? books = response.data is Map
+        ? (response.data as Map)['books']
+        : null;
+    if (books is! List) return const <Map<String, dynamic>>[];
+    return books
+        .whereType<Map>()
+        .map((Map<dynamic, dynamic> row) => Map<String, dynamic>.from(row))
+        .toList(growable: false);
+  }
+
+  Future<Map<String, dynamic>?> getReadingTextbook(String bookId) async {
+    final String id = bookId.trim();
+    if (id.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.readingTextbook(id),
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) return null;
+      rethrow;
+    }
+    return null;
+  }
+
   /// ECS content media (reading / oral / course / …). Same item shape as foundation.
   Future<FoundationMediaManifest> contentMediaManifest({
     String namespace = 'reading',

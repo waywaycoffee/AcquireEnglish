@@ -22,4 +22,12 @@ void main() {
     expect(k12TextbookStageForGradeId('gaokao'), K12TextbookStage.senior);
     expect(k12TextbookGradesForStage(K12TextbookStage.primary).length, 6);
   });
+
+  test('beijing grade 4 volume 2 is on the shelf', () {
+    final K12TextbookEntry book = k12TextbooksForGrade('k12_g4').firstWhere(
+      (K12TextbookEntry e) => e.edition == '北京版' && e.volume == '下册',
+    );
+    expect(book.id, 'k12-textbook:beijing:k12_g4:b');
+    expect(book.publisher, '北京出版社');
+  });
 }

@@ -169,6 +169,11 @@ class Endpoints {
   static String syllabusBook(String bookId) =>
       'api/syllabus/books/${Uri.encodeComponent(bookId)}';
 
+  /// Licensed K12 textbooks on ECS (PDF + lesson MP3).
+  static const String readingTextbooks = 'api/reading/textbooks';
+  static String readingTextbook(String bookId) =>
+      'api/reading/textbooks/${Uri.encodeComponent(bookId)}';
+
   /// Aliyun DashScope (Qwen Audio) TTS — voices list + speech synthesis.
   static const String readingVoices = 'api/reading/voices';
   static const String readingSpeech = 'api/reading/speech';

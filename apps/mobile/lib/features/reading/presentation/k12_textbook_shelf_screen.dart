@@ -6,9 +6,12 @@ import 'package:go_router/go_router.dart';
 
 import '../../exam/domain/exam_registry.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../sync/data/acquire_api_client.dart';
 import '../domain/k12_textbook_catalog.dart';
+import '../domain/k12_textbook_media.dart';
 import '../domain/reading_doc.dart';
 import 'k12_reading_section.dart';
+import 'k12_textbook_study_screen.dart';
 import 'reading_book_cover.dart';
 import 'reading_library_provider.dart';
 
@@ -32,6 +35,7 @@ class _K12TextbookShelfScreenState
   late K12TextbookStage _stage;
   late String _gradeId;
   bool _opening = false;
+  Set<String> _readyCatalogIds = <String>{};
 
   @override
   void initState() {
@@ -48,6 +52,9 @@ class _K12TextbookShelfScreenState
     } else {
       _gradeId = grades.isEmpty ? 'k12_g1' : grades.first.id;
     }
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      unawaited(_refreshReadyBooks());
+    });
   }
 
   void _selectStage(K12TextbookStage stage) {
@@ -57,12 +64,65 @@ class _K12TextbookShelfScreenState
       _stage = stage;
       _gradeId = grades.isEmpty ? _gradeId : grades.first.id;
     });
+    unawaited(_refreshReadyBooks());
+  }
+
+  Future<void> _refreshReadyBooks() async {
+    final String gradeId = _gradeId;
+    try {
+      final List<Map<String, dynamic>> rows = await ref
+          .read(acquireApiClientProvider)
+          .listReadingTextbooks(gradeId: gradeId);
+      if (!mounted || gradeId != _gradeId) return;
+      setState(() {
+        _readyCatalogIds = <String>{
+          for (final Map<String, dynamic> row in rows)
+            if ('${row['catalog_id'] ?? ''}'.trim().isNotEmpty)
+              '${row['catalog_id']}'.trim(),
+        };
+      });
+    } catch (_) {
+      if (!mounted || gradeId != _gradeId) return;
+      setState(() => _readyCatalogIds = <String>{});
+    }
   }
 
   Future<void> _openTextbook(K12TextbookEntry entry) async {
     if (_opening) return;
     setState(() => _opening = true);
     try {
+      final String? mediaBookId = k12TextbookMediaBookId(entry.id);
+      if (mediaBookId != null && _readyCatalogIds.contains(entry.id)) {
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute<void>(
+            builder: (_) => K12TextbookStudyScreen(
+              mediaBookId: mediaBookId,
+              catalogTitle: entry.titleZh.isEmpty ? entry.title : entry.titleZh,
+            ),
+          ),
+        );
+        return;
+      }
+      if (mediaBookId != null) {
+        // Catalog may lag; still try the ECS package when the id is known.
+        final Map<String, dynamic>? detail = await ref
+            .read(acquireApiClientProvider)
+            .getReadingTextbook(mediaBookId);
+        if (detail != null && mounted) {
+          await Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (_) => K12TextbookStudyScreen(
+                mediaBookId: mediaBookId,
+                catalogTitle:
+                    entry.titleZh.isEmpty ? entry.title : entry.titleZh,
+              ),
+            ),
+          );
+          return;
+        }
+      }
+
       final ReadingLibraryNotifier library =
           ref.read(readingLibraryProvider.notifier);
       final ReadingLibraryState state = ref.read(readingLibraryProvider);
@@ -119,8 +179,8 @@ class _K12TextbookShelfScreenState
         padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
         children: <Widget>[
           Text(
-            '按年级浏览教材目录。封面为占位样式；点击后进入电子书阅读模块。'
-            '正文需自行导入合法文本，本目录不内置商业教材扫描件。',
+            '按年级浏览教材目录。已上传到服务器的课本会显示「有声教材」，'
+            '可直接播放配套 MP3；其余仍为目录占位，需自行导入合法文本。',
             style: TextStyle(
               color: AppDesignTokens.textSecondary,
               height: 1.45,
@@ -156,7 +216,10 @@ class _K12TextbookShelfScreenState
                 ChoiceChip(
                   label: Text(family.label),
                   selected: _gradeId == family.id,
-                  onSelected: (_) => setState(() => _gradeId = family.id),
+                  onSelected: (_) {
+                    setState(() => _gradeId = family.id);
+                    unawaited(_refreshReadyBooks());
+                  },
                 ),
             ],
           ),
@@ -205,6 +268,7 @@ class _K12TextbookShelfScreenState
                           entry: books[i],
                           paletteIndex: i,
                           enabled: !_opening,
+                          hasAudio: _readyCatalogIds.contains(books[i].id),
                           onTap: () => unawaited(_openTextbook(books[i])),
                         ),
                       ),
@@ -223,12 +287,14 @@ class _TextbookTile extends StatelessWidget {
     required this.entry,
     required this.paletteIndex,
     required this.enabled,
+    required this.hasAudio,
     required this.onTap,
   });
 
   final K12TextbookEntry entry;
   final int paletteIndex;
   final bool enabled;
+  final bool hasAudio;
   final VoidCallback onTap;
 
   @override
@@ -282,6 +348,27 @@ class _TextbookTile extends StatelessWidget {
                   color: AppDesignTokens.textSecondary,
                 ),
               ),
+              if (hasAudio) ...<Widget>[
+                const SizedBox(height: 6),
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 8,
+                    vertical: 3,
+                  ),
+                  decoration: BoxDecoration(
+                    color: AppDesignTokens.successSoft,
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                  child: Text(
+                    '有声教材',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppDesignTokens.brandGreenDark,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              ],
             ],
           ),
         ),

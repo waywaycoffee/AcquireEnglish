@@ -41,6 +41,7 @@ PYTHONPATH=/opt/acquireenglish/services/api \
 {media_cache_dir}/
   foundation/{book_id}/{key}.mp3|.mp4
   reading/{pack_id}/{doc_or_slug}.mp3|.mp4
+  reading/textbooks/{book_id}/book.pdf|book.json|audio/*.mp3  # K12 有声教材（本地点选上传）
   oral/...
   course/...
   misc/...
@@ -81,6 +82,12 @@ curl -X POST "$API/api/content/media/upload" \
 ## 与阅读书库的关系
 
 在线书库只拉取**文本**（OneStop / CEFR / Magic 文案 / Standard Ebooks EPUB）。配套朗读须运营上传到 `reading` 命名空间；客户端用 `readingContentMediaProvider` 查找，不从 GitHub 拉音频进包。
+
+### K12 有声教材
+
+本机 PDF + 同目录 MP3 经 `tools/k12_textbooks/` 打包上传到 `reading/textbooks/`。  
+清单：`GET /api/reading/textbooks`；册次：`GET /api/reading/textbooks/{book_id}`。  
+勿把整盘「教材」镜像进 ECS，只上传点选册次。详见该目录 README。
 
 ## 阅读页 TTS 预生成（手机不扛合成）
 

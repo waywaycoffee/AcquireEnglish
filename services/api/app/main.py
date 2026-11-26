@@ -277,4 +277,6 @@ if _admin_web.is_dir():
 
 # Public reading catalogs are cached by ECS for reliable domestic downloads.
 from app.routers import reading_source
+from app.routers import reading_textbooks
 app.include_router(reading_source.router, prefix="/api")
+app.include_router(reading_textbooks.router, prefix="/api")
