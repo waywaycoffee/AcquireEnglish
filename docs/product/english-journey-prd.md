@@ -1,6 +1,6 @@
 # 英语之旅 · 产品需求说明（PRD）
 
-> 状态：设计优化稿待确认（2026-11-26）  
+> 状态：M0 开发中（2026-11-26）· 首页单「下一步」已接规则  
 > 范围：首页「英语之旅」三关仪式 + 「今日路径 / CoursePlan」课程调度；明确二者关系与下一期改造。  
 > 设计稿：暂挂在 `apps/mobile/design/tv_study_landscape.pen`（`home-journey` 等帧）· 导出 `apps/mobile/design/exports/english-journey-next/`  
 > 相关：`docs/COURSE_DECOMPOSE.md`、`docs/TEST_PLAN_EXISTING.md`（曾排除「主线旅程」地图稿）、`apps/mobile/lib/features/daily_path/`、`.../home/.../today_activity_card.dart`

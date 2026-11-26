@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../authentication/presentation/account_storage.dart';
 import '../../../daily_path/data/today_journey_store.dart';
+import '../../../learner_model/data/journey_feedback_store.dart';
 import '../../../learner_model/domain/journey_next_step.dart';
 import '../../../learner_model/domain/learner_skill_profile.dart';
 import '../../../learner_model/domain/learning_recommendation.dart';
@@ -17,10 +20,10 @@ import '../../../player/presentation/learning_resume_provider.dart';
 import '../../../reading/domain/reading_doc.dart';
 import '../../../reading/presentation/reading_library_provider.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
+import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/presentation/daily_feed_provider.dart';
 import '../../../words/presentation/learner_level_provider.dart';
 import '../../../words/presentation/word_book_provider.dart';
-import '../learning_dashboard_provider.dart';
 
 class TodayActivityCard extends ConsumerStatefulWidget {
   const TodayActivityCard({super.key});
@@ -31,6 +34,7 @@ class TodayActivityCard extends ConsumerStatefulWidget {
 
 class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
   bool _busy = false;
+  bool _skippingEmptyReview = false;
 
   DateTime _nextDay(DateTime today) =>
       DateTime(today.year, today.month, today.day + 1);
@@ -40,8 +44,18 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         context: context,
         isScrollControlled: true,
         showDragHandle: true,
+        backgroundColor: AppDesignTokens.appWhite,
         builder: (_) => _TodayActivityPicker(tomorrow: tomorrow),
       );
+
+  Future<void> _ensureEmptyReviewSkipped(TodayJourneyStore store) async {
+    if (_skippingEmptyReview || store.stage != JourneyStage.review) return;
+    final int due = ref.read(wordBookProvider.notifier).dueCounts().dueReviews;
+    if (due > 0) return;
+    _skippingEmptyReview = true;
+    await store.saveStage(JourneyStage.learn);
+    if (mounted) setState(() => _skippingEmptyReview = false);
+  }
 
   Future<void> _runJourney() async {
     if (_busy) return;
@@ -56,6 +70,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         DateUtils.isSameDay(today, DateTime.now());
 
     try {
+      await _ensureEmptyReviewSkipped(store);
+      if (!mounted) return;
       final JourneyNextStep step = _nextStep(store);
       if (store.stage == JourneyStage.review ||
           store.stage == JourneyStage.learn) {
@@ -88,8 +104,14 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           context: context,
           builder: (BuildContext dialogContext) => AlertDialog(
             backgroundColor: AppDesignTokens.appWhite,
-            title: const Text('这关学完了吗？'),
-            content: Text(activity.title),
+            title: Text(
+              '这关学完了吗？',
+              style: TextStyle(color: AppDesignTokens.textPrimary),
+            ),
+            content: Text(
+              activity.title,
+              style: TextStyle(color: AppDesignTokens.textSecondary),
+            ),
             actions: <Widget>[
               TextButton(
                 onPressed: () => Navigator.of(dialogContext).pop(false),
@@ -103,6 +125,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           ),
         );
         if (active() && (completed ?? false)) {
+          await _seedTomorrowIfNeeded(account, today);
           await store.saveStage(JourneyStage.tomorrow);
         }
         return;
@@ -112,17 +135,172 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         case JourneyStage.learn:
           return;
         case JourneyStage.tomorrow:
+          await store.saveStage(JourneyStage.done);
+          return;
         case JourneyStage.done:
-          final JourneyActivity? activity = await _pick(tomorrow: true);
-          if (!active() || activity == null) return;
-          await TodayJourneyStore(
-            account,
-            _nextDay(today),
-          ).saveActivity(activity);
-          if (active()) await store.saveStage(JourneyStage.done);
+          return;
       }
     } finally {
       if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _seedTomorrowIfNeeded(String account, DateTime today) async {
+    final TodayJourneyStore tomorrow = TodayJourneyStore(
+      account,
+      _nextDay(today),
+    );
+    if (tomorrow.activity?.route.isNotEmpty ?? false) return;
+    final JourneyNextStep preview = resolveJourneyNext(
+      JourneyNextRequest(
+        dueReviewCount: 0,
+        reviewFinished: true,
+        pursuit: _currentPursuit(),
+        recommendation: _coldTask(),
+        recommendationReason: '',
+      ),
+    );
+    if (preview.route.isEmpty) return;
+    await tomorrow.saveActivity((
+      route: preview.route,
+      title: preview.title.replaceFirst(RegExp(r'^下一步 · '), ''),
+    ));
+  }
+
+  JourneyTask? _currentPursuit() {
+    final Set<String> tracks = selectedLearningTracks(
+      ref.read(learningPreferencesProvider).tags,
+    );
+    final JourneyTask? videoNext = _videoPursuit(
+      ref.read(continueLearningTargetProvider),
+      enabled: tracks.contains(kTrackVideo),
+    );
+    final ReadingDoc? book = ref.read(readingLibraryProvider).continueDoc;
+    final JourneyTask? readingNext =
+        tracks.contains(kTrackReading) && book != null
+        ? JourneyTask(
+            route: '/reading/${Uri.encodeComponent(book.id)}',
+            title: '继续读${book.displayTitle}',
+            module: LearnModule.reading,
+          )
+        : null;
+    final String recent = ref.read(currentLearningKindProvider);
+    return recent == 'reading'
+        ? (readingNext ?? videoNext)
+        : (videoNext ?? readingNext);
+  }
+
+  JourneyTask? _coldTask() {
+    final Set<String> tracks = selectedLearningTracks(
+      ref.read(learningPreferencesProvider).tags,
+    );
+    final ScoredLearnCandidate? cold = _coldRecommendation(
+      videoOn: tracks.contains(kTrackVideo),
+      readingOn: tracks.contains(kTrackReading),
+    );
+    if (cold == null) return null;
+    return JourneyTask(
+      route: cold.candidate.route,
+      title: cold.candidate.title,
+      module: cold.candidate.module,
+    );
+  }
+
+  Future<void> _changeTomorrow() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final DateTime today = DateTime.now();
+    final String account = ref.read(studyAccountProvider);
+    try {
+      final JourneyActivity? picked = await _pick(tomorrow: true);
+      if (!mounted || picked == null) return;
+      await TodayJourneyStore(account, _nextDay(today)).saveActivity(picked);
+      await TodayJourneyStore(account, today).saveStage(JourneyStage.done);
+    } finally {
+      if (mounted) setState(() => _busy = false);
+    }
+  }
+
+  Future<void> _openFeedback() async {
+    final TodayJourneyStore store = TodayJourneyStore(
+      ref.read(studyAccountProvider),
+      DateTime.now(),
+    );
+    final JourneyNextStep step = _nextStep(store);
+    if (step.kind == JourneyNextKind.review || step.route.isEmpty) {
+      await _swapOnce();
+      return;
+    }
+    final LearnFeedback? feedback = await showModalBottomSheet<LearnFeedback>(
+      context: context,
+      backgroundColor: AppDesignTokens.appWhite,
+      showDragHandle: true,
+      builder: (BuildContext context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              title: Text(
+                '换一个',
+                style: TextStyle(color: AppDesignTokens.textPrimary),
+              ),
+              subtitle: Text(
+                '只改这一次，不记成长期偏好',
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+              onTap: () => Navigator.pop(context, LearnFeedback.swap),
+            ),
+            ListTile(
+              title: Text(
+                '不感兴趣',
+                style: TextStyle(color: AppDesignTokens.textPrimary),
+              ),
+              subtitle: Text(
+                '七天内不再默认推荐这条',
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+              onTap: () => Navigator.pop(context, LearnFeedback.notInterested),
+            ),
+            ListTile(
+              title: Text(
+                '太难了',
+                style: TextStyle(color: AppDesignTokens.textPrimary),
+              ),
+              subtitle: Text(
+                '同类内容以后略降一档',
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+              onTap: () => Navigator.pop(context, LearnFeedback.tooHard),
+            ),
+            ListTile(
+              title: Text(
+                '太简单了',
+                style: TextStyle(color: AppDesignTokens.textPrimary),
+              ),
+              subtitle: Text(
+                '同类内容以后略升一档',
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+              onTap: () => Navigator.pop(context, LearnFeedback.tooEasy),
+            ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || feedback == null) return;
+    final LearnModule module = step.route.startsWith('/reading/')
+        ? LearnModule.reading
+        : step.route.contains('review')
+        ? LearnModule.vocab
+        : LearnModule.video;
+    await JourneyFeedbackStore(
+      ref.read(studyAccountProvider),
+    ).apply(id: step.route, module: module, feedback: feedback);
+    if (feedback == LearnFeedback.swap ||
+        feedback == LearnFeedback.notInterested) {
+      await _swapOnce();
+    } else if (mounted) {
+      setState(() {});
     }
   }
 
@@ -156,44 +334,22 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           )
         : null;
     final int due = ref.read(wordBookProvider.notifier).dueCounts().dueReviews;
-    final Set<String> tracks = selectedLearningTracks(
-      ref.read(learningPreferencesProvider).tags,
-    );
-    final bool videoOn = tracks.contains(kTrackVideo);
-    final bool readingOn = tracks.contains(kTrackReading);
-    final ContinueLearningTarget? resume = ref.read(
-      continueLearningTargetProvider,
-    );
-    final JourneyTask? videoNext = _videoPursuit(resume, enabled: videoOn);
-    final ReadingDoc? book = ref.read(readingLibraryProvider).continueDoc;
-    final JourneyTask? readingNext = readingOn && book != null
-        ? JourneyTask(
-            route: '/reading/${Uri.encodeComponent(book.id)}',
-            title: '继续读${book.displayTitle}',
-            module: LearnModule.reading,
-          )
-        : null;
-    final String recent = ref.read(currentLearningKindProvider);
-    final JourneyTask? pursuit = recent == 'reading'
-        ? (readingNext ?? videoNext)
-        : (videoNext ?? readingNext);
-    final ScoredLearnCandidate? cold = pursuit == null
-        ? _coldRecommendation(videoOn: videoOn, readingOn: readingOn)
-        : null;
     return resolveJourneyNext(
       JourneyNextRequest(
         paused: paused,
         dueReviewCount: due,
         reviewFinished: reviewFinished,
-        pursuit: pursuit,
-        recommendation: cold == null
-            ? null
-            : JourneyTask(
-                route: cold.candidate.route,
-                title: cold.candidate.title,
-                module: cold.candidate.module,
-              ),
-        recommendationReason: cold?.reason ?? '',
+        pursuit: _currentPursuit(),
+        recommendation: _coldTask(),
+        recommendationReason: _coldRecommendation(
+              videoOn: selectedLearningTracks(
+                ref.read(learningPreferencesProvider).tags,
+              ).contains(kTrackVideo),
+              readingOn: selectedLearningTracks(
+                ref.read(learningPreferencesProvider).tags,
+              ).contains(kTrackReading),
+            )?.reason ??
+            '',
       ),
     );
   }
@@ -241,6 +397,9 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       priorBand: level,
     );
     final OnboardingProfile onboarding = ref.read(onboardingProvider);
+    final JourneyFeedbackStore feedback = JourneyFeedbackStore(
+      ref.read(studyAccountProvider),
+    );
     final List<LearnCandidate> candidates = <LearnCandidate>[
       if (selectedLearningTracks(
         ref.read(learningPreferencesProvider).tags,
@@ -252,6 +411,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           module: LearnModule.vocab,
           contentBand: profile.estimate(LearnerSkill.vocab).band,
           interestMatch: onboarding.focusId == 'vocab',
+          notInterested: feedback.isHidden('/review/session?kind=word'),
         ),
     ];
     if (videoOn) {
@@ -276,6 +436,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                 .recommendationEstimate(LearnerSkill.listening)
                 .band,
             interestMatch: true,
+            notInterested: feedback.isHidden(video.route),
           ),
         );
       }
@@ -301,13 +462,36 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                 .recommendationEstimate(LearnerSkill.reading)
                 .band,
             interestMatch: true,
+            notInterested: feedback.isHidden(article.route),
           ),
         );
       }
     }
     return pickAimlessNext(
-      rankLearnCandidates(candidates: candidates, profile: profile),
+      rankLearnCandidates(
+        candidates: candidates,
+        profile: profile,
+        difficultyShift: feedback.difficultyShifts,
+      ),
     );
+  }
+
+  String _ctaLabel(JourneyNextStep step, JourneyStage stage) {
+    if (stage == JourneyStage.tomorrow) return '就这样 · 明天见';
+    if (stage == JourneyStage.done) return '更换明天的内容';
+    return switch (step.kind) {
+      JourneyNextKind.review => '下一步：开始复习',
+      JourneyNextKind.paused ||
+      JourneyNextKind.continuePursuit => '下一步：${step.title.replaceFirst(RegExp(r'^继续 · '), '')}',
+      JourneyNextKind.recommend => '下一步：打开学习',
+      JourneyNextKind.chooseLevel => '下一步：选一条适合你的',
+    };
+  }
+
+  int _activeGate(JourneyStage stage, JourneyNextStep step) {
+    if (stage == JourneyStage.tomorrow || stage == JourneyStage.done) return 3;
+    if (step.kind == JourneyNextKind.review) return 1;
+    return 2;
   }
 
   @override
@@ -323,54 +507,357 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     final DateTime today = DateTime.now();
     final TodayJourneyStore store = TodayJourneyStore(account, today);
     final JourneyStage stage = store.stage;
+    final int due = ref.watch(wordBookProvider.notifier).dueCounts().dueReviews;
+    if (stage == JourneyStage.review && due == 0) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        unawaited(_ensureEmptyReviewSkipped(store));
+      });
+    }
     final JourneyNextStep step = _nextStep(store);
-    final bool planning = stage == JourneyStage.review || stage == JourneyStage.learn;
-    final String title = planning
-        ? step.title
-        : switch (stage) {
-            JourneyStage.tomorrow => '选明天学什么',
-            JourneyStage.done => '更换明天的内容',
-            _ => step.title,
-          };
-    final String detail = planning
-        ? step.reason
-        : switch (stage) {
-            JourneyStage.tomorrow => '第 3 关 · 安排明天',
-            JourneyStage.done =>
-              '今日已完成 · 明天：${TodayJourneyStore(account, _nextDay(today)).activity?.title ?? '按你的水平再排一条'}',
-            _ => step.reason,
-          };
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: <Widget>[
-            Text('今天的英语之旅', style: Theme.of(context).textTheme.titleMedium),
-            Text(detail),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              runSpacing: 4,
+    final int gate = _activeGate(stage, step);
+    final JourneyActivity? tomorrow = TodayJourneyStore(
+      account,
+      _nextDay(today),
+    ).activity;
+    final List<({String title, String label})> preview =
+        <({String title, String label})>[
+          if (due > 0 && stage == JourneyStage.review)
+            (title: '复习 $due 词', label: '到期优先'),
+          if (step.kind != JourneyNextKind.review)
+            (
+              title: step.title.replaceFirst(RegExp(r'^下一步 · '), ''),
+              label: step.reason,
+            ),
+          (
+            title: tomorrow?.title.isNotEmpty == true
+                ? tomorrow!.title
+                : '排明天',
+            label: tomorrow?.route.isNotEmpty == true
+                ? '明天已替你排好'
+                : '可跳过，系统代排',
+          ),
+        ];
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        DecoratedBox(
+          decoration: BoxDecoration(
+            color: AppDesignTokens.appWhite,
+            borderRadius: BorderRadius.circular(20),
+            boxShadow: AppDesignTokens.toyCardShadow,
+          ),
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 18),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
-                FilledButton.icon(
-                  icon: Icon(
-                    stage == JourneyStage.done
-                        ? Icons.edit_calendar_outlined
-                        : Icons.play_arrow_rounded,
+                Text(
+                  '今天 · 约 15 分钟',
+                  style: TextStyle(
+                    color: AppDesignTokens.brandGreen,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 13,
                   ),
-                  label: Text(title),
-                  onPressed: _busy ? null : () => _runJourney(),
                 ),
-                if (planning && step.kind != JourneyNextKind.review)
-                  TextButton(
-                    onPressed: _busy ? null : _swapOnce,
-                    child: const Text('换一个'),
+                const SizedBox(height: 6),
+                Text(
+                  stage == JourneyStage.tomorrow || stage == JourneyStage.done
+                      ? '今天打卡完成'
+                      : '英语之旅',
+                  style: TextStyle(
+                    color: AppDesignTokens.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 24,
                   ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  stage == JourneyStage.tomorrow || stage == JourneyStage.done
+                      ? '复习和今天的新学都过了。明天继续点「下一步」就行。'
+                      : '不用想学什么。点下一步，把复习和感兴趣的内容一路做完。',
+                  style: TextStyle(
+                    color: AppDesignTokens.textSecondary,
+                    height: 1.45,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                _GateRow(active: gate),
+                const SizedBox(height: 14),
+                if (stage == JourneyStage.tomorrow ||
+                    stage == JourneyStage.done)
+                  _TomorrowBanner(
+                    title: tomorrow?.title.isNotEmpty == true
+                        ? tomorrow!.title
+                        : '明天按你的水平再排一条',
+                    reason: tomorrow?.route.isNotEmpty == true
+                        ? '明天已替你排好 · 可改'
+                        : '还没定明天 · 可现在选',
+                  )
+                else
+                  _NextBanner(
+                    title: step.kind == JourneyNextKind.review
+                        ? '下一步 · 今日复习'
+                        : step.title.startsWith('下一步')
+                        ? step.title
+                        : '下一步 · ${step.title}',
+                    reason: step.kind == JourneyNextKind.review
+                        ? '到期 $due 张词卡 · 做完自动进新学'
+                        : step.reason,
+                  ),
+                const SizedBox(height: 14),
+                SizedBox(
+                  width: double.infinity,
+                  child: FilledButton(
+                    onPressed: _busy
+                        ? null
+                        : stage == JourneyStage.done
+                        ? _changeTomorrow
+                        : _runJourney,
+                    style: FilledButton.styleFrom(
+                      backgroundColor: AppDesignTokens.brandGreen,
+                      foregroundColor: AppDesignTokens.onAccent,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(14),
+                      ),
+                    ),
+                    child: Text(
+                      _ctaLabel(step, stage),
+                      style: const TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 16,
+                      ),
+                    ),
+                  ),
+                ),
+                if (stage == JourneyStage.tomorrow) ...<Widget>[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _busy ? null : _changeTomorrow,
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppDesignTokens.textPrimary,
+                        side: BorderSide(color: AppDesignTokens.borderGray),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: const Text('换明天学别的'),
+                    ),
+                  ),
+                ] else if (stage == JourneyStage.review ||
+                    stage == JourneyStage.learn) ...<Widget>[
+                  if (step.kind != JourneyNextKind.review) ...<Widget>[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.center,
+                      child: TextButton(
+                        onPressed: _busy ? null : _openFeedback,
+                        child: Text(
+                          '换一个 / 反馈',
+                          style: TextStyle(
+                            color: AppDesignTokens.textSecondary,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
               ],
             ),
-          ],
+          ),
         ),
+        if (stage == JourneyStage.review || stage == JourneyStage.learn) ...<
+          Widget
+        >[
+          const SizedBox(height: 18),
+          Text(
+            '今天还会带你过',
+            style: TextStyle(
+              color: AppDesignTokens.textPrimary,
+              fontWeight: FontWeight.w700,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 10),
+          for (final ({String title, String label}) item in preview)
+            Padding(
+              padding: const EdgeInsets.only(bottom: 8),
+              child: DecoratedBox(
+                decoration: BoxDecoration(
+                  color: AppDesignTokens.appWhite,
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: ListTile(
+                  leading: Icon(
+                    Icons.circle,
+                    size: 10,
+                    color: AppDesignTokens.brandGreen,
+                  ),
+                  title: Text(
+                    item.title,
+                    style: TextStyle(
+                      color: AppDesignTokens.textPrimary,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  subtitle: Text(
+                    item.label,
+                    style: TextStyle(color: AppDesignTokens.textSecondary),
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ],
+    );
+  }
+}
+
+class _GateRow extends StatelessWidget {
+  const _GateRow({required this.active});
+
+  final int active;
+
+  @override
+  Widget build(BuildContext context) {
+    Widget chip(int n, String label) {
+      final bool on = active == n;
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+        decoration: BoxDecoration(
+          color: on ? AppDesignTokens.successSoft : Colors.transparent,
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(
+            color: on ? AppDesignTokens.brandGreen : AppDesignTokens.borderGray,
+          ),
+        ),
+        child: Text(
+          '$n $label',
+          style: TextStyle(
+            color: on
+                ? AppDesignTokens.brandGreen
+                : AppDesignTokens.textSecondary,
+            fontWeight: FontWeight.w700,
+            fontSize: 12,
+          ),
+        ),
+      );
+    }
+
+    return Row(
+      children: <Widget>[
+        chip(1, '复习'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 12,
+            color: AppDesignTokens.textSecondary,
+          ),
+        ),
+        chip(2, '新学'),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 6),
+          child: Icon(
+            Icons.arrow_forward_ios_rounded,
+            size: 12,
+            color: AppDesignTokens.textSecondary,
+          ),
+        ),
+        chip(3, '明天'),
+      ],
+    );
+  }
+}
+
+class _NextBanner extends StatelessWidget {
+  const _NextBanner({required this.title, required this.reason});
+
+  final String title;
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppDesignTokens.successSoft,
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: AppDesignTokens.brandGreen.withValues(alpha: 0.35)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            title,
+            style: TextStyle(
+              color: AppDesignTokens.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: 15,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            reason,
+            style: TextStyle(
+              color: AppDesignTokens.textSecondary,
+              height: 1.4,
+              fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _TomorrowBanner extends StatelessWidget {
+  const _TomorrowBanner({required this.title, required this.reason});
+
+  final String title;
+  final String reason;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: AppDesignTokens.selectedSurface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text(
+            '明天已替你排好',
+            style: TextStyle(
+              color: AppDesignTokens.brandGreen,
+              fontWeight: FontWeight.w700,
+              fontSize: 12,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            title,
+            style: TextStyle(
+              color: AppDesignTokens.textPrimary,
+              fontWeight: FontWeight.w800,
+              fontSize: 16,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            reason,
+            style: TextStyle(
+              color: AppDesignTokens.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -398,7 +885,7 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
       continueLearningTargetProvider,
     );
     final OnboardingProfile profile = ref.watch(onboardingProvider);
-    final prefs = ref.watch(learningPreferencesProvider);
+    final AcquirePreferencesDto prefs = ref.watch(learningPreferencesProvider);
     final String level = ref.watch(adaptiveLearnerCefrProvider);
     final FocusRecommendation? readingSuggestion = book == null
         ? buildFocusRecommendation(
@@ -410,19 +897,6 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
             levelOverride: level,
           )
         : null;
-    final Set<String> yesterday = ref
-        .watch(learningActivityProvider)
-        .yesterday
-        .watchedVideoKeys;
-    final LibraryEpisodeItem? previousVideo = courses
-        .expand((LibraryCourseData c) => c.episodes)
-        .where(
-          (LibraryEpisodeItem e) =>
-              yesterday.contains(e.id) &&
-              !e.videoMissing &&
-              e.hasEnglishSubtitles,
-        )
-        .lastOrNull;
     String videoRoute(LibraryEpisodeItem e) =>
         '/episodes/${Uri.encodeComponent(e.id)}';
     final FocusRecommendation recommended = buildFocusRecommendation(
@@ -484,8 +958,7 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
               continuingVideo &&
               recommended.route == videoRoute(resume.episode),
         ),
-      if (continuingVideo &&
-          (recommended.route != videoRoute(resume.episode)))
+      if (continuingVideo && recommended.route != videoRoute(resume.episode))
         LearnCandidate(
           id: videoRoute(resume.episode),
           title: resume.episode.title,
@@ -526,34 +999,22 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
       String subtitle,
       String route,
     ) => ListTile(
-      leading: Icon(icon),
-      title: Text(title),
-      subtitle: Text(subtitle),
-      trailing: const Icon(Icons.chevron_right),
+      leading: Icon(icon, color: AppDesignTokens.brandGreen),
+      title: Text(title, style: TextStyle(color: AppDesignTokens.textPrimary)),
+      subtitle: Text(
+        subtitle,
+        style: TextStyle(color: AppDesignTokens.textSecondary),
+      ),
+      trailing: Icon(
+        Icons.chevron_right,
+        color: AppDesignTokens.textSecondary,
+      ),
       onTap: () => open(
         route,
         route.startsWith('/episodes/') || route.startsWith('/reading/')
             ? subtitle
             : title,
       ),
-    );
-
-    final Widget video = ListTile(
-      leading: const Icon(Icons.ondemand_video_outlined),
-      title: const Text('看一段推荐视频'),
-      subtitle: Text(hasVideo ? recommended.title : '去视频库挑一段'),
-      onTap: () => open(
-        hasVideo ? recommended.route : '/library',
-        hasVideo ? recommended.title : '挑一段视频',
-      ),
-      trailing: hasVideo
-          ? IconButton(
-              tooltip: '跳过这条，换一段',
-              icon: const Icon(Icons.skip_next),
-              onPressed: () =>
-                  setState(() => _skippedRoutes.add(recommended.route)),
-            )
-          : const Icon(Icons.chevron_right),
     );
 
     return SafeArea(
@@ -569,8 +1030,10 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
             Padding(
               padding: const EdgeInsets.fromLTRB(12, 0, 12, 8),
               child: Text(
-                widget.tomorrow ? '明天想学什么？' : '今天想做什么？',
-                style: Theme.of(context).textTheme.titleLarge,
+                widget.tomorrow ? '明天想学什么？' : '想换一个也可以',
+                style: Theme.of(context).textTheme.titleLarge?.copyWith(
+                  color: AppDesignTokens.textPrimary,
+                ),
               ),
             ),
             if (!purposeful && aimless != null)
@@ -593,51 +1056,26 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
                   shortlist[i].candidate.route,
                 ),
             if (hasVideo)
-              Dismissible(
-                key: ValueKey<String>(recommended.route),
-                direction: DismissDirection.horizontal,
-                onDismissed: (_) =>
-                    setState(() => _skippedRoutes.add(recommended.route)),
-                background: const Align(
-                  alignment: Alignment.center,
-                  child: Icon(Icons.skip_next),
-                ),
-                child: video,
+              activity(
+                Icons.ondemand_video_outlined,
+                recommended.title,
+                '看一段推荐视频',
+                recommended.route,
+              ),
+            if (book != null)
+              activity(
+                Icons.menu_book_outlined,
+                book.displayTitle,
+                '继续读正在看的书',
+                '/reading/${Uri.encodeComponent(book.id)}',
               )
-            else
-              video,
-            if (resume != null &&
-                !resume.episode.videoMissing &&
-                ref.watch(lastLearningEpisodeProvider) == resume.episode.id)
+            else if (readingSuggestion != null)
               activity(
-                Icons.play_circle_outline,
-                '继续上次的视频',
-                resume.episode.title,
-                videoRoute(resume.episode),
+                Icons.menu_book_outlined,
+                readingSuggestion.title,
+                '选一本书读',
+                readingSuggestion.route,
               ),
-            activity(
-              Icons.menu_book_outlined,
-              book == null ? '选一本书读' : '继续读正在看的书',
-              book?.displayTitle ?? readingSuggestion!.title,
-              book == null
-                  ? readingSuggestion!.route
-                  : '/reading/${Uri.encodeComponent(book.id)}',
-            ),
-            activity(Icons.quiz_outlined, '做真题', '练一组目标考试的题目', '/exam'),
-            activity(
-              Icons.record_voice_over_outlined,
-              '聊聊周围的环境',
-              '可以直接描述，也可以在口语页主动拍照',
-              '/digital-human?sceneMenu=1',
-            ),
-            if (!widget.tomorrow && previousVideo != null)
-              activity(
-                Icons.forum_outlined,
-                '聊昨天的视频',
-                previousVideo.title,
-                '${videoRoute(previousVideo)}?autoplay=0&activity=coach',
-              ),
-            activity(Icons.headphones, '磨耳朵', '听一段喜欢的音频', '/ear-grind'),
             if (widget.tomorrow)
               activity(Icons.auto_awesome, '交给系统推荐', '明天再看适合你的内容', ''),
           ],

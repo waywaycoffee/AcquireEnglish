@@ -2107,6 +2107,25 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     color: ReviewRecallTheme.textMuted,
                   ),
                 ),
+                if (widget.journeyReview) ...<Widget>[
+                  const SizedBox(height: 12),
+                  Text(
+                    '评完这张会自动下一张。也可以跳过剩余复习，直接去学新内容。',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 12,
+                      height: 1.5,
+                      color: AppDesignTokens.textSecondary,
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  OutlinedButton(
+                    onPressed: _saving
+                        ? null
+                        : () => _leaveSession(journeyCompleted: true),
+                    child: const Text('跳过剩余 · 去学新'),
+                  ),
+                ],
               ],
               if (_saving)
                 const Padding(
