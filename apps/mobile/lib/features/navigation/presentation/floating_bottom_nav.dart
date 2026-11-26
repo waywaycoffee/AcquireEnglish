@@ -11,8 +11,10 @@ import 'navigation_destination.dart';
 /// Horizontally swipeable bottom navigation.
 ///
 /// Fixed viewport shows [AppNavDestination.bottomBarVisibleCount] tabs;
-/// swipe left/right for the rest. Lives in [Scaffold.bottomNavigationBar],
-/// so horizontal drags are hit-tested on this bar only and do not enter the
+/// swipe left/right for the rest. Selecting a tab only scrolls when that tab
+/// is outside the viewport (edge-aligned), so mid-bar tabs like 社区 do not
+/// shove 学习 off-screen. Lives in [Scaffold.bottomNavigationBar], so
+/// horizontal drags are hit-tested on this bar only and do not enter the
 /// page body's gesture arena (PageView / TabBarView stay independent).
 class FloatingBottomNav extends StatefulWidget {
   const FloatingBottomNav({
@@ -54,7 +56,7 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
         widget.forceShowScrollHint ?? !readBottomNavScrollHintSeen();
     _scrollController.addListener(_onScroll);
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      _centerCurrent(animated: false);
+      _ensureCurrentVisible(animated: false);
     });
   }
 
@@ -63,7 +65,7 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.current != widget.current) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        _centerCurrent(animated: true);
+        _ensureCurrentVisible(animated: true);
       });
     }
     if (oldWidget.forceShowScrollHint != widget.forceShowScrollHint) {
@@ -94,16 +96,10 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
       });
       return;
     }
-    final double viewport = _scrollController.position.viewportDimension;
-    if (viewport <= 0) return;
-    final double itemWidth = _itemWidth(viewport);
-    final double target = (index * itemWidth) - (viewport - itemWidth) / 2;
-    final double clamped = target.clamp(
-      0.0,
-      _scrollController.position.maxScrollExtent,
-    );
+    final double? target = _targetOffsetForIndex(index);
+    if (target == null) return;
     // Jump (not animate) so tour GlobalKeys attach on the next frame.
-    _scrollController.jumpTo(clamped);
+    _scrollController.jumpTo(target);
   }
 
   @override
@@ -138,27 +134,44 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
   double _itemWidth(double viewportWidth) =>
       viewportWidth / AppNavDestination.bottomBarVisibleCount;
 
-  void _centerCurrent({required bool animated}) {
-    if (!_scrollController.hasClients) return;
+  /// Minimal scroll that keeps [index] inside the viewport.
+  ///
+  /// Prefer leaving the offset unchanged when the tab is already visible, so
+  /// selecting 社区 (still in the first five slots) does not hide 学习.
+  double? _targetOffsetForIndex(int index) {
+    if (!_scrollController.hasClients) return null;
     final double viewport = _scrollController.position.viewportDimension;
-    if (viewport <= 0) return;
+    if (viewport <= 0) return null;
     final double itemWidth = _itemWidth(viewport);
-    final int index = _selectedIndex();
-    final double target =
-        (index * itemWidth) -
-        (viewport - itemWidth) / 2;
-    final double clamped = target.clamp(
-      0.0,
-      _scrollController.position.maxScrollExtent,
-    );
+    final double itemLeading = index * itemWidth;
+    final double itemTrailing = itemLeading + itemWidth;
+    final double current = _scrollController.offset;
+    final double visibleLeading = current;
+    final double visibleTrailing = current + viewport;
+
+    double target = current;
+    if (itemLeading < visibleLeading) {
+      target = itemLeading;
+    } else if (itemTrailing > visibleTrailing) {
+      target = itemTrailing - viewport;
+    }
+
+    return target.clamp(0.0, _scrollController.position.maxScrollExtent);
+  }
+
+  void _ensureCurrentVisible({required bool animated}) {
+    if (!_scrollController.hasClients) return;
+    final double? target = _targetOffsetForIndex(_selectedIndex());
+    if (target == null) return;
+    if ((target - _scrollController.offset).abs() < 0.5) return;
     if (animated) {
       _scrollController.animateTo(
-        clamped,
+        target,
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOutCubic,
       );
     } else {
-      _scrollController.jumpTo(clamped);
+      _scrollController.jumpTo(target);
     }
   }
 
@@ -171,7 +184,7 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
 
   @visibleForTesting
   Future<void> centerCurrentForTest({bool animated = false}) async {
-    _centerCurrent(animated: animated);
+    _ensureCurrentVisible(animated: animated);
     if (animated) {
       await Future<void>.delayed(const Duration(milliseconds: 300));
     }
@@ -495,6 +508,7 @@ class _MoreNavItem extends StatelessWidget {
       context: context,
       showDragHandle: true,
       isScrollControlled: true,
+      backgroundColor: AppDesignTokens.appWhite,
       builder: (BuildContext sheetContext) => SafeArea(
         top: false,
         child: SingleChildScrollView(

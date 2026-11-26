@@ -120,7 +120,7 @@ void main() {
     expect(find.text('更多'), findsOneWidget);
   });
 
-  testWidgets('selecting a far tab centers it in the visible area', (
+  testWidgets('selecting a far tab scrolls just enough to reveal it', (
     WidgetTester tester,
   ) async {
     tester.view.physicalSize = const Size(390, 844);
@@ -151,9 +151,38 @@ void main() {
     final Rect selected = tester.getRect(
       find.byKey(const Key('bottom-nav-item-exam')),
     );
-    final double selectedCenter = selected.center.dx;
-    final double viewportCenter = viewport.center.dx;
-    expect((selectedCenter - viewportCenter).abs(), lessThan(selected.width));
+    expect(selected.left, greaterThanOrEqualTo(viewport.left - 0.5));
+    expect(selected.right, lessThanOrEqualTo(viewport.right + 0.5));
+  });
+
+  testWidgets('selecting 社区 keeps 学习 visible without scrolling', (
+    WidgetTester tester,
+  ) async {
+    tester.view.physicalSize = const Size(390, 844);
+    tester.view.devicePixelRatio = 1;
+    addTearDown(tester.view.reset);
+
+    final GlobalKey<FloatingBottomNavState> navKey =
+        GlobalKey<FloatingBottomNavState>();
+
+    await tester.pumpWidget(
+      MaterialApp(
+        home: Scaffold(
+          bottomNavigationBar: FloatingBottomNav(
+            key: navKey,
+            current: AppNavDestination.discover,
+            forceShowScrollHint: false,
+          ),
+        ),
+      ),
+    );
+    await tester.pumpAndSettle();
+    await navKey.currentState!.centerCurrentForTest();
+    await tester.pumpAndSettle();
+
+    expect(navKey.currentState!.scrollOffsetForTest, 0);
+    expect(find.text('学习'), findsOneWidget);
+    expect(find.text('社区'), findsOneWidget);
   });
 
   testWidgets('tapping a tab navigates via go_router', (
