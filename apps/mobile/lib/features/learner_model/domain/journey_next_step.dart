@@ -83,7 +83,9 @@ JourneyNextStep resolveJourneyNext(JourneyNextRequest request) {
       kind: JourneyNextKind.continuePursuit,
       title: pursuit.title,
       route: pursuit.route,
-      reason: '回到你正在学的内容',
+      reason: pursuit.title.contains('第')
+          ? '昨天学到这里了，今天接着看 · 越追越想回来'
+          : '回到你正在学的内容 · 接着昨天的进度',
     );
   }
   final JourneyTask? recommendation = request.recommendation;

@@ -475,15 +475,22 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         : null;
     String routeOf(LibraryEpisodeItem episode) =>
         '/episodes/${Uri.encodeComponent(episode.id)}';
+    String episodeLabel(LibraryEpisodeItem episode, int episodeIndex) {
+      final String raw = episode.title.trim();
+      if (raw.contains('第') && raw.contains('集')) return '继续$raw';
+      return '继续第${episodeIndex + 1}集 · $raw';
+    }
+
     return seriesContinueTarget(
       SeriesProgress(
         itemCount: episodes.length,
         lastIndex: index,
         lastCompleted: current.completed,
-        confirmed: false,
-        currentTitle: '继续${current.title}',
+        // Once past the first episode, treat the series as a return hook.
+        confirmed: index >= 1,
+        currentTitle: episodeLabel(current, index),
         currentRoute: routeOf(current),
-        nextTitle: next == null ? '' : '继续${next.title}',
+        nextTitle: next == null ? '' : episodeLabel(next, index + 1),
         nextRoute: next == null ? '' : routeOf(next),
       ),
       enabled: true,

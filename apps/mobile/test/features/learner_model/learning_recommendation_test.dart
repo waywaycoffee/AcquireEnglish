@@ -238,6 +238,7 @@ void main() {
     expect(after.kind, JourneyNextKind.continuePursuit);
     expect(after.title, '继续第 4 集');
     expect(after.route, '/episodes/4');
+    expect(after.reason, contains('昨天学到这里了'));
   });
 
   test('an unfinished explicit task stays ahead of due review', () {
