@@ -78,66 +78,89 @@ class CoachAvatarStage extends StatelessWidget {
           : thinking
           ? CoachMotion.thinking
           : CoachMotion.idle;
-      return Stack(
-        fit: StackFit.expand,
-        children: <Widget>[
-          const DecoratedBox(
-            decoration: BoxDecoration(
-              gradient: RadialGradient(
-                center: Alignment(0, -0.2),
-                radius: 0.95,
-                colors: <Color>[
-                  Color(0xFF4A3A6E),
-                  Color(0xFF2A2038),
-                  Color(0xFF18122A),
-                ],
-              ),
-            ),
-          ),
-          Center(
-            child: AnimatedBuilder(
-              animation: reduceMotion
-                  ? const AlwaysStoppedAnimation<double>(0)
-                  : pulse,
-              builder: (BuildContext context, Widget? child) {
-                final double t = reduceMotion ? 0 : pulse.value;
-                final double scale = speaking
-                    ? 1.0 + math.sin(t * math.pi * 2) * 0.012
-                    : listening
-                    ? 1.0 + math.sin(t * math.pi * 2) * 0.006
-                    : 1.0 + math.sin(t * math.pi) * 0.004;
-                return Transform.scale(
-                  scale: scale,
-                  child: SizedBox.square(
-                    dimension: 196,
-                    child: CartoonCoachSprite(
-                      asset: sprite,
-                      mouth: mouth ??
-                          (speaking ? CoachViseme.open : CoachViseme.closed),
-                      phase: t,
-                      transitionDuration: Duration.zero,
-                      motion: motion,
-                    ),
+      return LayoutBuilder(
+        builder: (BuildContext context, BoxConstraints constraints) {
+          // One cell only; size from stage so we never paint a wide strip of
+          // the 3×3 atlas (that looked like a duplicated face).
+          final double stage = math.min(
+            constraints.maxWidth,
+            constraints.maxHeight,
+          );
+          final double dim = (stage.isFinite && stage > 0)
+              ? (stage * 0.72).clamp(168.0, 280.0)
+              : 196.0;
+          return Stack(
+            fit: StackFit.expand,
+            clipBehavior: Clip.hardEdge,
+            children: <Widget>[
+              const DecoratedBox(
+                decoration: BoxDecoration(
+                  gradient: RadialGradient(
+                    center: Alignment(0, -0.2),
+                    radius: 0.95,
+                    colors: <Color>[
+                      Color(0xFF4A3A6E),
+                      Color(0xFF2A2038),
+                      Color(0xFF18122A),
+                    ],
                   ),
-                );
-              },
-            ),
-          ),
-          Positioned(
-            left: 24,
-            right: 24,
-            bottom: 28,
-            child: Text(
-              label,
-              textAlign: TextAlign.center,
-              style: TextStyle(
-                color: Colors.white.withValues(alpha: 0.78),
-                fontWeight: FontWeight.w700,
-                fontSize: 14,
+                ),
               ),
-            ),
-          ),
-        ],
+              Center(
+                child: AnimatedBuilder(
+                  animation: reduceMotion
+                      ? const AlwaysStoppedAnimation<double>(0)
+                      : pulse,
+                  builder: (BuildContext context, Widget? child) {
+                    final double t = reduceMotion ? 0 : pulse.value;
+                    final double scale = speaking
+                        ? 1.0 + math.sin(t * math.pi * 2) * 0.012
+                        : listening
+                        ? 1.0 + math.sin(t * math.pi * 2) * 0.006
+                        : 1.0 + math.sin(t * math.pi) * 0.004;
+                    return Transform.scale(
+                      scale: scale,
+                      filterQuality: FilterQuality.medium,
+                      child: ClipOval(
+                        clipBehavior: Clip.hardEdge,
+                        child: SizedBox.square(
+                          dimension: dim,
+                          child: ColoredBox(
+                            color: const Color(0xFF18122A),
+                            child: CartoonCoachSprite(
+                              asset: sprite,
+                              mouth: mouth ??
+                                  (speaking
+                                      ? CoachViseme.open
+                                      : CoachViseme.closed),
+                              phase: t,
+                              transitionDuration: Duration.zero,
+                              motion: motion,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Positioned(
+                left: 24,
+                right: 24,
+                bottom: 28,
+                child: Text(
+                  label,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    color: Colors.white.withValues(alpha: 0.78),
+                    fontWeight: FontWeight.w700,
+                    fontSize: 14,
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
       );
     }
     return AnimatedBuilder(

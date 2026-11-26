@@ -1,11 +1,11 @@
 {
-  "version": "0.2.270",
-  "version_code": 291,
-  "apk_name": "AcquireEnglish-android-0.2.270+291.apk",
+  "version": "0.2.271",
+  "version_code": 292,
+  "apk_name": "AcquireEnglish-android-0.2.271+292.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "a6d6f45ea8e017cc9b8d6f534a03a4fe39e5f61c38e0fbac911fde3223459401",
+  "sha256": "df906bddbf87b44a0251330100f4b177c377ca2c91a98948f506951d055b748e",
   "force": true,
-  "min_version_code": 291,
-  "notes": "必须更新：修复绿野仙踪等书籍封面（下载后本地加载）",
-  "published_at": "2026-11-26T15:30:00+08:00"
+  "min_version_code": 292,
+  "notes": "必须更新：修复数字人口型立绘重影（只显示单格）；书籍封面本地缓存",
+  "published_at": "2026-11-26T15:45:00+08:00"
 }
