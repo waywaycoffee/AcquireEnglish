@@ -1,5 +1,6 @@
 {
-  "version": 1,
+  "version": 2,
+  "note": "W1 content rail: education-only curated BVs. Long collections use seed_pages 1-3 so ECS shared-sub seeding stays cheap.",
   "items": [
     {
       "id": "haos-rp",
@@ -27,7 +28,7 @@
       "display_name": "BBC官方音标教程",
       "avatar_url": "http://i1.hdslb.com/bfs/face/e16031a99ba468f6e4a2ac860271244bb1de806c.jpg",
       "profile_url": "https://space.bilibili.com/25893643",
-      "blurb": "Alex Bellem / The Sounds of English · 44 音合集",
+      "blurb": "Alex Bellem / The Sounds of English · 英音音标分段",
       "videos": [
         {
           "bvid": "BV127411n7nj",
@@ -35,7 +36,7 @@
           "watch_url": "https://www.bilibili.com/video/BV127411n7nj",
           "cover_url": "http://i0.hdslb.com/bfs/archive/9944bf5247ff93ff00afdbaf7a4a4fa2aa752d05.jpg",
           "duration_sec": 10439,
-          "seed_pages": "all"
+          "seed_pages": "1-3"
         }
       ]
     },
@@ -43,7 +44,7 @@
       "id": "ipa-48-mouth",
       "source": "bilibili",
       "creator_id": "57365341",
-      "display_name": "音标标准发音",
+      "display_name": "惊叹号的英语世界",
       "avatar_url": "https://i1.hdslb.com/bfs/face/c661cc3f12fc29304b57cf8ca7b880f6cdfd716d.jpg",
       "profile_url": "https://space.bilibili.com/57365341",
       "blurb": "48 音标 · 真人口型对照练习",
@@ -59,21 +60,105 @@
       ]
     },
     {
+      "id": "sounds-american-ipa",
+      "source": "bilibili",
+      "creator_id": "443873753",
+      "display_name": "爱烤火的双木子呀",
+      "avatar_url": "https://i2.hdslb.com/bfs/face/4e56a2a97154e9a4330c3de43ae032f92f9af7e8.jpg",
+      "profile_url": "https://space.bilibili.com/443873753",
+      "blurb": "Sounds American · 美式音标双语合集",
+      "videos": [
+        {
+          "bvid": "BV12L4y1B7D2",
+          "title": "Sounds American 美式音标教程（双语字幕）",
+          "watch_url": "https://www.bilibili.com/video/BV12L4y1B7D2",
+          "cover_url": "http://i1.hdslb.com/bfs/archive/0ae045b9e811ea3d9d0ca40e5eec1d264d31f21e.png",
+          "duration_sec": 32895,
+          "seed_pages": "1-3"
+        }
+      ]
+    },
+    {
       "id": "youtube-english-house",
       "source": "bilibili",
       "creator_id": "481885544",
       "display_name": "YouTube英语屋",
       "avatar_url": "https://i2.hdslb.com/bfs/face/8a3b0fa867ca9b78d9416e67ee92d74eef515052.jpg",
       "profile_url": "https://space.bilibili.com/481885544",
-      "blurb": "BBC / 真题听力与原声精听合集",
+      "blurb": "BBC / 原声精听合集 · 每天几分钟",
       "videos": [
         {
           "bvid": "BV1J5Wj63Esq",
           "title": "BBC 原版听力120集精选精制（第1期）",
           "watch_url": "https://www.bilibili.com/video/BV1J5Wj63Esq",
           "cover_url": "http://i0.hdslb.com/bfs/archive/e7d673368218d8069438a24a2e30334c5271cfd4.jpg",
-          "duration_sec": 89202,
-          "seed_pages": "all"
+          "duration_sec": 119369,
+          "seed_pages": "1-3"
+        }
+      ]
+    },
+    {
+      "id": "listening-method-beiwaionline",
+      "source": "bilibili",
+      "creator_id": "37796440",
+      "display_name": "PC-262",
+      "avatar_url": "https://i1.hdslb.com/bfs/face/e794b3b7cbf547d65b36de0ae47dcee580e19f68.jpg",
+      "profile_url": "https://space.bilibili.com/37796440",
+      "blurb": "北外在线 · 精听 / 复述 / 影子跟读方法课",
+      "videos": [
+        {
+          "bvid": "BV14o4y1R7B2",
+          "title": "【全集】超实用听力口语方法课",
+          "watch_url": "https://www.bilibili.com/video/BV14o4y1R7B2",
+          "cover_url": "http://i2.hdslb.com/bfs/archive/486c929e57602e123f42db8a4a7a1049f32cc5d2.jpg",
+          "duration_sec": 24780,
+          "seed_pages": "1-3"
+        }
+      ]
+    },
+    {
+      "id": "intensive-listening-582",
+      "source": "bilibili",
+      "creator_id": "3494369487227121",
+      "display_name": "YouTube知识宝藏区",
+      "avatar_url": "https://i0.hdslb.com/bfs/face/de05710e9bb455c9decf9440221105dff9272738.jpg",
+      "profile_url": "https://space.bilibili.com/3494369487227121",
+      "blurb": "场景精听精讲 · 机场酒店餐厅等实用听力",
+      "videos": [
+        {
+          "bvid": "BV1K3hPznEyx",
+          "title": "英语精听精讲 · 听说同步提升课",
+          "watch_url": "https://www.bilibili.com/video/BV1K3hPznEyx",
+          "cover_url": "http://i2.hdslb.com/bfs/archive/eef273c4335a176cf5168cb0fc6bf92ec1df9ad7.jpg",
+          "duration_sec": 77746,
+          "seed_pages": "1-3"
+        }
+      ]
+    },
+    {
+      "id": "youtube-oral-podcast",
+      "source": "bilibili",
+      "creator_id": "454755309",
+      "display_name": "YouTube口语精选",
+      "avatar_url": "https://i0.hdslb.com/bfs/face/4ddb3436d2ceaf6c0cb46380b7fb074dd7ef00f8.jpg",
+      "profile_url": "https://space.bilibili.com/454755309",
+      "blurb": "Easy English Talk / 分级播客 · 影子跟读磨耳朵",
+      "videos": [
+        {
+          "bvid": "BV1MN4dewEQZ",
+          "title": "YouTube英语播客 · 初级版磨耳朵",
+          "watch_url": "https://www.bilibili.com/video/BV1MN4dewEQZ",
+          "cover_url": "http://i2.hdslb.com/bfs/archive/8d4cddb13d579592486c98bcd9d14a52d449942c.jpg",
+          "duration_sec": 27426,
+          "seed_pages": "1-3"
+        },
+        {
+          "bvid": "BV1KW6SBHEUj",
+          "title": "Easy English Talk · 48小时沉浸式影子跟读",
+          "watch_url": "https://www.bilibili.com/video/BV1KW6SBHEUj",
+          "cover_url": "http://i2.hdslb.com/bfs/archive/df7c64f5a69eea46fb4bc22a101707ba0f3b3c84.jpg",
+          "duration_sec": 162827,
+          "seed_pages": "1-3"
         }
       ]
     },
@@ -84,15 +169,15 @@
       "display_name": "净信背单词App",
       "avatar_url": "https://i2.hdslb.com/bfs/face/b1970b7d767f703335fe3a32d0d80e7015524fbd.jpg",
       "profile_url": "https://space.bilibili.com/1637588963",
-      "blurb": "每日英语跟读 · 常用口语与生活例句",
+      "blurb": "核心口语句型 · 与 oral_core_9000 同源合集",
       "videos": [
         {
           "bvid": "BV1CS4y1v7sQ",
-          "title": "英语核心口语句型9000句（合集  共151课）",
+          "title": "英语核心口语句型9000句（合集）",
           "watch_url": "https://www.bilibili.com/video/BV1CS4y1v7sQ",
           "cover_url": "http://i1.hdslb.com/bfs/archive/e1b5bfd132fceb0dc4b0e7b78c2f976e2f883ba0.png",
           "duration_sec": 115047,
-          "seed_pages": "all"
+          "seed_pages": "1-3"
         }
       ]
     },
@@ -100,18 +185,56 @@
       "id": "daily-speaking-3493130475145687",
       "source": "bilibili",
       "creator_id": "3493130475145687",
-      "display_name": "原声原味学英语",
+      "display_name": "YouTuber原声英语",
       "avatar_url": "https://i1.hdslb.com/bfs/face/cf320e62607f8830f3fee2d0f13c9fa31a54a71e.jpg",
       "profile_url": "https://space.bilibili.com/3493130475145687",
-      "blurb": "每日英语跟读 · 常用口语与生活例句",
+      "blurb": "美国人从小就说的英文 · 日常口语跟读",
       "videos": [
         {
           "bvid": "BV1Aw4m1k7qU",
-          "title": "美国人从小就说的英文100句｜每天1小时听英文One Hour English｜快速提升英语水平｜跟美国人学英语｜【从零开始学英语】出国后才发现人生必学英语口语",
+          "title": "美国人从小就说的英文100句",
           "watch_url": "https://www.bilibili.com/video/BV1Aw4m1k7qU",
           "cover_url": "http://i0.hdslb.com/bfs/archive/ffbbb1e47adbc6f95922efd6d20ecdd9ae0dd183.jpg",
           "duration_sec": 3020,
           "seed_pages": "all"
+        }
+      ]
+    },
+    {
+      "id": "friends-shadowing",
+      "source": "bilibili",
+      "creator_id": "3546778123111346",
+      "display_name": "万物棱镜",
+      "avatar_url": "https://i2.hdslb.com/bfs/face/46d3c4a47c3d94d0e089e6a3423ebb7198e81919.jpg",
+      "profile_url": "https://space.bilibili.com/3546778123111346",
+      "blurb": "看美剧学英语 · 《老友记》影子跟读精讲",
+      "videos": [
+        {
+          "bvid": "BV1phynYEEBx",
+          "title": "看美剧学英语【老友记】逐句讲解影子跟读",
+          "watch_url": "https://www.bilibili.com/video/BV1phynYEEBx",
+          "cover_url": "http://i0.hdslb.com/bfs/archive/dd2f2229213b2f776df25f29a9e1042ff565cc22.png",
+          "duration_sec": 57011,
+          "seed_pages": "1-3"
+        }
+      ]
+    },
+    {
+      "id": "minecraft-slow-english",
+      "source": "bilibili",
+      "creator_id": "496369622",
+      "display_name": "毒家翻译麦块同学",
+      "avatar_url": "https://i2.hdslb.com/bfs/face/a70e2d06ae31b14f3480cc2ba8dbe62e4b042419.jpg",
+      "profile_url": "https://space.bilibili.com/496369622",
+      "blurb": "慢速中英字幕 · 游戏情境学英语（分级故事感）",
+      "videos": [
+        {
+          "bvid": "BV1BwGKzbEF1",
+          "title": "我的世界英语课 #1：从零开始（中英字幕）",
+          "watch_url": "https://www.bilibili.com/video/BV1BwGKzbEF1",
+          "cover_url": "http://i2.hdslb.com/bfs/archive/3b5d5cc685b50ca54fbf1ca04963be3d48b0780d.jpg",
+          "duration_sec": 4317,
+          "seed_pages": "1-3"
         }
       ]
     },
@@ -122,8 +245,25 @@
       "display_name": "小默英语",
       "avatar_url": "https://i0.hdslb.com/bfs/baselabs/85fb232d3aaa51666291c5441be4a74b3c28deed.jpg",
       "profile_url": "https://space.bilibili.com/476820741",
-      "blurb": "英语学习推荐博主",
-      "videos": []
+      "blurb": "高频词 / 四级词 · 绿色护眼刷词",
+      "videos": [
+        {
+          "bvid": "BV15N411d7UT",
+          "title": "2000个可覆盖一般阅读86%的常用英语词汇",
+          "watch_url": "https://www.bilibili.com/video/BV15N411d7UT",
+          "cover_url": "http://i1.hdslb.com/bfs/archive/321a86a4f2ca999d0906c18ec45f4ae0b4c47177.jpg",
+          "duration_sec": 9534,
+          "seed_pages": "1-3"
+        },
+        {
+          "bvid": "BV1ui4y1x7CT",
+          "title": "70分钟1遍四级英语4500单词",
+          "watch_url": "https://www.bilibili.com/video/BV1ui4y1x7CT",
+          "cover_url": "http://i1.hdslb.com/bfs/archive/e94447ae730919894a1d36135dc69bfde613380b.jpg",
+          "duration_sec": 4220,
+          "seed_pages": "all"
+        }
+      ]
     }
   ]
 }

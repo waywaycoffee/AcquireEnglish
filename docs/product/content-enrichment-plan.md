@@ -81,9 +81,9 @@
 
 ## 建议执行顺序（你/协作时可勾）
 
-- [ ] **W1a** 选题：定 10–15 条 BV（合规教育向）写入 recommended + free_trial  
-- [ ] **W1b** ECS 跑字幕 seed + health check  
-- [ ] **W1c** 真机：新装 → 推荐/免费 → 跟读一条龙  
+- [x] **W1a** 选题：推荐轨扩到 13 个 UP / 15 条 BV；免费视频 5 条与推荐重叠并对齐 App 兜底  
+- [x] **W1b** ECS 已部署 JSON；官方软字幕多为 zh-only → 已 `enqueue_recommended_missing_gpu_subs`（需本机 5060 Ti `gpu_worker` 消化队列）；已有共享 EN：`BV1CS4y1v7sQ` / `BV127411n7nj` / `BV1gm411r7yz`  
+- [ ] **W1c** 真机：新装 → 推荐/免费 → 跟读一条龙（等 GPU 队列出若干 EN 后更佳）  
 - [ ] **W2** 3 本精选书封面 + TTS 预生成  
 - [ ] **W3** foundation 上传 ≥3 个 demo  
 - [ ] **W4** exam + gloss 扫一遍  

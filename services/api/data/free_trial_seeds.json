@@ -26,45 +26,17 @@
         }
       },
       {
-        "id": "bilibili:BV1gm411r7yz",
-        "title": "Pronunciation with Emma · 英音语调",
+        "id": "bilibili:BV12L4y1B7D2",
+        "title": "Sounds American · 美式音标（试看第1P）",
         "freeTrial": true,
         "defaultSeed": true,
         "kind": "bilibili",
-        "bvid": "BV1gm411r7yz",
+        "bvid": "BV12L4y1B7D2",
         "page": 1,
-        "watchUrl": "https://www.bilibili.com/video/BV1gm411r7yz?p=1",
+        "watchUrl": "https://www.bilibili.com/video/BV12L4y1B7D2?p=1",
         "learningPath": ["字幕", "分句精听", "跟读", "复习"],
         "ecs": {
-          "shared_subtitles": "shared_bilibili_subtitles for BV1gm411r7yz p1"
-        }
-      },
-      {
-        "id": "bilibili:BV1Aw4m1k7qU",
-        "title": "美国人从小就说的英文100句（试看第1P）",
-        "freeTrial": true,
-        "defaultSeed": true,
-        "kind": "bilibili",
-        "bvid": "BV1Aw4m1k7qU",
-        "page": 1,
-        "watchUrl": "https://www.bilibili.com/video/BV1Aw4m1k7qU?p=1",
-        "learningPath": ["字幕", "分句精听", "跟读", "复习"],
-        "ecs": {
-          "shared_subtitles": "shared_bilibili_subtitles for BV1Aw4m1k7qU p1"
-        }
-      },
-      {
-        "id": "bilibili:BV127411n7nj",
-        "title": "BBC官方音标教程（试看第1P）",
-        "freeTrial": true,
-        "defaultSeed": true,
-        "kind": "bilibili",
-        "bvid": "BV127411n7nj",
-        "page": 1,
-        "watchUrl": "https://www.bilibili.com/video/BV127411n7nj?p=1",
-        "learningPath": ["字幕", "分句精听", "跟读", "复习"],
-        "ecs": {
-          "shared_subtitles": "shared_bilibili_subtitles for BV127411n7nj p1"
+          "shared_subtitles": "shared_bilibili_subtitles for BV12L4y1B7D2 p1"
         }
       },
       {
@@ -79,6 +51,34 @@
         "learningPath": ["字幕", "分句精听", "跟读", "复习"],
         "ecs": {
           "shared_subtitles": "shared_bilibili_subtitles for BV1CS4y1v7sQ p1"
+        }
+      },
+      {
+        "id": "bilibili:BV1MN4dewEQZ",
+        "title": "英语播客初级版 · 磨耳朵（试看第1P）",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "bilibili",
+        "bvid": "BV1MN4dewEQZ",
+        "page": 1,
+        "watchUrl": "https://www.bilibili.com/video/BV1MN4dewEQZ?p=1",
+        "learningPath": ["字幕", "分句精听", "跟读", "复习"],
+        "ecs": {
+          "shared_subtitles": "shared_bilibili_subtitles for BV1MN4dewEQZ p1"
+        }
+      },
+      {
+        "id": "bilibili:BV1phynYEEBx",
+        "title": "老友记影子跟读（试看第1P）",
+        "freeTrial": true,
+        "defaultSeed": true,
+        "kind": "bilibili",
+        "bvid": "BV1phynYEEBx",
+        "page": 1,
+        "watchUrl": "https://www.bilibili.com/video/BV1phynYEEBx?p=1",
+        "learningPath": ["字幕", "分句精听", "跟读", "复习"],
+        "ecs": {
+          "shared_subtitles": "shared_bilibili_subtitles for BV1phynYEEBx p1"
         }
       }
     ],

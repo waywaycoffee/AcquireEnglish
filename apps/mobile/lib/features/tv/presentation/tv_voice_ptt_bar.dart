@@ -93,8 +93,8 @@ class TvVoicePttBarState extends ConsumerState<TvVoicePttBar> {
     if (mode != null) {
       _mode = mode;
     }
-    final String ref = widget.referenceEnglish.trim();
-    if (_mode == TvVoiceMode.shadowing && ref.isEmpty) {
+    final String reference = widget.referenceEnglish.trim();
+    if (_mode == TvVoiceMode.shadowing && reference.isEmpty) {
       setState(() => _status = '当前句没有英文字幕，无法跟读');
       return;
     }
@@ -211,12 +211,12 @@ class TvVoicePttBarState extends ConsumerState<TvVoicePttBar> {
 
   Future<void> _finishShadowing(String path) async {
     final LearningSettingsState settings = ref.read(learningSettingsProvider);
-    final String ref = widget.referenceEnglish.trim();
+    final String reference = widget.referenceEnglish.trim();
     if (settings.usesVoicePractice) {
       try {
         final VoiceShadowResult result = await _voice.shadowSentence(
           rawBaseUrl: settings.voicePracticeServerUrl,
-          referenceText: ref,
+          referenceText: reference,
           audioPath: path,
         );
         if (!mounted) return;
