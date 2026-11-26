@@ -55,25 +55,50 @@ class LearningPreferencesNotifier extends Notifier<AcquirePreferencesDto> {
     }
   }
 
-  Future<void> save(AcquirePreferencesDto prefs) async {
+  Future<void> save(
+    AcquirePreferencesDto prefs, {
+    bool awaitCloud = true,
+    bool refreshFeed = true,
+  }) async {
     state = prefs;
     if (Hive.isBoxOpen('prefs')) {
       await Hive.box<String>(
         'prefs',
       ).put(_prefsKey, jsonEncode(prefs.toJson()));
     }
-    try {
-      final AcquireApiClient api = ref.read(acquireApiClientProvider);
-      state = await api.putPreferences(prefs);
-      if (Hive.isBoxOpen('prefs')) {
-        await Hive.box<String>(
-          'prefs',
-        ).put(_prefsKey, jsonEncode(state.toJson()));
+    Future<void> pushCloud() async {
+      try {
+        final AcquireApiClient api = ref.read(acquireApiClientProvider);
+        final AcquirePreferencesDto remote = await api.putPreferences(prefs);
+        state = remote;
+        if (Hive.isBoxOpen('prefs')) {
+          await Hive.box<String>(
+            'prefs',
+          ).put(_prefsKey, jsonEncode(state.toJson()));
+        }
+      } catch (_) {
+        // Keep local prefs when offline.
       }
-    } catch (_) {
-      // Keep local prefs when offline.
     }
-    await ref.read(dailyFeedProvider.notifier).refresh(force: true);
+
+    if (awaitCloud) {
+      await pushCloud();
+    } else {
+      // Onboarding / first-open must not block UI on network.
+      // ignore: unawaited_futures
+      pushCloud();
+    }
+    if (!refreshFeed) {
+      return;
+    }
+    final Future<void> feed =
+        ref.read(dailyFeedProvider.notifier).refresh(force: true);
+    if (awaitCloud) {
+      await feed;
+    } else {
+      // ignore: unawaited_futures
+      feed;
+    }
   }
 
   Future<void> pullRemote() async {

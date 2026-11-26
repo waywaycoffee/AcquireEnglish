@@ -165,6 +165,7 @@ class _FirstOpenOnboardingScreenState
                   ),
                   _AbilityPage(
                     profile: profile,
+                    busy: _busy,
                     onChanged: (OnboardingProfile next) => ref
                         .read(onboardingProvider.notifier)
                         .update((_) => next),
@@ -455,12 +456,14 @@ class _AbilityPage extends StatelessWidget {
     required this.onChanged,
     required this.onBack,
     required this.onNext,
+    this.busy = false,
   });
 
   final OnboardingProfile profile;
   final ValueChanged<OnboardingProfile> onChanged;
   final VoidCallback onBack;
   final VoidCallback? onNext;
+  final bool busy;
 
   @override
   Widget build(BuildContext context) {
@@ -523,7 +526,7 @@ class _AbilityPage extends StatelessWidget {
             const SizedBox(width: 12),
             Expanded(
               child: HubChunkyButton(
-                label: '查看我的起点',
+                label: busy ? '准备中…' : '查看我的起点',
                 onPressed: onNext,
               ),
             ),

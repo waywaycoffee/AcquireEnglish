@@ -76,6 +76,8 @@ class OnboardingNotifier extends Notifier<OnboardingProfile> {
     await _persist(done);
 
     final AcquirePreferencesDto current = ref.read(learningPreferencesProvider);
+    // Persist locally and return immediately; cloud prefs + daily feed
+    // (Bilibili search) continue in the background so「查看我的起点」isn't stuck.
     await ref.read(learningPreferencesProvider.notifier).save(
           current.copyWith(
             level: done.resolvedLevel,
@@ -86,10 +88,9 @@ class OnboardingNotifier extends Notifier<OnboardingProfile> {
               keepTags: current.tags,
             ),
           ),
+          awaitCloud: false,
+          refreshFeed: true,
         );
-    // Exam focus no longer flips a separate study mode; user picks a
-    // family later under unified acquisition via /exam/select.
-
   }
 
   Future<void> skipForNow() async {
