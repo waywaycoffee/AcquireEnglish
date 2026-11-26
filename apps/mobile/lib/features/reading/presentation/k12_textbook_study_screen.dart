@@ -4,7 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:media_kit/media_kit.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:pdfrx/pdfrx.dart';
 
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -73,7 +73,7 @@ class _K12TextbookStudyScreenState
       if (raw == null) {
         setState(() {
           _loading = false;
-          _error = '服务器上还没有这本教材的音频包';
+          _error = '服务器上还没有这本教材的 PDF / 音频包';
         });
         return;
       }
@@ -132,25 +132,44 @@ class _K12TextbookStudyScreenState
     await _play(lesson);
   }
 
-  Future<void> _openPdf() async {
-    final String url = _book?.pdfUrl.trim() ?? '';
-    if (url.isEmpty) return;
-    final Uri? uri = Uri.tryParse(url);
-    if (uri == null) return;
-    final bool ok = await launchUrl(uri, mode: LaunchMode.externalApplication);
-    if (!ok && mounted) {
+  Future<void> _showAudioSheet() async {
+    final K12TextbookMedia? book = _book;
+    if (book == null || book.lessons.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('无法打开课本 PDF')),
+        const SnackBar(content: Text('这本教材还没有课次音频')),
       );
+      return;
     }
+    await showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppDesignTokens.appWhite,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (BuildContext context) {
+        return SafeArea(
+          child: SizedBox(
+            height: MediaQuery.sizeOf(context).height * 0.72,
+            child: _AudioLessonList(
+              book: book,
+              caching: _caching,
+              playingSeq: _playingSeq,
+              playing: _playing,
+              onToggle: _toggle,
+            ),
+          ),
+        );
+      },
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     final K12TextbookMedia? book = _book;
-    final String title = book?.displayTitle.isNotEmpty == true
+    final String title = (book?.displayTitle.isNotEmpty ?? false)
         ? book!.displayTitle
         : (widget.catalogTitle.isEmpty ? '英语教材' : widget.catalogTitle);
+    final String pdfUrl = book?.pdfUrl.trim() ?? '';
+    final Uri? pdfUri = pdfUrl.isEmpty ? null : Uri.tryParse(pdfUrl);
 
     return Scaffold(
       backgroundColor: AppDesignTokens.softWhite,
@@ -158,8 +177,14 @@ class _K12TextbookStudyScreenState
         backgroundColor: AppDesignTokens.softWhite,
         title: Text(title),
         actions: <Widget>[
-          if (book != null && book.pdfUrl.isNotEmpty)
-            TextButton(onPressed: _openPdf, child: const Text('打开 PDF')),
+          if (book != null && book.lessons.isNotEmpty)
+            TextButton(
+              onPressed: _showAudioSheet,
+              child: Text(
+                '课次音频',
+                style: TextStyle(color: AppDesignTokens.textPrimary),
+              ),
+            ),
         ],
       ),
       body: _loading
@@ -168,18 +193,116 @@ class _K12TextbookStudyScreenState
           ? Center(
               child: Padding(
                 padding: const EdgeInsets.all(24),
-                child: Text(
-                  _error!,
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: AppDesignTokens.textPrimary),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: <Widget>[
+                    Text(
+                      _error!,
+                      textAlign: TextAlign.center,
+                      style: TextStyle(color: AppDesignTokens.textPrimary),
+                    ),
+                    const SizedBox(height: 16),
+                    FilledButton(
+                      onPressed: _load,
+                      child: const Text('重试'),
+                    ),
+                  ],
                 ),
               ),
             )
-          : _buildBody(book!),
+          : pdfUri == null
+          ? Center(
+              child: Text(
+                '这本教材还没有 PDF',
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+            )
+          : PdfViewer.uri(
+              pdfUri,
+              params: PdfViewerParams(
+                backgroundColor: AppDesignTokens.softWhite,
+                loadingBannerBuilder:
+                    (
+                      BuildContext context,
+                      int bytesDownloaded,
+                      int? totalBytes,
+                    ) {
+                      final double? progress = totalBytes == null || totalBytes <= 0
+                          ? null
+                          : bytesDownloaded / totalBytes;
+                      return Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: <Widget>[
+                            SizedBox(
+                              width: 160,
+                              child: LinearProgressIndicator(value: progress),
+                            ),
+                            const SizedBox(height: 12),
+                            Text(
+                              '正在加载课本 PDF…',
+                              style: TextStyle(
+                                color: AppDesignTokens.textSecondary,
+                              ),
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                errorBannerBuilder:
+                    (
+                      BuildContext context,
+                      Object error,
+                      StackTrace? stackTrace,
+                      PdfDocumentRef documentRef,
+                    ) {
+                      return Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Text(
+                            'PDF 打开失败：$error',
+                            textAlign: TextAlign.center,
+                            style: TextStyle(
+                              color: AppDesignTokens.textPrimary,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+              ),
+            ),
+      floatingActionButton: book != null && book.lessons.isNotEmpty
+          ? FloatingActionButton.extended(
+              onPressed: _showAudioSheet,
+              backgroundColor: AppDesignTokens.brandGreen,
+              foregroundColor: AppDesignTokens.onAccent,
+              icon: Icon(
+                _playing ? Icons.pause_rounded : Icons.headphones_rounded,
+              ),
+              label: Text(_playing ? '播放中' : '听课'),
+            )
+          : null,
     );
   }
+}
 
-  Widget _buildBody(K12TextbookMedia book) {
+class _AudioLessonList extends StatelessWidget {
+  const _AudioLessonList({
+    required this.book,
+    required this.caching,
+    required this.playingSeq,
+    required this.playing,
+    required this.onToggle,
+  });
+
+  final K12TextbookMedia book;
+  final bool caching;
+  final int? playingSeq;
+  final bool playing;
+  final Future<void> Function(K12TextbookLesson lesson) onToggle;
+
+  @override
+  Widget build(BuildContext context) {
     final Map<String, List<K12TextbookLesson>> grouped =
         <String, List<K12TextbookLesson>>{};
     for (final K12TextbookLesson lesson in book.lessons) {
@@ -188,19 +311,22 @@ class _K12TextbookStudyScreenState
     }
 
     return ListView(
-      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      padding: const EdgeInsets.fromLTRB(16, 0, 16, 28),
       children: <Widget>[
         Text(
           '${book.edition} · ${book.volume} · ${book.lessons.length} 课音频',
-          style: TextStyle(color: AppDesignTokens.textSecondary),
+          style: TextStyle(
+            color: AppDesignTokens.textPrimary,
+            fontWeight: FontWeight.w800,
+            fontSize: 16,
+          ),
         ),
-        const SizedBox(height: 8),
+        const SizedBox(height: 6),
         Text(
-          '点课程会下载配套 MP3 到本机后再播放（音频来自教材网盘，不占服务器盘）。'
-          '点读（OCR→翻译→朗读）下一阶段接入。',
+          '点课程会下载配套 MP3 到本机后再播放。',
           style: TextStyle(color: AppDesignTokens.textSecondary, height: 1.35),
         ),
-        if (_caching) ...<Widget>[
+        if (caching) ...<Widget>[
           const SizedBox(height: 12),
           const LinearProgressIndicator(minHeight: 2),
           const SizedBox(height: 4),
@@ -209,7 +335,7 @@ class _K12TextbookStudyScreenState
             style: TextStyle(color: AppDesignTokens.textSecondary, fontSize: 12),
           ),
         ],
-        const SizedBox(height: 16),
+        const SizedBox(height: 12),
         for (final MapEntry<String, List<K12TextbookLesson>> entry
             in grouped.entries) ...<Widget>[
           Padding(
@@ -218,7 +344,7 @@ class _K12TextbookStudyScreenState
               entry.key,
               style: TextStyle(
                 color: AppDesignTokens.textPrimary,
-                fontSize: 16,
+                fontSize: 15,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -236,13 +362,13 @@ class _K12TextbookStudyScreenState
                   style: TextStyle(color: AppDesignTokens.textSecondary),
                 ),
                 trailing: Icon(
-                  _playingSeq == lesson.seq && _playing
+                  playingSeq == lesson.seq && playing
                       ? Icons.pause_circle_filled
                       : Icons.play_circle_fill,
                   color: AppDesignTokens.brandGreen,
                   size: 32,
                 ),
-                onTap: () => unawaited(_toggle(lesson)),
+                onTap: () => unawaited(onToggle(lesson)),
               ),
             ),
         ],
