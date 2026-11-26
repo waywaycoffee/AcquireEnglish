@@ -5,6 +5,8 @@ import 'package:go_router/go_router.dart';
 import '../../../../router/app_router.dart';
 import '../../../authentication/presentation/account_storage.dart';
 import '../../../daily_path/data/today_journey_store.dart';
+import '../../../learner_model/domain/learner_skill_profile.dart';
+import '../../../learner_model/domain/learning_recommendation.dart';
 import '../../../library/presentation/library_catalog_provider.dart';
 import '../../../library/presentation/library_mock_data.dart';
 import '../../../onboarding/domain/onboarding_profile.dart';
@@ -256,6 +258,75 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
       levelOverride: level,
     );
     final bool hasVideo = recommended.route.startsWith('/episodes/');
+    final bool continuingVideo =
+        resume != null &&
+        !resume.episode.videoMissing &&
+        ref.watch(lastLearningEpisodeProvider) == resume.episode.id;
+    final bool purposeful = continuingVideo || book != null;
+    final LearnerSkillProfile skillProfile = LearnerSkillProfile.initial(
+      priorBand: level,
+    );
+    String asBand(String raw, String fallback) {
+      final String upper = raw.trim().toUpperCase();
+      return kLearnerBands.contains(upper) ? upper : fallback;
+    }
+
+    final List<LearnCandidate> candidates = <LearnCandidate>[
+      LearnCandidate(
+        id: 'vocab-next',
+        title: '背一组适合现在的词',
+        route: '/review/session?kind=word',
+        module: LearnModule.vocab,
+        contentBand: skillProfile.estimate(LearnerSkill.vocab).band,
+        interestMatch: profile.focusId == 'vocab',
+      ),
+      if (hasVideo)
+        LearnCandidate(
+          id: recommended.route,
+          title: recommended.title,
+          route: recommended.route,
+          module: LearnModule.video,
+          contentBand: asBand(
+            level,
+            skillProfile.recommendationEstimate(LearnerSkill.listening).band,
+          ),
+          interestMatch: true,
+          pursuit:
+              continuingVideo &&
+              recommended.route == videoRoute(resume.episode),
+        ),
+      if (continuingVideo &&
+          (recommended.route != videoRoute(resume.episode)))
+        LearnCandidate(
+          id: videoRoute(resume.episode),
+          title: resume.episode.title,
+          route: videoRoute(resume.episode),
+          module: LearnModule.video,
+          contentBand: skillProfile
+              .recommendationEstimate(LearnerSkill.listening)
+              .band,
+          pursuit: true,
+        ),
+      LearnCandidate(
+        id: book?.id ?? 'reading-next',
+        title: book?.displayTitle ?? (readingSuggestion?.title ?? '选一篇来读'),
+        route: book == null
+            ? (readingSuggestion?.route ?? '/reading')
+            : '/reading/${Uri.encodeComponent(book.id)}',
+        module: LearnModule.reading,
+        contentBand: asBand(
+          book?.level ?? '',
+          skillProfile.recommendationEstimate(LearnerSkill.reading).band,
+        ),
+        pursuit: book != null,
+      ),
+    ];
+    final List<ScoredLearnCandidate> ranked = rankLearnCandidates(
+      candidates: candidates,
+      profile: skillProfile,
+    );
+    final ScoredLearnCandidate? aimless = pickAimlessNext(ranked);
+    final List<ScoredLearnCandidate> shortlist = purposefulShortlist(ranked);
 
     void open(String route, String title) =>
         Navigator.of(context).pop((route: route, title: title));
@@ -313,6 +384,25 @@ class _TodayActivityPickerState extends ConsumerState<_TodayActivityPicker> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
             ),
+            if (!purposeful && aimless != null)
+              activity(
+                Icons.arrow_forward_rounded,
+                '下一步 · ${aimless.candidate.title}',
+                aimless.reason,
+                aimless.candidate.route,
+              )
+            else if (purposeful)
+              for (int i = 0; i < shortlist.length; i++)
+                activity(
+                  i == 0 ? Icons.star_rounded : Icons.swap_horiz_rounded,
+                  i == 0
+                      ? '最可能 · ${shortlist[i].candidate.title}'
+                      : shortlist[i].candidate.title,
+                  shortlist[i].slightlyHard
+                      ? '稍难 · ${shortlist[i].reason}'
+                      : shortlist[i].reason,
+                  shortlist[i].candidate.route,
+                ),
             if (hasVideo)
               Dismissible(
                 key: ValueKey<String>(recommended.route),
