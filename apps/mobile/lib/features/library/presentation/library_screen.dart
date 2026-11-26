@@ -2169,7 +2169,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         );
       } else if (netdiskStream) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('美剧将先下载本集再播，保证横屏流畅')),
+          const SnackBar(content: Text('美剧默认竖屏播放，需要时可横屏或预约下载')),
         );
       }
       await context.pushNamed<void>(

@@ -896,27 +896,10 @@ bool isNetdiskCourse(LibraryCourseData course) {
   return false;
 }
 
-/// 美剧 / 网盘剧集：默认横屏全屏内嵌在线播，不先下本地。
+/// Formerly auto-opened landscape for netdisk drama; kept for call-site
+/// compatibility. Portrait is the default — user rotates / taps fullscreen.
 bool prefersNetdiskLandscapePlayback(LibraryCourseData? course) {
-  if (course == null) {
-    return false;
-  }
-  if (!isNetdiskCourse(course)) {
-    return false;
-  }
-  // Multi-episode series, or explicitly tagged as series / drama.
-  if (course.id.startsWith('netdisk-series-')) {
-    return true;
-  }
-  if (course.episodes.length > 1) {
-    return true;
-  }
-  final String hay =
-      '${course.category} ${course.sourceLabel} ${course.title}'.toLowerCase();
-  return hay.contains('series') ||
-      hay.contains('美剧') ||
-      hay.contains('drama') ||
-      hay.contains('剧集');
+  return false;
 }
 
 bool isRemoteStreamVideoAsset(String? path) {

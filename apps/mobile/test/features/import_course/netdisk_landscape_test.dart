@@ -41,24 +41,24 @@ LibraryCourseData _course({
 }
 
 void main() {
-  test('netdisk series prefers landscape stream playback', () {
+  test('netdisk series stays portrait by default', () {
     final LibraryCourseData series = _course(
       id: 'netdisk-series-friends',
       episodeCount: 8,
       title: 'Friends S01',
     );
     expect(isNetdiskCourse(series), isTrue);
-    expect(prefersNetdiskLandscapePlayback(series), isTrue);
+    expect(prefersNetdiskLandscapePlayback(series), isFalse);
     expect(isRemoteStreamVideoAsset(series.episodes.first.videoAsset), isTrue);
   });
 
-  test('single netdisk clip titled 美剧 also prefers landscape', () {
+  test('single netdisk clip titled 美剧 also stays portrait', () {
     final LibraryCourseData drama = _course(
       id: 'link-42',
       category: 'baidu_netdisk',
       title: '美剧精听 · Pilot',
     );
-    expect(prefersNetdiskLandscapePlayback(drama), isTrue);
+    expect(prefersNetdiskLandscapePlayback(drama), isFalse);
   });
 
   test('bilibili course does not prefer netdisk landscape', () {

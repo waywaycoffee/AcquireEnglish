@@ -3741,8 +3741,9 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
     final Size window = MediaQuery.sizeOf(context);
     final bool wideIosPlayer = Theme.of(context).platform == TargetPlatform.iOS &&
         window.width >= 800 && window.width > window.height;
-    final bool landscapeFirst = wideIosPlayer || widget.autoOpenFullscreen ||
-        prefersNetdiskLandscapePlayback(course);
+    // Drama/netdisk stay portrait; only iPad-wide or explicit fullscreen=1.
+    final bool landscapeFirst =
+        wideIosPlayer || widget.autoOpenFullscreen;
     // Wait until video is ready (or failed) so landscape does not open on a
     // frozen videoReady=false black surface while audio already plays.
     if (landscapeFirst &&
