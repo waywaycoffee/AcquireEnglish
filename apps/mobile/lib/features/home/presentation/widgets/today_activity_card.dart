@@ -559,7 +559,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               profile.recommendationEstimate(LearnerSkill.listening).band,
             ),
             interestMatch: onboarding.focusId == 'video' ||
-                onboarding.focusId.isEmpty,
+                (onboarding.focusId?.isEmpty ?? true),
             notInterested: feedback.isHidden(video.route),
           ),
         );

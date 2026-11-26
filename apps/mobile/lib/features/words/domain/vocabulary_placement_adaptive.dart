@@ -92,7 +92,7 @@ class AdaptivePlacementEngine {
   final double _startEstimate;
   final PlacementBayesianScorer _scorer;
 
-  double estimate;
+  late double estimate;
   int asked = 0;
   final Set<String> _usedWords = <String>{};
   double? _prevEstimate;
