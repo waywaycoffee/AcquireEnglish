@@ -38,6 +38,15 @@ _UNIT_BODY_RE = re.compile(
     r"^Unit\s+([A-Za-z0-9]+)(?:\s*[_\s]\s*([ABC]))?\s*(.*)$",
     re.IGNORECASE | re.DOTALL,
 )
+# Junior Go for it: Starter Unit 1 Section A, 2a / Unit 2 Section B, 1b
+_JUNIOR_UNIT_RE = re.compile(
+    r"^(?:Starter\s+)?Unit\s+(\d+)\s*(.*)$",
+    re.IGNORECASE | re.DOTALL,
+)
+_SECTION_RE = re.compile(
+    r"Section\s+([AB])\s*,?\s*(.*)$",
+    re.IGNORECASE | re.DOTALL,
+)
 _LETTERS_RE = re.compile(
     r"^Letters\s+and\s+Sounds\s*(.*)$",
     re.IGNORECASE | re.DOTALL,
@@ -141,6 +150,36 @@ def _from_beijing(seq: int, mid: str, rest: str, raw: str) -> TextbookAudioTrack
 
 def _from_pep(seq: int, body: str, raw: str) -> TextbookAudioTrack:
     body = _clean(body)
+
+    junior = _JUNIOR_UNIT_RE.match(body)
+    if junior and ("section" in body.lower() or body.lower().startswith("starter")):
+        unit = int(junior.group(1))
+        rest = _clean(junior.group(2) or "")
+        section = ""
+        sec = _SECTION_RE.match(rest)
+        if sec:
+            section = sec.group(1).upper()
+            rest = _clean(sec.group(2) or "")
+        kind = "starter" if body.lower().startswith("starter") else "section"
+        if "pronunciation" in body.lower():
+            kind = "pronunciation"
+        unit_label = (
+            ("Starter " if body.lower().startswith("starter") else "")
+            + f"Unit {unit}"
+            + (f" Section {section}" if section else "")
+        )
+        return TextbookAudioTrack(
+            seq=seq,
+            unit=unit,
+            unit_label=unit_label,
+            lesson=None,
+            kind=kind,
+            title=rest or unit_label,
+            source_name=raw,
+            section=section,
+            audio_key=_audio_key(seq, unit, section or kind, None),
+        )
+
     match = _UNIT_BODY_RE.match(body)
     if not match:
         return TextbookAudioTrack(

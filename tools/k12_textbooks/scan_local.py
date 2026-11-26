@@ -174,16 +174,35 @@ def _looks_like_english_textbook_path(parts: list[str]) -> bool:
         return True
     # Local dumps often omit the「英语」layer: 小学/人教版（PEP）/三年级/上册
     markers = ("人教", "外研", "译林", "北京版", "北师", "冀教", "PEP", "Go for it")
-    return any(marker in joined for marker in markers)
+    if any(marker in joined for marker in markers):
+        return True
+    # Flat junior dump: 初中/七年级/上册 (人教 Go for it, no edition folder)
+    if parts and parts[0] == "初中" and any(g in parts for g in _GRADE_MAP):
+        return True
+    if parts and parts[0] == "高中" and any(g in parts for g in _GRADE_MAP):
+        return True
+    return False
 
 
-def _edition_folder_from_parts(parts: list[str]) -> str:
+def _edition_folder_from_parts(parts: list[str], folder: Path | None = None) -> str:
     if "英语" in parts:
         idx = parts.index("英语")
         return parts[idx + 1] if idx + 1 < len(parts) else (parts[-1] if parts else "")
     # 小学 / {edition} / 三年级 / …
     if parts and parts[0] in ("小学", "初中", "高中") and len(parts) >= 2:
-        return parts[1]
+        second = parts[1]
+        if second in _GRADE_MAP:
+            # Flat layout without edition name — infer 人教 from PDF when possible.
+            if folder is not None:
+                pdf = _pick_pdf(folder)
+                if pdf is not None and ("英语" in pdf.name or "English" in pdf.name):
+                    if parts[0] == "初中":
+                        return "人教版"
+                    if parts[0] == "高中":
+                        return "人教版"
+                    return "人教版"
+            return "人教版" if parts[0] in ("初中", "高中") else second
+        return second
     return parts[0] if parts else ""
 
 
@@ -221,7 +240,7 @@ def scan_local_tree(
             continue
 
         stage_dir = parts[0] if parts else ""
-        edition_folder = _edition_folder_from_parts(parts)
+        edition_folder = _edition_folder_from_parts(parts, folder)
         edition_key, edition, publisher, score, hot = _match_edition(edition_folder)
         if pep_only and "人教" not in edition_folder and "PEP" not in edition_folder.upper():
             continue
@@ -231,6 +250,16 @@ def scan_local_tree(
         grade_info = _grade_from_parts(parts)
         volume_info = _volume_from_parts(parts)
         notes: list[str] = []
+        if stage_dir == "初中" and edition_folder == "人教版":
+            # Prefer Go-for-it id for junior 人教 flat dumps.
+            edition_key, edition, publisher, score, hot = (
+                "pep-go",
+                "人教版 Go for it!",
+                "人民教育出版社",
+                95,
+                True,
+            )
+            notes.append("路径为初中扁平目录，按人教 Go for it! 入库")
         parseable = sum(1 for p in mp3s if parse_audio_filename(p.name))
         if parseable < len(mp3s):
             notes.append(f"有 {len(mp3s) - parseable} 个 MP3 文件名未能按课次解析")
