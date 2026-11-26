@@ -34,6 +34,7 @@ import '../../learner_model/presentation/learner_skill_profile_provider.dart';
 import '../../sync/data/study_activity_service.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../words/domain/foundation_media.dart';
+import '../../words/data/offline_word_dictionary.dart';
 import '../../words/domain/syllabus_book.dart';
 import '../../words/domain/vocab_entry.dart';
 import '../../words/domain/word_morphology.dart';
@@ -129,6 +130,10 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   final Map<String, int> _freshPasses = <String, int>{};
   String? _passStorageKey;
   final Map<String, List<String>> _choices = <String, List<String>>{};
+  final Map<String, String> _reviewMeanings = <String, String>{};
+  final Set<String> _requestedMeanings = <String>{};
+  final Set<String> _prefetchedAudio = <String>{};
+  final OfflineWordDictionary _reviewDictionary = OfflineWordDictionary();
   String? _playedWord;
   bool _retryWord = false;
   bool _forward = true;
@@ -296,6 +301,20 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
 
   @override
   Widget build(BuildContext context) {
+    ref.listen<MicroReviewUiState>(microReviewProvider, (
+      MicroReviewUiState? prev,
+      MicroReviewUiState next,
+    ) {
+      final String? msg = next.message;
+      if (msg == null || msg == prev?.message) return;
+      if (msg == 'open_review') {
+        handleMicroReviewOpenMessage(context, ref);
+        return;
+      }
+      if (msg.startsWith('本轮')) {
+        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+      }
+    });
     ref.listen<String>(studyAccountProvider, (String? previous, String next) {
       if (previous != null && previous != next) {
         _stopSpeech();
@@ -760,11 +779,18 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         : const Duration(milliseconds: 220);
 
     final ReviewSource? visible = finished ? null : byKey[_currentKey];
-    if (visible?.kind == ReviewKind.word && _playedWord != visible?.key) {
-      _playedWord = visible!.key;
+    if (visible != null && visible.key != _playedWord) {
+      _playedWord = visible.key;
+      final List<ReviewSource> upcoming = <ReviewSource>[
+        visible,
+        if (index >= 0 && index + 1 < keys.length) byKey[keys[index + 1]]!,
+      ];
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _currentKey == visible.key) {
-          // Prefetch Aliyun URL, then play — cuts the “wait then cut off” feel.
+        if (!mounted) return;
+        for (final ReviewSource source in upcoming) {
+          if (source.kind == ReviewKind.word) _prepareReviewWord(source);
+        }
+        if (visible.kind == ReviewKind.word && _currentKey == visible.key) {
           unawaited(_playWord(visible));
         }
       });
@@ -780,9 +806,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               compact ? 12 : 32,
               16,
               compact ? 12 : 32,
-              // Leave room for the sticky prev/next bar so grade buttons
-              // remain hittable after ensureVisible scrolls.
-              96,
+              compact ? 16 : 32,
             ),
             children: <Widget>[
               Center(
@@ -1265,20 +1289,6 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         ? '继续今天的记忆练习'
         : '把学过的，真正记住';
     final MicroReviewUiState micro = ref.watch(microReviewProvider);
-    ref.listen<MicroReviewUiState>(microReviewProvider, (
-      MicroReviewUiState? prev,
-      MicroReviewUiState next,
-    ) {
-      final String? msg = next.message;
-      if (msg == null || msg == prev?.message) return;
-      if (msg == 'open_review') {
-        handleMicroReviewOpenMessage(context, ref);
-        return;
-      }
-      if (msg.startsWith('本轮')) {
-        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
-      }
-    });
     return _ReviewSurface(
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -1595,6 +1605,9 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     final ReviewSource source = _displaySource(rawSource);
     final WordReviewSettings options = ref.watch(wordReviewSettingsProvider);
     final bool word = source.kind == ReviewKind.word;
+    final String answer = source.answer.trim().isNotEmpty
+        ? source.answer
+        : (_reviewMeanings[source.question] ?? '');
     final WordPracticeMode mode = _currentMode(source);
     final bool speakStage = word && mode == WordPracticeMode.speak;
     final bool listenStage = word && mode == WordPracticeMode.listen;
@@ -1614,7 +1627,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         : word &&
                 !speakStage &&
                 options.recallStyle == WordRecallStyle.multipleChoice
-            ? _choices.putIfAbsent(source.key, () => _meaningChoices(source))
+            ? _choices.putIfAbsent(source.key, () => _meaningChoices(source, answer))
             : const <String>[];
     final bool choiceMode = choices.length >= 2;
     final int? passes = _freshPasses[source.key];
@@ -1655,7 +1668,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     return _ReviewSurface(
       child: ConstrainedBox(
         constraints: BoxConstraints(
-          minHeight: MediaQuery.sizeOf(context).width < 600 ? 320 : 380,
+          minHeight: word ? 0 : (MediaQuery.sizeOf(context).width < 600 ? 320 : 380),
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -1730,24 +1743,34 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                     (source.episodeId?.trim().isNotEmpty ?? false) ||
                     source.sourceLabel.trim().isNotEmpty)) ...<Widget>[
               const SizedBox(height: 14),
-              ReviewSourceContextPanel(
-                source: source,
-                word: source.question,
-                speaking: _speaking,
-                compact: !_revealed,
-                // Cloze / listen / contrast: keep source + clip, hide sentence.
-                hideSentence: !_revealed &&
-                    (useCloze || listenStage || contrastStage),
-                onSpeakSentence: () => _speakSource(source),
-                onSelectRelatedSource: (ReviewSourceLink link) {
-                  setState(() {
-                    final String? episode = link.episodeId?.trim();
-                    _contextPick[rawSource.key] =
-                        (episode != null && episode.isNotEmpty)
-                            ? episode
-                            : link.label;
-                  });
-                },
+              Material(
+                type: MaterialType.transparency,
+                child: ExpansionTile(
+                key: ValueKey<String>('review-context-${source.key}'),
+                tilePadding: EdgeInsets.zero,
+                initiallyExpanded: MediaQuery.sizeOf(context).width >= 600,
+                title: const Text('原句与来源'),
+                children: <Widget>[
+                  ReviewSourceContextPanel(
+                    source: source,
+                    word: source.question,
+                    speaking: _speaking,
+                    compact: true,
+                    hideSentence: !_revealed &&
+                        (useCloze || listenStage || contrastStage),
+                    onSpeakSentence: () => _speakSource(source),
+                    onSelectRelatedSource: (ReviewSourceLink link) {
+                      setState(() {
+                        final String? episode = link.episodeId?.trim();
+                        _contextPick[rawSource.key] =
+                            (episode != null && episode.isNotEmpty)
+                                ? episode
+                                : link.label;
+                      });
+                    },
+                  ),
+                ],
+                ),
               ),
             ],
             if (word && (_revealed || (!listenStage && !useCloze && !contrastStage)))
@@ -1933,7 +1956,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 for (final String choice in choices)
                   OutlinedButton(
                     onPressed: () {
-                      if (choice == source.answer.trim()) {
+                      if (choice == answer.trim()) {
                         setState(() => _revealed = true);
                       } else if (skill) {
                         unawaited(
@@ -1981,12 +2004,12 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               const Divider(height: 24),
               // Headword + phonics live in the top surface when revealed.
               Text(
-                source.answer.trim().isEmpty
-                    ? '暂无单词释义，可以结合下方原句回忆，或在单词本补充。'
+                answer.trim().isEmpty
+                    ? '暂未找到中文释义'
                     : source.kind != ReviewKind.word &&
                           source.answer == source.english
                     ? formatSubtitleLetterCase(source.answer, letterCase)
-                    : source.answer,
+                    : answer,
                 style: TextStyle(
                   fontSize: 23,
                   height: 1.5,
@@ -2948,8 +2971,38 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     });
   }
 
-  List<String> _meaningChoices(ReviewSource source) {
-    final String answer = source.answer.trim();
+  void _prepareReviewWord(ReviewSource source) {
+    final String word = source.question;
+    if (_prefetchedAudio.add(word)) {
+      final resolver = ref.read(wordPronunciationServiceProvider).cloudAudioResolver;
+      if (resolver != null) unawaited(resolver(word));
+    }
+    if (source.answer.trim().isEmpty && _requestedMeanings.add(word)) {
+      unawaited(_loadReviewMeaning(word));
+    }
+  }
+
+  Future<void> _loadReviewMeaning(String word) async {
+    try {
+      String meaning = (await _reviewDictionary.lookup(word))?.translation.trim() ?? '';
+      if (!mounted) return;
+      if (meaning.isEmpty) {
+        final WordLookupEntry entry = await ref.read(wordLookupServiceProvider).lookupWord(
+          rawWord: word,
+          settings: ref.read(learningSettingsProvider),
+        );
+        if (entry.sourceLabel != '未配置') meaning = entry.definitionCn.trim();
+      }
+      if (!mounted || meaning.isEmpty) return;
+      setState(() {
+        _reviewMeanings[word] = meaning;
+        _choices.removeWhere((String key, List<String> choices) => choices.isEmpty);
+      });
+    } catch (_) {}
+  }
+
+  List<String> _meaningChoices(ReviewSource source, String rawAnswer) {
+    final String answer = rawAnswer.trim();
     if (answer.isEmpty) return const <String>[];
     final Set<String> distractors = ref
         .read(reviewSourcesProvider)
@@ -3081,31 +3134,26 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       children: <Widget>[
         ColoredVowelHeadword(
           word: word,
-          showLegend: true,
+          showLegend: open,
           onTap: () => setState(() => _phonicsOpen = !_phonicsOpen),
         ),
-        const SizedBox(height: 10),
-        PhonicsSyllableBlocks(
+        if (open) ...<Widget>[
+          const SizedBox(height: 10),
+          PhonicsSyllableBlocks(
           word: word,
           compact: !open,
           onSegmentTap: (PhonicsSegment seg) {
             unawaited(_speak(seg.text));
             if (!_phonicsOpen) setState(() => _phonicsOpen = true);
           },
-        ),
-        if (open) ...<Widget>[
+          ),
           const SizedBox(height: 12),
           PhonicsCoachPanel(
             word: word,
             speaking: _speaking,
             onSpeak: (String text) => _speak(text),
           ),
-        ] else
-          TextButton.icon(
-            onPressed: () => setState(() => _phonicsOpen = true),
-            icon: const Icon(Icons.spellcheck_rounded, size: 18),
-            label: const Text('展开自然拼读引导'),
-          ),
+        ],
       ],
     );
   }

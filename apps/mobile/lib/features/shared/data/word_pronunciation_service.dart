@@ -94,6 +94,7 @@ class WordPronunciationService {
 
   Player? _recordedPlayer;
   Completer<bool>? _recordedCompletion;
+  int _speechGeneration = 0;
 
   Future<void> speak(
     String text, {
@@ -114,7 +115,10 @@ class WordPronunciationService {
     }
 
     // One tap must never layer a new utterance on top of an in-flight one.
-    await stop();
+    final Future<void> stopping = stop();
+    final int generation = _speechGeneration;
+    await stopping;
+    if (generation != _speechGeneration) return;
 
     final double effectiveRate = (rate ?? selectedRate).clamp(0.5, 1.8);
 
@@ -131,6 +135,7 @@ class WordPronunciationService {
         cloudAudioResolver != null && (preferAliyunCloud || forceCloud);
     if (tryCloud) {
       final String? cloudUrl = await cloudAudioResolver!(normalizedText);
+      if (generation != _speechGeneration) return;
       if (cloudUrl != null &&
           cloudUrl.isNotEmpty &&
           // Keep natural CosyVoice pacing; rate only for on-device fallback.
@@ -148,12 +153,13 @@ class WordPronunciationService {
           '阿里云发音暂不可用，请确认已登录且服务器已配置配音。',
         );
       }
-    } else if (forceCloud && cloudAudioResolver == null) {
+    } else if (forceCloud && cloudAudioResolver == null && !allowSynthesisFallback) {
       throw const WordPronunciationException(
         '请先登录账号以使用阿里云真人音色。',
       );
     }
 
+    if (generation != _speechGeneration) return;
     if (!allowSynthesisFallback) {
       throw const WordPronunciationException('词库发音暂不可用。');
     }
@@ -204,11 +210,7 @@ class WordPronunciationService {
           started = true;
           return;
         }
-        // Only finish after playback actually started — media_kit can emit
-        // completed/playing=false during open, which used to cut words short.
-        if (started) {
-          scheduleFinish(true);
-        }
+        // Buffering can temporarily clear playing; only EOS ends a clip.
       });
       completed = activePlayer.stream.completed.listen((bool value) {
         if (value && started) {
@@ -218,7 +220,7 @@ class WordPronunciationService {
       errors = activePlayer.stream.error.listen((String _) {
         if (!result.isCompleted) result.complete(false);
       });
-      await activePlayer.open(Media(url), play: true).timeout(
+      await activePlayer.open(Media(url), play: false).timeout(
         const Duration(seconds: 20),
       );
       // Cloud MP3 already has natural pacing; don't slow it (caused choppy cutoffs).
@@ -226,10 +228,13 @@ class WordPronunciationService {
       if ((clamped - 1.0).abs() > 0.02) {
         await activePlayer.setRate(clamped);
       }
+      final Duration initialDuration = activePlayer.state.duration;
       // Short clips: also watch duration/position as a safety net.
       unawaited(() async {
         try {
-          final Duration duration = await activePlayer.stream.duration
+          final Duration duration = initialDuration > Duration.zero
+              ? initialDuration
+              : await activePlayer.stream.duration
               .firstWhere((Duration d) => d > Duration.zero)
               .timeout(const Duration(seconds: 5));
           await activePlayer.stream.position
@@ -242,6 +247,9 @@ class WordPronunciationService {
           scheduleFinish(true);
         } catch (_) {}
       }());
+      if (!result.isCompleted && identical(_recordedPlayer, activePlayer)) {
+        await activePlayer.play();
+      }
       return await result.future.timeout(
         const Duration(seconds: 60) + endGrace,
       );
@@ -260,6 +268,7 @@ class WordPronunciationService {
   }
 
   Future<void> stop() async {
+    _speechGeneration++;
     if (stopOverride != null) {
       await stopOverride!();
       return;
