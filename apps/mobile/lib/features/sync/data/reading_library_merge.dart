@@ -38,7 +38,8 @@ class ReadingLibrarySnapshot {
           Map<String, dynamic>.from(item),
         );
         if (doc.id.isEmpty) continue;
-        if (!doc.hasBody && (doc.contentHash == null || doc.contentHash!.isEmpty)) {
+        if (!doc.hasBody &&
+            (doc.contentHash == null || doc.contentHash!.isEmpty)) {
           continue;
         }
         docs.add(doc);
@@ -123,12 +124,16 @@ ReadingDoc _preferRicherDoc(ReadingDoc a, ReadingDoc b) {
     }
   }
   final ReadingDoc other = identical(richer, a) ? b : a;
-  // Cloud backups often omit coverUrl; never wipe a local jacket pointer.
+  // Cloud backups often omit coverUrl; never wipe a local jacket pointer
+  // or the netdisk path used to skip books already on the shelf.
   return richer.copyWith(
     coverUrl: richer.coverUrl.trim().isNotEmpty
         ? richer.coverUrl
         : other.coverUrl,
     titleZh: richer.titleZh.trim().isNotEmpty ? richer.titleZh : other.titleZh,
+    netdiskPath: richer.netdiskPath.trim().isNotEmpty
+        ? richer.netdiskPath
+        : other.netdiskPath,
   );
 }
 

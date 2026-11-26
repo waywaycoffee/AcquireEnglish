@@ -18,6 +18,7 @@ import '../../words/data/offline_word_dictionary.dart';
 import '../data/reading_fingerprint.dart';
 import '../data/reading_gloss.dart';
 import '../data/reading_ingest.dart';
+import '../data/reading_netdisk_import.dart';
 import '../data/reading_pdf_import.dart';
 import '../data/reading_vocab_lists.dart';
 import '../domain/reading_doc.dart';
@@ -29,6 +30,7 @@ import 'reading_cold_start.dart';
 import 'reading_cover_provider.dart';
 import 'reading_library_provider.dart';
 import 'reading_netdisk_import_sheet.dart';
+import 'reading_netdisk_shelf_provider.dart';
 import 'reading_vocab_lists_sheet.dart';
 
 class ReadingHubScreen extends ConsumerStatefulWidget {
@@ -50,6 +52,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
       // Warm ECDICT + frequency lexicon before the user opens a book.
       unawaited(ref.read(offlineWordDictionaryProvider).ensureLoaded());
       unawaited(ref.read(readingFrequencyLexiconProvider.future));
+      unawaited(_syncNetdiskShelf());
     });
   }
 
@@ -57,6 +60,18 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
   void dispose() {
     _searchController.dispose();
     super.dispose();
+  }
+
+  Future<void> _syncNetdiskShelf() async {
+    try {
+      final NetdiskImportOutcome? outcome = await ref
+          .read(readingNetdiskShelfProvider.notifier)
+          .syncWatched();
+      if (!mounted || outcome == null || outcome.imported <= 0) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已从百度网盘自动导入 ${outcome.imported} 本')),
+      );
+    } catch (_) {}
   }
 
   Future<void> _confirmRemove(BuildContext context, ReadingDoc doc) async {
@@ -573,6 +588,9 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
     ref.watch(readingCoverSyncProvider);
     ref.watch(readingColdStartProvider);
     final ReadingLibraryState state = ref.watch(readingLibraryProvider);
+    final ReadingNetdiskShelfState shelf = ref.watch(
+      readingNetdiskShelfProvider,
+    );
     final ReadingVocabLists lists = ref.watch(readingVocabListsProvider);
     final ReadingBookshelfTheme shelfTheme = ReadingBookshelfTheme.of(context);
     final List<ReadingDoc> books = _filteredBooks(state);
@@ -606,6 +624,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                 });
               },
               onSearch: () => setState(() => _searching = true),
+              subtitle: shelf.subtitle,
               onImport: () => unawaited(_importFile(context, ref)),
               onBack: () {
                 if (context.canPop()) {
@@ -656,7 +675,7 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                     ),
                     const PopupMenuItem<String>(
                       value: 'netdisk',
-                      child: Text('从百度网盘导入 EPUB'),
+                      child: Text('百度网盘书架'),
                     ),
                     const PopupMenuItem<String>(
                       value: 'catalog',

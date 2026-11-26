@@ -3,11 +3,7 @@ import 'reading_title_zh.dart';
 enum ReadingSourceType { import, builtin, video, catalog }
 
 class ReadingSegment {
-  const ReadingSegment({
-    required this.text,
-    this.startMs,
-    this.endMs,
-  });
+  const ReadingSegment({required this.text, this.startMs, this.endMs});
 
   final String text;
   final int? startMs;
@@ -44,6 +40,7 @@ class ReadingDoc {
     this.createdAt,
     this.builtin = false,
     this.contentHash,
+    this.netdiskPath = '',
   });
 
   final String id;
@@ -69,6 +66,9 @@ class ReadingDoc {
   /// sha256 of original plainText when body was stripped for cloud size limits.
   final String? contentHash;
 
+  /// Absolute path on the user's bound Baidu drive. Empty for other sources.
+  final String netdiskPath;
+
   /// Best-effort author for cover search (catalog stores it in [episodeTitle]).
   String get authorHint {
     final String fromEpisode = episodeTitle.trim();
@@ -84,8 +84,7 @@ class ReadingDoc {
   }
 
   /// `The Wonderful Wizard of Oz（绿野仙踪）`
-  String get displayTitle =>
-      readingDisplayTitle(title, titleZh: titleZh);
+  String get displayTitle => readingDisplayTitle(title, titleZh: titleZh);
 
   /// Fill missing Chinese titles for already-saved library docs.
   ReadingDoc withEnrichedTitle() {
@@ -112,25 +111,26 @@ class ReadingDoc {
     String? coverUrl,
     String? contentHash,
     bool clearContentHash = false,
-  }) =>
-      ReadingDoc(
-        id: id,
-        title: title ?? this.title,
-        titleZh: titleZh ?? this.titleZh,
-        sourceType: sourceType,
-        level: level,
-        plainText: plainText ?? this.plainText,
-        segments: segments ?? this.segments,
-        courseId: courseId,
-        episodeId: episodeId,
-        courseTitle: courseTitle,
-        episodeTitle: episodeTitle,
-        sourceLabel: sourceLabel,
-        coverUrl: coverUrl ?? this.coverUrl,
-        createdAt: createdAt,
-        builtin: builtin,
-        contentHash: clearContentHash ? null : (contentHash ?? this.contentHash),
-      );
+    String? netdiskPath,
+  }) => ReadingDoc(
+    id: id,
+    title: title ?? this.title,
+    titleZh: titleZh ?? this.titleZh,
+    sourceType: sourceType,
+    level: level,
+    plainText: plainText ?? this.plainText,
+    segments: segments ?? this.segments,
+    courseId: courseId,
+    episodeId: episodeId,
+    courseTitle: courseTitle,
+    episodeTitle: episodeTitle,
+    sourceLabel: sourceLabel,
+    coverUrl: coverUrl ?? this.coverUrl,
+    createdAt: createdAt,
+    builtin: builtin,
+    contentHash: clearContentHash ? null : (contentHash ?? this.contentHash),
+    netdiskPath: netdiskPath ?? this.netdiskPath,
+  );
 
   Map<String, Object?> toJson() => <String, Object?>{
     'id': id,
@@ -148,7 +148,9 @@ class ReadingDoc {
     if (coverUrl.trim().isNotEmpty) 'coverUrl': coverUrl,
     'createdAt': createdAt?.toIso8601String(),
     'builtin': builtin,
-    if (contentHash != null && contentHash!.isNotEmpty) 'contentHash': contentHash,
+    if (contentHash != null && contentHash!.isNotEmpty)
+      'contentHash': contentHash,
+    if (netdiskPath.trim().isNotEmpty) 'netdiskPath': netdiskPath.trim(),
   };
 
   factory ReadingDoc.fromJson(
@@ -189,6 +191,7 @@ class ReadingDoc {
       createdAt: DateTime.tryParse('${json['createdAt'] ?? ''}'),
       builtin: json['builtin'] as bool? ?? builtin,
       contentHash: (hash == null || hash.isEmpty) ? null : hash,
+      netdiskPath: '${json['netdiskPath'] ?? ''}'.trim(),
     );
   }
 }
@@ -242,10 +245,7 @@ class ReadingProgress {
 /// Soft quota hooks for membership / free-tier personal libraries.
 /// Free promise: personal reading uploads stay ≥15 (default headroom 50).
 class ReadingQuota {
-  const ReadingQuota({
-    this.maxImportDocs = 50,
-    this.maxVideoDocs = 30,
-  });
+  const ReadingQuota({this.maxImportDocs = 50, this.maxVideoDocs = 30});
 
   final int maxImportDocs;
   final int maxVideoDocs;
