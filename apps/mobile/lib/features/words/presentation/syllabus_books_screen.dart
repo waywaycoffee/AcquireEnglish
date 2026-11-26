@@ -11,8 +11,8 @@ import '../../exam/domain/exam_fsrs.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
 import '../../navigation/presentation/navigation_destination.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
-import '../../shared/presentation/pill_segmented_control.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../data/lilinji_catalog.dart';
 import '../domain/server_syllabus_catalog.dart';
@@ -31,24 +31,41 @@ class SyllabusBooksScreen extends ConsumerStatefulWidget {
   ConsumerState<SyllabusBooksScreen> createState() => _SyllabusBooksScreenState();
 }
 
-class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
-  late SyllabusBookKind _kind = widget.initialKind;
-  SyllabusBookCategory _category = SyllabusBookCategory.college;
+class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabController;
   ServerSyllabusCatalog? _catalog;
   bool _catalogLoading = false;
   String? _catalogError;
   String? _downloadingId;
   int _catalogRequestVersion = 0;
 
+  SyllabusBookCategory get _category =>
+      SyllabusBookCategory.tabs[_tabController.index];
+
+  SyllabusBookKind get _importKind => _category.importKind;
+
   @override
   void initState() {
     super.initState();
+    final SyllabusBookCategory initial =
+        SyllabusBookCategory.fromInitialKind(widget.initialKind);
+    _tabController = TabController(
+      length: SyllabusBookCategory.tabs.length,
+      vsync: this,
+      initialIndex: SyllabusBookCategory.tabs.indexOf(initial),
+    );
     unawaited(_loadCatalog());
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCatalog({bool refresh = false}) async {
     final int version = ++_catalogRequestVersion;
-    final SyllabusBookKind kind = _kind;
     setState(() {
       _catalogLoading = true;
       _catalogError = null;
@@ -56,7 +73,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     try {
       final ServerSyllabusCatalog catalog = await ref
           .read(acquireApiClientProvider)
-          .fetchSyllabusCatalog(kind: kind, refresh: refresh);
+          .fetchSyllabusCatalog(refresh: refresh);
       if (!mounted || version != _catalogRequestVersion) return;
       setState(() {
         _catalog = catalog;
@@ -117,20 +134,24 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     await _downloadCloudBook(item);
   }
 
-  List<_BrowseEntry> _browseEntries(SyllabusBooksState local) {
+  List<_BrowseEntry> _browseEntriesFor(
+    SyllabusBookCategory category,
+    SyllabusBooksState local,
+  ) {
     final List<_BrowseEntry> entries = <_BrowseEntry>[];
     final List<ServerSyllabusCatalogItem> cloud =
-        _catalog?.ofKind(_kind) ?? const <ServerSyllabusCatalogItem>[];
+        _catalog?.items ?? const <ServerSyllabusCatalogItem>[];
     for (final ServerSyllabusCatalogItem item in cloud) {
-      final bool downloaded = local.bookById(item.id) != null;
-      final bool busy = _downloadingId == item.id;
-      final String tag =
-          item.examTag.isNotEmpty ? item.examTag : item.kind.labelCn;
-      final SyllabusBookCategory category = classifySyllabusBookCategory(
+      final SyllabusBookCategory bucket = classifySyllabusBookCategory(
         title: item.title,
         examTag: item.examTag,
         kind: item.kind,
       );
+      if (bucket != category) continue;
+      final bool downloaded = local.bookById(item.id) != null;
+      final bool busy = _downloadingId == item.id;
+      final String tag =
+          item.examTag.isNotEmpty ? item.examTag : item.kind.labelCn;
       entries.add(
         _BrowseEntry(
           title: item.title,
@@ -138,47 +159,35 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
               ? '$tag · 已在书架'
               : '$tag · ${item.wordCount} ${item.unitLabel}',
           busy: busy,
-          category: category,
           onTap: () => unawaited(_openCloudBook(item)),
         ),
       );
     }
-    if (_kind == SyllabusBookKind.word) {
-      for (final LilinjiCategory cat in kLilinjiCategories) {
-        entries.add(
-          _BrowseEntry(
-            title: cat.title,
-            subtitle: '${cat.tag} · 打开书架',
-            busy: false,
-            category: classifySyllabusBookCategory(
-              title: cat.title,
-              examTag: cat.tag,
-              path: cat.path,
-            ),
-            onTap: () {
-              context.push(
-                '/words/syllabus/catalog?path=${Uri.encodeComponent(cat.path)}',
-              );
-            },
-          ),
-        );
-      }
+    for (final LilinjiCategory cat in kLilinjiCategories) {
+      final SyllabusBookCategory bucket = classifySyllabusBookCategory(
+        title: cat.title,
+        examTag: cat.tag,
+        path: cat.path,
+      );
+      if (bucket != category) continue;
+      entries.add(
+        _BrowseEntry(
+          title: cat.title,
+          subtitle: '${cat.tag} · 打开书架',
+          busy: false,
+          onTap: () {
+            context.push(
+              '/words/syllabus/catalog?path=${Uri.encodeComponent(cat.path)}',
+            );
+          },
+        ),
+      );
     }
     return entries;
   }
 
-  void _onKindChanged(SyllabusBookKind value) {
-    setState(() {
-      _kind = value;
-      // Foundation shelf is almost all 拼读; keep other kinds on current tab.
-      if (value == SyllabusBookKind.foundation) {
-        _category = SyllabusBookCategory.phonics;
-      }
-    });
-    unawaited(_loadCatalog());
-  }
-
   Future<void> _import(BuildContext context) async {
+    final SyllabusBookKind kind = _importKind;
     final XFile? file = await openFile(
       acceptedTypeGroups: const <XTypeGroup>[
         XTypeGroup(
@@ -186,7 +195,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
           extensions: <String>['txt', 'csv', 'tsv'],
         ),
       ],
-      confirmButtonText: switch (_kind) {
+      confirmButtonText: switch (kind) {
         SyllabusBookKind.pattern => '导入句型',
         SyllabusBookKind.foundation => '导入音标/拼读',
         SyllabusBookKind.word => '导入词表',
@@ -201,7 +210,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     if (!context.mounted) return;
     final TextEditingController title = TextEditingController(
       text: suggested.isEmpty
-          ? switch (_kind) {
+          ? switch (kind) {
               SyllabusBookKind.pattern => '导入句型书',
               SyllabusBookKind.foundation => '导入零基础书',
               SyllabusBookKind.word => '导入词书',
@@ -211,7 +220,8 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     final String? name = await showDialog<String>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
-        title: Text(switch (_kind) {
+        backgroundColor: AppDesignTokens.appWhite,
+        title: Text(switch (kind) {
           SyllabusBookKind.pattern => '命名句型书',
           SyllabusBookKind.foundation => '命名零基础书',
           SyllabusBookKind.word => '命名词书',
@@ -220,7 +230,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
           controller: title,
           autofocus: true,
           decoration: InputDecoration(
-            labelText: switch (_kind) {
+            labelText: switch (kind) {
               SyllabusBookKind.pattern => '句型书名称',
               SyllabusBookKind.foundation => '零基础书名称',
               SyllabusBookKind.word => '词书名称',
@@ -243,13 +253,13 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     if (name == null || !context.mounted) return;
     final SyllabusBook? book = await ref
         .read(syllabusBooksProvider.notifier)
-        .importBook(title: name, rawText: raw, kind: _kind);
+        .importBook(title: name, rawText: raw, kind: kind);
     if (!context.mounted) return;
     if (book == null) {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
-            switch (_kind) {
+            switch (kind) {
               SyllabusBookKind.pattern =>
                 '未识别到有效句型（每行一句型，或 pattern,释义）',
               SyllabusBookKind.foundation =>
@@ -275,6 +285,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     final bool? ok = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
+        backgroundColor: AppDesignTokens.appWhite,
         title: Text(book.isPatternBook ? '删除句型书' : '删除词书'),
         content: Text('确定从本地书架移除「${book.title}」？'),
         actions: <Widget>[
@@ -298,22 +309,17 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
     final WordBookLibraryTheme theme = WordBookLibraryTheme.of(context);
     final SyllabusBooksState state = ref.watch(syllabusBooksProvider);
     final ExamProfile examProfile = ref.watch(examProfileProvider);
-    final List<SyllabusBook> raw = state.booksOf(_kind);
+    final List<SyllabusBook> raw = state.all;
     final List<SyllabusBook> matched = examProfile.hasExamTarget
         ? filterSyllabusForExam(raw, examProfile.family)
         : raw;
     final List<SyllabusBook> books =
         matched.isEmpty && examProfile.hasExamTarget ? raw : matched;
-    final bool isPattern = _kind == SyllabusBookKind.pattern;
-    final bool isFoundation = _kind == SyllabusBookKind.foundation;
     final String examHint = examProfile.hasExamTarget
         ? (matched.isEmpty
             ? '考试目标「${examProfile.family!.label}」：暂无匹配标签，先显示全部。'
             : '已按考试目标筛选「${examProfile.family!.label}」')
         : '';
-    final List<_BrowseEntry> browse = _browseEntries(state)
-        .where((_BrowseEntry e) => e.category == _category)
-        .toList(growable: false);
 
     return PadScaffold(
       currentDestination: AppNavDestination.words,
@@ -323,243 +329,213 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen> {
         bottom: false,
         child: !state.ready
             ? const Center(child: CircularProgressIndicator())
-            : CustomScrollView(
-                slivers: <Widget>[
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
-                      child: Row(
-                        children: <Widget>[
-                          IconButton(
-                            onPressed: () => context.pop(),
-                            icon: Icon(
-                              Icons.arrow_back_ios_new_rounded,
-                              size: 20,
-                              color: theme.accent,
-                            ),
+            : Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(20, 12, 12, 0),
+                    child: Row(
+                      children: <Widget>[
+                        IconButton(
+                          onPressed: () => context.pop(),
+                          icon: Icon(
+                            Icons.arrow_back_ios_new_rounded,
+                            size: 20,
+                            color: theme.accent,
                           ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: <Widget>[
-                                Text(
-                                  '词书',
-                                  style: TextStyle(
-                                    fontFamily: 'serif',
-                                    fontSize: 28,
-                                    fontWeight: FontWeight.w800,
-                                    letterSpacing: 2,
-                                    color: theme.title,
-                                  ),
-                                ),
-                                Text(
-                                  examHint.isNotEmpty
-                                      ? examHint
-                                      : '封面朝外 · 选一本开始背',
-                                  style: TextStyle(
-                                    fontSize: 12,
-                                    color: theme.subtitle,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: '云端书库',
-                            onPressed: () => context.push(
-                              '/words/syllabus/cloud?tab=${Uri.encodeComponent(_kind.storageName)}',
-                            ),
-                            icon: Icon(
-                              Icons.cloud_download_outlined,
-                              color: theme.accent,
-                            ),
-                          ),
-                          IconButton(
-                            tooltip: '导入',
-                            onPressed: () => unawaited(_import(context)),
-                            icon: Icon(
-                              Icons.upload_file_rounded,
-                              color: theme.accent,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(20, 16, 20, 8),
-                      child: PillSegmentedControl<SyllabusBookKind>(
-                        value: _kind,
-                        options: const <SegmentOption<SyllabusBookKind>>[
-                          SegmentOption<SyllabusBookKind>(
-                            value: SyllabusBookKind.word,
-                            label: '词书',
-                          ),
-                          SegmentOption<SyllabusBookKind>(
-                            value: SyllabusBookKind.pattern,
-                            label: '句型书',
-                          ),
-                          SegmentOption<SyllabusBookKind>(
-                            value: SyllabusBookKind.foundation,
-                            label: '零基础',
-                          ),
-                        ],
-                        onValueChanged: _onKindChanged,
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
-                      child: SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: <Widget>[
-                            for (final SyllabusBookCategory cat
-                                in SyllabusBookCategory.tabs)
-                              Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: ChoiceChip(
-                                  label: Text(cat.label),
-                                  selected: _category == cat,
-                                  selectedColor: theme.accent,
-                                  backgroundColor: theme.card,
-                                  labelStyle: TextStyle(
-                                    color: _category == cat
-                                        ? theme.onAccent
-                                        : theme.title,
-                                    fontWeight: FontWeight.w700,
-                                    fontSize: 13,
-                                  ),
-                                  side: BorderSide(
-                                    color: _category == cat
-                                        ? theme.accent
-                                        : theme.subtitle.withValues(alpha: 0.35),
-                                  ),
-                                  onSelected: (_) =>
-                                      setState(() => _category = cat),
+                        ),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: <Widget>[
+                              Text(
+                                '词书',
+                                style: TextStyle(
+                                  fontFamily: 'serif',
+                                  fontSize: 28,
+                                  fontWeight: FontWeight.w800,
+                                  letterSpacing: 2,
+                                  color: theme.title,
                                 ),
                               ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
-                      child: Text(
-                        '我的书架',
-                        style: TextStyle(
-                          fontFamily: 'serif',
-                          fontSize: 16,
-                          fontWeight: FontWeight.w800,
-                          color: theme.title,
-                        ),
-                      ),
-                    ),
-                  ),
-                  SliverToBoxAdapter(
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 14),
-                      child: _MyShelf(
-                        theme: theme,
-                        books: books,
-                        state: state,
-                        emptyLabel: isPattern
-                            ? '本地暂无句型书'
-                            : isFoundation
-                            ? '本地暂无零基础书'
-                            : '本地暂无词书，从下方挑一本',
-                        onOpen: (SyllabusBook book) =>
-                            unawaited(_startBook(book)),
-                        onStart: (SyllabusBook book) =>
-                            unawaited(_startBook(book)),
-                        onDelete: (SyllabusBook book) =>
-                            unawaited(_confirmDelete(book)),
-                      ),
-                    ),
-                  ),
-                  if (_catalogLoading && browse.isEmpty)
-                    const SliverToBoxAdapter(
-                      child: Padding(
-                        padding: EdgeInsets.fromLTRB(20, 28, 20, 36),
-                        child: Center(child: CircularProgressIndicator()),
-                      ),
-                    )
-                  else if (browse.isEmpty && _catalogError != null)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
-                        child: Column(
-                          children: <Widget>[
-                            Text(
-                              _catalogError!,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(color: theme.title, fontSize: 13),
-                            ),
-                            const SizedBox(height: 12),
-                            FilledButton(
-                              style: FilledButton.styleFrom(
-                                backgroundColor: theme.accent,
-                                foregroundColor: theme.onAccent,
+                              Text(
+                                examHint.isNotEmpty
+                                    ? examHint
+                                    : '封面朝外 · 选一本开始背',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: theme.subtitle,
+                                ),
                               ),
-                              onPressed: () =>
-                                  unawaited(_loadCatalog(refresh: true)),
-                              child: const Text('重试'),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
+                        IconButton(
+                          tooltip: '云端书库',
+                          onPressed: () => context.push(
+                            '/words/syllabus/cloud?tab=${Uri.encodeComponent(_importKind.storageName)}',
+                          ),
+                          icon: Icon(
+                            Icons.cloud_download_outlined,
+                            color: theme.accent,
+                          ),
+                        ),
+                        IconButton(
+                          tooltip: '导入',
+                          onPressed: () => unawaited(_import(context)),
+                          icon: Icon(
+                            Icons.upload_file_rounded,
+                            color: theme.accent,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(24, 12, 24, 8),
+                    child: Text(
+                      '我的书架',
+                      style: TextStyle(
+                        fontFamily: 'serif',
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                        color: theme.title,
                       ),
-                    )
-                  else if (browse.isEmpty)
-                    SliverToBoxAdapter(
-                      child: Padding(
-                        padding: const EdgeInsets.fromLTRB(20, 24, 20, 36),
+                    ),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 14),
+                    child: _MyShelf(
+                      theme: theme,
+                      books: books,
+                      state: state,
+                      emptyLabel: '本地暂无词书，从下方挑一本',
+                      onOpen: (SyllabusBook book) =>
+                          unawaited(_startBook(book)),
+                      onStart: (SyllabusBook book) =>
+                          unawaited(_startBook(book)),
+                      onDelete: (SyllabusBook book) =>
+                          unawaited(_confirmDelete(book)),
+                    ),
+                  ),
+                  Material(
+                    color: theme.canvas,
+                    child: TabBar(
+                      controller: _tabController,
+                      isScrollable: true,
+                      tabAlignment: TabAlignment.start,
+                      labelColor: theme.accent,
+                      unselectedLabelColor: theme.subtitle,
+                      indicatorColor: theme.accent,
+                      labelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w800,
+                      ),
+                      unselectedLabelStyle: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                      ),
+                      tabs: <Tab>[
+                        for (final SyllabusBookCategory cat
+                            in SyllabusBookCategory.tabs)
+                          Tab(text: cat.label),
+                      ],
+                    ),
+                  ),
+                  if (_catalogError != null &&
+                      (_catalog?.items.isNotEmpty ?? false))
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(20, 8, 20, 0),
+                      child: TextButton(
+                        onPressed: () =>
+                            unawaited(_loadCatalog(refresh: true)),
                         child: Text(
-                          '「${_category.label}」暂无词书',
-                          textAlign: TextAlign.center,
-                          style: TextStyle(color: theme.subtitle, fontSize: 13),
-                        ),
-                      ),
-                    )
-                  else ...<Widget>[
-                    if (_catalogError != null)
-                      SliverToBoxAdapter(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-                          child: TextButton(
-                            onPressed: () =>
-                                unawaited(_loadCatalog(refresh: true)),
-                            child: Text(
-                              '部分书库加载失败，点此重试',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: theme.subtitle,
-                              ),
-                            ),
+                          '部分书库加载失败，点此重试',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: theme.subtitle,
                           ),
                         ),
                       ),
-                    SliverPadding(
-                      padding: const EdgeInsets.fromLTRB(20, 18, 20, 36),
-                      sliver: SliverList.separated(
-                        itemCount: browse.length,
-                        separatorBuilder: (_, __) =>
-                            const SizedBox(height: 10),
-                        itemBuilder: (BuildContext context, int index) {
-                          return _BrowseRow(
-                            theme: theme,
-                            entry: browse[index],
-                          );
-                        },
-                      ),
                     ),
-                  ],
+                  Expanded(
+                    child: _catalogLoading && _catalog == null
+                        ? const Center(child: CircularProgressIndicator())
+                        : _catalog == null && _catalogError != null
+                            ? Center(
+                                child: Padding(
+                                  padding: const EdgeInsets.all(24),
+                                  child: Column(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: <Widget>[
+                                      Text(
+                                        _catalogError!,
+                                        textAlign: TextAlign.center,
+                                        style: TextStyle(
+                                          color: theme.title,
+                                          fontSize: 13,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 12),
+                                      FilledButton(
+                                        style: FilledButton.styleFrom(
+                                          backgroundColor: theme.accent,
+                                          foregroundColor: theme.onAccent,
+                                        ),
+                                        onPressed: () => unawaited(
+                                          _loadCatalog(refresh: true),
+                                        ),
+                                        child: const Text('重试'),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              )
+                            : TabBarView(
+                                controller: _tabController,
+                                children: <Widget>[
+                                  for (final SyllabusBookCategory cat
+                                      in SyllabusBookCategory.tabs)
+                                    _CategoryBookList(
+                                      theme: theme,
+                                      entries: _browseEntriesFor(cat, state),
+                                    ),
+                                ],
+                              ),
+                  ),
                 ],
               ),
       ),
+    );
+  }
+}
+
+class _CategoryBookList extends StatelessWidget {
+  const _CategoryBookList({
+    required this.theme,
+    required this.entries,
+  });
+
+  final WordBookLibraryTheme theme;
+  final List<_BrowseEntry> entries;
+
+  @override
+  Widget build(BuildContext context) {
+    if (entries.isEmpty) {
+      return Center(
+        child: Text(
+          '本分类暂无词书',
+          style: TextStyle(fontSize: 13, color: theme.subtitle),
+        ),
+      );
+    }
+    return ListView.separated(
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
+      itemCount: entries.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 10),
+      itemBuilder: (BuildContext context, int index) {
+        return _BrowseRow(theme: theme, entry: entries[index]);
+      },
     );
   }
 }
@@ -569,14 +545,12 @@ class _BrowseEntry {
     required this.title,
     required this.subtitle,
     required this.busy,
-    required this.category,
     required this.onTap,
   });
 
   final String title;
   final String subtitle;
   final bool busy;
-  final SyllabusBookCategory category;
   final VoidCallback onTap;
 }
 

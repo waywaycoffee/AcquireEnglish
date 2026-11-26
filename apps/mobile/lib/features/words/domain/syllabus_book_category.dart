@@ -39,6 +39,8 @@ enum SyllabusBookCategory {
 /// 1. [SyllabusBookKind.pattern] → 句型
 /// 2. [SyllabusBookKind.foundation] → 拼读
 /// 3. examTag / title / path keywords:
+///    - 句型 / 句式 / sentence pattern(s) / phrases / 情景句 / 日常口语 → 句型
+///      (before career / abroad / school buckets so e.g. 程序员口语句型 → 句型)
 ///    - phonics / 拼读 / 自然拼读 / IPA → 拼读
 ///    - 商务 / BEC / IT / 职业 / 程序员 → 职业
 ///    - 托福 / 雅思 / SAT / GRE / 出国 → 出国
@@ -65,6 +67,24 @@ SyllabusBookCategory classifySyllabusBookCategory({
 
   final String hay =
       '$examTag $title $path ${kind.storageName}'.toLowerCase();
+
+  // 句型 keywords before other stage/career buckets.
+  if (_matches(hay, const <String>[
+        'sentence pattern',
+        'sentence patterns',
+        'oral pattern',
+        'oral patterns',
+        'pattern book',
+        '句型',
+        '句式',
+        '情景句',
+        '日常口语',
+        '口语句型',
+        '语块',
+      ]) ||
+      RegExp(r'(^|[^a-z])phrases?([^a-z]|$)').hasMatch(hay)) {
+    return SyllabusBookCategory.pattern;
+  }
 
   if (_matches(hay, const <String>[
     'phonics',

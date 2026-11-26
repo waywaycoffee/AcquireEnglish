@@ -3,6 +3,24 @@ import 'package:common_learn_english/features/words/domain/syllabus_book_categor
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  group('SyllabusBookCategory.tabs', () {
+    test('exactly 8 tabs in required order', () {
+      expect(
+        SyllabusBookCategory.tabs.map((e) => e.label).toList(),
+        const <String>[
+          '句型',
+          '拼读',
+          '小学',
+          '初中',
+          '高中',
+          '大学',
+          '出国',
+          '职业',
+        ],
+      );
+    });
+  });
+
   group('classifySyllabusBookCategory', () {
     test('pattern kind → 句型', () {
       expect(
@@ -19,6 +37,37 @@ void main() {
           examTag: 'SPEAK',
           kind: SyllabusBookKind.pattern,
         ),
+        SyllabusBookCategory.pattern,
+      );
+    });
+
+    test('句型 keywords match before career / school buckets', () {
+      expect(
+        classifySyllabusBookCategory(title: '日常口语句型'),
+        SyllabusBookCategory.pattern,
+      );
+      expect(
+        classifySyllabusBookCategory(title: '情景句 151'),
+        SyllabusBookCategory.pattern,
+      );
+      expect(
+        classifySyllabusBookCategory(title: '常用句式'),
+        SyllabusBookCategory.pattern,
+      );
+      expect(
+        classifySyllabusBookCategory(title: 'Sentence Patterns A1'),
+        SyllabusBookCategory.pattern,
+      );
+      expect(
+        classifySyllabusBookCategory(title: 'Useful Phrases'),
+        SyllabusBookCategory.pattern,
+      );
+      expect(
+        classifySyllabusBookCategory(title: '程序员口语句型'),
+        SyllabusBookCategory.pattern,
+      );
+      expect(
+        classifySyllabusBookCategory(title: '语块训练'),
         SyllabusBookCategory.pattern,
       );
     });
