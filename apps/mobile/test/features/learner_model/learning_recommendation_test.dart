@@ -361,7 +361,9 @@ void main() {
     expect(effectFor(LearnFeedback.swap).demoteDays, 0);
     expect(effectFor(LearnFeedback.notInterested).demoteDays, 7);
     expect(effectFor(LearnFeedback.tooHard).difficultyShift, -1);
+    expect(effectFor(LearnFeedback.tooHard).sessionOnly, isTrue);
     expect(effectFor(LearnFeedback.tooEasy).difficultyShift, 1);
+    expect(effectFor(LearnFeedback.tooEasy).sessionOnly, isTrue);
 
     final LearnerSkillProfile profile = LearnerSkillProfile.initial(
       priorBand: 'B1',

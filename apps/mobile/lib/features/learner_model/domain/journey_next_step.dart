@@ -185,12 +185,14 @@ LearnFeedbackEffect effectFor(LearnFeedback feedback) => switch (feedback) {
     difficultyShift: 0,
   ),
   LearnFeedback.tooHard => const LearnFeedbackEffect(
-    sessionOnly: false,
+    // Hide current pick for this session and nudge difficulty down.
+    sessionOnly: true,
     demoteDays: 0,
     difficultyShift: -1,
   ),
   LearnFeedback.tooEasy => const LearnFeedbackEffect(
-    sessionOnly: false,
+    // Hide current pick for this session and nudge difficulty up.
+    sessionOnly: true,
     demoteDays: 0,
     difficultyShift: 1,
   ),

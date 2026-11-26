@@ -314,12 +314,18 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     await JourneyFeedbackStore(
       ref.read(studyAccountProvider),
     ).apply(id: step.route, module: module, feedback: feedback);
-    if (feedback == LearnFeedback.swap ||
-        feedback == LearnFeedback.notInterested) {
-      await _swapOnce();
-    } else if (mounted) {
-      setState(() {});
-    }
+    if (!mounted) return;
+    final String toast = switch (feedback) {
+      LearnFeedback.swap => '换一条试试',
+      LearnFeedback.notInterested => '七天内不再默认推荐这条',
+      LearnFeedback.tooHard => '已记下偏难，换一条更容易的',
+      LearnFeedback.tooEasy => '已记下偏简单，换一条更有挑战的',
+    };
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(toast)),
+    );
+    // Difficulty feedback also means “not this one” — always open the picker.
+    await _swapOnce();
   }
 
   Future<void> _swapOnce() async {

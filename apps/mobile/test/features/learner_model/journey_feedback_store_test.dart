@@ -59,5 +59,17 @@ void main() {
       feedback: LearnFeedback.tooHard,
     );
     expect(store.difficultyShifts[LearnModule.video], -1);
+    expect(store.isHidden('/episodes/c'), isTrue);
+  });
+
+  test('too easy raises difficulty and hides current for the session', () async {
+    final JourneyFeedbackStore store = JourneyFeedbackStore('demo');
+    await store.apply(
+      id: '/reading/easy',
+      module: LearnModule.reading,
+      feedback: LearnFeedback.tooEasy,
+    );
+    expect(store.difficultyShifts[LearnModule.reading], 1);
+    expect(store.isHidden('/reading/easy'), isTrue);
   });
 }
