@@ -95,6 +95,29 @@ async def test_wechat_login_auto_registers():
         assert second.json()["user"]["id"] == data["user"]["id"]
 
 
+@pytest.mark.asyncio
+async def test_wechat_mp_login_auto_registers():
+    transport = ASGITransport(app=fastapi_app)
+    async with AsyncClient(transport=transport, base_url="http://test") as client:
+        first = await client.post(
+            "/api/auth/wechat/mp-login",
+            json={"code": "dev_mp_user_1", "device_label": "wechat-miniprogram"},
+        )
+        assert first.status_code == 200, first.text
+        data = first.json()
+        assert data["is_new_user"] is True
+        assert data["access_token"]
+        assert data["user"]["display_name"]
+
+        second = await client.post(
+            "/api/auth/wechat/mp-login",
+            json={"code": "dev_mp_user_1"},
+        )
+        assert second.status_code == 200
+        assert second.json()["is_new_user"] is False
+        assert second.json()["user"]["id"] == data["user"]["id"]
+
+
 def test_aliyun_phone_normalization_and_provider_labels():
     from app.services.aliyun_sms import _phone_for_aliyun
     from app.services.phone_auth import sms_provider

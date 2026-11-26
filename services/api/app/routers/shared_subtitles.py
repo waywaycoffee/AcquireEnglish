@@ -355,3 +355,46 @@ async def gpu_subtitle_status(job_id: str, user: User = Depends(get_current_user
         if row is None:
             raise HTTPException(404, 'Task not found')
         return public(row)
+
+
+@router.get('/reservations')
+async def list_my_reservations(
+    mine: int = Query(default=1, ge=0, le=1),
+    user: User = Depends(get_current_user),
+):
+    """Mini program / App: list GPU subtitle jobs reserved by the current user."""
+    if not mine:
+        return {"items": []}
+    try:
+        from app.services.gpu_subtitle_queue import connection, public
+    except Exception:  # noqa: BLE001
+        return {"items": []}
+    items: list[dict] = []
+    try:
+        with connection() as gdb:
+            rows = gdb.execute(
+                """
+                SELECT * FROM jobs
+                WHERE user_id = ?
+                ORDER BY id DESC
+                LIMIT 50
+                """,
+                (user.id,),
+            ).fetchall()
+            for row in rows:
+                pub = public(row)
+                items.append(
+                    {
+                        "job_id": pub.get("id") or pub.get("job_id"),
+                        "bvid": pub.get("bvid"),
+                        "page": pub.get("page") or 1,
+                        "title": pub.get("title"),
+                        "status": pub.get("state") or pub.get("status"),
+                        "created_at": pub.get("created_at"),
+                        "updated_at": pub.get("updated_at"),
+                        "error": pub.get("error"),
+                    }
+                )
+    except Exception:  # noqa: BLE001 — queue may lack user_id yet
+        return {"items": []}
+    return {"items": items}

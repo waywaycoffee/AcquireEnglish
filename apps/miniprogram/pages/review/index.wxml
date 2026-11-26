@@ -1,0 +1,9 @@
+<view class="hero">
+  <view class="hero-title">今日复习</view>
+  <view class="muted">云端 FSRS 队列即将接入。当前可先打开 App 完成跟读与听写。</view>
+</view>
+<view class="card">
+  <view class="card-title">即将上线</view>
+  <view class="muted">Again / Hard / Good / Easy · TTS · 分享打卡</view>
+  <view class="btn btn-primary" bindtap="openApp">去 App 复习</view>
+</view>

@@ -1,0 +1,33 @@
+<view class="hero">
+  <view class="hero-title">今天学什么</view>
+  <view class="muted">碎片复习与字幕预约；完整精听请打开 App</view>
+</view>
+
+<view class="stat-row">
+  <view class="stat" bindtap="goReview">
+    <view class="stat-num">{{dueCount}}</view>
+    <view class="stat-label">待复习</view>
+  </view>
+  <view class="stat" bindtap="goReserve">
+    <view class="stat-num">{{reserveActive}}</view>
+    <view class="stat-label">预约中</view>
+  </view>
+  <view class="stat">
+    <view class="stat-num">{{streakDays}}</view>
+    <view class="stat-label">连续打卡</view>
+  </view>
+</view>
+
+<view class="card">
+  <view class="card-title">今日摘要</view>
+  <view class="muted">已学 {{studyMinutes}} 分钟 · 复习完成 {{doneCount}}</view>
+  <view class="btn btn-primary" bindtap="openApp">打开 App 精听</view>
+  <view class="btn btn-ghost" wx:if="{{!loggedIn}}" bindtap="goLogin">微信登录同步进度</view>
+</view>
+
+<view class="card">
+  <view class="card-title">快捷入口</view>
+  <view class="muted">阅读 / 口语一期陆续开放；预约字幕可先用。</view>
+  <view class="btn btn-ghost" bindtap="goReserve">预约 B 站字幕</view>
+  <view class="btn btn-ghost" bindtap="goOral">口语（瘦身版）</view>
+</view>

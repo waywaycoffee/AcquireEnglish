@@ -1,0 +1,13 @@
+.input {
+  background: #0b1220;
+  border: 1rpx solid #243044;
+  border-radius: 16rpx;
+  padding: 20rpx;
+  color: #e8eef8;
+  margin-top: 12rpx;
+}
+
+.item {
+  padding: 16rpx 0;
+  border-bottom: 1rpx solid #243044;
+}

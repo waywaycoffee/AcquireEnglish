@@ -1,0 +1,59 @@
+{
+  "pages": [
+    "pages/home/index",
+    "pages/review/index",
+    "pages/reserve/index",
+    "pages/reading/index",
+    "pages/oral/index",
+    "pages/me/index",
+    "pages/login/index"
+  ],
+  "window": {
+    "navigationBarTitleText": "爱快英语",
+    "navigationBarBackgroundColor": "#0B1220",
+    "navigationBarTextStyle": "white",
+    "backgroundColor": "#0B1220",
+    "backgroundTextStyle": "light"
+  },
+  "tabBar": {
+    "color": "#9FB0C7",
+    "selectedColor": "#3DDC84",
+    "backgroundColor": "#121A2B",
+    "borderStyle": "black",
+    "list": [
+      {
+        "pagePath": "pages/home/index",
+        "text": "首页",
+        "iconPath": "assets/tab-home.png",
+        "selectedIconPath": "assets/tab-home-active.png"
+      },
+      {
+        "pagePath": "pages/review/index",
+        "text": "复习",
+        "iconPath": "assets/tab-review.png",
+        "selectedIconPath": "assets/tab-review-active.png"
+      },
+      {
+        "pagePath": "pages/reserve/index",
+        "text": "预约",
+        "iconPath": "assets/tab-reserve.png",
+        "selectedIconPath": "assets/tab-reserve-active.png"
+      },
+      {
+        "pagePath": "pages/reading/index",
+        "text": "阅读",
+        "iconPath": "assets/tab-reading.png",
+        "selectedIconPath": "assets/tab-reading-active.png"
+      },
+      {
+        "pagePath": "pages/me/index",
+        "text": "我的",
+        "iconPath": "assets/tab-me.png",
+        "selectedIconPath": "assets/tab-me-active.png"
+      }
+    ]
+  },
+  "style": "v2",
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents"
+}

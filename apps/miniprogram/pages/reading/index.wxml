@@ -1,0 +1,7 @@
+<view class="hero">
+  <view class="hero-title">碎片阅读</view>
+  <view class="muted">在线短文与点词查词将在后续迭代接入。</view>
+</view>
+<view class="card">
+  <view class="btn btn-primary" bindtap="openApp">去 App 阅读</view>
+</view>

@@ -1,0 +1,24 @@
+<view class="hero">
+  <view class="hero-title">预约字幕</view>
+  <view class="muted">粘贴 B 站链接，云端生成后去 App 精听。</view>
+</view>
+<view class="card">
+  <view class="card-title">提交预约</view>
+  <input
+    class="input"
+    placeholder="https://www.bilibili.com/video/BVxxxx"
+    value="{{url}}"
+    bindinput="onInput"
+  />
+  <view class="btn btn-primary" bindtap="submit">提交（需登录）</view>
+  <view class="muted" style="margin-top: 12rpx;">{{message}}</view>
+</view>
+<view class="card">
+  <view class="card-title">我的预约</view>
+  <view class="muted" wx:if="{{!items.length}}">暂无记录</view>
+  <view wx:for="{{items}}" wx:key="job_id" class="item">
+    <view>{{item.title || item.bvid}} · P{{item.page || 1}}</view>
+    <view class="muted">{{item.status}}</view>
+  </view>
+  <view class="btn btn-ghost" bindtap="refresh">刷新列表</view>
+</view>

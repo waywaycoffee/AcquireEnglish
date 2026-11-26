@@ -1,0 +1,7 @@
+<view class="hero">
+  <view class="hero-title">口语回合</view>
+  <view class="muted">瘦身版：场景录音 → 云端反馈。数字人请用 App。</view>
+</view>
+<view class="card">
+  <view class="btn btn-primary" bindtap="openApp">去 App 口语陪练</view>
+</view>

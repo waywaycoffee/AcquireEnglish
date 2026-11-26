@@ -71,6 +71,8 @@ async def _ensure_user_auth_columns(conn: AsyncConnection) -> None:
         alters.append("ALTER TABLE users ADD COLUMN phone VARCHAR(32)")
     if "wechat_openid" not in existing:
         alters.append("ALTER TABLE users ADD COLUMN wechat_openid VARCHAR(64)")
+    if "wechat_mp_openid" not in existing:
+        alters.append("ALTER TABLE users ADD COLUMN wechat_mp_openid VARCHAR(64)")
     if "wechat_unionid" not in existing:
         alters.append("ALTER TABLE users ADD COLUMN wechat_unionid VARCHAR(64)")
     for sql in alters:
@@ -79,6 +81,7 @@ async def _ensure_user_auth_columns(conn: AsyncConnection) -> None:
     for name, col in (
         ("ix_users_phone", "phone"),
         ("ix_users_wechat_openid", "wechat_openid"),
+        ("ix_users_wechat_mp_openid", "wechat_mp_openid"),
         ("ix_users_wechat_unionid", "wechat_unionid"),
     ):
         try:

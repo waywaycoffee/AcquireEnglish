@@ -159,4 +159,7 @@ POST /api/oral/turn
 
 - 总功能说明：`docs/product/PRODUCT_FEATURES.md`  
 - 媒体原则：`docs/MEDIA_ECS.md`  
-- 共享字幕 / GPU 队列：`services/api` → `shared_subtitles`、`gpu_subtitle_queue`
+- 共享字幕 / GPU 队列：`services/api` → `shared_subtitles`、`gpu_subtitle_queue`  
+- 工程目录：`apps/miniprogram/`（README 含 AppID / 服务器域名步骤）  
+- 公众号挂官网：`docs/wechat/official-account.md`  
+- 小程序登录：`POST /api/auth/wechat/mp-login`（`WECHAT_MP_APP_ID` / `WECHAT_MP_APP_SECRET`）

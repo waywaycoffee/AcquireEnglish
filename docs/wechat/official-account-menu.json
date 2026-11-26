@@ -1,0 +1,49 @@
+{
+  "button": [
+    {
+      "name": "了解爱快",
+      "sub_button": [
+        {
+          "type": "view",
+          "name": "产品官网",
+          "url": "https://acquireenglish.curlhairai.com/"
+        },
+        {
+          "type": "view",
+          "name": "怎么学",
+          "url": "https://acquireenglish.curlhairai.com/"
+        }
+      ]
+    },
+    {
+      "name": "下载安装",
+      "sub_button": [
+        {
+          "type": "view",
+          "name": "安卓 / iOS",
+          "url": "https://acquireenglish.curlhairai.com/download.html"
+        },
+        {
+          "type": "view",
+          "name": "打开 App",
+          "url": "https://acquireenglish.curlhairai.com/open-app.html"
+        }
+      ]
+    },
+    {
+      "name": "联系我们",
+      "sub_button": [
+        {
+          "type": "click",
+          "name": "加作者微信",
+          "key": "CONTACT_AUTHOR"
+        },
+        {
+          "type": "view",
+          "name": "下载页说明",
+          "url": "https://acquireenglish.curlhairai.com/download.html"
+        }
+      ]
+    }
+  ]
+}

@@ -69,6 +69,9 @@ class Settings(BaseSettings):
     auth_wechat_mock: bool = True
     wechat_app_id: str = ""
     wechat_app_secret: str = ""
+    # WeChat mini program login (js_code → openid via jscode2session).
+    wechat_mp_app_id: str = ""
+    wechat_mp_app_secret: str = ""
 
     # WeChat Pay (App 支付). Requires merchant credentials beyond AppID/Secret.
     wechat_mch_id: str = ""
@@ -169,9 +172,19 @@ class Settings(BaseSettings):
         return bool(self.wechat_app_id.strip() and self.wechat_app_secret.strip())
 
     @property
+    def wechat_mp_configured(self) -> bool:
+        return bool(self.wechat_mp_app_id.strip() and self.wechat_mp_app_secret.strip())
+
+    @property
     def wechat_mock_enabled(self) -> bool:
         return not self.production_mode and (
             self.auth_wechat_mock or not self.wechat_configured
+        )
+
+    @property
+    def wechat_mp_mock_enabled(self) -> bool:
+        return not self.production_mode and (
+            self.auth_wechat_mock or not self.wechat_mp_configured
         )
 
     @property

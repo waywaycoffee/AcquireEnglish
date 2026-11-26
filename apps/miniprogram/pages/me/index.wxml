@@ -1,0 +1,12 @@
+<view class="hero">
+  <view class="hero-title">{{user.display_name || '未登录'}}</view>
+  <view class="muted" wx:if="{{user.member_no}}">会员号 {{user.member_no}}</view>
+  <view class="muted" wx:else>登录后同步复习、预约与成长数据</view>
+</view>
+
+<view class="card">
+  <view class="btn btn-primary" wx:if="{{!loggedIn}}" bindtap="goLogin">微信登录</view>
+  <view class="btn btn-ghost" wx:else bindtap="logout">退出登录</view>
+  <view class="btn btn-primary" bindtap="openApp">打开 App</view>
+  <view class="btn btn-ghost" bindtap="copyDownload">复制下载页</view>
+</view>

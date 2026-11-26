@@ -58,6 +58,7 @@ from app.routers import (
     exam_reading_parse,
     grammar_analyze,
     podcast,
+    review_cloud,
     review_sync,
     rewards,
     shared_ocr_books,
@@ -166,6 +167,7 @@ app.include_router(fingerprint_cache.router, prefix="/api")
 app.include_router(fingerprint_cache.admin_router, prefix="/api")
 app.include_router(rewards.router, prefix="/api")
 app.include_router(cosmetics.router, prefix="/api")
+app.include_router(review_cloud.router, prefix="/api")
 app.include_router(review_sync.router, prefix="/api")
 app.include_router(read_aloud.router, prefix="/api")
 app.include_router(reading_backup.router, prefix="/api")

@@ -85,3 +85,44 @@ async def exchange_wechat_code(code: str) -> WeChatIdentity:
         except Exception:  # noqa: BLE001 — nickname is optional
             nickname = None
     return WeChatIdentity(openid=openid, unionid=unionid, nickname=nickname)
+
+
+async def exchange_wechat_mp_code(code: str) -> WeChatIdentity:
+    """Mini program wx.login code → openid via jscode2session."""
+    trimmed = (code or "").strip()
+    if not trimmed:
+        raise ValueError("缺少微信小程序 code")
+
+    if settings.wechat_mp_mock_enabled:
+        openid = trimmed if trimmed.startswith("mock_mp_") else f"mock_mp_{trimmed}"
+        return WeChatIdentity(openid=openid[:64], unionid=None, nickname="微信用户")
+
+    if not settings.wechat_mp_configured:
+        raise ValueError("微信小程序登录暂未配置")
+
+    if trimmed.startswith("mock_"):
+        raise ValueError("当前环境未启用小程序 mock 登录")
+
+    async with httpx.AsyncClient(timeout=20) as client:
+        response = await client.get(
+            "https://api.weixin.qq.com/sns/jscode2session",
+            params={
+                "appid": settings.wechat_mp_app_id,
+                "secret": settings.wechat_mp_app_secret,
+                "js_code": trimmed,
+                "grant_type": "authorization_code",
+            },
+        )
+        response.raise_for_status()
+        data = response.json()
+    if data.get("errcode"):
+        errcode = data.get("errcode")
+        errmsg = str(data.get("errmsg") or errcode)
+        if errcode in (40029, 40163) or "invalid code" in errmsg:
+            raise ValueError("小程序登录码无效或已使用，请重试")
+        raise RuntimeError(f"小程序登录失败：{errmsg}")
+    openid = str(data.get("openid") or "").strip()
+    if not openid:
+        raise RuntimeError("微信未返回小程序 openid")
+    unionid = str(data.get("unionid") or "").strip() or None
+    return WeChatIdentity(openid=openid, unionid=unionid, nickname=None)

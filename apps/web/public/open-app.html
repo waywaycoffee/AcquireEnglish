@@ -1,0 +1,111 @@
+<!doctype html>
+<html lang="zh-CN">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>打开爱快英语 App</title>
+    <meta
+      name="description"
+      content="从公众号或小程序跳转打开爱快英语 App；未安装则前往下载页。"
+    />
+    <link rel="icon" href="/brand/app-icon.png" />
+    <style>
+      :root {
+        --bg: #0b1220;
+        --card: #121a2b;
+        --text: #e8eef8;
+        --muted: #9fb0c7;
+        --line: #243044;
+        --accent: #93c5fd;
+        --green: #3ddc84;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        font-family: "DM Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
+        background: radial-gradient(1200px 600px at 10% -10%, #1a2740, var(--bg));
+        color: var(--text);
+        line-height: 1.65;
+        min-height: 100vh;
+      }
+      main { max-width: 480px; margin: 0 auto; padding: 48px 20px 80px; }
+      img.logo { width: 72px; height: 72px; border-radius: 16px; }
+      h1 { font-size: 28px; letter-spacing: -0.03em; margin: 18px 0 8px; }
+      p { color: var(--muted); margin: 0 0 16px; }
+      .card {
+        background: var(--card);
+        border: 1px solid var(--line);
+        border-radius: 18px;
+        padding: 22px;
+        margin-top: 24px;
+      }
+      .btn {
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        min-height: 48px;
+        padding: 0 18px;
+        border-radius: 999px;
+        text-decoration: none;
+        font-weight: 700;
+        margin-top: 12px;
+      }
+      .btn.primary { background: var(--green); color: #04110a; }
+      .btn.ghost {
+        background: transparent;
+        color: var(--accent);
+        border: 1px solid #35507a;
+      }
+      .tip {
+        margin-top: 20px;
+        font-size: 13px;
+        color: var(--muted);
+      }
+      code { color: #dbeafe; }
+    </style>
+  </head>
+  <body>
+    <main>
+      <img class="logo" src="/brand/app-icon.png" alt="爱快英语" />
+      <h1>打开爱快英语</h1>
+      <p>完整精听、导入与数字人陪练在 App。若未自动跳转，请点下方按钮。</p>
+      <div class="card">
+        <a class="btn primary" id="open-app" href="acquireenglish://home">打开 App</a>
+        <a class="btn ghost" href="/download.html">还没安装？去下载</a>
+        <p class="tip">
+          在微信内若无法拉起 App，请点右上角 <code>···</code> →
+          <strong>在浏览器中打开</strong> 本页后再试。
+        </p>
+      </div>
+    </main>
+    <script>
+      (function () {
+        var params = new URLSearchParams(location.search);
+        var path = params.get("path") || "home";
+        var qs = params.toString();
+        var scheme = "acquireenglish://" + path.replace(/^\//, "");
+        if (qs && path.indexOf("?") < 0) {
+          // keep episode etc.: ?bvid=&page=
+          var extra = [];
+          params.forEach(function (v, k) {
+            if (k !== "path") extra.push(encodeURIComponent(k) + "=" + encodeURIComponent(v));
+          });
+          if (extra.length) scheme += (scheme.indexOf("?") >= 0 ? "&" : "?") + extra.join("&");
+        }
+        var openBtn = document.getElementById("open-app");
+        openBtn.href = scheme;
+        // Best-effort auto launch outside WeChat.
+        var ua = navigator.userAgent || "";
+        var inWeChat = /MicroMessenger/i.test(ua);
+        if (!inWeChat) {
+          setTimeout(function () {
+            location.href = scheme;
+          }, 400);
+          setTimeout(function () {
+            // If still here, user likely has no app.
+          }, 1800);
+        }
+      })();
+    </script>
+  </body>
+</html>

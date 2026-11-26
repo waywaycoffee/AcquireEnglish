@@ -40,6 +40,9 @@ class User(Base):
     wechat_openid: Mapped[str | None] = mapped_column(
         String(64), unique=True, index=True, nullable=True
     )
+    wechat_mp_openid: Mapped[str | None] = mapped_column(
+        String(64), unique=True, index=True, nullable=True
+    )
     wechat_unionid: Mapped[str | None] = mapped_column(
         String(64), unique=True, index=True, nullable=True
     )
