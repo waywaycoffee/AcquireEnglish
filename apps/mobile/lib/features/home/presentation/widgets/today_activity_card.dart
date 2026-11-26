@@ -142,9 +142,14 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           ),
         );
         if (active() && (completed ?? false)) {
+          await store.clearPausedFlag();
           await _seedTomorrowIfNeeded(account, today);
           await store.saveStage(JourneyStage.tomorrow);
           if (active()) await _maybeOfferSkillProbe(module);
+        } else if (active() && completed == false) {
+          // 「稍后继续」— keep this route as the explicit pause target.
+          await store.saveActivity(activity, pausedExplicitly: true);
+          await store.saveStage(JourneyStage.learn);
         }
         return;
       }
@@ -189,9 +194,13 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     final Set<String> tracks = selectedLearningTracks(
       ref.read(learningPreferencesProvider).tags,
     );
+    // If they already opened an episode this install, always allow resume —
+    // don't let a toggled-off track erase「接着看第4集」.
+    final bool hasResumeEpisode =
+        (ref.read(lastLearningEpisodeProvider) ?? '').isNotEmpty;
     final JourneyTask? videoNext = _videoPursuit(
       ref.read(continueLearningTargetProvider),
-      enabled: tracks.contains(kTrackVideo),
+      enabled: tracks.contains(kTrackVideo) || hasResumeEpisode,
     );
     final ReadingDoc? book = ref.read(readingLibraryProvider).continueDoc;
     final String readingBand = ref
@@ -354,8 +363,11 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
   JourneyNextStep _nextStep(TodayJourneyStore store) {
     final bool reviewFinished = store.stage != JourneyStage.review;
     final JourneyActivity? pausedActivity = store.activity;
+    // Only honor explicit「稍后继续」. Auto-saved cold picks must not hide
+    // 「继续第4集」.
     final JourneyTask? paused =
-        store.stage == JourneyStage.learn &&
+        store.pausedExplicitly &&
+            store.stage == JourneyStage.learn &&
             pausedActivity != null &&
             pausedActivity.route.isNotEmpty
         ? JourneyTask(
@@ -365,12 +377,13 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           )
         : null;
     final int due = ref.read(wordBookProvider.notifier).dueCounts().dueReviews;
+    final JourneyTask? pursuit = _currentPursuit();
     return resolveJourneyNext(
       JourneyNextRequest(
         paused: paused,
         dueReviewCount: due,
         reviewFinished: reviewFinished,
-        pursuit: _currentPursuit(),
+        pursuit: pursuit,
         recommendation: _coldTask(),
         recommendationReason: _coldRecommendation(
               videoOn: selectedLearningTracks(
@@ -474,14 +487,31 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     ContinueLearningTarget? resume, {
     required bool enabled,
   }) {
-    if (!enabled || resume == null || resume.episode.videoMissing) return null;
+    if (!enabled || resume == null) return null;
     final List<LibraryEpisodeItem> episodes = resume.course.episodes
         .where((LibraryEpisodeItem episode) => !episode.videoMissing)
         .toList();
-    final int index = episodes.indexWhere(
+    if (episodes.isEmpty) return null;
+    int index = episodes.indexWhere(
       (LibraryEpisodeItem episode) => episode.id == resume.episode.id,
     );
-    if (index < 0) return null;
+    // Last watched marked missing → still try to offer the next playable.
+    if (index < 0) {
+      if (resume.episode.videoMissing) {
+        final int rawIndex = resume.course.episodes.indexWhere(
+          (LibraryEpisodeItem e) => e.id == resume.episode.id,
+        );
+        if (rawIndex >= 0) {
+          for (int i = rawIndex + 1; i < resume.course.episodes.length; i++) {
+            final LibraryEpisodeItem candidate = resume.course.episodes[i];
+            if (candidate.videoMissing) continue;
+            index = episodes.indexWhere((LibraryEpisodeItem e) => e.id == candidate.id);
+            break;
+          }
+        }
+      }
+      if (index < 0) return null;
+    }
     final LibraryEpisodeItem current = episodes[index];
     final LibraryEpisodeItem? next = index + 1 < episodes.length
         ? episodes[index + 1]
@@ -494,13 +524,18 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       return '继续第${episodeIndex + 1}集 · $raw';
     }
 
+    // Treat any resumed multi-ep series as confirmed pursuit (watched before).
+    final bool confirmedSeries =
+        index >= 1 ||
+        resume.course.completedEpisodes >= 1 ||
+        (ref.read(lastLearningEpisodeProvider) ?? '').isNotEmpty;
+
     return seriesContinueTarget(
       SeriesProgress(
         itemCount: episodes.length,
         lastIndex: index,
-        lastCompleted: current.completed,
-        // Once past the first episode, treat the series as a return hook.
-        confirmed: index >= 1,
+        lastCompleted: current.completed || current.progressPercent >= 95,
+        confirmed: confirmedSeries,
         currentTitle: episodeLabel(current, index),
         currentRoute: routeOf(current),
         nextTitle: next == null ? '' : episodeLabel(next, index + 1),
@@ -752,9 +787,52 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                         ? step.title
                         : '下一步 · ${step.title}',
                     reason: step.kind == JourneyNextKind.review
-                        ? '到期 $due 张词卡 · 做完自动进新学'
+                        ? (() {
+                            final JourneyTask? chase = _currentPursuit();
+                            if (chase != null) {
+                              return '到期 $due 张 · 做完接着：${chase.title}';
+                            }
+                            return '到期 $due 张词卡 · 做完自动进新学';
+                          })()
                         : step.reason,
                   ),
+                if (step.kind == JourneyNextKind.review &&
+                    _currentPursuit() != null) ...<Widget>[
+                  const SizedBox(height: 8),
+                  SizedBox(
+                    width: double.infinity,
+                    child: OutlinedButton(
+                      onPressed: _busy
+                          ? null
+                          : () async {
+                              final JourneyTask? chase = _currentPursuit();
+                              if (chase == null) return;
+                              setState(() => _busy = true);
+                              try {
+                                await store.saveStage(JourneyStage.learn);
+                                await store.saveActivity((
+                                  route: chase.route,
+                                  title: chase.title,
+                                ));
+                                if (!mounted) return;
+                                await context.push(chase.route);
+                              } finally {
+                                if (mounted) setState(() => _busy = false);
+                              }
+                            },
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: AppDesignTokens.textPrimary,
+                        side: BorderSide(color: AppDesignTokens.borderGray),
+                        padding: const EdgeInsets.symmetric(vertical: 12),
+                      ),
+                      child: Text(
+                        '先接着看 · ${_currentPursuit()!.title}',
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                  ),
+                ],
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,

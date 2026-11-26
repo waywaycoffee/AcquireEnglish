@@ -61,31 +61,83 @@ class ContinueLearningTarget {
   final LibraryEpisodeItem episode;
 }
 
+/// Resume target for「接着看第 N 集」.
+///
+/// Never invent "first episode of first course" — that erased real progress
+/// and made seriesContinueTarget treat the user as not yet pursuing.
 final Provider<ContinueLearningTarget?> continueLearningTargetProvider =
     Provider<ContinueLearningTarget?>((Ref ref) {
       final List<LibraryCourseData> courses = ref.watch(libraryCatalogProvider);
       final String? lastEpisode = ref.watch(lastLearningEpisodeProvider);
+
+      ContinueLearningTarget? findEpisode(String episodeId) {
+        for (final LibraryCourseData course in courses) {
+          for (final LibraryEpisodeItem episode in course.episodes) {
+            if (episode.id == episodeId) {
+              return ContinueLearningTarget(course: course, episode: episode);
+            }
+          }
+        }
+        return null;
+      }
+
+      if (lastEpisode != null && lastEpisode.isNotEmpty) {
+        final ContinueLearningTarget? hit = findEpisode(lastEpisode);
+        if (hit != null) return hit;
+      }
+
+      // Fallback: most recently studied unfinished episode (by course stamp).
+      LibraryCourseData? bestCourse;
+      LibraryEpisodeItem? bestEpisode;
+      int bestStamp = -1;
       for (final LibraryCourseData course in courses) {
+        final int stamp = course.lastStudiedAtMs ?? 0;
         for (final LibraryEpisodeItem episode in course.episodes) {
-          if (episode.id == lastEpisode) {
-            return ContinueLearningTarget(course: course, episode: episode);
+          if (episode.videoMissing) continue;
+          if (episode.completed && episode.progressPercent >= 100) continue;
+          if (episode.progressPercent <= 0 && !episode.completed) {
+            // Prefer in-progress; allow completed=false with 0% only if this
+            // course was studied recently and we need *next* after a finished
+            // prior episode — handled below via completedEpisodes.
+            continue;
+          }
+          if (stamp >= bestStamp) {
+            bestStamp = stamp;
+            bestCourse = course;
+            bestEpisode = episode;
           }
         }
       }
-      // Existing libraries have no global history yet. Prefer an unfinished
-      // episode with progress, then the first available episode.
+      if (bestCourse != null && bestEpisode != null) {
+        return ContinueLearningTarget(course: bestCourse, episode: bestEpisode);
+      }
+
+      // Last finished episode in the most recently studied multi-ep course →
+      // caller will advance to next via seriesContinueTarget.
+      LibraryCourseData? recentSeries;
+      int recentStamp = -1;
       for (final LibraryCourseData course in courses) {
-        for (final LibraryEpisodeItem episode in course.episodes) {
-          if (!episode.completed && episode.progressPercent > 0) {
-            return ContinueLearningTarget(course: course, episode: episode);
+        if (course.episodes.length < 2) continue;
+        final int stamp = course.lastStudiedAtMs ?? 0;
+        if (stamp <= recentStamp) continue;
+        final bool anyDone = course.episodes.any(
+          (LibraryEpisodeItem e) => e.completed || e.progressPercent > 0,
+        );
+        if (!anyDone) continue;
+        recentStamp = stamp;
+        recentSeries = course;
+      }
+      if (recentSeries != null) {
+        LibraryEpisodeItem? lastTouched;
+        for (final LibraryEpisodeItem episode in recentSeries.episodes) {
+          if (episode.completed || episode.progressPercent > 0) {
+            lastTouched = episode;
           }
         }
-      }
-      for (final LibraryCourseData course in courses) {
-        if (course.episodes.isNotEmpty) {
+        if (lastTouched != null) {
           return ContinueLearningTarget(
-            course: course,
-            episode: course.episodes.first,
+            course: recentSeries,
+            episode: lastTouched,
           );
         }
       }

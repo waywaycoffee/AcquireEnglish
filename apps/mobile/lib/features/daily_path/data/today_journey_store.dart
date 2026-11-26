@@ -46,18 +46,34 @@ class TodayJourneyStore {
     return (route: route, title: title);
   }
 
+  /// True only when the learner tapped「稍后继续」— not when Journey merely
+  /// opened a cold recommendation. Stale auto-saves must not block「接着看下一集」.
+  bool get pausedExplicitly {
+    final Object? flag = _read()['pausedExplicitly'];
+    return flag == true;
+  }
+
   Future<void> saveStage(JourneyStage stage) async {
     await _prefs?.put(_key, jsonEncode({..._read(), 'stage': stage.name}));
   }
 
-  Future<void> saveActivity(JourneyActivity activity) async {
+  Future<void> saveActivity(
+    JourneyActivity activity, {
+    bool pausedExplicitly = false,
+  }) async {
     await _prefs?.put(
       _key,
       jsonEncode({
         ..._read(),
         'route': activity.route,
         'title': activity.title,
+        'pausedExplicitly': pausedExplicitly,
       }),
     );
+  }
+
+  Future<void> clearPausedFlag() async {
+    final Map<String, Object?> next = {..._read()}..remove('pausedExplicitly');
+    await _prefs?.put(_key, jsonEncode(next));
   }
 }
