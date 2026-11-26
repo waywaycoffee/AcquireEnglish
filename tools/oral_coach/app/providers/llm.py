@@ -41,7 +41,9 @@ def _coach_system(context: VideoContext, *, stuck: bool = False) -> str:
     extra = (
         '\n\n会话能力补充：支持 freechat、视频主题口语、情景角色扮演。'
         '若提供 scene_description，优先围绕眼前实物教词与描述。'
-        '正常问答每轮 spoken text 控制在 2 个短句以内；默认英语台词。'
+        '节奏必须遵守主提示词：讲解示范为主（约70%）、轻量开放式提问为辅（约30%）；'
+        '每轮先简短讲解/示范，再抛出最多一个引导问题，不要连续追问或压成两句寒暄。'
+        '用户卡壳时再缩短并给提示例句。默认英语台词。'
         '内容诊断必须检查语法：时态一致、主谓一致、冠词、介词、词形；'
         '有错则 literal_en 给出改正句，不可原样回显。'
     )
@@ -605,8 +607,9 @@ class OpenAiLlm:
                     'role': 'system',
                     'content': (
                         _coach_system(context, stuck=_is_stuck(learner_text))
-                        + ' Reply as compact JSON. The "text" field must be English'
-                        ' unless the learner asked for Chinese.'
+                        + ' Reply as JSON. The "text" field is spoken coach lines:'
+                        ' teach/demonstrate first, then at most one open question;'
+                        ' English unless the learner asked for Chinese.'
                         ' Include diagnosis when Chinese/mixed/awkward OR when English'
                         ' has real grammar errors (tense, agreement, articles, etc.).'
                         ' literal_en must fix those errors and must not equal source;'
@@ -619,7 +622,7 @@ class OpenAiLlm:
             ],
             temperature=0.55,
             response_format={'type': 'json_object'},
-            max_tokens=320,
+            max_tokens=560,
         )
         fallback = _guided_fallback(context, learner_text)
         text = str(data.get('text') or '').strip() or fallback.text

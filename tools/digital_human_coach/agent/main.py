@@ -34,7 +34,9 @@ INSTRUCTIONS = (
     realtime_system_prompt(light=False)
     + '\n\n'
     + session_anchor_prompt(level='初中', topic='日常口语', weak_points='暂无')
-    + '\nKeep each turn short (1–4 spoken sentences). Prefer open questions. '
+    + '\nFollow the guided-teaching rhythm: explain/demonstrate first (~70%), '
+    'then at most one open question (~30%). Do not fire consecutive quiz questions. '
+    'When the learner is stuck, shorten and offer a scaffold example. '
     'When video context is provided, stay on that topic.'
 )
 
