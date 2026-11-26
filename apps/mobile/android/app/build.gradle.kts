@@ -1,5 +1,6 @@
 import java.util.Properties
 import java.io.FileInputStream
+import java.io.File
 
 plugins {
     id("com.android.application")
@@ -12,6 +13,106 @@ val keystoreProperties = Properties()
 val keystorePropertiesFile = rootProject.file("key.properties")
 if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
+}
+
+// media_kit 1.2.6 has an Android release-only disposal race on Flutter 3.38+:
+// it closes NativeCallable, then waits 5 seconds before joining mpv's thread.
+// An in-flight callback in that window aborts the process. This applies the
+// upstream fix (media-kit/media-kit#1424) until pub.dev contains it.
+val patchMediaKitDisposeRace = tasks.register("patchMediaKitDisposeRace") {
+    doLast {
+        val pubCache = System.getenv("PUB_CACHE")?.let(::File)
+            ?: File(System.getProperty("user.home"), ".pub-cache")
+        val packageDir = File(pubCache, "hosted/pub.dev/media_kit-1.2.6")
+        require(packageDir.isDirectory) {
+            "media_kit 1.2.6 is missing from $packageDir; run flutter pub get first."
+        }
+
+        fun patch(relative: String, old: String, replacement: String) {
+            val target = File(packageDir, relative)
+            val source = target.readText()
+            val marker = replacement.lineSequence()
+                .first { it.isNotBlank() }
+                .trim()
+            if (source.lineSequence().any { it.trim() == marker }) return
+            require(source.contains(old)) {
+                "media_kit source changed; refuse to apply stale crash patch to $target"
+            }
+            target.writeText(source.replace(old, replacement))
+        }
+
+        patch(
+            "lib/src/player/native/core/initializer_native_callable.dart",
+            """
+  void dispose(Pointer<generated.mpv_handle> ctx) {
+    _locks.remove(ctx.address);
+    _eventCallbacks.remove(ctx.address);
+
+    // Clear the wakeup callback in libmpv before closing NativeCallable
+    // to prevent libmpv from invoking a deleted callback
+    mpv.mpv_set_wakeup_callback(ctx, nullptr, nullptr);
+    
+    _wakeUpNativeCallables.remove(ctx.address)?.close();
+  }
+""".trimIndent(),
+            """
+  WakeUpNativeCallable? dispose(Pointer<generated.mpv_handle> ctx) {
+    _locks.remove(ctx.address);
+    _eventCallbacks.remove(ctx.address);
+
+    // Stop new wakeups, but keep the callable alive until mpv's thread joins.
+    mpv.mpv_set_wakeup_callback(ctx, nullptr, nullptr);
+    return _wakeUpNativeCallables.remove(ctx.address);
+  }
+""".trimIndent(),
+        )
+        patch(
+            "lib/src/player/native/core/initializer.dart",
+            """
+  void dispose(Pointer<generated.mpv_handle> ctx) {
+    if (!isExecmemRestricted) {
+      InitializerNativeCallable(mpv).dispose(ctx);
+    } else {
+      InitializerIsolate().dispose(mpv, ctx);
+    }
+  }
+""".trimIndent(),
+            """
+  WakeUpNativeCallable? dispose(Pointer<generated.mpv_handle> ctx) {
+    if (!isExecmemRestricted) {
+      return InitializerNativeCallable(mpv).dispose(ctx);
+    } else {
+      InitializerIsolate().dispose(mpv, ctx);
+      return null;
+    }
+  }
+""".trimIndent(),
+        )
+        patch(
+            "lib/src/player/native/player/real.dart",
+            """
+      Initializer(mpv).dispose(ctx);
+
+      Future.delayed(const Duration(seconds: 5), () {
+        mpv.mpv_terminate_destroy(ctx);
+      });
+""".trimIndent(),
+            """
+      final callable = Initializer(mpv).dispose(ctx);
+
+      Future.delayed(const Duration(seconds: 5), () {
+        mpv.mpv_terminate_destroy(ctx);
+        callable?.close();
+      });
+""".trimIndent(),
+        )
+    }
+}
+
+tasks.configureEach {
+    if (name.startsWith("compileFlutterBuild")) {
+        dependsOn(patchMediaKitDisposeRace)
+    }
 }
 
 android {
