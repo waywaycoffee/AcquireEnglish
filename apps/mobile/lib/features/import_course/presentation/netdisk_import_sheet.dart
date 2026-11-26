@@ -216,9 +216,16 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
       }
     } catch (error) {
       if (!mounted) return;
+      final String raw = '$error'.replaceFirst('Exception: ', '');
+      final bool gateway =
+          raw.contains('502') || raw.toLowerCase().contains('bad response');
       setState(() {
         _loading = false;
-        _error = '$error'.replaceFirst('Exception: ', '');
+        // Keep OpenList readiness unknown on transport errors — do not claim
+        // "服务端尚未启用 OpenList" when the API briefly returned 502.
+        _error = gateway
+            ? '服务暂时繁忙（502），请稍后点重试。OpenList 已在服务器配置。'
+            : raw;
       });
     }
   }
@@ -606,11 +613,25 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
                     child: Center(child: CircularProgressIndicator()),
                   )
                 else ...<Widget>[
-                  if (!_openlistReady)
+                  if (!_openlistReady && _error == null)
                     Text(
                       '服务端尚未启用 OpenList。部署后即可绑定网盘。',
                       style: TextStyle(color: AppDesignTokens.textSecondary),
                     ),
+                  if (_error != null) ...<Widget>[
+                    Text(
+                      _error!,
+                      style: TextStyle(color: AppDesignTokens.dangerText),
+                    ),
+                    const SizedBox(height: 8),
+                    OutlinedButton(
+                      onPressed: _busy
+                          ? null
+                          : () => unawaited(_reloadStatus()),
+                      child: const Text('重试连接网盘服务'),
+                    ),
+                    const SizedBox(height: 12),
+                  ],
                   if (_openlistReady && !_bound) ...<Widget>[
                     if (_useBaiduOauth) ...<Widget>[
                       Text(

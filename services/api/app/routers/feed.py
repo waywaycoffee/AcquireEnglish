@@ -175,7 +175,7 @@ async def daily_feed(
     # Prefer i+1 duration fit, then stable day rank (not pure interest noise).
     interest_candidates.sort(
         key=lambda item: (
-            -duration_iplus1_score(item.duration_sec, level),
+            -duration_iplus1_score(item.durationSec, level),
             _stable_rank(item.bvid, feed_day, user.id),
         )
     )
