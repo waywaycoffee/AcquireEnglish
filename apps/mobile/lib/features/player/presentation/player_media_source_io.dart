@@ -8,13 +8,17 @@ import '../../../constants/endpoints.dart';
 import '../data/softsub_paths.dart';
 
 String createPlayerMediaUri(String source) {
-  if (source.startsWith('http://') || source.startsWith('https://')) {
-    return source;
+  final String trimmed = source.trim();
+  if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
+    return trimmed;
   }
-  if (_isLocalFilePath(source)) {
-    return Uri.file(source).toString();
+  if (trimmed.startsWith('/media/')) {
+    return _absoluteApiUrl(trimmed);
   }
-  return 'asset:///$source';
+  if (_isLocalFilePath(trimmed)) {
+    return Uri.file(trimmed).toString();
+  }
+  return 'asset:///$trimmed';
 }
 
 bool playerMediaAvailable(String source) {
@@ -31,6 +35,39 @@ bool playerMediaAvailable(String source) {
     return true;
   }
   return File(source).existsSync();
+}
+
+/// Fast existence probe for ECS `/media` (or absolute) streams.
+///
+/// Used so skill-module episodes can fall back to Bilibili stream without a
+/// multi-second media_kit open failure when the ECS copy is not uploaded yet.
+Future<bool> playerRemoteMediaExists(
+  String source, {
+  Duration timeout = const Duration(milliseconds: 1200),
+}) async {
+  final String uri = createPlayerMediaUri(source.trim());
+  if (!(uri.startsWith('http://') || uri.startsWith('https://'))) {
+    return _isLocalFilePath(source) && File(source).existsSync();
+  }
+  final HttpClient client = HttpClient();
+  client.connectionTimeout = timeout;
+  try {
+    final HttpClientRequest request = await client
+        .headUrl(Uri.parse(uri))
+        .timeout(timeout);
+    final HttpClientResponse response = await request.close().timeout(timeout);
+    final int code = response.statusCode;
+    // Drain lightly so the socket can close cleanly.
+    await response.drain<void>().timeout(
+      const Duration(milliseconds: 400),
+      onTimeout: () {},
+    );
+    return code >= 200 && code < 300;
+  } catch (_) {
+    return false;
+  } finally {
+    client.close(force: true);
+  }
 }
 
 Future<String> loadPlayerTextSource(String source) async {
@@ -75,7 +112,7 @@ Future<String> loadPlayerTextSource(String source) async {
         const Duration(seconds: 30),
       );
       if (response.statusCode < 200 || response.statusCode >= 300) {
-        throw StateError('字幕下载失败 HTTP ${response.statusCode}');
+        throw StateError('字幕加载失败 HTTP ${response.statusCode}');
       }
       return await response.transform(utf8.decoder).join();
     } finally {
@@ -83,14 +120,21 @@ Future<String> loadPlayerTextSource(String source) async {
     }
   }
   if (trimmed.startsWith('/media/')) {
-    final String base = Endpoints.normalizeBaseUrl(Endpoints.baseUrl)
-        .replaceAll(RegExp(r'/$'), '');
-    return loadPlayerTextSource('$base$trimmed');
+    return loadPlayerTextSource(_absoluteApiUrl(trimmed));
   }
   if (_isLocalFilePath(trimmed)) {
     return File(trimmed).readAsString();
   }
   return rootBundle.loadString(trimmed);
+}
+
+String _absoluteApiUrl(String path) {
+  final String base = Endpoints.normalizeBaseUrl(Endpoints.baseUrl)
+      .replaceAll(RegExp(r'/$'), '');
+  if (path.startsWith('/')) {
+    return '$base$path';
+  }
+  return '$base/$path';
 }
 
 int? _importIdFromPath(String path) {
@@ -100,6 +144,9 @@ int? _importIdFromPath(String path) {
 
 bool _isLocalFilePath(String source) {
   if (source.isEmpty) {
+    return false;
+  }
+  if (source.startsWith('/media/')) {
     return false;
   }
   return File(source).existsSync();

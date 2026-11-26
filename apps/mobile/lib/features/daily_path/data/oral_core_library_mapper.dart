@@ -1,40 +1,36 @@
-import '../../../constants/endpoints.dart';
+import '../../learning_modules/official_skill_course_media.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../domain/oral_core_series.dart';
-
-String _absoluteMediaUrl(String raw) {
-  final String path = raw.trim();
-  if (path.isEmpty) {
-    return '';
-  }
-  if (path.startsWith('http://') || path.startsWith('https://')) {
-    return path;
-  }
-  final String base = Endpoints.normalizeBaseUrl(Endpoints.baseUrl)
-      .replaceAll(RegExp(r'/$'), '');
-  if (path.startsWith('/')) {
-    return '$base$path';
-  }
-  return '$base/$path';
-}
 
 LibraryCourseData oralCoreSeriesToLibraryCourse(OralCoreSeries series) {
   final List<LibraryEpisodeItem> episodes = series.lessons
       .map((OralCoreLesson lesson) {
-        final String page = lesson.page.toString().padLeft(2, '0');
+        final String page = OfficialSkillCourseMedia.pageFolder(lesson.page);
         final String watchUrl =
             'https://www.bilibili.com/video/${lesson.bvid}?p=${lesson.page}';
         final int minutes =
             (lesson.durationMs / 60000).ceil().clamp(1, 99);
-        final String enSub = _absoluteMediaUrl(
+        final String enSub = OfficialSkillCourseMedia.absoluteMediaUrl(
           lesson.subtitleEn.isNotEmpty
               ? lesson.subtitleEn
-              : '/media/course/oral_core_9000/$page/en.srt',
+              : OfficialSkillCourseMedia.relativeSubtitlePath(
+                  OralCoreSeries.kSeriesId,
+                  lesson.page,
+                  lang: 'en',
+                ),
         );
-        final String zhSub = _absoluteMediaUrl(
+        final String zhSub = OfficialSkillCourseMedia.absoluteMediaUrl(
           lesson.subtitleZh.isNotEmpty
               ? lesson.subtitleZh
-              : '/media/course/oral_core_9000/$page/zh.srt',
+              : OfficialSkillCourseMedia.relativeSubtitlePath(
+                  OralCoreSeries.kSeriesId,
+                  lesson.page,
+                  lang: 'zh',
+                ),
+        );
+        final String ecsVideo = OfficialSkillCourseMedia.relativeVideoPath(
+          OralCoreSeries.kSeriesId,
+          lesson.page,
         );
         return LibraryEpisodeItem(
           id: '${OralCoreSeries.kSeriesId}-$page',
@@ -47,7 +43,7 @@ LibraryCourseData oralCoreSeriesToLibraryCourse(OralCoreSeries series) {
           progressPercent: 0,
           coverImage: 'assets/img/app_icon.png',
           totalTimeStr: '${minutes.toString().padLeft(2, '0')}:00',
-          videoAsset: watchUrl,
+          videoAsset: ecsVideo,
           sourceUrl: watchUrl,
           enSubtitleAsset: enSub.isEmpty ? null : enSub,
           cnSubtitleAsset: zhSub.isEmpty ? null : zhSub,
@@ -73,8 +69,8 @@ LibraryCourseData oralCoreSeriesToLibraryCourse(OralCoreSeries series) {
     id: OralCoreSeries.kSeriesId,
     title: series.title,
     description:
-        '官方课 · B站「英语核心口语句型9000句」共 ${series.lessons.length} 课。 '
-        '一集一课：跟读 · 练习 · AI 讨论。视频仍走 B 站源，字幕走 ECS，不进 APK。',
+        '官方课 · 英语核心口语句型9000句共 ${series.lessons.length} 课。 '
+        '视频/字幕在 ECS 流式秒播；缺集时回退 B 站流，不进 APK。',
     sourceLabel: '官方课',
     coverImage: 'assets/img/app_icon.png',
     level: '口语',

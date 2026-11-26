@@ -19,7 +19,9 @@ import '../../import_course/data/bilibili_multipage.dart';
 import '../../import_course/data/netdisk_local_download.dart';
 import '../../import_course/data/subtitle_source_policy.dart';
 import '../../import_course/domain/bilibili_import.dart';
-import 'hardsub_asr_repair.dart';import '../../library/presentation/library_catalog_provider.dart';
+import '../../learning_modules/official_skill_course_media.dart';
+import 'hardsub_asr_repair.dart';
+import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../phrases/presentation/phrase_book_provider.dart';
@@ -62,6 +64,7 @@ import 'manual_subtitle_guard.dart';
 import 'player_course_lookup.dart';
 import 'player_fullscreen_video_screen.dart';
 import 'player_graphics_cache.dart';
+import 'player_ecs_stream.dart';
 import 'player_media_source.dart';
 import 'player_mock_state.dart';
 import 'player_native_subtitles.dart';
@@ -1013,6 +1016,15 @@ class PadLandscapePlayerScreenState
     final bool hasLocalVideo = isUsableLocalVideoPath(resource.videoAsset);
     final bool hasEnglish = isUsableSubtitlePath(resource.englishSubtitleAsset);
     final bool hasChinese = isUsableSubtitlePath(resource.chineseSubtitleAsset);
+    final String courseId = resource.course?.id ?? '';
+    final String episodeId = resource.episode?.id ?? widget.episodeId;
+    final bool officialCloudSubs =
+        (OfficialSkillCourseMedia.isOfficialSkillSeries(courseId) ||
+            OfficialSkillCourseMedia.isOfficialSkillSeries(episodeId)) &&
+        (hasEnglish || hasChinese);
+    if (officialCloudSubs) {
+      return false;
+    }
     // Local + real English: open immediately. Local + Chinese-only still
     // prepare once so official EN can be pulled before falling back to translate.
     if (hasLocalVideo && hasEnglish) {
@@ -1472,21 +1484,51 @@ class PadLandscapePlayerScreenState
     final bool looksLocal =
         trimmed.isNotEmpty &&
         !trimmed.startsWith('http://') &&
-        !trimmed.startsWith('https://');
+        !trimmed.startsWith('https://') &&
+        !OfficialSkillCourseMedia.looksLikeEcsMediaPath(trimmed);
     if (looksLocal) {
       final File local = File(trimmed);
       if (local.existsSync() && local.lengthSync() > 64 * 1024) {
         return (uri: trimmed, headers: null);
       }
     }
-    if (isNetdiskPlayUrl(trimmed)) {
+    // Homepage skill modules: stream ECS video when present (no download).
+    final PlayerCourseLookupResult ecsLookup = resolvePlayerCourseForEpisode(
+      courses: ref.read(libraryCatalogProvider),
+      episodeId: widget.episodeId,
+    );
+    final String? ecsStream = await tryResolveEcsCourseVideoStream(
+      course: ecsLookup.course,
+      episode: ecsLookup.episode,
+      currentSource: trimmed,
+    );
+    if (ecsStream != null) {
+      onProgress?.call(1, '正在秒播…');
+      return (uri: ecsStream, headers: null);
+    }
+    // Missing ECS object: never open a 404 /media URL; fall back to sourceUrl.
+    String candidate = trimmed;
+    if (OfficialSkillCourseMedia.looksLikeEcsMediaPath(trimmed) ||
+        ((trimmed.startsWith('http://') || trimmed.startsWith('https://')) &&
+            trimmed.contains('/media/course/'))) {
+      final String? fallback = ecsLookup.episode?.sourceUrl?.trim();
+      if (fallback != null && fallback.isNotEmpty) {
+        candidate = fallback;
+      }
+    }
+    final bool candidateLocal =
+        candidate.isNotEmpty &&
+        !candidate.startsWith('http://') &&
+        !candidate.startsWith('https://') &&
+        !OfficialSkillCourseMedia.looksLikeEcsMediaPath(candidate);
+    if (isNetdiskPlayUrl(candidate)) {
       final PlayerCourseLookupResult lookup = resolvePlayerCourseForEpisode(
         courses: ref.read(libraryCatalogProvider),
         episodeId: widget.episodeId,
       );
       final ({String uri, Map<String, String>? headers}) resolved =
           await prepareNetdiskEpisodeForSmoothPlayback(
-        playUrl: trimmed,
+        playUrl: candidate,
         preferredLocalPath: lookup.episode?.videoAsset,
         onProgress: onProgress,
       );
@@ -1514,10 +1556,10 @@ class PadLandscapePlayerScreenState
       }
       return resolved;
     }
-    if (!looksLocal &&
-        !BilibiliImport.isWatchPageUrl(trimmed) &&
-        !BilibiliImport.looksLikeBilibiliInput(trimmed)) {
-      return (uri: trimmed, headers: null);
+    if (!candidateLocal &&
+        !BilibiliImport.isWatchPageUrl(candidate) &&
+        !BilibiliImport.looksLikeBilibiliInput(candidate)) {
+      return (uri: candidate, headers: null);
     }
 
     final PlayerCourseLookupResult resource = resolvePlayerCourseForEpisode(
@@ -1528,14 +1570,14 @@ class PadLandscapePlayerScreenState
         bilibiliSourceForEpisode(
           course: resource.course,
           episode: resource.episode,
-          videoAsset: resource.videoAsset ?? trimmed,
+          videoAsset: resource.videoAsset ?? candidate,
         ) ??
-        _bilibiliRecoverSource(trimmed);
+        _bilibiliRecoverSource(candidate);
     if (biliSource == null) {
-      if (looksLocal) {
+      if (candidateLocal) {
         throw StateError('本地视频文件不存在，且无法从课程信息恢复 B 站链接');
       }
-      return (uri: trimmed, headers: null);
+      return (uri: candidate, headers: null);
     }
 
     try {

@@ -8,6 +8,33 @@
 | App 经 manifest/lookup 拿 URL 后流式播放 | 第三方音视频原文件随包分发 |
 | 文本 JSON/TXT/CSV/EPUB 按需下载到本地缓存 | 把 Magic/GitHub 的 mp3 拷进工程 |
 
+## 首页技能模块（秒播）
+
+官方技能课（国际音标 / 美式音标 / 自然拼读 / 核心口语9000句）的视频与字幕落在：
+
+```
+media/course/{series_id}/{nn}/video.mp4
+media/course/{series_id}/{nn}/en.srt
+media/course/{series_id}/{nn}/zh.srt
+```
+
+App 打开单集时：
+
+1. HEAD 探测 ECS `video.mp4` → 有则 **HTTP Range 流式秒播**（不下载整集）
+2. 同步 GET ECS `en.srt` / `zh.srt` 进内存解析（小文件，无本机落盘）
+3. ECS 缺视频时回退 B 站 **流式**播放（仍不「先下后学」）
+
+运维：
+
+```bash
+# 从 shared_bilibili_subtitles 物化字幕到 course/
+PYTHONPATH=/opt/acquireenglish/services/api \
+  /opt/acquireenglish/services/api/.venv/bin/python \
+  /opt/acquireenglish/tools/course_media/materialize_skill_subs_from_shared.py
+
+# 本机 5060 Ti 镜像视频后再 scp 到 ECS（见 tools/course_media/mirror_skill_videos.py）
+```
+
 ## 磁盘布局
 
 ```

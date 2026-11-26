@@ -23,4 +23,12 @@ void main() {
       'https://example.com/video.mp4',
     );
   });
+
+  test('absolutizes relative /media course paths for streaming', () {
+    final String uri = createPlayerMediaUri(
+      '/media/course/british_ipa_bbc/02/video.mp4',
+    );
+    expect(uri.startsWith('http'), isTrue);
+    expect(uri.endsWith('/media/course/british_ipa_bbc/02/video.mp4'), isTrue);
+  });
 }

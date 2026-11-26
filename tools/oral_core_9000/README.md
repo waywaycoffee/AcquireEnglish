@@ -28,4 +28,4 @@ App 打开官方课时会把 ECS `/media/course/oral_core_9000/{nn}/en.srt|zh.sr
 3. 规则抽句型；有 `DEEPSEEK_API_KEY` 时生成 quiz + discuss
 4. 合并回 `manifest.json`（同步到 `apps/mobile/assets/courses/` 与 `services/api/data/oral_core_9000/`）
 
-视频**不**上传 ECS；播放仍走 B 站源。
+视频优先上传 ECS（`media/course/oral_core_9000/{nn}/video.mp4`）供秒播；缺集时 App 回退 B 站流。镜像脚本：`tools/course_media/mirror_skill_videos.py`。

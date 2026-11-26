@@ -1,4 +1,5 @@
 import '../library/presentation/library_mock_data.dart';
+import 'official_skill_course_media.dart';
 
 /// Bilibili BV1Qg4mzKENh — Nessy 自然拼读趣味动画（当前合集 75 集）.
 class PhonicsNessyLesson {
@@ -100,9 +101,25 @@ class PhonicsNessyCourse {
   static LibraryCourseData toLibraryCourse() {
     final List<LibraryEpisodeItem> episodes = lessons
         .map((PhonicsNessyLesson lesson) {
-          final String page = lesson.page.toString().padLeft(2, '0');
+          final String page = OfficialSkillCourseMedia.pageFolder(lesson.page);
           final String watchUrl =
               'https://www.bilibili.com/video/$kBvid?p=${lesson.page}';
+          final String ecsVideo =
+              OfficialSkillCourseMedia.relativeVideoPath(kSeriesId, lesson.page);
+          final String enSub = OfficialSkillCourseMedia.absoluteMediaUrl(
+            OfficialSkillCourseMedia.relativeSubtitlePath(
+              kSeriesId,
+              lesson.page,
+              lang: 'en',
+            ),
+          );
+          final String zhSub = OfficialSkillCourseMedia.absoluteMediaUrl(
+            OfficialSkillCourseMedia.relativeSubtitlePath(
+              kSeriesId,
+              lesson.page,
+              lang: 'zh',
+            ),
+          );
           return LibraryEpisodeItem(
             id: episodeIdForPage(lesson.page),
             numberStr: page,
@@ -114,8 +131,22 @@ class PhonicsNessyCourse {
             progressPercent: 0,
             coverImage: 'assets/img/app_icon.png',
             totalTimeStr: '03:00',
-            videoAsset: watchUrl,
+            videoAsset: ecsVideo,
             sourceUrl: watchUrl,
+            enSubtitleAsset: enSub,
+            cnSubtitleAsset: zhSub,
+            subtitleTracks: <LibrarySubtitleTrackItem>[
+              LibrarySubtitleTrackItem(
+                languageCode: 'en',
+                languageLabel: 'English',
+                path: enSub,
+              ),
+              LibrarySubtitleTrackItem(
+                languageCode: 'zh',
+                languageLabel: '中文',
+                path: zhSub,
+              ),
+            ],
             videoMissing: false,
           );
         })
@@ -125,8 +156,8 @@ class PhonicsNessyCourse {
       id: kSeriesId,
       title: kTitle,
       description:
-          '官方技能课 · B站 Nessy 自然拼读趣味动画 ${lessons.length} 集。'
-          '打开单集后在播放器里用跟读即可；视频走 B 站源，不进 APK。',
+          '官方技能课 · Nessy 自然拼读 ${lessons.length} 集。视频/字幕在 ECS 流式秒播，不进 APK；'
+          'ECS 缺集时回退 B 站流（仍不下载）。',
       sourceLabel: '官方课',
       coverImage: 'assets/img/app_icon.png',
       level: '拼读',

@@ -1,4 +1,5 @@
 import '../library/presentation/library_mock_data.dart';
+import 'official_skill_course_media.dart';
 
 /// Bilibili BV1iy4y1v7WQ — 【美式发音】国际音标慢速跟读（20 集）.
 class AmericanIpaLesson {
@@ -47,22 +48,52 @@ class AmericanIpaCourse {
   static LibraryCourseData toLibraryCourse() {
     final List<LibraryEpisodeItem> episodes = lessons
         .map((AmericanIpaLesson lesson) {
-          final String page = lesson.page.toString().padLeft(2, '0');
+          final String page = OfficialSkillCourseMedia.pageFolder(lesson.page);
           final String watchUrl =
               'https://www.bilibili.com/video/$kBvid?p=${lesson.page}';
+          final String ecsVideo =
+              OfficialSkillCourseMedia.relativeVideoPath(kSeriesId, lesson.page);
+          final String enSub = OfficialSkillCourseMedia.absoluteMediaUrl(
+            OfficialSkillCourseMedia.relativeSubtitlePath(
+              kSeriesId,
+              lesson.page,
+              lang: 'en',
+            ),
+          );
+          final String zhSub = OfficialSkillCourseMedia.absoluteMediaUrl(
+            OfficialSkillCourseMedia.relativeSubtitlePath(
+              kSeriesId,
+              lesson.page,
+              lang: 'zh',
+            ),
+          );
           return LibraryEpisodeItem(
             id: episodeIdForPage(lesson.page),
             numberStr: page,
             title: lesson.title,
             durationMinutes: 1,
-            hasChineseSubtitles: false,
+            hasChineseSubtitles: true,
             hasEnglishSubtitles: true,
             completed: false,
             progressPercent: 0,
             coverImage: 'assets/img/app_icon.png',
             totalTimeStr: '00:55',
-            videoAsset: watchUrl,
+            videoAsset: ecsVideo,
             sourceUrl: watchUrl,
+            enSubtitleAsset: enSub,
+            cnSubtitleAsset: zhSub,
+            subtitleTracks: <LibrarySubtitleTrackItem>[
+              LibrarySubtitleTrackItem(
+                languageCode: 'en',
+                languageLabel: 'English',
+                path: enSub,
+              ),
+              LibrarySubtitleTrackItem(
+                languageCode: 'zh',
+                languageLabel: '中文',
+                path: zhSub,
+              ),
+            ],
             videoMissing: false,
           );
         })
@@ -72,8 +103,8 @@ class AmericanIpaCourse {
       id: kSeriesId,
       title: kTitle,
       description:
-          '官方技能课 · B站「美式发音国际音标」20 集慢速跟读。'
-          '打开单集后在播放器里用跟读即可；视频走 B 站源，不进 APK。',
+          '官方技能课 · 美式音标慢速跟读。视频/字幕在 ECS 流式秒播，不进 APK；'
+          'ECS 缺集时回退 B 站流（仍不下载）。',
       sourceLabel: '官方课',
       coverImage: 'assets/img/app_icon.png',
       level: '音标',

@@ -1,4 +1,5 @@
 import '../library/presentation/library_mock_data.dart';
+import 'official_skill_course_media.dart';
 
 /// Bilibili BV127411n7nj — BBC 官方音标教程（取有字幕分 P，跳过后半无字幕重复）。
 class BritishIpaLesson {
@@ -74,9 +75,25 @@ class BritishIpaCourse {
   static LibraryCourseData toLibraryCourse() {
     final List<LibraryEpisodeItem> episodes = lessons
         .map((BritishIpaLesson lesson) {
-          final String page = lesson.page.toString().padLeft(2, '0');
+          final String page = OfficialSkillCourseMedia.pageFolder(lesson.page);
           final String watchUrl =
               'https://www.bilibili.com/video/$kBvid?p=${lesson.page}';
+          final String ecsVideo =
+              OfficialSkillCourseMedia.relativeVideoPath(kSeriesId, lesson.page);
+          final String enSub = OfficialSkillCourseMedia.absoluteMediaUrl(
+            OfficialSkillCourseMedia.relativeSubtitlePath(
+              kSeriesId,
+              lesson.page,
+              lang: 'en',
+            ),
+          );
+          final String zhSub = OfficialSkillCourseMedia.absoluteMediaUrl(
+            OfficialSkillCourseMedia.relativeSubtitlePath(
+              kSeriesId,
+              lesson.page,
+              lang: 'zh',
+            ),
+          );
           return LibraryEpisodeItem(
             id: episodeIdForPage(lesson.page),
             numberStr: page,
@@ -88,8 +105,23 @@ class BritishIpaCourse {
             progressPercent: 0,
             coverImage: 'assets/img/app_icon.png',
             totalTimeStr: '02:00',
-            videoAsset: watchUrl,
+            // Prefer ECS stream path; player falls back to sourceUrl if missing.
+            videoAsset: ecsVideo,
             sourceUrl: watchUrl,
+            enSubtitleAsset: enSub,
+            cnSubtitleAsset: zhSub,
+            subtitleTracks: <LibrarySubtitleTrackItem>[
+              LibrarySubtitleTrackItem(
+                languageCode: 'en',
+                languageLabel: 'English',
+                path: enSub,
+              ),
+              LibrarySubtitleTrackItem(
+                languageCode: 'zh',
+                languageLabel: '中文',
+                path: zhSub,
+              ),
+            ],
             videoMissing: false,
           );
         })
@@ -99,8 +131,8 @@ class BritishIpaCourse {
       id: kSeriesId,
       title: kTitle,
       description:
-          '官方技能课 · B站 BBC 英式音标教程（有字幕分集）。'
-          '打开单集后在播放器里跟读即可；视频走 B 站源，不进 APK。',
+          '官方技能课 · BBC 英式音标。视频/字幕在 ECS 流式秒播，不进 APK；'
+          'ECS 缺集时回退 B 站流（仍不下载）。',
       sourceLabel: '官方课',
       coverImage: 'assets/img/app_icon.png',
       level: '音标',
