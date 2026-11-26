@@ -18,7 +18,10 @@ HOT_EDITIONS: list[tuple[re.Pattern[str], str, str, str, int]] = [
     # edition_key, edition_label, publisher, score
     (re.compile(r"人教.*PEP|PEP.*人教|人教版（PEP）"), "pep-y3", "人教版 PEP", "人民教育出版社", 100),
     (re.compile(r"人教版（一年级起点）|人教.*一年级起点"), "pep-y1", "人教版（一年级起点）", "人民教育出版社", 95),
+    (re.compile(r"人教版（三年级起点）|人教.*三年级起点"), "pep-y3-start", "人教版（三年级起点）", "人民教育出版社", 96),
     (re.compile(r"Go\s*for\s*it|人教.*初中|人教版\s*Go", re.I), "pep-go", "人教版 Go for it!", "人民教育出版社", 95),
+    # Junior/senior folders often named plain「人教版」.
+    (re.compile(r"人教"), "pep", "人教版", "人民教育出版社", 92),
     (re.compile(r"外研"), "fltrp-y3", "外研社版", "外语教学与研究出版社", 90),
     (re.compile(r"译林"), "yilin-y3", "译林版", "译林出版社", 85),
     (re.compile(r"北京版|北京出版社"), "beijing", "北京版", "北京出版社", 88),
@@ -165,12 +168,42 @@ def _grade_from_parts(parts: list[str]) -> tuple[str, str, str, str] | None:
     return None
 
 
+def _looks_like_english_textbook_path(parts: list[str]) -> bool:
+    joined = "/".join(parts)
+    if "英语" in parts:
+        return True
+    # Local dumps often omit the「英语」layer: 小学/人教版（PEP）/三年级/上册
+    markers = ("人教", "外研", "译林", "北京版", "北师", "冀教", "PEP", "Go for it")
+    return any(marker in joined for marker in markers)
+
+
+def _edition_folder_from_parts(parts: list[str]) -> str:
+    if "英语" in parts:
+        idx = parts.index("英语")
+        return parts[idx + 1] if idx + 1 < len(parts) else (parts[-1] if parts else "")
+    # 小学 / {edition} / 三年级 / …
+    if parts and parts[0] in ("小学", "初中", "高中") and len(parts) >= 2:
+        return parts[1]
+    return parts[0] if parts else ""
+
+
+def _year_rank(parts: list[str]) -> int:
+    best = 0
+    for part in parts:
+        match = re.search(r"(20\d{2})", part)
+        if match:
+            best = max(best, int(match.group(1)))
+    return best
+
+
 def scan_local_tree(
     root: Path,
     *,
     english_only: bool = True,
     hot_only: bool = False,
+    pep_only: bool = False,
     min_mp3: int = 5,
+    latest_year_only: bool = True,
 ) -> list[LocalTextbookCandidate]:
     root = root.resolve()
     if not root.is_dir():
@@ -180,7 +213,7 @@ def scan_local_tree(
     for folder in sorted({p.parent for p in root.rglob("*.mp3") if p.is_file()}):
         rel = folder.relative_to(root)
         parts = list(rel.parts)
-        if english_only and "英语" not in parts:
+        if english_only and not _looks_like_english_textbook_path(parts):
             continue
         pdf = _pick_pdf(folder)
         mp3s = sorted({p.name.lower(): p for p in folder.glob("*.mp3")}.values())
@@ -188,15 +221,10 @@ def scan_local_tree(
             continue
 
         stage_dir = parts[0] if parts else ""
-        # Prefer …/英语/{edition}/{grade}/{volume}
-        edition_folder = ""
-        if "英语" in parts:
-            idx = parts.index("英语")
-            edition_folder = parts[idx + 1] if idx + 1 < len(parts) else folder.name
-        else:
-            edition_folder = folder.name
-
+        edition_folder = _edition_folder_from_parts(parts)
         edition_key, edition, publisher, score, hot = _match_edition(edition_folder)
+        if pep_only and "人教" not in edition_folder and "PEP" not in edition_folder.upper():
+            continue
         if hot_only and not hot:
             continue
 
@@ -226,6 +254,10 @@ def scan_local_tree(
             if grade_info and stage != expected:
                 notes.append(f"路径学段 {stage_dir} 与年级 {grade_label} 不一致")
 
+        # Disambiguate PEP 吴欣 key (pep-y3 overlaps with generic).
+        if "PEP" in edition_folder.upper() and "吴欣" in edition_folder:
+            edition_key = "pep-y3-wuxin"
+            edition = "人教版 PEP"
         grade_short = grade_id.replace("k12_", "") if grade_id else "x"
         book_id = f"{edition_key}-{grade_short}-{volume_key}" if volume_key else ""
         catalog_id = (
@@ -238,10 +270,13 @@ def scan_local_tree(
         if not book_id:
             ready = False
 
-        # Multiple PDFs: note which one we pick.
         pdf_names = sorted({p.name for p in folder.glob("*.pdf")})
         if len(pdf_names) > 1:
             notes.append(f"目录有 {len(pdf_names)} 个 PDF，将使用：{pdf.name}")
+
+        year = _year_rank(parts)
+        if year:
+            notes.append(f"内容年份 {year}")
 
         out.append(
             LocalTextbookCandidate(
@@ -255,7 +290,7 @@ def scan_local_tree(
                 parseable_mp3=parseable,
                 pdf_name=pdf.name,
                 hot=hot,
-                score=score + min(20, parseable // 5),
+                score=score + min(20, parseable // 5) + (year % 100 if year else 0),
                 edition_key=edition_key,
                 edition=edition,
                 publisher=publisher,
@@ -271,6 +306,19 @@ def scan_local_tree(
                 notes=notes,
             )
         )
+
+    if latest_year_only:
+        best: dict[str, LocalTextbookCandidate] = {}
+        for row in out:
+            key = row.book_id or row.path
+            prev = best.get(key)
+            row_year = _year_rank(Path(row.path).parts)
+            prev_year = _year_rank(Path(prev.path).parts) if prev else -1
+            if prev is None or row_year > prev_year or (
+                row_year == prev_year and row.score > prev.score
+            ):
+                best[key] = row
+        out = list(best.values())
 
     out.sort(key=lambda c: (-c.score, c.edition_folder, c.grade_id, c.volume_key))
     return out
@@ -297,6 +345,7 @@ def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--root", type=Path, default=ROOT_DEFAULT)
     parser.add_argument("--hot-only", action="store_true", help="只列热门版本")
+    parser.add_argument("--pep-only", action="store_true", help="只列人教系")
     parser.add_argument("--ready-only", action="store_true", help="只列可直接导入的")
     parser.add_argument("--min-mp3", type=int, default=5)
     parser.add_argument("--json", type=Path, default=None, help="写出候选 JSON")
@@ -308,7 +357,10 @@ def main() -> int:
     args = parser.parse_args()
 
     rows = scan_local_tree(
-        args.root, hot_only=args.hot_only, min_mp3=args.min_mp3
+        args.root,
+        hot_only=args.hot_only,
+        pep_only=args.pep_only,
+        min_mp3=args.min_mp3,
     )
     if args.ready_only:
         rows = [r for r in rows if r.ready]

@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -7,6 +8,7 @@ import 'package:url_launcher/url_launcher.dart';
 
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
+import '../data/k12_textbook_audio_cache.dart';
 import '../domain/k12_textbook_media.dart';
 
 class K12TextbookStudyScreen extends ConsumerStatefulWidget {
@@ -29,6 +31,7 @@ class _K12TextbookStudyScreenState
   K12TextbookMedia? _book;
   String? _error;
   bool _loading = true;
+  bool _caching = false;
   int? _playingSeq;
   bool _playing = false;
   late final Player _player;
@@ -88,14 +91,36 @@ class _K12TextbookStudyScreenState
   }
 
   Future<void> _play(K12TextbookLesson lesson) async {
-    final String url = lesson.audioUrl.trim();
-    if (url.isEmpty) return;
-    setState(() => _playingSeq = lesson.seq);
-    await _player.open(Media(url));
-    await _player.play();
+    setState(() {
+      _playingSeq = lesson.seq;
+      _caching = true;
+      _error = null;
+    });
+    try {
+      final File cached = await ensureK12TextbookAudioCached(
+        client: ref.read(acquireApiClientProvider),
+        bookId: widget.mediaBookId,
+        seq: lesson.seq,
+        fallbackAudioUrl: lesson.audioUrl,
+      );
+      if (!mounted) return;
+      setState(() => _caching = false);
+      await _player.open(Media(cached.uri.toString()));
+      await _player.play();
+    } catch (error) {
+      if (!mounted) return;
+      setState(() {
+        _caching = false;
+        _playingSeq = null;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('音频下载失败，请重试：$error')),
+      );
+    }
   }
 
   Future<void> _toggle(K12TextbookLesson lesson) async {
+    if (_caching) return;
     if (_playingSeq == lesson.seq && _playing) {
       await _player.pause();
       return;
@@ -171,9 +196,19 @@ class _K12TextbookStudyScreenState
         ),
         const SizedBox(height: 8),
         Text(
-          '点课程即可播放配套 MP3。点读（OCR→翻译→朗读）下一阶段接入。',
+          '点课程会下载配套 MP3 到本机后再播放（音频来自教材网盘，不占服务器盘）。'
+          '点读（OCR→翻译→朗读）下一阶段接入。',
           style: TextStyle(color: AppDesignTokens.textSecondary, height: 1.35),
         ),
+        if (_caching) ...<Widget>[
+          const SizedBox(height: 12),
+          const LinearProgressIndicator(minHeight: 2),
+          const SizedBox(height: 4),
+          Text(
+            '正在下载到手机…',
+            style: TextStyle(color: AppDesignTokens.textSecondary, fontSize: 12),
+          ),
+        ],
         const SizedBox(height: 16),
         for (final MapEntry<String, List<K12TextbookLesson>> entry
             in grouped.entries) ...<Widget>[

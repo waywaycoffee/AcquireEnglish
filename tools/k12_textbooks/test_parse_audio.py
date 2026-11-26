@@ -34,6 +34,19 @@ class ParseAudioTest(unittest.TestCase):
         assert reading is not None
         self.assertEqual(reading.kind, "reading")
 
+    def test_pep_unit_section(self) -> None:
+        track = parse_audio_filename("03_Unit 1 A Let's talk.mp3")
+        assert track is not None
+        self.assertEqual(track.seq, 3)
+        self.assertEqual(track.unit, 1)
+        self.assertEqual(track.section, "A")
+        self.assertEqual(track.kind, "talk")
+
+        doubled = parse_audio_filename("03_03 Unit 1 A Let's talk.mp3")
+        assert doubled is not None
+        self.assertEqual(doubled.unit, 1)
+        self.assertEqual(doubled.section, "A")
+
     def test_sample_folder(self) -> None:
         folder = (
             Path(__file__).resolve().parents[2]

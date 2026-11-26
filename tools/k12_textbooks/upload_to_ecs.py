@@ -10,7 +10,7 @@ import tempfile
 from pathlib import Path
 
 DEFAULT_HOST = "root@8.163.45.100"
-DEFAULT_REMOTE = "/opt/acquireenglish/services/api/media/reading/textbooks"
+DEFAULT_REMOTE = "/opt/acquireenglish/services/api/media/reading/k12"
 
 
 def _run(cmd: list[str]) -> None:
@@ -33,7 +33,7 @@ def merge_catalog(existing: dict | None, book: dict, *, public_base: str) -> dic
         ]
 
     base = public_base.rstrip("/")
-    prefix = f"{base}/media/reading/textbooks/{book['book_id']}"
+    prefix = f"{base}/media/reading/k12/{book['book_id']}"
     entry = {
         "book_id": book["book_id"],
         "catalog_id": book["catalog_id"],
@@ -46,10 +46,15 @@ def merge_catalog(existing: dict | None, book: dict, *, public_base: str) -> dic
         "volume": book["volume"],
         "level": book.get("level") or "A1",
         "lesson_count": book["lesson_count"],
+        "audio_mode": book.get("audio_mode") or "ecs",
         "pdf_url": f"{prefix}/book.pdf",
         "book_json_url": f"{prefix}/book.json",
         "built_at": book.get("built_at"),
     }
+    if book.get("source_share_url"):
+        entry["source_share_url"] = book["source_share_url"]
+    if book.get("share_stage"):
+        entry["share_stage"] = book["share_stage"]
     catalog["books"].append(entry)
     catalog["books"].sort(
         key=lambda row: (row.get("grade_id") or "", row.get("book_id") or "")
@@ -122,10 +127,31 @@ def main() -> int:
     book_id = book["book_id"]
     remote_book = f"{args.remote.rstrip('/')}/{book_id}"
 
-    audio_count = len(list((package / "audio").glob("*.mp3"))) if (package / "audio").is_dir() else 0
-    if audio_count != int(book.get("lesson_count") or 0):
+    audio_mode = str(book.get("audio_mode") or "ecs").strip().lower()
+    lesson_count = int(book.get("lesson_count") or 0)
+    audio_count = (
+        len(list((package / "audio").glob("*.mp3")))
+        if (package / "audio").is_dir()
+        else 0
+    )
+    if audio_mode == "netdisk":
+        if not (package / "book.pdf").is_file():
+            raise SystemExit("package incomplete: missing book.pdf")
+        if lesson_count < 1:
+            raise SystemExit("package incomplete: netdisk package has no lessons")
+        netdisk_lessons = sum(
+            1
+            for row in (book.get("lessons") or [])
+            if isinstance(row, dict) and str(row.get("audio_netdisk_path") or "").strip()
+        )
+        if netdisk_lessons != lesson_count:
+            raise SystemExit(
+                f"package incomplete: lessons={lesson_count} "
+                f"but audio_netdisk_path={netdisk_lessons}"
+            )
+    elif audio_count != lesson_count:
         raise SystemExit(
-            f"package incomplete: book.json lessons={book.get('lesson_count')} "
+            f"package incomplete: book.json lessons={lesson_count} "
             f"but audio/*.mp3={audio_count}"
         )
 
@@ -135,7 +161,9 @@ def main() -> int:
                 {
                     "would_upload": str(package),
                     "remote": remote_book,
+                    "audio_mode": audio_mode,
                     "audio_count": audio_count,
+                    "lesson_count": lesson_count,
                 },
                 ensure_ascii=False,
             )
@@ -156,24 +184,40 @@ def main() -> int:
     except (FileNotFoundError, subprocess.CalledProcessError):
         _upload_package_archive(package, host=args.host, remote_book=remote_book)
 
-    # Verify remote audio count before writing catalog.
-    check = subprocess.run(
-        [
-            "ssh",
-            "-o",
-            "BatchMode=yes",
-            args.host,
-            f"ls {remote_book}/audio/*.mp3 2>/dev/null | wc -l",
-        ],
-        check=True,
-        capture_output=True,
-        text=True,
-    )
-    remote_audio = int((check.stdout or "0").strip() or "0")
-    if remote_audio != audio_count:
-        raise SystemExit(
-            f"upload incomplete: local {audio_count} mp3, remote {remote_audio}"
+    if audio_mode != "netdisk":
+        # Verify remote audio count before writing catalog.
+        check = subprocess.run(
+            [
+                "ssh",
+                "-o",
+                "BatchMode=yes",
+                args.host,
+                f"ls {remote_book}/audio/*.mp3 2>/dev/null | wc -l",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
         )
+        remote_audio = int((check.stdout or "0").strip() or "0")
+        if remote_audio != audio_count:
+            raise SystemExit(
+                f"upload incomplete: local {audio_count} mp3, remote {remote_audio}"
+            )
+    else:
+        check = subprocess.run(
+            [
+                "ssh",
+                "-o",
+                "BatchMode=yes",
+                args.host,
+                f"test -f {remote_book}/book.pdf && test -f {remote_book}/book.json && echo ok",
+            ],
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        if "ok" not in (check.stdout or ""):
+            raise SystemExit("upload incomplete: missing book.pdf or book.json")
 
     remote_catalog = f"{args.remote.rstrip('/')}/catalog.json"
     with tempfile.TemporaryDirectory() as tmp:
@@ -216,11 +260,13 @@ def main() -> int:
                 "ok": True,
                 "book_id": book_id,
                 "remote": remote_book,
+                "audio_mode": audio_mode,
                 "audio_count": audio_count,
+                "lesson_count": lesson_count,
                 "catalog_count": catalog["count"],
                 "pdf_url": (
                     f"{args.public_base.rstrip('/')}"
-                    f"/media/reading/textbooks/{book_id}/book.pdf"
+                    f"/media/reading/k12/{book_id}/book.pdf"
                 ),
             },
             ensure_ascii=False,

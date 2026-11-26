@@ -173,6 +173,8 @@ class Endpoints {
   static const String readingTextbooks = 'api/reading/textbooks';
   static String readingTextbook(String bookId) =>
       'api/reading/textbooks/${Uri.encodeComponent(bookId)}';
+  static String readingTextbookAudio(String bookId, int seq) =>
+      'api/reading/textbooks/${Uri.encodeComponent(bookId)}/audio/$seq';
 
   /// Aliyun DashScope (Qwen Audio) TTS — voices list + speech synthesis.
   static const String readingVoices = 'api/reading/voices';

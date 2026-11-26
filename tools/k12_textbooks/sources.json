@@ -1,0 +1,29 @@
+{
+  "version": 1,
+  "pep_only": true,
+  "pdf_budget_bytes": 4294967296,
+  "bundle_root": "/ae-u44-baidu/小初高/2026年小初高教材（版本齐全）/2026年最新中小学教材电子书汇总（9月最新）",
+  "stages": {
+    "primary": {
+      "stage": "小学",
+      "stage_key": "primary",
+      "share_url": "https://pan.baidu.com/s/1Vy4XzBQcH02vAnKxRJHVKQ",
+      "pwd": "4iqf",
+      "personal_root": "/ae-u44-baidu/小初高/2026年小初高教材（版本齐全）/2026年最新中小学教材电子书汇总（9月最新）/小学/英语"
+    },
+    "junior": {
+      "stage": "初中",
+      "stage_key": "junior",
+      "share_url": "https://pan.baidu.com/s/1R69Cy1zwsiZnhhavHxUQwA",
+      "pwd": "6e4b",
+      "personal_root": "/ae-u44-baidu/小初高/2026年小初高教材（版本齐全）/2026年最新中小学教材电子书汇总（9月最新）/初中/英语"
+    },
+    "senior": {
+      "stage": "高中",
+      "stage_key": "senior",
+      "share_url": "https://pan.baidu.com/s/1aLRipTS6Hl-DqWUUHFFHEg",
+      "pwd": "kavg",
+      "personal_root": "/ae-u44-baidu/小初高/2026年小初高教材（版本齐全）/2026年最新中小学教材电子书汇总（9月最新）/高中/英语"
+    }
+  }
+}

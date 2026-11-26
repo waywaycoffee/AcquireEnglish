@@ -1,78 +1,60 @@
-# K12 有声教材本地导入（PDF + 同目录 MP3）
+# K12 有声教材（本机人教版结构化入库）
 
-流程：**扫描本机 `docs/教材` → 挑热门英语册次 → 打包上传 ECS**。  
-不走百度网盘扫描；只上传本地点选的册次，控制服务器体积。
+本地扫 `docs/教材` 里的 **人教版 PDF + 同目录 MP3** → 打包上传 ECS  
+`media/reading/k12/{book_id}/`（`book.pdf` + `audio/*.mp3` + `book.json`/`manifest.json`）。
 
-## 1. 扫描本地目录
+点读（OCR→译→TTS）下一阶段；本阶段验证「整夹导入 + 课音频对应」。
 
-默认根目录：`docs/教材/{小学|初中|高中}/英语/{版本}/{年级}/{上册|下册}/`
+## 本机目录（实际）
+
+```text
+docs/教材/小学/人教版（PEP）（主编：吴欣）/四年级/上册/2026年度/
+  （…）英语 四年级上册.pdf
+  01_Unit 1 Listen and chant.mp3
+  03_Unit 1 A Let's talk.mp3
+  …
+```
+
+多「年度」时默认只取**最新年**一册。
+
+## 一键入库人教
 
 ```powershell
 cd D:\AcquireEnglish
 
-# 全部英语候选
-python tools/k12_textbooks/scan_local.py
+# 扫描可导入册
+python tools/k12_textbooks/scan_local.py --pep-only --ready-only
 
-# 只看热门版本（人教 PEP / 外研 / 译林 / 北京版 / 北师大 / 冀教…）
-python tools/k12_textbooks/scan_local.py --hot-only --ready-only
+# 预览
+python tools/k12_textbooks/import_pep_local.py --dry-run
 
-# 写出 JSON，并打印可直接复制的导入命令
-python tools/k12_textbooks/scan_local.py --hot-only --ready-only --print-import `
-  --json tmp/k12-local-candidates.json
+# 全部人教 ready 册上传 ECS（PDF+MP3）
+python tools/k12_textbooks/import_pep_local.py
+
+# 只导指定册
+python tools/k12_textbooks/import_pep_local.py --book-id pep-y3-wuxin-g4-b --limit 1
 ```
 
-## 2. 导入某一册
-
-### 样例：北京版四年级下册
-
-```powershell
-python tools/k12_textbooks/import_beijing_g4_b.py
-```
-
-### 通用
-
-```powershell
-python tools/k12_textbooks/import_book.py `
-  --source "D:\AcquireEnglish\docs\教材\小学\英语\北京版\四年级\下册" `
-  --book-id beijing-g4-b `
-  --catalog-id "k12-textbook:beijing:k12_g4:b" `
-  --title "English · Grade 4 Book 2" `
-  --title-zh "英语 四年级 下册" `
-  --edition 北京版 `
-  --publisher 北京出版社 `
-  --grade-id k12_g4 `
-  --stage primary `
-  --volume 下册
-```
-
-也可直接复制 `scan_local.py --print-import` 打出来的命令。
-
-## 目录约定
-
-每个册次文件夹内：课本 PDF 与配套 MP3 同级。
+## ECS 布局
 
 ```text
-…/北京版/四年级/下册/
-  （…）义务教育教科书·英语 四年级下册.pdf
-  01_Unit One_Lesson 1  What's Your Hobby.mp3
-  …
-```
-
-若有多个 PDF，工具会优先选文件名含「英语 / 义务教育教科书」的那本。
-
-## ECS 与 App
-
-```text
-/opt/acquireenglish/services/api/media/reading/textbooks/
+media/reading/k12/
   catalog.json
-  beijing-g4-b/book.pdf|book.json|audio/*.mp3
+  {book_id}/
+    book.pdf
+    book.json          # 课次清单（API 用）
+    manifest.json      # 同内容别名
+    audio/u01_a_03.mp3
 ```
 
 - API：`/api/reading/textbooks`、`/api/reading/textbooks/{book_id}`
-- App：K12 英语教材书架 → 已上传册次显示「有声教材」
+- 音频 URL：`/media/reading/k12/{book_id}/audio/...`（不进 APK）
+
+## 网盘三链（可选）
+
+分享链配置见 [`sources.json`](sources.json)。若要从网盘补 PDF-only 清单，可用 `auto_seed_from_netdisk.py`；**本机人教有完整 MP3 时优先本脚本**。
 
 ## 注意
 
-- `docs/教材/` 已 gitignore，勿提交 PDF/MP3，勿打进 APK。
-- 版权教材仅供有授权学习使用。
-- 点读（OCR→翻译→TTS）在有声书架稳定后再做。
+- `docs/教材/` 已 gitignore；版权教材走运营私有库，勿进公共分享池。
+- 点读：页内点选 → OCR → 中译 → **TTS**（非 ASR）。

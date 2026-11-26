@@ -3521,6 +3521,28 @@ class AcquireApiClient {
     return null;
   }
 
+  /// Resolve textbook lesson audio (netdisk raw URL + Baidu headers).
+  Future<Map<String, dynamic>?> getReadingTextbookAudio(
+    String bookId,
+    int seq,
+  ) async {
+    final String id = bookId.trim();
+    if (id.isEmpty || seq < 1) return null;
+    try {
+      final Response<dynamic> response = await _dio.get(
+        Endpoints.readingTextbookAudio(id, seq),
+        queryParameters: const <String, dynamic>{'format': 'json'},
+      );
+      final Object? data = response.data;
+      if (data is Map<String, dynamic>) return data;
+      if (data is Map) return Map<String, dynamic>.from(data);
+    } on DioException catch (error) {
+      if (error.response?.statusCode == 404) return null;
+      rethrow;
+    }
+    return null;
+  }
+
   /// ECS content media (reading / oral / course / …). Same item shape as foundation.
   Future<FoundationMediaManifest> contentMediaManifest({
     String namespace = 'reading',
