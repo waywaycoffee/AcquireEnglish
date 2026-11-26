@@ -42,6 +42,8 @@ def _coach_system(context: VideoContext, *, stuck: bool = False) -> str:
         '\n\n会话能力补充：支持 freechat、视频主题口语、情景角色扮演。'
         '若提供 scene_description，优先围绕眼前实物教词与描述。'
         '每轮 spoken text 控制在 4 句以内；默认英语台词。'
+        '内容诊断必须检查语法：时态一致、主谓一致、冠词、介词、词形；'
+        '有错则 literal_en 给出改正句，不可原样回显。'
     )
     if stuck:
         return f'{base}\n\n{anchor}\n\n{silence_system_prompt()}{extra}'
@@ -546,14 +548,18 @@ class OpenAiLlm:
                 '(preferably from next_unused_topics). '
                 'If the learner made grammar mistakes, correct them immediately in '
                 '"text" and list brief notes in "corrections". '
-                'If the learner spoke Chinese, mixed Chinese/English, or awkward English, '
-                'fill "diagnosis" with: source (their utterance), literal_en '
-                '(clear English meaning — must FIX real grammar/tense issues), '
-                'idiomatic_en (natural spoken English), '
-                'and tip (brief Chinese tip). Then in "text" ask them to hold the mic '
-                'and say the idiomatic sentence once. '
-                'If their English is already clear and correct, OMIT "diagnosis" '
-                '(do not repeat the same sentence as a fake rewrite). '
+                'Grammar checks are mandatory on every learner turn: tense agreement, '
+                'subject–verb agreement, articles, prepositions, word form, and '
+                'parallel structure (e.g. "I went … and study" → "I went … and studied"). '
+                'If ANY such error exists, you MUST fill "diagnosis": source = their '
+                'exact utterance, literal_en = grammatically corrected English (MUST '
+                'differ from source), idiomatic_en = natural spoken English, tip = short '
+                'Chinese note naming the grammar point (e.g. 过去时一致). Then ask them '
+                'to hold the mic and say the corrected/idiomatic line once. '
+                'If the learner spoke Chinese, mixed Chinese/English, or awkward English '
+                '(even without a clear grammar rule break), also fill diagnosis the same way. '
+                'Only OMIT "diagnosis" when the English is already grammatical AND clear '
+                '(never echo the same sentence as a fake rewrite). '
                 'Do not ask the learner to repeat a single subtitle line verbatim. '
                 'Default spoken language: English only. '
                 'Switch to Chinese only if the learner explicitly asks.'
@@ -572,10 +578,13 @@ class OpenAiLlm:
                     '(never speak it as if you are the learner)'
                 ),
                 'diagnosis': {
-                    'source': 'original learner utterance when Chinese/mixed/awkward',
-                    'literal_en': 'clear English meaning',
+                    'source': 'exact learner utterance when Chinese/mixed/awkward/ungrammatical',
+                    'literal_en': (
+                        'grammatically corrected clear English; must differ from source '
+                        'when fixing tense/agreement/articles/etc.'
+                    ),
                     'idiomatic_en': 'natural spoken English',
-                    'tip': 'short Chinese tip or empty',
+                    'tip': 'short Chinese tip naming the grammar point, or empty',
                 },
             },
         }
@@ -595,9 +604,10 @@ class OpenAiLlm:
                         _coach_system(context, stuck=_is_stuck(learner_text))
                         + ' Reply as compact JSON. The "text" field must be English'
                         ' unless the learner asked for Chinese.'
-                        ' Include diagnosis only when learner used Chinese or English'
-                        ' that needs a real rewrite; never set literal_en/idiomatic_en'
-                        ' to the same text as source just to show a correction.'
+                        ' Include diagnosis when Chinese/mixed/awkward OR when English'
+                        ' has real grammar errors (tense, agreement, articles, etc.).'
+                        ' literal_en must fix those errors and must not equal source;'
+                        ' never echo the same sentence as a fake rewrite.'
                         ' You may append a short expression tag like 【表情：微笑】/'
                         '【表情：思考】/【表情：平静】 (never markdown).'
                     ),
