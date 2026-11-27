@@ -13,6 +13,7 @@ import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/domain/word_lookup_entry.dart';
+import '../../words/domain/word_morphology.dart';
 import '../../words/presentation/widgets/phonics_syllable_blocks.dart';
 import '../../words/presentation/widgets/word_root_breakdown_panel.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
