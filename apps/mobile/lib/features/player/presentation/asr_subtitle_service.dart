@@ -22,10 +22,8 @@ String? describeAsrConfigurationError(LearningSettingsState settings) {
     return '本地识别暂不可用，请改用云端识别或等待云端字幕。';
   }
   if (settings.resolvedAsrApiKey.isEmpty) {
-    final String field = settings.asrProvider == '腾讯云'
-        ? '腾讯云 SecretId / SecretKey'
-        : '阿里云百炼 API Key';
-    return '未配置语音识别密钥，请填写 $field。导入缺字幕时会优先匹配云端字幕。';
+    // Production keys live on ECS; device BYOK is developer-only.
+    return '本机语音识别未开通。导入缺字幕时请优先使用云端字幕，或稍后重试。';
   }
   if (settings.asrProvider == '腾讯云') {
     final String trimmed = settings.resolvedAsrApiKey;
@@ -34,11 +32,11 @@ String? describeAsrConfigurationError(LearningSettingsState settings) {
       separator = trimmed.indexOf('：');
     }
     if (separator <= 0 || separator >= trimmed.length - 1) {
-      return '腾讯云 ASR 需同时填写 SecretId 和 SecretKey。';
+      return '本机腾讯云 ASR 配置无效。请改用云端字幕，或在开发者模式中检查密钥。';
     }
   }
   if (settings.asrBaseUrl.trim().isEmpty || settings.asrModel.trim().isEmpty) {
-    return 'ASR 服务地址或模型为空，请到设置中检查，或关闭“自定义 ASR 接口地址”。';
+    return '本机 ASR 地址或模型为空。请改用云端字幕，或关闭“自定义 ASR 接口地址”。';
   }
   // Missing translation keys are handled as a soft warning after English ASR
   // succeeds, so bilingual can degrade to English-only instead of blocking.

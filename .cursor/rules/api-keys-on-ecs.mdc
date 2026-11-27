@@ -1,0 +1,23 @@
+---
+description: Cloud vendor API keys live on ECS only (not in the APK / user Settings)
+alwaysApply: true
+---
+
+# API keys on ECS only
+
+Production DeepSeek / DashScope / Tencent SOE / OCR / TTS and similar **vendor secrets stay on the Guangzhou ECS API** (`/opt/acquireenglish/services/api/.env`). The App must call ECS proxies (`/api/pronunciation/*`, `/api/grammar/*`, `/api/learning/scene-recognize`, reading speech, shared-subtitle jobs, etc.).
+
+## Required
+
+1. **Do not** ask normal learners to paste SecretId / SecretKey / DeepSeek / 百炼 keys into Settings. Key fields stay behind developer mode for BYOK/debug only.
+2. **New cloud AI features** add an authenticated ECS route first; wire the App to that route. Device-side vendor HTTP/WebSocket is optional fallback under `developerMode` / debug only.
+3. **Do not** put live API keys in the APK, git, or `toSyncJson()` / app-settings-backup. Compile-time `--dart-define` / `.env` is for local/CI BYOK, not the release user path.
+4. User-facing errors: prefer「评测服务暂未开通 / 请先登录 / 请稍后重试」, never「请到设置填写腾讯云/DeepSeek密钥」for production flows.
+
+## ECS env (examples)
+
+- `DEEPSEEK_API_KEY` — grammar, quiz, writing, podcast, …
+- `DASHSCOPE_API_KEY` — scene VL, TTS, community ASR, …
+- `TENCENT_SOE_APP_ID` / `SECRET_ID` / `SECRET_KEY` — shadowing score
+
+See `deploy/TENCENT_SOE_SETUP.md` and `services/api/.env.example`.

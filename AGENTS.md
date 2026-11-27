@@ -14,3 +14,9 @@
 - **禁止**把语音、视频文件打进 App（勿放入 `apps/mobile/assets` 或任何随 APK 发布的资源目录）。
 - 主存储为阿里云 OSS（`OSS_*`）；ECS `{media_cache_dir}/{namespace}/` 可作迁移期缓存。经 `OSS_PUBLIC_BASE` 或 `/media/{namespace}/…` 与 `/api/content/media/*` 按需读取。
 - 文本语料可按需下载缓存；若文章有配套朗读/视频，须先上传到 OSS/`reading` 等命名空间后再播放。详见 `docs/MEDIA_ECS.md`。
+
+## 云端 AI 密钥只放 ECS
+
+- DeepSeek / DashScope / 腾讯 SOE 等 vendor 密钥配置在 ECS `services/api/.env`，App 走 `/api/*` 代理。
+- **禁止**要求正式用户在设置里填写这些密钥；开发者模式 BYOK 仅作调试兜底。
+- 设置云同步（`toSyncJson`）不得上传 API Key / Secret。

@@ -1106,19 +1106,19 @@ class AsrSubtitleJobRunner {
       return null;
     }
     if (settings.translationApiKey.trim().isEmpty) {
-      return '无法生成双语字幕：请先在“翻译”中填写 API Key。';
+      return '无法生成本机双语字幕：请改用云端字幕，或使用默认本地 Ollama 翻译。';
     }
     if ((settings.translationProvider == '百度翻译' ||
             settings.translationProvider == '阿里云翻译') &&
         settings.translationApiSecret.trim().isEmpty) {
-      return '无法生成双语字幕：${settings.translationProvider} 还需要填写 Secret。';
+      return '无法生成本机双语字幕：${settings.translationProvider} 本机 Secret 未配置。';
     }
     if (settings.translationBaseUrl.trim().isEmpty) {
-      return '无法生成双语字幕：请在“翻译”中填写服务地址。';
+      return '无法生成本机双语字幕：翻译服务地址为空。';
     }
     if (_isAiTranslationProvider(settings.translationProvider) &&
         settings.translationModel.trim().isEmpty) {
-      return '无法生成双语字幕：请在“翻译”中填写模型名称。';
+      return '无法生成本机双语字幕：模型名称为空。';
     }
     return null;
   }
