@@ -371,6 +371,7 @@ class _NewWordSessionState extends ConsumerState<NewWordSession> {
           word: source.question,
           compact: true,
           initiallyExpanded: true,
+          allowGuess: false,
         ),
         TextButton(
           onPressed: () => _play(source.question),

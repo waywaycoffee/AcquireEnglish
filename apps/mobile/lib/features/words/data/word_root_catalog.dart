@@ -1,407 +1,224 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import '../domain/word_root_models.dart';
-import '../domain/word_morphology.dart';
 
-const String kWordRootAssetPath = 'assets/data/wordroot/roots_full.json';
-
-/// Offline word-root catalog: load once, query in memory.
+/// Offline catalog loaded from assets/data/wordroot (prefer roots_app.json / v2).
 class WordRootCatalog {
   WordRootCatalog._({
-    required this.roots,
-    required this.words,
-    required this.rels,
+    required this.version,
+    required this.generatedAt,
     required this.meta,
-  });
+    required List<WordRootEntry> roots,
+    required List<WordRootWord> words,
+    required List<WordRootRel> rels,
+  })  : roots = List<WordRootEntry>.unmodifiable(roots),
+        words = List<WordRootWord>.unmodifiable(words),
+        rels = List<WordRootRel>.unmodifiable(rels),
+        _rootById = <String, WordRootEntry>{
+          for (final WordRootEntry r in roots) r.id: r,
+        },
+        _wordByKey = <String, WordRootWord>{
+          for (final WordRootWord w in words) w.word: w,
+        },
+        _relsByWord = <String, List<WordRootRel>>{},
+        _wordsByRootId = <String, List<WordRootWord>>{} {
+    for (final WordRootRel rel in rels) {
+      (_relsByWord[rel.word] ??= <WordRootRel>[]).add(rel);
+    }
+    for (final WordRootWord w in words) {
+      for (final String rid in w.rootIds) {
+        (_wordsByRootId[rid] ??= <WordRootWord>[]).add(w);
+      }
+    }
+  }
 
+  static const String assetPath = 'assets/data/wordroot/roots_app.json';
+  static const String legacyAssetPath = 'assets/data/wordroot/roots_full.json';
+
+  /// Preferred asset path (tests / callers).
+  static const String kAssetPath = assetPath;
+
+  final String version;
+  final String generatedAt;
+  final Map<String, dynamic> meta;
   final List<WordRootEntry> roots;
   final List<WordRootWord> words;
   final List<WordRootRel> rels;
-  final Map<String, Object?> meta;
 
-  late final Map<String, WordRootEntry> rootsById = <String, WordRootEntry>{
-    for (final WordRootEntry r in roots) r.id: r,
-  };
-  late final Map<String, WordRootWord> wordsByLemma = <String, WordRootWord>{
-    for (final WordRootWord w in words) w.word: w,
-  };
-  late final Map<String, List<WordRootRel>> relsByWord =
-      <String, List<WordRootRel>>{};
-  late final Map<String, List<WordRootRel>> relsByRootId =
-      <String, List<WordRootRel>>{};
-  late final Map<String, List<WordRootEntry>> rootsByForm =
-      <String, List<WordRootEntry>>{};
+  final Map<String, WordRootEntry> _rootById;
+  final Map<String, WordRootWord> _wordByKey;
+  final Map<String, List<WordRootRel>> _relsByWord;
+  final Map<String, List<WordRootWord>> _wordsByRootId;
 
   static WordRootCatalog? _instance;
   static Future<WordRootCatalog>? _loading;
 
   static Future<WordRootCatalog> load() {
-    final WordRootCatalog? ready = _instance;
-    if (ready != null) return Future<WordRootCatalog>.value(ready);
-    return _loading ??= _loadAsset().then((WordRootCatalog catalog) {
-      _instance = catalog;
+    if (_instance != null) return Future<WordRootCatalog>.value(_instance);
+    return _loading ??= _loadInternal().then((WordRootCatalog c) {
+      _instance = c;
       _loading = null;
-      return catalog;
+      return c;
     });
   }
 
-  static Future<WordRootCatalog> _loadAsset() async {
-    final String raw = await rootBundle.loadString(kWordRootAssetPath);
-    final Map<String, dynamic> json = Map<String, dynamic>.from(
-      jsonDecode(raw) as Map,
-    );
+  @visibleForTesting
+  static void resetForTest() {
+    _instance = null;
+    _loading = null;
+  }
+
+  static Future<WordRootCatalog> _loadInternal() async {
+    String raw;
+    try {
+      raw = await rootBundle.loadString(assetPath);
+    } catch (_) {
+      raw = await rootBundle.loadString(legacyAssetPath);
+    }
+    return compute(_parseCatalogJson, raw);
+  }
+
+  static WordRootCatalog _parseCatalogJson(String raw) {
+    final Object? decoded = jsonDecode(raw);
+    if (decoded is! Map) {
+      throw const FormatException('wordroot catalog must be a JSON object');
+    }
+    final Map<String, dynamic> map = Map<String, dynamic>.from(decoded);
+    final Map<String, dynamic> meta = map['meta'] is Map
+        ? Map<String, dynamic>.from(map['meta'] as Map)
+        : <String, dynamic>{};
+
     final List<WordRootEntry> roots = <WordRootEntry>[];
-    final Object? rootsRaw = json['roots'];
+    final Object? rootsRaw = map['roots'];
     if (rootsRaw is List) {
       for (final Object? item in rootsRaw) {
         if (item is Map) {
-          roots.add(
-            WordRootEntry.fromJson(Map<String, dynamic>.from(item)),
-          );
+          roots.add(WordRootEntry.fromJson(Map<String, dynamic>.from(item)));
         }
       }
     }
+
     final List<WordRootWord> words = <WordRootWord>[];
-    final Object? wordsRaw = json['words'];
+    final Object? wordsRaw = map['words'];
     if (wordsRaw is List) {
       for (final Object? item in wordsRaw) {
         if (item is Map) {
-          final WordRootWord word = WordRootWord.fromJson(
-            Map<String, dynamic>.from(item),
-          );
-          if (word.word.isNotEmpty) words.add(word);
+          words.add(WordRootWord.fromJson(Map<String, dynamic>.from(item)));
         }
       }
     }
+
+    // Prefer explicit top-level rels (v1); else flatten embedded word.roots (v2).
     final List<WordRootRel> rels = <WordRootRel>[];
-    final Object? relsRaw = json['rels'];
-    if (relsRaw is List) {
+    final Object? relsRaw = map['rels'];
+    if (relsRaw is List && relsRaw.isNotEmpty) {
       for (final Object? item in relsRaw) {
         if (item is Map) {
-          final WordRootRel rel = WordRootRel.fromJson(
-            Map<String, dynamic>.from(item),
+          rels.add(WordRootRel.fromJson(Map<String, dynamic>.from(item)));
+        }
+      }
+    } else {
+      for (final WordRootWord w in words) {
+        for (final WordRootRel rel in w.embeddedRels) {
+          rels.add(
+            WordRootRel(
+              word: rel.word,
+              rootId: rel.rootId,
+              root: rel.root,
+              typeCn: rel.typeCn,
+              matchedForm: rel.matchedForm,
+              position: rel.position,
+              rootCn: rel.rootCn,
+              rootSense: rel.rootSense,
+              wordGloss: w.gloss,
+              senseSource: rel.senseSource,
+              type: rel.type,
+            ),
           );
-          if (rel.word.isNotEmpty && rel.rootId.isNotEmpty) {
-            rels.add(rel);
-          }
         }
       }
     }
-    final WordRootCatalog catalog = WordRootCatalog._(
-      roots: List<WordRootEntry>.unmodifiable(roots),
-      words: List<WordRootWord>.unmodifiable(words),
-      rels: List<WordRootRel>.unmodifiable(rels),
-      meta: Map<String, Object?>.from(json['meta'] as Map? ?? const <String, Object?>{}),
+
+    return WordRootCatalog._(
+      version: '${map['version'] ?? meta['version'] ?? ''}'.trim(),
+      generatedAt: '${map['generatedAt'] ?? meta['generated_at'] ?? ''}'.trim(),
+      meta: meta,
+      roots: roots,
+      words: words,
+      rels: rels,
     );
-    catalog._buildIndexes();
-    return catalog;
   }
 
-  void _buildIndexes() {
-    for (final WordRootRel rel in rels) {
-      relsByWord.putIfAbsent(rel.word, () => <WordRootRel>[]).add(rel);
-      relsByRootId.putIfAbsent(rel.rootId, () => <WordRootRel>[]).add(rel);
-    }
-    for (final WordRootEntry root in roots) {
-      for (final String form in root.variantForms) {
-        final String key = _normalizeForm(form);
-        if (key.isEmpty) continue;
-        rootsByForm.putIfAbsent(key, () => <WordRootEntry>[]).add(root);
-      }
-    }
-  }
+  WordRootEntry? rootById(String id) => _rootById[id];
 
-  static String _normalizeForm(String raw) =>
-      raw.trim().toLowerCase().replaceAll(RegExp(r'^-+|-+$'), '');
+  WordRootWord? wordEntry(String word) =>
+      _wordByKey[word.trim().toLowerCase()];
 
-  static String _normalizeWord(String raw) =>
-      raw.trim().toLowerCase().replaceAll(RegExp(r"[^a-z']"), '');
-
-  WordRootDetail? queryWordDetail(String raw) {
-    final String word = _normalizeWord(raw);
-    if (word.isEmpty) return null;
-    final WordRootWord? meta = wordsByLemma[word];
-    final List<WordRootRel> wordRels = relsByWord[word] ?? const <WordRootRel>[];
-    if (meta == null && wordRels.isEmpty) return null;
-
-    // Longest-span dedupe (same idea as docs/wordroot/query_demo.py):
-    // biology should keep ology, not also logy / log.
-    final List<({int start, int end, WordRootParsePart part})> spans =
-        <({int start, int end, WordRootParsePart part})>[];
-    final Set<String> rootIds = <String>{};
-    for (final WordRootRel rel in wordRels) {
-      final WordRootEntry? root = rootsById[rel.rootId];
-      rootIds.add(rel.rootId);
-      final String form = (rel.matchedForm.isNotEmpty
-              ? rel.matchedForm
-              : (rel.root.isNotEmpty ? rel.root : (root?.root ?? '')))
-          .toLowerCase()
-          .replaceAll(RegExp(r'^-+|-+$'), '');
-      final int start = form.isEmpty ? -1 : word.indexOf(form);
-      final WordRootParsePart part = WordRootParsePart(
-        rootText: rel.root.isNotEmpty ? rel.root : (root?.root ?? ''),
-        cnMeaning: rel.rootCn.isNotEmpty ? rel.rootCn : (root?.cn ?? ''),
-        type: root?.type ?? '',
-        typeCn: rel.typeCn.isNotEmpty ? rel.typeCn : (root?.typeCn ?? ''),
-        position: rel.position,
-        matchedForm: rel.matchedForm.isNotEmpty ? rel.matchedForm : form,
-        // Contextual sense in THIS word; empty → UI falls back to cnMeaning.
-        rootSense: rel.rootSense,
-        rootId: rel.rootId,
+  List<WordRootRel> relsForWord(String word) =>
+      List<WordRootRel>.unmodifiable(
+        _relsByWord[word.trim().toLowerCase()] ?? const <WordRootRel>[],
       );
-      if (start < 0) {
-        spans.add((start: 999, end: 999, part: part));
-        continue;
-      }
-      spans.add((start: start, end: start + form.length, part: part));
-    }
-    spans.sort((a, b) {
-      final int byStart = a.start.compareTo(b.start);
-      if (byStart != 0) return byStart;
-      final int byLen = (b.end - b.start).compareTo(a.end - a.start);
-      if (byLen != 0) return byLen;
-      final bool aRoot = a.part.type == 'root' || a.part.typeCn == '词根';
-      final bool bRoot = b.part.type == 'root' || b.part.typeCn == '词根';
-      if (aRoot != bRoot) return aRoot ? -1 : 1;
-      return 0;
-    });
-    final List<({int start, int end, WordRootParsePart part})> kept =
-        <({int start, int end, WordRootParsePart part})>[];
-    for (final ({int start, int end, WordRootParsePart part}) sp in spans) {
-      if (kept.any(
-        (k) => k.start == sp.start && k.end == sp.end,
-      )) {
-        continue;
-      }
-      if (kept.any(
-        (k) =>
-            k.start <= sp.start &&
-            k.end >= sp.end &&
-            (k.end - k.start) > (sp.end - sp.start),
-      )) {
-        continue;
-      }
-      kept.add(sp);
-    }
-    kept.sort((a, b) => a.start.compareTo(b.start));
-    final List<WordRootParsePart> parse = <WordRootParsePart>[
-      for (final item in kept) item.part,
-    ];
 
-    final List<WordRootWord> same = <WordRootWord>[];
-    final Set<String> seen = <String>{word};
-    for (final String rid in rootIds) {
-      for (final WordRootRel rel in relsByRootId[rid] ?? const <WordRootRel>[]) {
-        if (!seen.add(rel.word)) continue;
-        final WordRootWord? other = wordsByLemma[rel.word];
-        same.add(
-          other ??
-              WordRootWord(
-                word: rel.word,
-                gloss: rel.wordGloss,
-                level: '',
-                rootIds: <String>[rid],
-              ),
-        );
-      }
-    }
-    const Map<String, int> levelRank = <String, int>{'高频': 0, '进阶': 1};
-    same.sort((WordRootWord a, WordRootWord b) {
-      final int byLevel =
-          (levelRank[a.level] ?? 9).compareTo(levelRank[b.level] ?? 9);
-      return byLevel != 0 ? byLevel : a.word.compareTo(b.word);
-    });
-
-    return WordRootDetail(
-      word: word,
-      gloss: meta?.gloss ?? (wordRels.isEmpty ? '' : wordRels.first.wordGloss),
-      level: meta?.level ?? '',
-      parse: List<WordRootParsePart>.unmodifiable(parse),
-      sameRootWords: List<WordRootWord>.unmodifiable(same),
-      isManual: true,
-    );
-  }
-
-  /// Curated catalog first; if missing, light morphology guess (never writes root_sense).
-  WordRootDetail? resolveWord(String raw) {
-    final WordRootDetail? curated = queryWordDetail(raw);
-    if (curated != null && curated.parse.isNotEmpty) {
-      return curated;
-    }
-    final List<AffixHit> guessed = matchRootsAndAffixes(raw);
-    if (guessed.isEmpty) {
-      return curated;
-    }
-    final String word = _normalizeWord(raw);
-    return WordRootDetail(
-      word: word,
-      gloss: curated?.gloss ?? '',
-      level: curated?.level ?? '',
-      parse: List<WordRootParsePart>.unmodifiable(<WordRootParsePart>[
-        for (final AffixHit hit in guessed)
-          WordRootParsePart(
-            rootText: hit.part,
-            cnMeaning: hit.meaningCn,
-            type: hit.kind,
-            typeCn: switch (hit.kind) {
-              'prefix' => '前缀',
-              'suffix' => '后缀',
-              _ => '词根',
-            },
-            position: '',
-            matchedForm: hit.part,
-            rootSense: '',
-            rootId: '',
-          ),
-      ]),
-      sameRootWords: const <WordRootWord>[],
-      isManual: false,
-      warning: '词缀自动推测，未人工标注，仅供参考',
-    );
+  List<WordRootWord> wordsForRoot(String rootId, {int limit = 40}) {
+    final List<WordRootWord> list =
+        _wordsByRootId[rootId] ?? const <WordRootWord>[];
+    if (list.length <= limit) return List<WordRootWord>.unmodifiable(list);
+    return List<WordRootWord>.unmodifiable(list.take(limit));
   }
 
   List<WordRootEntry> findRoots(String raw) {
-    final String needle = _normalizeForm(raw);
+    final String needle = raw.trim().toLowerCase();
     if (needle.isEmpty) return const <WordRootEntry>[];
-    final List<WordRootEntry>? exact = rootsByForm[needle];
-    if (exact != null && exact.isNotEmpty) {
-      return List<WordRootEntry>.unmodifiable(exact);
-    }
-    // Prefix / contains fallback for short queries.
+    final List<WordRootEntry> exact = <WordRootEntry>[];
     final List<WordRootEntry> fuzzy = <WordRootEntry>[];
-    final Set<String> seen = <String>{};
-    for (final MapEntry<String, List<WordRootEntry>> e in rootsByForm.entries) {
-      if (e.key == needle || e.key.startsWith(needle) || needle.startsWith(e.key)) {
-        for (final WordRootEntry root in e.value) {
-          if (seen.add(root.id)) fuzzy.add(root);
-        }
+    for (final WordRootEntry r in roots) {
+      final List<String> forms = r.variantForms
+          .map((String f) => f.toLowerCase())
+          .toList(growable: false);
+      if (r.id.toLowerCase() == needle || forms.contains(needle)) {
+        exact.add(r);
+        continue;
+      }
+      if (forms.any(
+        (String f) => f.startsWith(needle) || needle.startsWith(f),
+      )) {
+        fuzzy.add(r);
       }
     }
-    fuzzy.sort(
-      (WordRootEntry a, WordRootEntry b) =>
-          b.exampleCount.compareTo(a.exampleCount),
-    );
+    if (exact.isNotEmpty) return List<WordRootEntry>.unmodifiable(exact);
     return List<WordRootEntry>.unmodifiable(fuzzy);
   }
 
   List<WordRootWord> queryRootWords(
-    String rootText, {
+    String rootQuery, {
     String? level,
     int limit = 80,
   }) {
-    final List<WordRootEntry> matched = findRoots(rootText);
+    final List<WordRootEntry> matched = findRoots(rootQuery);
     if (matched.isEmpty) return const <WordRootWord>[];
     final Set<String> ids = matched.map((WordRootEntry r) => r.id).toSet();
     final List<WordRootWord> out = <WordRootWord>[];
     final Set<String> seen = <String>{};
     for (final String id in ids) {
-      for (final WordRootRel rel in relsByRootId[id] ?? const <WordRootRel>[]) {
-        if (!seen.add(rel.word)) continue;
-        final WordRootWord? meta = wordsByLemma[rel.word];
-        final WordRootWord word = meta ??
-            WordRootWord(
-              word: rel.word,
-              gloss: rel.wordGloss,
-              level: '',
-              rootIds: <String>[id],
-            );
+      for (final WordRootWord w in wordsForRoot(id, limit: limit * 2)) {
+        if (!seen.add(w.word)) continue;
         if (level != null &&
             level.isNotEmpty &&
-            word.level.isNotEmpty &&
-            word.level != level &&
-            !word.level.contains(level) &&
-            !level.contains(word.level)) {
+            w.level.isNotEmpty &&
+            w.level != level &&
+            !w.level.contains(level)) {
           continue;
         }
-        out.add(word);
+        out.add(w);
+        if (out.length >= limit) {
+          return List<WordRootWord>.unmodifiable(out);
+        }
       }
     }
-    const Map<String, int> levelRank = <String, int>{'高频': 0, '进阶': 1};
-    out.sort((WordRootWord a, WordRootWord b) {
-      final int byLevel =
-          (levelRank[a.level] ?? 9).compareTo(levelRank[b.level] ?? 9);
-      return byLevel != 0 ? byLevel : a.word.compareTo(b.word);
-    });
-    if (out.length <= limit) {
-      return List<WordRootWord>.unmodifiable(out);
-    }
-    return List<WordRootWord>.unmodifiable(out.take(limit));
-  }
-
-  List<WordRootSpellCandidate> spellSuggest(
-    String raw, {
-    int maxCandidates = 5,
-    int maxDist = 2,
-  }) {
-    final String input = _normalizeWord(raw);
-    if (input.isEmpty) return const <WordRootSpellCandidate>[];
-    if (wordsByLemma.containsKey(input)) {
-      final WordRootWord hit = wordsByLemma[input]!;
-      return <WordRootSpellCandidate>[
-        WordRootSpellCandidate(
-          word: hit.word,
-          distance: 0,
-          gloss: hit.gloss,
-          level: hit.level,
-        ),
-      ];
-    }
-    final List<WordRootSpellCandidate> candidates = <WordRootSpellCandidate>[];
-    for (final WordRootWord w in words) {
-      if ((w.word.length - input.length).abs() > maxDist) continue;
-      final int d = _levenshtein(input, w.word, maxDist);
-      if (d < 0 || d > maxDist) continue;
-      candidates.add(
-        WordRootSpellCandidate(
-          word: w.word,
-          distance: d,
-          gloss: w.gloss,
-          level: w.level,
-        ),
-      );
-    }
-    candidates.sort((WordRootSpellCandidate a, WordRootSpellCandidate b) {
-      final int byDist = a.distance.compareTo(b.distance);
-      return byDist != 0
-          ? byDist
-          : a.word.length.compareTo(b.word.length);
-    });
-    return candidates.take(maxCandidates).toList(growable: false);
-  }
-
-  /// Convert catalog parse into AffixHit chips used by existing UI.
-  List<AffixHit> affixHitsFor(String raw) {
-    final WordRootDetail? detail = queryWordDetail(raw);
-    if (detail == null || detail.parse.isEmpty) {
-      return const <AffixHit>[];
-    }
-    final List<AffixHit> hits = <AffixHit>[];
-    for (final WordRootParsePart part in detail.parse) {
-      final String kind = switch (part.type) {
-        'prefix' => 'prefix',
-        'suffix' => 'suffix',
-        _ => part.typeCn == '前缀'
-            ? 'prefix'
-            : part.typeCn == '后缀'
-                ? 'suffix'
-                : 'root',
-      };
-      final List<String> examples = queryRootWords(
-        part.rootText,
-        limit: 3,
-      ).map((WordRootWord w) => w.word).where((String w) => w != detail.word).toList();
-      hits.add(
-        AffixHit(
-          part: part.matchedForm.isNotEmpty ? part.matchedForm : part.rootText,
-          kind: kind,
-          meaningCn: part.displayMeaning,
-          examples: examples,
-        ),
-      );
-    }
-    return hits;
+    return List<WordRootWord>.unmodifiable(out);
   }
 
   List<WordRootEntry> topRoots({int limit = 40, String? level}) {
@@ -418,33 +235,298 @@ class WordRootCatalog {
         (WordRootEntry a, WordRootEntry b) =>
             b.exampleCount.compareTo(a.exampleCount),
       );
+    // Fallback: when exampleCount is unset (v2), prefer core then id.
+    if (list.isNotEmpty && list.every((WordRootEntry r) => r.exampleCount == 0)) {
+      list.sort((WordRootEntry a, WordRootEntry b) {
+        final int byLevel = _levelRank(a.level).compareTo(_levelRank(b.level));
+        if (byLevel != 0) return byLevel;
+        return a.root.compareTo(b.root);
+      });
+    }
     return list.take(limit).toList(growable: false);
   }
 
-  /// Bounded Levenshtein; returns -1 when distance exceeds [maxDist].
-  static int _levenshtein(String a, String b, int maxDist) {
-    if (a == b) return 0;
-    final int la = a.length;
-    final int lb = b.length;
-    if ((la - lb).abs() > maxDist) return -1;
-    List<int> prev = List<int>.generate(lb + 1, (int j) => j);
-    for (int i = 1; i <= la; i++) {
-      final List<int> cur = List<int>.filled(lb + 1, 0);
-      cur[0] = i;
-      int rowMin = cur[0];
-      for (int j = 1; j <= lb; j++) {
-        final int cost = a[i - 1] == b[j - 1] ? 0 : 1;
-        cur[j] = <int>[
-          prev[j] + 1,
-          cur[j - 1] + 1,
-          prev[j - 1] + cost,
-        ].reduce((int x, int y) => x < y ? x : y);
-        if (cur[j] < rowMin) rowMin = cur[j];
-      }
-      if (rowMin > maxDist) return -1;
-      prev = cur;
+  static int _levelRank(String level) {
+    switch (level) {
+      case '高频':
+      case 'core':
+        return 0;
+      case '进阶':
+      case 'advanced':
+        return 1;
+      default:
+        return 2;
     }
-    final int dist = prev[lb];
-    return dist > maxDist ? -1 : dist;
   }
+
+  /// Curated parse only — empty when word is not in the annotated catalog.
+  WordRootDetail? queryWordDetail(String rawWord) {
+    final String word = rawWord.trim().toLowerCase();
+    if (word.isEmpty) return null;
+    final WordRootWord? entry = _wordByKey[word];
+    final List<WordRootRel> wordRels = _relsByWord[word] ?? const <WordRootRel>[];
+    if (entry == null && wordRels.isEmpty) return null;
+
+    final List<WordRootParsePart> parse = _partsFromRels(wordRels);
+    final List<WordRootWord> related = _sameRootWords(
+      word,
+      parse.map((WordRootParsePart p) => p.rootId).where((String id) => id.isNotEmpty),
+    );
+
+    return WordRootDetail(
+      word: word,
+      gloss: entry?.gloss ?? (wordRels.isNotEmpty ? wordRels.first.wordGloss : ''),
+      level: entry?.level ?? '',
+      parse: parse,
+      sameRootWords: related,
+      isManual: true,
+      wordId: entry?.wordId ?? '',
+    );
+  }
+
+  /// Curated first; optional heuristic guess for lookup/detail only.
+  WordRootDetail? resolveWord(String rawWord, {bool allowGuess = true}) {
+    final WordRootDetail? curated = queryWordDetail(rawWord);
+    if (curated != null && curated.parse.isNotEmpty) return curated;
+    if (!allowGuess) return curated;
+    return guessWordDetail(rawWord) ?? curated;
+  }
+
+  WordRootDetail? guessWordDetail(String rawWord) {
+    final String word = rawWord.trim().toLowerCase();
+    if (word.length < 4) return null;
+
+    final List<_SpanHit> hits = <_SpanHit>[];
+    for (final WordRootEntry root in roots) {
+      for (final String form in root.variantForms) {
+        final String f = form.trim().toLowerCase();
+        if (f.length < 2) continue;
+        int from = 0;
+        while (true) {
+          final int idx = word.indexOf(f, from);
+          if (idx < 0) break;
+          hits.add(_SpanHit(start: idx, end: idx + f.length, root: root, form: f));
+          from = idx + 1;
+        }
+      }
+    }
+    if (hits.isEmpty) return null;
+
+    hits.sort((a, b) {
+      final int byLen = (b.end - b.start).compareTo(a.end - a.start);
+      if (byLen != 0) return byLen;
+      return a.start.compareTo(b.start);
+    });
+
+    final List<_SpanHit> chosen = <_SpanHit>[];
+    final Set<int> covered = <int>{};
+    for (final _SpanHit hit in hits) {
+      bool overlap = false;
+      for (int i = hit.start; i < hit.end; i++) {
+        if (covered.contains(i)) {
+          overlap = true;
+          break;
+        }
+      }
+      if (overlap) continue;
+      for (int i = hit.start; i < hit.end; i++) {
+        covered.add(i);
+      }
+      chosen.add(hit);
+    }
+    if (chosen.isEmpty) return null;
+    chosen.sort((a, b) => a.start.compareTo(b.start));
+
+    final List<WordRootParsePart> parse = chosen
+        .map(
+          (_SpanHit h) => WordRootParsePart(
+            rootText: h.root.root,
+            cnMeaning: h.root.cn,
+            type: h.root.type,
+            typeCn: h.root.typeCn,
+            position: h.start == 0
+                ? '词首'
+                : (h.end >= word.length ? '词尾' : '词中'),
+            matchedForm: h.form,
+            rootSense: '',
+            rootId: h.root.id,
+            senseSource: WordRootSenseSource.unknown,
+          ),
+        )
+        .toList(growable: false);
+
+    final WordRootWord? entry = _wordByKey[word];
+    return WordRootDetail(
+      word: word,
+      gloss: entry?.gloss ?? '',
+      level: entry?.level ?? '',
+      parse: parse,
+      sameRootWords: _sameRootWords(
+        word,
+        parse.map((WordRootParsePart p) => p.rootId),
+      ),
+      isManual: false,
+      warning: '未收录词，以下为自动猜测，仅供参考',
+      wordId: entry?.wordId ?? '',
+    );
+  }
+
+  List<WordRootSpellCandidate> spellSuggest(String rawWord, {int limit = 8}) {
+    final String word = rawWord.trim().toLowerCase();
+    if (word.length < 3) return const <WordRootSpellCandidate>[];
+    final List<WordRootSpellCandidate> out = <WordRootSpellCandidate>[];
+    for (final WordRootWord w in words) {
+      if ((w.word.length - word.length).abs() > 2) continue;
+      final int d = _levenshtein(word, w.word);
+      if (d <= 0 || d > 2) continue;
+      out.add(
+        WordRootSpellCandidate(
+          word: w.word,
+          distance: d,
+          gloss: w.gloss,
+          level: w.level,
+        ),
+      );
+    }
+    out.sort((a, b) {
+      final int byDist = a.distance.compareTo(b.distance);
+      if (byDist != 0) return byDist;
+      return a.word.compareTo(b.word);
+    });
+    if (out.length <= limit) return out;
+    return out.take(limit).toList(growable: false);
+  }
+
+  List<WordRootEntry> searchRoots(String query, {int limit = 40}) {
+    final String q = query.trim().toLowerCase();
+    if (q.isEmpty) {
+      return roots.take(limit).toList(growable: false);
+    }
+    final List<WordRootEntry> out = <WordRootEntry>[];
+    for (final WordRootEntry r in roots) {
+      if (r.root.toLowerCase().contains(q) ||
+          r.cn.contains(q) ||
+          r.variants.toLowerCase().contains(q) ||
+          r.id.toLowerCase().contains(q)) {
+        out.add(r);
+        if (out.length >= limit) break;
+      }
+    }
+    return out;
+  }
+
+  List<WordRootWord> searchWords(String query, {int limit = 40}) {
+    final String q = query.trim().toLowerCase();
+    if (q.isEmpty) {
+      return words.take(limit).toList(growable: false);
+    }
+    final List<WordRootWord> out = <WordRootWord>[];
+    for (final WordRootWord w in words) {
+      if (w.word.contains(q) || w.gloss.contains(q)) {
+        out.add(w);
+        if (out.length >= limit) break;
+      }
+    }
+    return out;
+  }
+
+  List<WordRootParsePart> _partsFromRels(List<WordRootRel> wordRels) {
+    final List<WordRootRel> ordered = List<WordRootRel>.from(wordRels)
+      ..sort((a, b) {
+        final int byPos =
+            _positionRank(a.position).compareTo(_positionRank(b.position));
+        if (byPos != 0) return byPos;
+        return a.rootId.compareTo(b.rootId);
+      });
+
+    return ordered
+        .map((WordRootRel rel) {
+          final WordRootEntry? root = _rootById[rel.rootId];
+          final String type = rel.type.isNotEmpty
+              ? rel.type
+              : (root?.type ?? '');
+          final String typeCn = rel.typeCn.isNotEmpty
+              ? rel.typeCn
+              : (root?.typeCn ?? '');
+          return WordRootParsePart(
+            rootText: rel.root.isNotEmpty ? rel.root : (root?.root ?? ''),
+            cnMeaning: rel.rootCn.isNotEmpty ? rel.rootCn : (root?.cn ?? ''),
+            type: type,
+            typeCn: typeCn,
+            position: rel.position,
+            matchedForm: rel.matchedForm.isNotEmpty
+                ? rel.matchedForm
+                : (rel.root.isNotEmpty ? rel.root : (root?.root ?? '')),
+            rootSense: rel.rootSense,
+            rootId: rel.rootId,
+            senseSource: rel.senseSource,
+          );
+        })
+        .toList(growable: false);
+  }
+
+  List<WordRootWord> _sameRootWords(String word, Iterable<String> rootIds) {
+    final Set<String> seen = <String>{word};
+    final List<WordRootWord> related = <WordRootWord>[];
+    for (final String rid in rootIds) {
+      if (rid.isEmpty) continue;
+      for (final WordRootWord other in wordsForRoot(rid, limit: 12)) {
+        if (seen.add(other.word)) {
+          related.add(other);
+          if (related.length >= 24) return related;
+        }
+      }
+    }
+    return related;
+  }
+
+  static int _positionRank(String position) {
+    switch (position) {
+      case '词首':
+        return 0;
+      case '词中':
+        return 1;
+      case '词尾':
+        return 2;
+      default:
+        return 3;
+    }
+  }
+
+  static int _levenshtein(String a, String b) {
+    if (a == b) return 0;
+    if (a.isEmpty) return b.length;
+    if (b.isEmpty) return a.length;
+    final List<int> prev = List<int>.generate(b.length + 1, (int i) => i);
+    final List<int> curr = List<int>.filled(b.length + 1, 0);
+    for (int i = 0; i < a.length; i++) {
+      curr[0] = i + 1;
+      for (int j = 0; j < b.length; j++) {
+        final int cost = a.codeUnitAt(i) == b.codeUnitAt(j) ? 0 : 1;
+        curr[j + 1] = <int>[
+          curr[j] + 1,
+          prev[j + 1] + 1,
+          prev[j] + cost,
+        ].reduce((int x, int y) => x < y ? x : y);
+      }
+      for (int j = 0; j <= b.length; j++) {
+        prev[j] = curr[j];
+      }
+    }
+    return prev[b.length];
+  }
+}
+
+class _SpanHit {
+  const _SpanHit({
+    required this.start,
+    required this.end,
+    required this.root,
+    required this.form,
+  });
+
+  final int start;
+  final int end;
+  final WordRootEntry root;
+  final String form;
 }

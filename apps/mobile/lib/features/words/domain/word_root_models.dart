@@ -1,4 +1,17 @@
-/// Offline word-root catalog models (from docs/wordroot → roots_full.json).
+/// Offline word-root catalog models (docs/wordroot v2 → roots_app.json).
+
+enum WordRootSenseSource { manual, derived, unknown }
+
+WordRootSenseSource parseWordRootSenseSource(String? raw) {
+  switch ((raw ?? '').trim().toLowerCase()) {
+    case 'manual':
+      return WordRootSenseSource.manual;
+    case 'derived':
+      return WordRootSenseSource.derived;
+    default:
+      return WordRootSenseSource.unknown;
+  }
+}
 
 class WordRootEntry {
   const WordRootEntry({
@@ -12,24 +25,40 @@ class WordRootEntry {
     required this.lang,
     required this.etym,
     required this.level,
-    required this.exampleCount,
-    required this.examplesRaw,
+    this.exampleCount = 0,
+    this.examplesRaw = '',
   });
 
-  factory WordRootEntry.fromJson(Map<String, dynamic> json) => WordRootEntry(
-        id: '${json['id'] ?? ''}'.trim(),
-        root: '${json['root'] ?? ''}'.trim(),
-        variants: '${json['variants'] ?? ''}'.trim(),
-        type: '${json['type'] ?? ''}'.trim(),
-        typeCn: '${json['typeCn'] ?? ''}'.trim(),
-        cn: '${json['cn'] ?? ''}'.trim(),
-        en: '${json['en'] ?? ''}'.trim(),
-        lang: '${json['lang'] ?? ''}'.trim(),
-        etym: '${json['etym'] ?? ''}'.trim(),
-        level: '${json['level'] ?? ''}'.trim(),
-        exampleCount: (json['exampleCount'] as num?)?.toInt() ?? 0,
-        examplesRaw: '${json['examples'] ?? ''}'.trim(),
-      );
+  /// Accepts both v1 export keys and v2 roots_app.json keys.
+  factory WordRootEntry.fromJson(Map<String, dynamic> json) {
+    final String type = '${json['type'] ?? ''}'.trim();
+    final String levelRaw = '${json['level'] ?? ''}'.trim();
+    final String level = switch (levelRaw) {
+      'core' => '高频',
+      'advanced' => '进阶',
+      _ => levelRaw,
+    };
+    return WordRootEntry(
+      id: '${json['id'] ?? json['root_id'] ?? ''}'.trim(),
+      root: '${json['root'] ?? json['root_text'] ?? ''}'.trim(),
+      variants: '${json['variants'] ?? json['root_alt'] ?? ''}'.trim(),
+      type: type,
+      typeCn: '${json['typeCn'] ?? ''}'.trim().isNotEmpty
+          ? '${json['typeCn']}'.trim()
+          : switch (type) {
+              'prefix' => '前缀',
+              'suffix' => '后缀',
+              _ => '词根',
+            },
+      cn: '${json['cn'] ?? json['cn_meaning'] ?? ''}'.trim(),
+      en: '${json['en'] ?? ''}'.trim(),
+      lang: '${json['lang'] ?? ''}'.trim(),
+      etym: '${json['etym'] ?? json['short_etym'] ?? ''}'.trim(),
+      level: level,
+      exampleCount: (json['exampleCount'] as num?)?.toInt() ?? 0,
+      examplesRaw: '${json['examples'] ?? ''}'.trim(),
+    );
+  }
 
   final String id;
   final String root;
@@ -63,10 +92,45 @@ class WordRootWord {
     required this.gloss,
     required this.level,
     required this.rootIds,
+    this.wordId = '',
     this.glossVariants = '',
+    this.embeddedRels = const <WordRootRel>[],
   });
 
   factory WordRootWord.fromJson(Map<String, dynamic> json) {
+    // v2 roots_app.json word object
+    if (json.containsKey('cn_def') || json.containsKey('word_id')) {
+      final String word = '${json['word'] ?? ''}'.trim().toLowerCase();
+      final List<WordRootRel> embedded = <WordRootRel>[];
+      final List<String> rids = <String>[];
+      final Object? rootsRaw = json['roots'];
+      if (rootsRaw is List) {
+        for (final Object? item in rootsRaw) {
+          if (item is! Map) continue;
+          final Map<String, dynamic> m = Map<String, dynamic>.from(item);
+          final WordRootRel rel = WordRootRel.fromEmbedded(word, m);
+          if (rel.rootId.isNotEmpty) {
+            embedded.add(rel);
+            rids.add(rel.rootId);
+          }
+        }
+      }
+      final String levelRaw = '${json['word_level'] ?? ''}'.trim();
+      return WordRootWord(
+        word: word,
+        gloss: '${json['cn_def'] ?? ''}'.trim(),
+        level: switch (levelRaw) {
+          'core' => '高频',
+          'advanced' => '进阶',
+          _ => levelRaw,
+        },
+        rootIds: List<String>.unmodifiable(rids),
+        wordId: '${json['word_id'] ?? ''}'.trim(),
+        embeddedRels: List<WordRootRel>.unmodifiable(embedded),
+      );
+    }
+
+    // v1 compact export
     final List<String> rids = <String>[];
     final Object? raw = json['rids'];
     if (raw is List) {
@@ -76,9 +140,9 @@ class WordRootWord {
       }
     }
     return WordRootWord(
-      word: '${json['w'] ?? ''}'.trim().toLowerCase(),
-      gloss: '${json['g'] ?? ''}'.trim(),
-      level: '${json['lv'] ?? ''}'.trim(),
+      word: '${json['w'] ?? json['word'] ?? ''}'.trim().toLowerCase(),
+      gloss: '${json['g'] ?? json['gloss'] ?? ''}'.trim(),
+      level: '${json['lv'] ?? json['level'] ?? ''}'.trim(),
       rootIds: List<String>.unmodifiable(rids),
       glossVariants: '${json['variants'] ?? ''}'.trim(),
     );
@@ -88,7 +152,9 @@ class WordRootWord {
   final String gloss;
   final String level;
   final List<String> rootIds;
+  final String wordId;
   final String glossVariants;
+  final List<WordRootRel> embeddedRels;
 }
 
 class WordRootRel {
@@ -102,19 +168,47 @@ class WordRootRel {
     required this.rootCn,
     required this.rootSense,
     required this.wordGloss,
+    this.senseSource = WordRootSenseSource.unknown,
+    this.type = '',
   });
 
   factory WordRootRel.fromJson(Map<String, dynamic> json) => WordRootRel(
-        word: '${json['w'] ?? ''}'.trim().toLowerCase(),
-        rootId: '${json['rid'] ?? ''}'.trim(),
-        root: '${json['root'] ?? ''}'.trim(),
+        word: '${json['w'] ?? json['word'] ?? ''}'.trim().toLowerCase(),
+        rootId: '${json['rid'] ?? json['root_id'] ?? ''}'.trim(),
+        root: '${json['root'] ?? json['root_text'] ?? ''}'.trim(),
         typeCn: '${json['typeCn'] ?? ''}'.trim(),
-        matchedForm: '${json['form'] ?? ''}'.trim(),
-        position: '${json['pos'] ?? ''}'.trim(),
-        rootCn: '${json['rcn'] ?? ''}'.trim(),
-        rootSense: '${json['sense'] ?? ''}'.trim(),
-        wordGloss: '${json['wg'] ?? ''}'.trim(),
+        matchedForm: '${json['form'] ?? json['matched_form'] ?? ''}'.trim(),
+        position: _normalizePosition('${json['pos'] ?? json['position'] ?? ''}'),
+        rootCn: '${json['rcn'] ?? json['root_cn_meaning'] ?? json['cn_meaning'] ?? ''}'.trim(),
+        rootSense: '${json['sense'] ?? json['root_sense'] ?? ''}'.trim(),
+        wordGloss: '${json['wg'] ?? json['word_gloss'] ?? ''}'.trim(),
+        senseSource: parseWordRootSenseSource(
+          '${json['sense_source'] ?? json['root_sense_source'] ?? ''}',
+        ),
+        type: '${json['type'] ?? ''}'.trim(),
       );
+
+  /// Nested root object under a v2 word entry.
+  factory WordRootRel.fromEmbedded(String word, Map<String, dynamic> json) {
+    final String type = '${json['type'] ?? ''}'.trim();
+    return WordRootRel(
+      word: word,
+      rootId: '${json['root_id'] ?? ''}'.trim(),
+      root: '${json['root_text'] ?? ''}'.trim(),
+      typeCn: switch (type) {
+        'prefix' => '前缀',
+        'suffix' => '后缀',
+        _ => '词根',
+      },
+      matchedForm: '${json['form'] ?? ''}'.trim(),
+      position: _normalizePosition('${json['position'] ?? ''}'),
+      rootCn: '${json['cn_meaning'] ?? ''}'.trim(),
+      rootSense: '${json['root_sense'] ?? ''}'.trim(),
+      wordGloss: '',
+      senseSource: parseWordRootSenseSource('${json['root_sense_source'] ?? ''}'),
+      type: type,
+    );
+  }
 
   final String word;
   final String rootId;
@@ -125,6 +219,24 @@ class WordRootRel {
   final String rootCn;
   final String rootSense;
   final String wordGloss;
+  final WordRootSenseSource senseSource;
+  final String type;
+
+  static String _normalizePosition(String raw) {
+    switch (raw.trim().toLowerCase()) {
+      case 'head':
+      case '词首':
+        return '词首';
+      case 'middle':
+      case '词中':
+        return '词中';
+      case 'tail':
+      case '词尾':
+        return '词尾';
+      default:
+        return raw.trim();
+    }
+  }
 }
 
 class WordRootParsePart {
@@ -137,6 +249,7 @@ class WordRootParsePart {
     required this.matchedForm,
     required this.rootSense,
     required this.rootId,
+    this.senseSource = WordRootSenseSource.unknown,
   });
 
   final String rootText;
@@ -145,12 +258,11 @@ class WordRootParsePart {
   final String typeCn;
   final String position;
   final String matchedForm;
-  /// Per-word sense of this root inside [word] (from word_root_rel.root_sense).
-  /// Empty until curated; fall back to [cnMeaning] (root's general gloss).
   final String rootSense;
   final String rootId;
+  final WordRootSenseSource senseSource;
 
-  /// Prefer contextual [rootSense]; otherwise the root's general [cnMeaning].
+  /// Prefer contextual sense for formula when present.
   String get displayMeaning {
     final String sense = rootSense.trim();
     if (sense.isNotEmpty) return sense;
@@ -158,6 +270,10 @@ class WordRootParsePart {
   }
 
   bool get hasContextualSense => rootSense.trim().isNotEmpty;
+
+  bool get isManualSense => senseSource == WordRootSenseSource.manual;
+
+  bool get isDerivedSense => senseSource == WordRootSenseSource.derived;
 }
 
 class WordRootDetail {
@@ -169,6 +285,7 @@ class WordRootDetail {
     required this.sameRootWords,
     this.isManual = true,
     this.warning = '',
+    this.wordId = '',
   });
 
   final String word;
@@ -176,12 +293,16 @@ class WordRootDetail {
   final String level;
   final List<WordRootParsePart> parse;
   final List<WordRootWord> sameRootWords;
-
-  /// True when parse comes from curated word_root_rel (may still lack root_sense).
   final bool isManual;
-
-  /// Shown when [isManual] is false (rule/morphology guess only).
   final String warning;
+  final String wordId;
+
+  bool get allManualSense =>
+      parse.isNotEmpty &&
+      parse.every((WordRootParsePart p) => p.isManualSense);
+
+  bool get anyDerivedSense =>
+      parse.any((WordRootParsePart p) => p.isDerivedSense);
 
   String get parseFormula {
     if (parse.isEmpty) return '';
@@ -208,6 +329,7 @@ class WordRootDetail {
       sameRootWords: sameRootWords ?? this.sameRootWords,
       isManual: isManual ?? this.isManual,
       warning: warning ?? this.warning,
+      wordId: wordId,
     );
   }
 }

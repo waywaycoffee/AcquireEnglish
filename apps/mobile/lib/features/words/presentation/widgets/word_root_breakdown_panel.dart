@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../shared/presentation/pad/app_design_tokens.dart';
+import '../../data/word_root_catalog.dart';
 import '../../domain/word_root_models.dart';
 import '../word_book_provider.dart';
 import '../word_review_settings_provider.dart';
@@ -10,19 +11,25 @@ import '../word_root_provider.dart';
 
 /// Shared root breakdown for review cards, lookup popup, and word detail.
 ///
-/// Shows contextual [WordRootParsePart.rootSense] when filled, else general
-/// [WordRootParsePart.cnMeaning]. Rule guesses are marked [WordRootDetail.isManual]=false.
+/// Copy rules follow docs/wordroot/API_PROTOCOL.md:
+/// - manual →「本词义」/ formula with contextual sense
+/// - derived →「通用义」badge; never claim "在这个词里"
+/// - guess (is_manual=false) → warning only; never on review cards ([allowGuess]=false)
 class WordRootBreakdownPanel extends ConsumerWidget {
   const WordRootBreakdownPanel({
     required this.word,
     this.compact = false,
     this.initiallyExpanded = false,
+    this.allowGuess = true,
     super.key,
   });
 
   final String word;
   final bool compact;
   final bool initiallyExpanded;
+
+  /// Review / recite cards must keep this false (no rule-guess noise).
+  final bool allowGuess;
 
   Future<void> _enroll(WidgetRef ref, BuildContext context, String lemma) async {
     final bool ok = ref.read(wordBookProvider.notifier).addFavoriteWord(
@@ -52,10 +59,23 @@ class WordRootBreakdownPanel extends ConsumerWidget {
     final String lemma = word.trim();
     if (lemma.isEmpty) return const SizedBox.shrink();
 
-    final WordRootDetail? detail = ref.watch(wordRootDetailProvider(lemma));
+    final AsyncValue<WordRootCatalog> catalogAsync =
+        ref.watch(wordRootCatalogProvider);
+    final WordRootDetail? detail = catalogAsync.maybeWhen(
+      data: (WordRootCatalog c) =>
+          c.resolveWord(lemma, allowGuess: allowGuess),
+      orElse: () => null,
+    );
     if (detail == null || detail.parse.isEmpty) {
       return const SizedBox.shrink();
     }
+
+    final bool derivedOnly = detail.isManual &&
+        detail.parse.isNotEmpty &&
+        detail.parse.every((WordRootParsePart p) => p.isDerivedSense);
+    final String title = !detail.isManual
+        ? '词根拆解（推测）'
+        : (derivedOnly ? '词根构成' : '词根拆解');
 
     final Widget body = Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -65,8 +85,10 @@ class WordRootBreakdownPanel extends ConsumerWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: Text(
               detail.warning,
-              style: const TextStyle(
-                color: Color(0xFFB45309),
+              style: TextStyle(
+                color: AppDesignTokens.isDark
+                    ? const Color(0xFFFBBF24)
+                    : const Color(0xFFB45309),
                 fontSize: 12,
                 fontWeight: FontWeight.w700,
               ),
@@ -84,25 +106,7 @@ class WordRootBreakdownPanel extends ConsumerWidget {
           ),
         const SizedBox(height: 8),
         for (final WordRootParsePart part in detail.parse) ...<Widget>[
-          Text(
-            part.hasContextualSense
-                ? '本词内：${part.matchedForm.isNotEmpty ? part.matchedForm : part.rootText}＝${part.rootSense}'
-                : '本词内：${part.matchedForm.isNotEmpty ? part.matchedForm : part.rootText}（暂无语境义）',
-            style: TextStyle(
-              color: AppDesignTokens.textPrimary,
-              fontSize: 13,
-              height: 1.35,
-            ),
-          ),
-          if (part.cnMeaning.isNotEmpty)
-            Text(
-              '通用义：${part.cnMeaning}',
-              style: TextStyle(
-                color: AppDesignTokens.textSecondary,
-                fontSize: 12,
-                height: 1.35,
-              ),
-            ),
+          ..._senseLines(part),
           const SizedBox(height: 6),
         ],
         if (detail.sameRootWords.isNotEmpty) ...<Widget>[
@@ -162,7 +166,7 @@ class WordRootBreakdownPanel extends ConsumerWidget {
             tilePadding: const EdgeInsets.symmetric(horizontal: 12),
             childrenPadding: const EdgeInsets.fromLTRB(12, 0, 12, 12),
             title: Text(
-              detail.isManual ? '词根拆解' : '词根拆解（推测）',
+              title,
               style: TextStyle(
                 color: AppDesignTokens.textPrimary,
                 fontWeight: FontWeight.w800,
@@ -197,5 +201,113 @@ class WordRootBreakdownPanel extends ConsumerWidget {
       ),
       child: body,
     );
+  }
+
+  List<Widget> _senseLines(WordRootParsePart part) {
+    final String form =
+        part.matchedForm.isNotEmpty ? part.matchedForm : part.rootText;
+    final String sense = part.rootSense.trim();
+    final List<Widget> lines = <Widget>[];
+
+    if (sense.isNotEmpty) {
+      if (part.isManualSense) {
+        lines.add(
+          Text(
+            '$form 在这里是$sense',
+            style: TextStyle(
+              color: AppDesignTokens.textPrimary,
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
+        );
+      } else if (part.isDerivedSense) {
+        lines.add(
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  '$form 的词根义是$sense',
+                  style: TextStyle(
+                    color: AppDesignTokens.textPrimary,
+                    fontSize: 13,
+                    height: 1.35,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: AppDesignTokens.borderGray.withValues(alpha: 0.35),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '通用义',
+                  style: TextStyle(
+                    color: AppDesignTokens.textSecondary,
+                    fontSize: 10,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      } else {
+        // Guess / unknown source: soft wording only.
+        lines.add(
+          Text(
+            '按常见词缀推测：$form（$sense）',
+            style: TextStyle(
+              color: AppDesignTokens.textSecondary,
+              fontSize: 13,
+              height: 1.35,
+            ),
+          ),
+        );
+      }
+    }
+
+    // Always show general root meaning when distinct from contextual sense.
+    if (part.cnMeaning.isNotEmpty &&
+        part.cnMeaning.trim() != sense &&
+        (sense.isEmpty || part.isDerivedSense || !part.isManualSense)) {
+      lines.add(
+        Text(
+          '通用义：${part.cnMeaning}',
+          style: TextStyle(
+            color: AppDesignTokens.textSecondary,
+            fontSize: 12,
+            height: 1.35,
+          ),
+        ),
+      );
+    } else if (part.cnMeaning.isNotEmpty && part.isManualSense && sense.isNotEmpty) {
+      lines.add(
+        Text(
+          '词根通用义：${part.cnMeaning}',
+          style: TextStyle(
+            color: AppDesignTokens.textSecondary,
+            fontSize: 12,
+            height: 1.35,
+          ),
+        ),
+      );
+    }
+
+    if (lines.isEmpty && form.isNotEmpty) {
+      lines.add(
+        Text(
+          form,
+          style: TextStyle(
+            color: AppDesignTokens.textSecondary,
+            fontSize: 13,
+          ),
+        ),
+      );
+    }
+    return lines;
   }
 }

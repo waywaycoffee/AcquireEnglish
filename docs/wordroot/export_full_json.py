@@ -1,7 +1,8 @@
 #!/usr/bin/env python3
-"""Export CSV wordroot tables → compact roots_full.json for Flutter offline load.
+"""Legacy export: CSV → compact roots_full.json (v1 shape).
 
-Reads the real CSV schema from README (not the mismatched Doubao SQLite draft).
+Prefer v2_export.py → roots_app.json for the Flutter offline pack
+(assets/data/wordroot/roots_app.json). Kept for diffing / rollback only.
 """
 from __future__ import annotations
 

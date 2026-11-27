@@ -1770,6 +1770,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
               WordRootBreakdownPanel(
                 word: source.question,
                 compact: true,
+                allowGuess: false,
               ),
             ],
             if (word &&
