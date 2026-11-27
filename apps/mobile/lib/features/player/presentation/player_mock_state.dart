@@ -560,6 +560,10 @@ class PlayerMockState {
     return _resolveInitialIndexByMilliseconds(targetMs, lines);
   }
 
+  /// Last cue whose [PlayerSubtitleLine.startMs] ≤ [milliseconds].
+  ///
+  /// Binary search keeps long-film SRT (thousands of cues) cheap on every
+  /// position tick — linear reverse scan was O(n) per frame.
   static int _resolveInitialIndexByMilliseconds(
     int milliseconds,
     List<PlayerSubtitleLine> lines,
@@ -568,18 +572,19 @@ class PlayerMockState {
       return 0;
     }
 
-    for (int i = 0; i < lines.length; i++) {
-      if (lines[i].startMs == milliseconds) {
-        return i;
+    int lo = 0;
+    int hi = lines.length - 1;
+    int ans = 0;
+    while (lo <= hi) {
+      final int mid = (lo + hi) >> 1;
+      if (lines[mid].startMs <= milliseconds) {
+        ans = mid;
+        lo = mid + 1;
+      } else {
+        hi = mid - 1;
       }
     }
-
-    for (int i = lines.length - 1; i >= 0; i--) {
-      if (lines[i].startMs <= milliseconds) {
-        return i;
-      }
-    }
-    return 0;
+    return ans;
   }
 
   void _syncCurrentWordIndex({bool forceLineStart = false}) {

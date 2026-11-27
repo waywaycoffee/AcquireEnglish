@@ -62,9 +62,9 @@ Future<void> suppressPlayerSoftSubtitles(Player player) async {
 Player createStudyVideoPlayer({bool largeNetworkBuffer = false}) {
   return Player(
     configuration: PlayerConfiguration(
-      // 96MB demuxer cache for netdisk/B站 progressive streams; local files
-      // keep the default 32MB so we do not over-allocate on every lesson.
-      bufferSize: largeNetworkBuffer ? 96 * 1024 * 1024 : 32 * 1024 * 1024,
+      // Cap demuxer cache: 2h+ MKV (e.g. Harry Potter) + 96MB buffer OOM'd
+      // mid-film. Netdisk/B站 still get a larger progressive window than local.
+      bufferSize: largeNetworkBuffer ? 48 * 1024 * 1024 : 24 * 1024 * 1024,
     ),
   );
 }

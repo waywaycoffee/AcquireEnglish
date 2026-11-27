@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 
 import 'package:flutter/services.dart';
@@ -6,6 +5,7 @@ import 'package:path_provider/path_provider.dart';
 
 import '../../../constants/endpoints.dart';
 import '../data/softsub_paths.dart';
+import 'subtitle_text_decode.dart';
 
 String createPlayerMediaUri(String source) {
   final String trimmed = source.trim();
@@ -84,7 +84,7 @@ Future<String> loadPlayerTextSource(String source) async {
       '${docs.path}/netdisk/$importId/${english ? 'en' : 'zh'}.srt',
     );
     if (cached.existsSync() && cached.lengthSync() > 16) {
-      return cached.readAsString();
+      return decodeSubtitleBytes(await cached.readAsBytes());
     }
     final SoftsubImportSrtFetcher? fetcher = SoftsubAuthBridge.fetchImportSrt;
     if (fetcher == null) {
@@ -98,6 +98,7 @@ Future<String> loadPlayerTextSource(String source) async {
       throw StateError('网盘字幕为空');
     }
     await cached.parent.create(recursive: true);
+    // Persist as UTF-8 so later opens skip charset guessing.
     await cached.writeAsString(body, flush: true);
     return body;
   }
@@ -114,7 +115,11 @@ Future<String> loadPlayerTextSource(String source) async {
       if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StateError('字幕加载失败 HTTP ${response.statusCode}');
       }
-      return await response.transform(utf8.decoder).join();
+      final List<int> bytes = await response.fold<List<int>>(
+        <int>[],
+        (List<int> prev, List<int> chunk) => prev..addAll(chunk),
+      );
+      return decodeSubtitleBytes(bytes);
     } finally {
       client.close(force: true);
     }
@@ -123,7 +128,7 @@ Future<String> loadPlayerTextSource(String source) async {
     return loadPlayerTextSource(_absoluteApiUrl(trimmed));
   }
   if (_isLocalFilePath(trimmed)) {
-    return File(trimmed).readAsString();
+    return decodeSubtitleBytes(await File(trimmed).readAsBytes());
   }
   return rootBundle.loadString(trimmed);
 }

@@ -281,59 +281,67 @@ List<PlayerSubtitleLine> parseSubtitleLines(String rawSubtitle) {
   );
 
   for (int index = 0; index < lines.length; index++) {
-    final String rawLine = lines[index].trim();
-    if (rawLine.startsWith('WEBVTT')) {
-      continue;
-    }
-    final Match? match = timingLine.firstMatch(rawLine);
-    if (match == null) {
-      continue;
-    }
-
-    final List<String> parts = rawLine.split('-->');
-    if (parts.length != 2) {
-      continue;
-    }
-
-    final int? startMs = _parseTimestampToMs(parts[0].trim());
-    final int? endMs = _parseTimestampToMs(parts[1].trim());
-    if (startMs == null || endMs == null || endMs <= startMs) {
-      continue;
-    }
-
-    final List<String> textLines = <String>[];
-    index += 1;
-    while (index < lines.length) {
-      final String textLine = lines[index].trim();
-      if (textLine.isEmpty) {
-        break;
+    try {
+      final String rawLine = lines[index].trim();
+      if (rawLine.startsWith('WEBVTT')) {
+        continue;
       }
-      textLines.add(textLine);
+      final Match? match = timingLine.firstMatch(rawLine);
+      if (match == null) {
+        continue;
+      }
+
+      final List<String> parts = rawLine.split('-->');
+      if (parts.length != 2) {
+        continue;
+      }
+
+      // Parser accepts both "," and "." millisecond separators.
+      final int? startMs = _parseTimestampToMs(parts[0].trim());
+      final int? endMs = _parseTimestampToMs(
+        parts[1].trim().split(RegExp(r'\s+')).first,
+      );
+      if (startMs == null || endMs == null || endMs <= startMs) {
+        continue;
+      }
+
+      final List<String> textLines = <String>[];
       index += 1;
-    }
-    final List<String> cleanedLines = textLines
-        .map(
-          (String textLine) => textLine
-              .replaceAll(RegExp('<[^>]+>'), '')
-              .trim()
-              .replaceAll(RegExp(r'\{[^}]*\}'), ''),
-        )
-        .where((String textLine) => textLine.isNotEmpty)
-        .toList(growable: false);
-    if (cleanedLines.isEmpty) {
+      while (index < lines.length) {
+        final String textLine = lines[index].trim();
+        if (textLine.isEmpty) {
+          break;
+        }
+        textLines.add(textLine);
+        index += 1;
+      }
+      final List<String> cleanedLines = textLines
+          .map(
+            (String textLine) => textLine
+                .replaceAll(RegExp('<[^>]+>'), '')
+                .trim()
+                .replaceAll(RegExp(r'\{[^}]*\}'), ''),
+          )
+          .where((String textLine) => textLine.isNotEmpty)
+          .toList(growable: false);
+      if (cleanedLines.isEmpty) {
+        continue;
+      }
+
+      final _DualLanguageLinePair pair = _splitDualLanguageLine(cleanedLines);
+      result.add(
+        PlayerSubtitleLine(
+          startTime: _formatTimestamp(startMs),
+          english: pair.english,
+          chinese: pair.chinese,
+          startMs: startMs,
+          endMs: endMs,
+        ),
+      );
+    } catch (_) {
+      // Bad cue — skip instead of crashing the long-film player.
       continue;
     }
-
-    final _DualLanguageLinePair pair = _splitDualLanguageLine(cleanedLines);
-    result.add(
-      PlayerSubtitleLine(
-        startTime: _formatTimestamp(startMs),
-        english: pair.english,
-        chinese: pair.chinese,
-        startMs: startMs,
-        endMs: endMs,
-      ),
-    );
   }
 
   return sanitizeSubtitleLanguageFields(result);

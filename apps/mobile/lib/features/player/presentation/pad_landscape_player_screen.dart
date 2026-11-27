@@ -141,6 +141,8 @@ class PadLandscapePlayerScreenState
   bool _videoIsPlaying = false;
   Duration _videoDuration = Duration.zero;
   Duration _videoPosition = Duration.zero;
+  /// Throttle progress setState (~5Hz) unless cue/word/loop needs a rebuild.
+  int _lastProgressUiMs = 0;
   int? _scrubTargetMs;
   DateTime? _scrubArmedAt;
   String? _videoErrorText;
@@ -2670,15 +2672,25 @@ Future<void> _settleChineseFillIfAlreadyPresent() async {
       return;
     }
 
-    setState(() {
-      _videoPosition = position;
-      loopRestarted = state.restartLoopAtTimestamp(position.inMilliseconds);
-      if (loopRestarted) {
-        _videoPosition = Duration(milliseconds: state.positionMs);
-      } else {
-        lineChanged = state.syncWithTimestamp(position.inMilliseconds);
-      }
-    });
+    final int prevWord = state.currentWordIndex;
+    final int ms = position.inMilliseconds;
+    loopRestarted = state.restartLoopAtTimestamp(ms);
+    Duration nextPosition = position;
+    if (loopRestarted) {
+      nextPosition = Duration(milliseconds: state.positionMs);
+    } else {
+      lineChanged = state.syncWithTimestamp(ms);
+    }
+    final bool wordChanged = state.currentWordIndex != prevWord;
+    final bool uiDue = lineChanged ||
+        loopRestarted ||
+        wordChanged ||
+        (ms - _lastProgressUiMs).abs() >= 200;
+    _videoPosition = nextPosition;
+    if (uiDue) {
+      _lastProgressUiMs = ms;
+      setState(() {});
+    }
     _syncTranscriptReader();
 
     if (wasPlaying) {
