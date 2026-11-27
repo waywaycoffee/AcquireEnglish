@@ -18,6 +18,15 @@ const Map<String, String> kReadingTitleZhByNormalizedEnglish =
       'adventures of huckleberry finn': '哈克贝利·费恩历险记',
       'moby dick': '白鲸',
       'moby-dick': '白鲸',
+      "harry potter and the sorcerer's stone": '哈利·波特与魔法石',
+      'harry potter and the sorcerers stone': '哈利·波特与魔法石',
+      "harry potter and the philosopher's stone": '哈利·波特与魔法石',
+      'harry potter and the chamber of secrets': '哈利·波特与密室',
+      'harry potter and the prisoner of azkaban': '哈利·波特与阿兹卡班的囚徒',
+      'harry potter and the goblet of fire': '哈利·波特与火焰杯',
+      'harry potter and the order of the phoenix': '哈利·波特与凤凰社',
+      'harry potter and the half-blood prince': '哈利·波特与混血王子',
+      'harry potter and the deathly hallows': '哈利·波特与死亡圣器',
     };
 
 String normalizeReadingTitleKey(String title) {

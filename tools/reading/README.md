@@ -62,3 +62,23 @@ python tools\reading\tts_worker.py
 ```
 
 SSH host defaults to `acquireenglish`（与字幕 GPU worker 相同）。
+
+## Local EPUB → shelf + book TTS
+
+Import personal novels (e.g. Harry Potter series) without putting EPUB binaries in git:
+
+```powershell
+python tools/reading/import_local_epubs.py --upload --seed-backup `
+  "D:\AcquireEnglish\docs\书籍\哈利波特\*.epub"
+```
+
+- Text corpus: `media/reading/personal/{user_id}/ebooks/{series}/`
+- Shelf: merges into `/api/reading-backup` (owner sync)
+- Queue TTS (no ECS drain — local worker fills):
+
+```powershell
+python tools/reading/enqueue_book_tts.py --doc-id ebook-harry-potter-01 --index 1
+python tools/reading/tts_worker.py
+```
+
+Packs land at `media/reading/packs/{doc_id}/{voice}/page-*.json` and sentence MP3s under `media/reading/tts/`.

@@ -129,3 +129,10 @@ apps/mobile_harmony/ohos/oh-package-lock.json5
 apps/mobile_harmony/ohos/entry/oh-package-lock.json5
 apps/mobile_harmony/ohos/signing/
 apps/mobile_harmony/pubspec.yaml
+
+tmp/.dashscope_key
+tmp/run_tts_worker.py
+tmp/_fix_dashscope_key.py
+tmp/reading_ebooks/
+tmp/reading_tts_worker.out.log
+tmp/reading_tts_worker.err.log

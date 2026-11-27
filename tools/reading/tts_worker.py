@@ -39,10 +39,11 @@ def rpc(payload: dict) -> dict | None:
             ".venv/bin/python -m app.services.reading_tts_rpc",
         ],
         input=json.dumps(payload),
-        text=True,
         capture_output=True,
         timeout=timeout,
         check=False,
+        encoding="utf-8",
+        errors="replace",
     )
     if result.returncode:
         raise RuntimeError(
@@ -58,9 +59,11 @@ def rpc(payload: dict) -> dict | None:
 
 
 def synthesize_local(text: str, voice: str, out_path: Path) -> bool:
-    key = (os.environ.get("DASHSCOPE_API_KEY") or "").strip()
+    key = (os.environ.get("DASHSCOPE_API_KEY") or "").strip().lstrip("\ufeff")
+    key = key.strip('"').strip("'")
     if not key:
         return False
+    os.environ["DASHSCOPE_API_KEY"] = key
     # Reuse ECS adapter code if checked out locally; else fall back to RPC.
     try:
         sys.path.insert(
@@ -97,30 +100,38 @@ def fill_job(job: dict) -> None:
                 continue
             if item.get("ready") and item.get("audio_url"):
                 continue
-            # Prefer ECS synthesize (API key + cache) — GPU box drives the queue.
-            saved = rpc(
-                {
-                    "action": "synthesize",
-                    "text": text,
-                    "voice": voice,
-                    "language": "en",
-                }
-            )
+            # Prefer local Aliyun CosyVoice (longanfengyue / longze_v3.1) when this
+            # PC has DASHSCOPE_API_KEY — ECS RPC may refuse cloud spend unless
+            # READING_ALLOW_CLOUD_TTS=1. Always upload/cache onto ECS packs.
+            saved = None
+            with tempfile.TemporaryDirectory(prefix="reading-tts-") as folder:
+                mp3 = Path(folder) / "out.mp3"
+                if synthesize_local(text, voice, mp3):
+                    saved = rpc(
+                        {
+                            "action": "upload",
+                            "text": text,
+                            "voice": voice,
+                            "language": "en",
+                            "mp3_b64": base64.b64encode(mp3.read_bytes()).decode(
+                                "ascii"
+                            ),
+                        }
+                    )
             if not saved:
-                with tempfile.TemporaryDirectory(prefix="reading-tts-") as folder:
-                    mp3 = Path(folder) / "out.mp3"
-                    if synthesize_local(text, voice, mp3):
-                        saved = rpc(
-                            {
-                                "action": "upload",
-                                "text": text,
-                                "voice": voice,
-                                "language": "en",
-                                "mp3_b64": base64.b64encode(mp3.read_bytes()).decode(
-                                    "ascii"
-                                ),
-                            }
-                        )
+                try:
+                    saved = rpc(
+                        {
+                            "action": "synthesize",
+                            "text": text,
+                            "voice": voice,
+                            "language": "en",
+                        }
+                    )
+                except RuntimeError as exc:
+                    if "cloud_tts_disabled" not in str(exc):
+                        raise
+                    saved = None
             if not saved:
                 raise RuntimeError(f"synthesize failed for sentence {i}")
             sentences[i] = {
