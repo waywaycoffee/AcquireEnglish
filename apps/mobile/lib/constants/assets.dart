@@ -21,4 +21,10 @@ class Assets {
   static const String onboardingCommunity = 'assets/img/onboarding/community.jpg';
   static const String onboardingBuddy = 'assets/img/onboarding/buddy.jpg';
   static const String onboardingCollect = 'assets/img/onboarding/collect.jpg';
+
+  /// Home「我的词书」covers — shipped to every install.
+  static const String wordBookSceneMemory =
+      'assets/img/word_books/scene_memory_cover.jpg';
+  static const String wordBookCurrent =
+      'assets/img/word_books/current_word_book_cover.jpg';
 }

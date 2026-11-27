@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../../constants/assets.dart';
 import '../../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../words/domain/syllabus_book.dart';
@@ -77,10 +78,7 @@ class LevelVocabBookModules extends ConsumerWidget {
                 subtitle: sceneCount == 0
                     ? '0 个单词 · 收藏词会出现在这里'
                     : '$sceneCount 个单词',
-                spineColor: const Color(0xFF3D8B7A),
-                coverColor: AppDesignTokens.isDark
-                    ? const Color(0xFF1F3A34)
-                    : const Color(0xFFD8EFE8),
+                coverAsset: Assets.wordBookSceneMemory,
                 onTap: () {
                   if (scene == null) {
                     context.push('/words?favorites=1');
@@ -98,10 +96,7 @@ class LevelVocabBookModules extends ConsumerWidget {
                 subtitle: active == null
                     ? (books.ready ? '尚未选择 · 0 个单词' : '正在读取词书…')
                     : '${active.title} · $activeCount 个单词',
-                spineColor: const Color(0xFF6B5B95),
-                coverColor: AppDesignTokens.isDark
-                    ? const Color(0xFF2A2438)
-                    : const Color(0xFFE8E0F5),
+                coverAsset: Assets.wordBookCurrent,
                 onTap: () {
                   if (active == null) {
                     context.push('/words/syllabus?selectForStudy=1');
@@ -124,8 +119,7 @@ class _BookModule extends StatelessWidget {
   const _BookModule({
     required this.title,
     required this.subtitle,
-    required this.spineColor,
-    required this.coverColor,
+    required this.coverAsset,
     required this.onTap,
     this.onLongPress,
     super.key,
@@ -133,8 +127,7 @@ class _BookModule extends StatelessWidget {
 
   final String title;
   final String subtitle;
-  final Color spineColor;
-  final Color coverColor;
+  final String coverAsset;
   final VoidCallback onTap;
   final VoidCallback? onLongPress;
 
@@ -154,54 +147,35 @@ class _BookModule extends StatelessWidget {
                 aspectRatio: 3 / 4,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    color: coverColor,
                     borderRadius: BorderRadius.circular(10),
                     boxShadow: AppDesignTokens.toyCardShadow,
                     border: Border.all(
                       color: AppDesignTokens.borderGray.withValues(alpha: 0.5),
                     ),
                   ),
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.stretch,
-                    children: <Widget>[
-                      Container(
-                        width: 10,
-                        decoration: BoxDecoration(
-                          color: spineColor,
-                          borderRadius: const BorderRadius.only(
-                            topLeft: Radius.circular(10),
-                            bottomLeft: Radius.circular(10),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset(
+                      coverAsset,
+                      fit: BoxFit.cover,
+                      width: double.infinity,
+                      height: double.infinity,
+                      filterQuality: FilterQuality.medium,
+                      semanticLabel: title,
+                      errorBuilder:
+                          (BuildContext context, Object error, StackTrace? st) {
+                        return ColoredBox(
+                          color: AppDesignTokens.appWhite,
+                          child: Center(
+                            child: Icon(
+                              Icons.menu_book_rounded,
+                              color: AppDesignTokens.textSecondary,
+                              size: 28,
+                            ),
                           ),
-                        ),
-                      ),
-                      Expanded(
-                        child: Padding(
-                          padding: const EdgeInsets.fromLTRB(10, 14, 10, 12),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: <Widget>[
-                              Icon(
-                                Icons.menu_book_rounded,
-                                color: spineColor,
-                                size: 22,
-                              ),
-                              const Spacer(),
-                              Text(
-                                title,
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                                style: TextStyle(
-                                  color: AppDesignTokens.textPrimary,
-                                  fontWeight: FontWeight.w900,
-                                  fontSize: 15,
-                                  height: 1.2,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ],
+                        );
+                      },
+                    ),
                   ),
                 ),
               ),
