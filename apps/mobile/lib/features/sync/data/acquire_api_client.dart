@@ -4284,6 +4284,38 @@ class AcquireApiClient {
     return ExamPack.fromJson(response.data as Map<String, dynamic>);
   }
 
+  /// ECS DeepSeek batch: syllabus-aligned exam items for [skill].
+  Future<List<Map<String, dynamic>>> generateExamItems({
+    required String familyId,
+    required String skill,
+    int count = 8,
+    String gradeHint = '',
+    String cefr = '',
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.examGenerate,
+      data: <String, dynamic>{
+        'family_id': familyId,
+        'skill': skill,
+        'count': count.clamp(1, 20),
+        if (gradeHint.trim().isNotEmpty) 'grade_hint': gradeHint.trim(),
+        if (cefr.trim().isNotEmpty) 'cefr': cefr.trim(),
+      },
+      options: Options(
+        extra: _noCache.extra,
+        receiveTimeout: const Duration(seconds: 90),
+      ),
+    );
+    final Object? body = response.data;
+    if (body is! Map) return const <Map<String, dynamic>>[];
+    final Object? items = body['items'];
+    if (items is! List) return const <Map<String, dynamic>>[];
+    return items
+        .whereType<Map>()
+        .map((Map e) => Map<String, dynamic>.from(e))
+        .toList(growable: false);
+  }
+
   /// Push on-device API usage events to the server ledger (idempotent by event id).
   Future<void> syncApiUsageEvents(List<Map<String, dynamic>> events) async {
     if (events.isEmpty) {

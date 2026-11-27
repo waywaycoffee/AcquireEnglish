@@ -25,6 +25,7 @@ from app.routers import (
     exam_assets,
     writing,
     exam_packs,
+    exam_generate,
     learning_cards,
     learning_module_progress,
     public_challenges,
@@ -148,6 +149,7 @@ app.include_router(exam_assets.router, prefix="/api")
 app.include_router(exam_assets.admin_router, prefix="/api")
 app.include_router(writing.router, prefix="/api")
 app.include_router(exam_packs.router, prefix="/api")
+app.include_router(exam_generate.router, prefix="/api")
 app.include_router(learning_cards.router, prefix="/api")
 app.include_router(public_challenges.router, prefix="/api")
 app.include_router(imports.router, prefix="/api")

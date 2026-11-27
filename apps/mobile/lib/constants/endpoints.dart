@@ -74,6 +74,7 @@ class Endpoints {
   static const String grammarAnalyze = 'api/grammar/analyze';
   static const String usageEvents = 'api/usage/events';
   static const String examPacks = 'api/exam/packs';
+  static const String examGenerate = 'api/exam/generate';
   static const String cosmeticsBalance = 'api/cosmetics/balance';
   static const String cosmeticsEarn = 'api/cosmetics/earn';
   static const String cosmeticsCatalog = 'api/cosmetics/catalog';

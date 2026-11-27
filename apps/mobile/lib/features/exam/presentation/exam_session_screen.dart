@@ -14,6 +14,7 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../shared/presentation/grammar_split_button.dart';
 import '../data/exam_error_book_store.dart';
+import '../data/exam_generated_bank.dart';
 import '../data/exam_progress_store.dart';
 import '../domain/exam_fsrs.dart';
 import '../domain/exam_pack.dart';
@@ -94,6 +95,58 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
     super.dispose();
   }
 
+  List<ExamMcq> _bankMcqs(String familyId, String skill) {
+    final List<Map<String, dynamic>> rows = ref
+        .read(examGeneratedBankProvider)
+        .itemsFor(familyId: familyId, skill: skill);
+    final List<ExamMcq> out = <ExamMcq>[];
+    for (final Map<String, dynamic> row in rows) {
+      // Flat MCQ rows (grammar/vocab/mock).
+      if (row.containsKey('prompt') && row.containsKey('options')) {
+        try {
+          out.add(ExamMcq.fromJson(row));
+        } catch (_) {}
+        continue;
+      }
+      // Passage / script wrappers.
+      final Object? questions = row['questions'];
+      if (questions is! List) continue;
+      for (final Object? q in questions) {
+        if (q is! Map) continue;
+        try {
+          out.add(ExamMcq.fromJson(Map<String, dynamic>.from(q)));
+        } catch (_) {}
+      }
+    }
+    return out;
+  }
+
+  List<ExamListeningItem> _bankListening(String familyId) {
+    final List<Map<String, dynamic>> rows = ref
+        .read(examGeneratedBankProvider)
+        .itemsFor(familyId: familyId, skill: 'listening');
+    final List<ExamListeningItem> out = <ExamListeningItem>[];
+    for (final Map<String, dynamic> row in rows) {
+      try {
+        out.add(ExamListeningItem.fromJson(row));
+      } catch (_) {}
+    }
+    return out;
+  }
+
+  List<ExamReadingItem> _bankReading(String familyId) {
+    final List<Map<String, dynamic>> rows = ref
+        .read(examGeneratedBankProvider)
+        .itemsFor(familyId: familyId, skill: 'reading');
+    final List<ExamReadingItem> out = <ExamReadingItem>[];
+    for (final Map<String, dynamic> row in rows) {
+      try {
+        out.add(ExamReadingItem.fromJson(row));
+      } catch (_) {}
+    }
+    return out;
+  }
+
   Future<void> _boot() async {
     final ExamPack? pack = await ref.read(examPackProvider.future);
     if (!mounted) return;
@@ -106,6 +159,8 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
       return;
     }
 
+    final String familyId =
+        ref.read(examProfileProvider).familyId ?? pack.familyId;
     final List<_SessionQ> built = <_SessionQ>[];
     final List<String> skills = widget.mock
         ? (pack.mockSections.isEmpty
@@ -122,7 +177,10 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
       if (skill == 'vocab') {
         final List<ExamMcq> vocabItems = previewOnly && widget.skill == 'vocab'
             ? _seedExamVocab(pack)
-            : pack.vocab;
+            : <ExamMcq>[
+                ...pack.vocab,
+                ..._bankMcqs(familyId, 'vocab'),
+              ];
         for (final ExamMcq q in vocabItems) {
           built.add(
             _SessionQ(
@@ -136,13 +194,21 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
           );
         }
       } else if (skill == 'grammar') {
-        List<ExamMcq> items = pack.grammar;
+        List<ExamMcq> items = <ExamMcq>[
+          ...pack.grammar,
+          ..._bankMcqs(familyId, 'grammar'),
+        ];
         final String? tag = widget.grammarTag;
         if (tag != null && tag.isNotEmpty) {
           items = items
               .where((ExamMcq q) => grammarTagForPrompt(q.prompt) == tag)
               .toList(growable: false);
-          if (items.isEmpty) items = pack.grammar;
+          if (items.isEmpty) {
+            items = <ExamMcq>[
+              ...pack.grammar,
+              ..._bankMcqs(familyId, 'grammar'),
+            ];
+          }
         }
         if (previewOnly) {
           items = items.take(kModuleFreePreviewCount).toList(growable: false);
@@ -163,7 +229,10 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
       } else if (skill == 'listening') {
         final List<ExamListeningItem> items = previewOnly
             ? _seedExamListening(pack)
-            : pack.listening;
+            : <ExamListeningItem>[
+                ...pack.listening,
+                ..._bankListening(familyId),
+              ];
         for (final ExamListeningItem item in items) {
           for (final ExamMcq q in item.questions) {
             built.add(
@@ -183,7 +252,10 @@ class _ExamSessionScreenState extends ConsumerState<ExamSessionScreen> {
       } else if (skill == 'reading') {
         final List<ExamReadingItem> items = previewOnly
             ? _seedExamReading(pack)
-            : pack.reading;
+            : <ExamReadingItem>[
+                ...pack.reading,
+                ..._bankReading(familyId),
+              ];
         for (final ExamReadingItem item in items) {
           for (final ExamMcq q in item.questions) {
             built.add(

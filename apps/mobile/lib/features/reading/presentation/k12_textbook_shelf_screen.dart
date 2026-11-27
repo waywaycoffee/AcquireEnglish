@@ -20,10 +20,14 @@ class K12TextbookShelfScreen extends ConsumerStatefulWidget {
     super.key,
     this.initialGradeId,
     this.initialStage,
+    this.embedded = false,
   });
 
   final String? initialGradeId;
   final K12TextbookStage? initialStage;
+
+  /// When true, render body only (no Scaffold/AppBar) for exam hub tabs.
+  final bool embedded;
 
   @override
   ConsumerState<K12TextbookShelfScreen> createState() =>
@@ -196,6 +200,142 @@ class _K12TextbookShelfScreenState
     final int readyCount =
         books.where((K12TextbookEntry e) => _readyBookIds.containsKey(e.id)).length;
 
+    final Widget body = ListView(
+      padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
+      children: <Widget>[
+        if (widget.embedded)
+          Row(
+            children: <Widget>[
+              Expanded(
+                child: Text(
+                  readyCount > 0
+                      ? '本年级已上线 $readyCount 册有声教材。点封面即可打开。'
+                      : '本年级暂无已上线教材。可切换年级查看。',
+                  style: TextStyle(
+                    color: AppDesignTokens.textSecondary,
+                    height: 1.45,
+                  ),
+                ),
+              ),
+              IconButton(
+                tooltip: '刷新',
+                onPressed:
+                    _loadingMedia ? null : () => unawaited(_refreshReadyBooks()),
+                icon: _loadingMedia
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Icon(Icons.refresh_rounded),
+              ),
+            ],
+          )
+        else
+          Text(
+            readyCount > 0
+                ? '本年级已上线 $readyCount 册有声教材（PDF + 课次音频）。点封面即可打开。'
+                : '本年级暂无已上线教材。可切换到三～六年级或初中查看已上传册次。',
+            style: TextStyle(
+              color: AppDesignTokens.textSecondary,
+              height: 1.45,
+            ),
+          ),
+        const SizedBox(height: 16),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            for (final K12TextbookStage stage in K12TextbookStage.values)
+              ChoiceChip(
+                label: Text(k12TextbookStageLabel(stage)),
+                selected: _stage == stage,
+                onSelected: (_) => _selectStage(stage),
+              ),
+          ],
+        ),
+        const SizedBox(height: 14),
+        Text(
+          '年级',
+          style: TextStyle(
+            fontWeight: FontWeight.w800,
+            color: AppDesignTokens.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Wrap(
+          spacing: 8,
+          runSpacing: 8,
+          children: <Widget>[
+            for (final ExamFamily family in grades)
+              ChoiceChip(
+                label: Text(family.label),
+                selected: _gradeId == family.id,
+                onSelected: (_) {
+                  setState(() => _gradeId = family.id);
+                  unawaited(_refreshReadyBooks());
+                },
+              ),
+          ],
+        ),
+        const SizedBox(height: 18),
+        Text(
+          '${grade?.label ?? '年级'} · ${books.length} 册'
+          '${readyCount > 0 ? ' · $readyCount 有声' : ''}',
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w900,
+            color: AppDesignTokens.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 12),
+        K12ReadingSection(gradeId: _gradeId),
+        if (books.isEmpty)
+          Card(
+            color: AppDesignTokens.appWhite,
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Text(
+                _loadingMedia ? '正在加载已上线教材…' : '该年级暂无已上线教材。',
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+            ),
+          )
+        else
+          LayoutBuilder(
+            builder: (BuildContext context, BoxConstraints constraints) {
+              final double width = constraints.maxWidth;
+              final int columns = width >= 720
+                  ? 4
+                  : width >= 520
+                      ? 3
+                      : 2;
+              const double gap = 12;
+              final double tileWidth =
+                  (width - gap * (columns - 1)) / columns;
+              return Wrap(
+                spacing: gap,
+                runSpacing: gap,
+                children: <Widget>[
+                  for (int i = 0; i < books.length; i++)
+                    SizedBox(
+                      width: tileWidth,
+                      child: _TextbookTile(
+                        entry: books[i],
+                        paletteIndex: i,
+                        enabled: !_opening,
+                        onTap: () => unawaited(_openTextbook(books[i])),
+                      ),
+                    ),
+                ],
+              );
+            },
+          ),
+      ],
+    );
+
+    if (widget.embedded) return body;
+
     return Scaffold(
       backgroundColor: AppDesignTokens.softWhite,
       appBar: AppBar(
@@ -204,7 +344,8 @@ class _K12TextbookShelfScreenState
         actions: <Widget>[
           IconButton(
             tooltip: '刷新有声教材',
-            onPressed: _loadingMedia ? null : () => unawaited(_refreshReadyBooks()),
+            onPressed:
+                _loadingMedia ? null : () => unawaited(_refreshReadyBooks()),
             icon: _loadingMedia
                 ? const SizedBox(
                     width: 18,
@@ -219,112 +360,7 @@ class _K12TextbookShelfScreenState
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 28),
-        children: <Widget>[
-          Text(
-            readyCount > 0
-                ? '本年级已上线 $readyCount 册有声教材（PDF + 课次音频）。点封面即可打开。'
-                : '本年级暂无已上线教材。可切换到三～六年级或初中查看已上传册次。',
-            style: TextStyle(
-              color: AppDesignTokens.textSecondary,
-              height: 1.45,
-            ),
-          ),
-          const SizedBox(height: 16),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              for (final K12TextbookStage stage in K12TextbookStage.values)
-                ChoiceChip(
-                  label: Text(k12TextbookStageLabel(stage)),
-                  selected: _stage == stage,
-                  onSelected: (_) => _selectStage(stage),
-                ),
-            ],
-          ),
-          const SizedBox(height: 14),
-          Text(
-            '年级',
-            style: TextStyle(
-              fontWeight: FontWeight.w800,
-              color: AppDesignTokens.textSecondary,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: <Widget>[
-              for (final ExamFamily family in grades)
-                ChoiceChip(
-                  label: Text(family.label),
-                  selected: _gradeId == family.id,
-                  onSelected: (_) {
-                    setState(() => _gradeId = family.id);
-                    unawaited(_refreshReadyBooks());
-                  },
-                ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Text(
-            '${grade?.label ?? '年级'} · ${books.length} 册'
-            '${readyCount > 0 ? ' · $readyCount 有声' : ''}',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.w900,
-              color: AppDesignTokens.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          K12ReadingSection(gradeId: _gradeId),
-          if (books.isEmpty)
-            Card(
-              color: AppDesignTokens.appWhite,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Text(
-                  _loadingMedia
-                      ? '正在加载已上线教材…'
-                      : '该年级暂无已上线教材。',
-                  style: TextStyle(color: AppDesignTokens.textSecondary),
-                ),
-              ),
-            )
-          else
-            LayoutBuilder(
-              builder: (BuildContext context, BoxConstraints constraints) {
-                final double width = constraints.maxWidth;
-                final int columns = width >= 720
-                    ? 4
-                    : width >= 520
-                        ? 3
-                        : 2;
-                const double gap = 12;
-                final double tileWidth =
-                    (width - gap * (columns - 1)) / columns;
-                return Wrap(
-                  spacing: gap,
-                  runSpacing: gap,
-                  children: <Widget>[
-                    for (int i = 0; i < books.length; i++)
-                      SizedBox(
-                        width: tileWidth,
-                        child: _TextbookTile(
-                          entry: books[i],
-                          paletteIndex: i,
-                          enabled: !_opening,
-                          onTap: () => unawaited(_openTextbook(books[i])),
-                        ),
-                      ),
-                  ],
-                );
-              },
-            ),
-        ],
-      ),
+      body: body,
     );
   }
 }

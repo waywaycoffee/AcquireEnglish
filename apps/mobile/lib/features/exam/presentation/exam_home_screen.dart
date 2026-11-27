@@ -3,6 +3,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../navigation/presentation/navigation_destination.dart';
+import '../../reading/domain/k12_textbook_catalog.dart';
+import '../../reading/presentation/k12_textbook_shelf_screen.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
 import '../../shared/presentation/pad/pad_top_bar.dart';
@@ -12,17 +14,48 @@ import '../domain/exam_pack.dart';
 import '../domain/exam_profile.dart';
 import '../domain/exam_registry.dart';
 import '../domain/exam_weakness.dart';
+import 'exam_module_panel.dart';
 import 'exam_pack_provider.dart';
 import 'exam_profile_provider.dart';
 import 'exam_weakness_provider.dart';
 
 const Color _kExamHeroDark = Color(0xFF1A2332);
 
-class ExamHomeScreen extends ConsumerWidget {
+class ExamHomeScreen extends ConsumerStatefulWidget {
   const ExamHomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ExamHomeScreen> createState() => _ExamHomeScreenState();
+}
+
+class _ExamHomeScreenState extends ConsumerState<ExamHomeScreen>
+    with SingleTickerProviderStateMixin {
+  late final TabController _tabs;
+
+  static const List<String> _tabLabels = <String>[
+    '教材',
+    '听力',
+    '阅读',
+    '完形',
+    '语法',
+    '写作',
+    '整卷',
+  ];
+
+  @override
+  void initState() {
+    super.initState();
+    _tabs = TabController(length: _tabLabels.length, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabs.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final ExamProfile profile = ref.watch(examProfileProvider);
     final ExamFamily? family = profile.family;
     final ExamPack? pack = ref.watch(examPackProvider).asData?.value;
@@ -49,116 +82,220 @@ class ExamHomeScreen extends ConsumerWidget {
       topBar: PadTopBar(
         title: '考试备考',
         description: family == null
-            ? '先选目标，再给今日备考与薄弱诊断'
+            ? '先选目标，再进入教材与专项页签'
             : '${family.label} · CEFR ${profile.resolvedCefr}'
                 '${_countdownSuffix(profile.targetDateIso)}',
       ),
-      body: ListView(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
-        children: <Widget>[
-          Text(
-            'ACQUIRE · EXAM',
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w700,
-              letterSpacing: 0.6,
-              color: AppDesignTokens.primaryBlueDark,
-            ),
-          ),
-          const SizedBox(height: 12),
-          if (family == null)
-            _EmptyTargetBody(ref: ref)
-          else ...<Widget>[
-            _HeroTargetCard(
-              family: family,
-              practiced: practiced,
-              errorCount: errorCount,
-              accuracy: accuracy,
-            ),
-            if (pack != null && pack.missing) ...<Widget>[
-              const SizedBox(height: 10),
-              _HintCard(
-                text: '当前题包较薄。可从社区下载听力/脚本，或先做专项与错题复习。',
-                actionLabel: '社区真题资料',
-                onAction: () => context.push('/discover'),
-              ),
-            ],
-            if (_isK12GradeFamily(family.id)) ...<Widget>[
-              const SizedBox(height: 16),
-              _HintCard(
-                text: '查看本年级英语教材目录（书名 / 版本 / 封面占位），点击进入电子书阅读。',
-                actionLabel: '打开教材书架',
-                onAction: () => context.push(
-                  '/reading/textbooks?grade=${Uri.encodeQueryComponent(family.id)}',
-                ),
-              ),
-            ],
-            const SizedBox(height: 20),
-            _SectionTitle('今日备考'),
-            const SizedBox(height: 10),
-            _TodayTaskRow(
-              family: family,
-              errorCount: errorCount,
-              weakness: weakness,
-            ),
-            const SizedBox(height: 20),
-            _SectionTitle('薄弱项'),
-            const SizedBox(height: 10),
-            _WeaknessBars(weakness: weakness),
-            const SizedBox(height: 20),
-            _SectionTitle('专项与模考'),
-            const SizedBox(height: 10),
-            _PracticeGrid(
-              pack: pack,
-              errorCount: errorCount,
-            ),
-            const SizedBox(height: 12),
-            ExpansionTile(
-              tilePadding: EdgeInsets.zero,
-              title: const Text(
-                '更多',
-                style: TextStyle(fontWeight: FontWeight.w800),
-              ),
+      body: family == null
+          ? ListView(
+              padding: const EdgeInsets.fromLTRB(16, 8, 16, 32),
               children: <Widget>[
-                _MoreLink(
-                  title: '听力专项',
-                  onTap: () => context.push('/exam/listening'),
+                Text(
+                  'ACQUIRE · EXAM',
+                  style: TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.6,
+                    color: AppDesignTokens.primaryBlueDark,
+                  ),
                 ),
-                _MoreLink(
-                  title: '完形填空',
-                  onTap: () => context.push('/exam/cloze'),
+                const SizedBox(height: 12),
+                _EmptyTargetBody(ref: ref),
+              ],
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
+              children: <Widget>[
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 4, 16, 0),
+                  child: _HeroTargetCard(
+                    family: family,
+                    practiced: practiced,
+                    errorCount: errorCount,
+                    accuracy: accuracy,
+                  ),
                 ),
-                _MoreLink(
-                  title: '语法选择',
-                  onTap: () => context.push('/exam/grammar'),
+                if (pack != null && pack.missing)
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+                    child: _HintCard(
+                      text: '官方题包较薄时，可在各页签「生成」或「导入」扩充习题。',
+                      actionLabel: '社区真题资料',
+                      onAction: () => context.push('/discover'),
+                    ),
+                  ),
+                const SizedBox(height: 8),
+                Material(
+                  color: AppDesignTokens.softWhite,
+                  child: TabBar(
+                    controller: _tabs,
+                    isScrollable: true,
+                    tabAlignment: TabAlignment.start,
+                    labelColor: AppDesignTokens.brandGreen,
+                    unselectedLabelColor: AppDesignTokens.textSecondary,
+                    indicatorColor: AppDesignTokens.brandGreen,
+                    labelStyle: const TextStyle(fontWeight: FontWeight.w800),
+                    tabs: <Widget>[
+                      for (final String label in _tabLabels) Tab(text: label),
+                    ],
+                  ),
                 ),
-                _MoreLink(
-                  title: '阅读专项',
-                  onTap: () => context.push('/exam/reading'),
-                ),
-                _MoreLink(
-                  title: '写作训练',
-                  onTap: () => context.push('/writing'),
-                ),
-                _MoreLink(
-                  title: '口语练习',
-                  onTap: () => context.push('/digital-human'),
-                ),
-                _MoreLink(
-                  title: '社区真题资料',
-                  onTap: () => context.push('/discover'),
+                Expanded(
+                  child: TabBarView(
+                    controller: _tabs,
+                    children: <Widget>[
+                      K12TextbookShelfScreen(
+                        embedded: true,
+                        initialGradeId: _isK12GradeFamily(family.id)
+                            ? family.id
+                            : null,
+                        initialStage: _stageForFamily(family.id),
+                      ),
+                      ExamModulePanel(
+                        skill: 'listening',
+                        title: '听力模块',
+                        blurb:
+                            '官方听力脚本 + 选择题；可生成考纲短听力稿，或从社区导入音频资料。',
+                        practiceRoute: '/exam/session?skill=listening',
+                        importRoute: '/discover',
+                        importLabel: '社区听力资料',
+                        generateCount: 6,
+                      ),
+                      ExamModulePanel(
+                        skill: 'reading',
+                        title: '阅读模块',
+                        blurb: '阅读理解专项。可导入真题卷，或按考纲批量生成篇章与题目。',
+                        practiceRoute: '/exam/reading',
+                        importRoute: '/exam/reading/import',
+                        importLabel: '导入阅读卷',
+                        generateCount: 4,
+                        extraActions: <Widget>[
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () =>
+                                context.push('/exam/session?skill=reading'),
+                            child: const Text('快速刷题（题包）'),
+                          ),
+                        ],
+                      ),
+                      ExamModulePanel(
+                        skill: 'cloze',
+                        title: '完形填空模块',
+                        blurb: '完形篇章练习。支持粘贴导入，也可生成符合年级难度的挖空篇。',
+                        practiceRoute: '/exam/cloze',
+                        importRoute: '/exam/cloze/import',
+                        importLabel: '导入完形文本',
+                        generateCount: 3,
+                      ),
+                      ExamModulePanel(
+                        skill: 'grammar',
+                        title: '语法模块',
+                        blurb: '语法选择与考点归类。可按考纲生成大批量选择题入库练习。',
+                        practiceRoute: '/exam/grammar',
+                        generateCount: 12,
+                        extraActions: <Widget>[
+                          const SizedBox(height: 8),
+                          TextButton(
+                            onPressed: () =>
+                                context.push('/exam/session?skill=grammar'),
+                            child: const Text('开始语法刷题'),
+                          ),
+                        ],
+                      ),
+                      ExamModulePanel(
+                        skill: 'writing',
+                        title: '写作模块',
+                        blurb: '写作题干与评分要点。生成后进入写作练习；云端批改走 ECS。',
+                        practiceRoute: '/writing',
+                        generateCount: 5,
+                      ),
+                      _MockTabBody(
+                        pack: pack,
+                        weakness: weakness,
+                        family: family,
+                        errorCount: errorCount,
+                      ),
+                    ],
+                  ),
                 ),
               ],
             ),
-          ],
-        ],
-      ),
     );
   }
 
   static String _countdownSuffix(String? iso) {
     final String label = _countdownLabel(iso);
     return label.isEmpty ? '' : ' · $label';
+  }
+}
+
+K12TextbookStage? _stageForFamily(String familyId) {
+  if (familyId.startsWith('k12_g')) return K12TextbookStage.primary;
+  if (familyId.startsWith('k12_j') || familyId == 'zhongkao') {
+    return K12TextbookStage.junior;
+  }
+  if (familyId.startsWith('k12_s') || familyId == 'gaokao') {
+    return K12TextbookStage.senior;
+  }
+  return null;
+}
+
+class _MockTabBody extends StatelessWidget {
+  const _MockTabBody({
+    required this.pack,
+    required this.weakness,
+    required this.family,
+    required this.errorCount,
+  });
+
+  final ExamPack? pack;
+  final ExamWeaknessReport? weakness;
+  final ExamFamily family;
+  final int errorCount;
+
+  @override
+  Widget build(BuildContext context) {
+    return ListView(
+      padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
+      children: <Widget>[
+        Text(
+          '整卷考试',
+          style: TextStyle(
+            fontSize: 20,
+            fontWeight: FontWeight.w900,
+            color: AppDesignTokens.textPrimary,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          '限时客观卷（词汇 / 听力 / 阅读等）。写作请用「写作」页签；可先生成一批客观题再开考。',
+          style: TextStyle(
+            height: 1.45,
+            fontWeight: FontWeight.w600,
+            color: AppDesignTokens.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 14),
+        _TodayTaskRow(
+          family: family,
+          errorCount: errorCount,
+          weakness: weakness,
+        ),
+        const SizedBox(height: 14),
+        _WeaknessBars(weakness: weakness),
+        const SizedBox(height: 16),
+        ExamModulePanel(
+          skill: 'mock',
+          title: '组卷与生成',
+          blurb: pack == null
+              ? '题包加载后可开限时卷；也可生成客观题扩充题量。'
+              : '${pack!.title} · 约 ${pack!.mockMinutes} 分钟',
+          practiceRoute: '/exam/mock',
+          generateCount: 15,
+          embeddedInScroll: true,
+        ),
+      ],
+    );
   }
 }
 
@@ -680,121 +817,6 @@ class _WeaknessBars extends StatelessWidget {
   }
 }
 
-class _PracticeGrid extends StatelessWidget {
-  const _PracticeGrid({required this.pack, required this.errorCount});
-
-  final ExamPack? pack;
-  final int errorCount;
-
-  @override
-  Widget build(BuildContext context) {
-    final String mockSub = pack == null
-        ? '计时客观题'
-        : '${pack!.mockMinutes} 分钟 · ${pack!.mockSections.join(" / ")}';
-    final List<_GridItem> items = <_GridItem>[
-      _GridItem(
-        title: '专项训练',
-        subtitle: '听 / 读 / 词 / 语法',
-        route: '/exam/practice',
-      ),
-      _GridItem(
-        title: '限时客观卷',
-        subtitle: mockSub,
-        route: '/exam/mock',
-      ),
-      _GridItem(
-        title: '错题本',
-        subtitle: errorCount == 0 ? '筛选 · 再练' : '$errorCount 条 · 筛选再练',
-        route: '/exam/errorbook',
-      ),
-      _GridItem(
-        title: '学习报告',
-        subtitle: '正确率 · 薄弱',
-        route: '/exam/report',
-      ),
-    ];
-
-    return Column(
-      children: <Widget>[
-        Row(
-          children: <Widget>[
-            Expanded(child: _GridCard(item: items[0])),
-            const SizedBox(width: 12),
-            Expanded(child: _GridCard(item: items[1])),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Row(
-          children: <Widget>[
-            Expanded(child: _GridCard(item: items[2])),
-            const SizedBox(width: 12),
-            Expanded(child: _GridCard(item: items[3])),
-          ],
-        ),
-      ],
-    );
-  }
-}
-
-class _GridItem {
-  const _GridItem({
-    required this.title,
-    required this.subtitle,
-    required this.route,
-  });
-
-  final String title;
-  final String subtitle;
-  final String route;
-}
-
-class _GridCard extends StatelessWidget {
-  const _GridCard({required this.item});
-
-  final _GridItem item;
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: AppDesignTokens.appWhite,
-      borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => context.push(item.route),
-        child: SizedBox(
-          height: 72,
-          child: Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  item.title,
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  item.subtitle,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: TextStyle(
-                    fontSize: 11,
-                    fontWeight: FontWeight.w600,
-                    color: AppDesignTokens.textSecondary,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}
-
 class _SectionTitle extends StatelessWidget {
   const _SectionTitle(this.text);
 
@@ -805,23 +827,6 @@ class _SectionTitle extends StatelessWidget {
     return Text(
       text,
       style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w900),
-    );
-  }
-}
-
-class _MoreLink extends StatelessWidget {
-  const _MoreLink({required this.title, required this.onTap});
-
-  final String title;
-  final VoidCallback onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return ListTile(
-      contentPadding: EdgeInsets.zero,
-      title: Text(title, style: const TextStyle(fontWeight: FontWeight.w700)),
-      trailing: const Icon(Icons.chevron_right),
-      onTap: onTap,
     );
   }
 }
