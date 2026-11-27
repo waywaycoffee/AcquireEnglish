@@ -23,17 +23,32 @@ void main() {
       const JourneyActivity video = (route: '/episodes/42', title: 'Travel');
       final TodayJourneyStore journey = TodayJourneyStore('learner', today);
 
+      expect(journey.learningOrder, TodayLearningStep.values);
+      await journey.saveLearningOrder(<TodayLearningStep>[
+        TodayLearningStep.reading,
+        TodayLearningStep.newWords,
+        TodayLearningStep.video,
+        TodayLearningStep.reviewWords,
+        TodayLearningStep.photoChat,
+      ]);
+      expect(
+        TodayJourneyStore('learner', today).learningOrder.first,
+        TodayLearningStep.reading,
+      );
+      expect(
+        TodayJourneyStore('learner', tomorrow).learningOrder,
+        TodayLearningStep.values,
+      );
       expect(journey.stage, JourneyStage.review);
       await journey.saveStage(JourneyStage.learn);
       await journey.saveActivity(video);
       expect(journey.stage, JourneyStage.learn);
 
       await journey.saveStage(JourneyStage.tomorrow);
-      await TodayJourneyStore('learner', tomorrow).saveActivity(
-        video,
-        planned: true,
-        reason: '接着第4集',
-      );
+      await TodayJourneyStore(
+        'learner',
+        tomorrow,
+      ).saveActivity(video, planned: true, reason: '接着第4集');
       await journey.saveStage(JourneyStage.done);
       await Hive.close();
       await Hive.openBox<String>('prefs');
@@ -73,10 +88,10 @@ void main() {
     expect(store.pausedExplicitly, isFalse);
     expect(store.reason, '按水平排好了');
 
-    await store.saveActivity(
-      (route: '/episodes/1', title: '第 1 集'),
-      pausedExplicitly: true,
-    );
+    await store.saveActivity((
+      route: '/episodes/1',
+      title: '第 1 集',
+    ), pausedExplicitly: true);
     expect(store.pausedExplicitly, isTrue);
     expect(store.planned, isFalse);
     expect(store.reason, isNull);
@@ -168,13 +183,10 @@ void main() {
       lastTrack: TodayStudyTrack.reading,
       quotasConfigured: true,
     );
-    expect(
-      plan.unfinishedOrdered(),
-      <TodayStudyTrack>[
-        TodayStudyTrack.reading,
-        TodayStudyTrack.video,
-        TodayStudyTrack.vocab,
-      ],
-    );
+    expect(plan.unfinishedOrdered(), <TodayStudyTrack>[
+      TodayStudyTrack.reading,
+      TodayStudyTrack.video,
+      TodayStudyTrack.vocab,
+    ]);
   });
 }

@@ -11,10 +11,10 @@ import '../../../daily_path/data/today_journey_store.dart';
 import '../../../daily_path/domain/today_task.dart';
 import '../../../daily_path/presentation/today_learning_setup.dart';
 import '../../../daily_path/presentation/today_path_provider.dart';
+import '../../../daily_review/domain/daily_review.dart';
 import '../../../daily_review/presentation/daily_review_provider.dart';
 import '../../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../../learner_model/data/journey_feedback_store.dart';
-import '../../../learner_model/domain/journey_completion.dart';
 import '../../../learner_model/domain/journey_next_step.dart';
 import '../../../learner_model/domain/learner_skill_profile.dart';
 import '../../../learner_model/domain/learning_recommendation.dart';
@@ -33,6 +33,7 @@ import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/presentation/daily_feed_provider.dart';
 import '../../../words/domain/syllabus_book.dart';
 import '../../../words/presentation/syllabus_books_provider.dart';
+import '../../../words/presentation/word_review_settings_provider.dart';
 import '../learning_dashboard_provider.dart';
 
 class TodayActivityCard extends ConsumerStatefulWidget {
@@ -68,8 +69,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     if (!plan.quotasConfigured) return false;
     final LearningDailyRecord today = ref.read(learningActivityProvider).today;
     final int videoMs = math.max(plan.videoDoneMs, today.videoStudyMilliseconds);
-    // ~25s per graded card heuristic + any stored session count.
-    final int vocabFromActivity = today.vocabStudyMilliseconds ~/ 25000;
+    final int vocabFromActivity = _newWordsToday();
     final int vocab = math.max(plan.vocabDone, vocabFromActivity);
     int readingWords = plan.readingWordsDone;
     final ReadingLibraryState library = ref.read(readingLibraryProvider);
@@ -154,6 +154,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       vocabCount: picked.vocabCount,
       readingWords: picked.readingWords,
     );
+    await ref.read(wordReviewSettingsProvider.notifier).setDailyNewLimit(picked.vocabCount);
     if (mounted) setState(() {});
   }
 
@@ -171,29 +172,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       vocabCount: picked.vocabCount,
       readingWords: picked.readingWords,
     );
+    await ref.read(wordReviewSettingsProvider.notifier).setDailyNewLimit(picked.vocabCount);
     if (mounted) setState(() {});
-  }
-
-  /// Ensure vocab book / video series / reading book exist for today's quotas.
-  Future<bool> _ensureContentSources(TodayStudyPlan plan) async {
-    if (!mounted) return false;
-    if (plan.vocabCount > 0) {
-      final bool ok = await ensureTodayVocabBook(context, ref);
-      if (!ok || !mounted) return false;
-    }
-    if (plan.videoMinutes > 0) {
-      final bool ok = await ensureTodayVideoSource(
-        context,
-        ref,
-        hasVideoTarget: () => _videoPursuit() != null,
-      );
-      if (!ok || !mounted) return false;
-    }
-    if (plan.readingWords > 0) {
-      final bool ok = await ensureTodayReadingBook(context, ref);
-      if (!ok || !mounted) return false;
-    }
-    return true;
   }
 
   JourneyTask? _videoPursuit() {
@@ -353,6 +333,76 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     }
   }
 
+  int _newWordsToday() => ref
+      .read(dailyReviewProvider)
+      .days[reviewDayKey(ref.read(reviewClockProvider)())]
+      ?.newLearned ?? 0;
+
+  bool _hasDueWords() {
+    final DailyReviewState review = ref.read(dailyReviewProvider);
+    final DateTime now = ref.read(reviewClockProvider)();
+    return ref.read(reviewSourcesProvider).any((ReviewSource source) {
+      final ReviewRecord? record = review.records[source.key];
+      return source.kind == ReviewKind.word &&
+          !source.key.startsWith('recommended:') &&
+          record != null && !record.isNew && !record.card.due.isAfter(now);
+    });
+  }
+
+  TodayLearningStep? _nextLearningStep(TodayJourneyStore store) {
+    final TodayStudyPlan plan = store.studyPlan;
+    final SyllabusBooksState books = ref.read(syllabusBooksProvider);
+    final SyllabusBook? book = books.activeBook;
+    final DailyReviewState review = ref.read(dailyReviewProvider);
+    final int learned = _newWordsToday();
+    return store.learningOrder.where((TodayLearningStep step) => switch (step) {
+      TodayLearningStep.newWords =>
+        !plan.vocabTrackDone && learned < plan.vocabCount &&
+            learned < review.dailyNewLimit &&
+            (book == null || !books.isComplete(book)),
+      TodayLearningStep.video => !plan.videoDone,
+      TodayLearningStep.reviewWords => _hasDueWords(),
+      TodayLearningStep.reading => !plan.readingDone,
+      TodayLearningStep.photoChat => !store.oralIntroDone,
+    }).firstOrNull;
+  }
+
+  Future<void> _editLearningOrder(TodayJourneyStore store) async {
+    final List<TodayLearningStep> order =
+        List<TodayLearningStep>.of(store.learningOrder);
+    final bool? saved = await showModalBottomSheet<bool>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        child: StatefulBuilder(
+          builder: (BuildContext context, StateSetter refresh) => Column(
+            children: <Widget>[
+              const ListTile(title: Text('拖动调整今日学习顺序')),
+              Expanded(
+                child: ReorderableListView(
+                  onReorderItem: (int oldIndex, int newIndex) => refresh(() {
+                    order.insert(newIndex, order.removeAt(oldIndex));
+                  }),
+                  children: <Widget>[
+                    for (final TodayLearningStep step in order)
+                      ListTile(key: ValueKey(step), title: Text(step.label)),
+                  ],
+                ),
+              ),
+              FilledButton(
+                onPressed: () => Navigator.pop(sheetContext, true),
+                child: const Text('保存顺序'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (saved != true || !mounted) return;
+    await store.saveLearningOrder(order);
+    if (mounted) setState(() {});
+  }
+
   Future<void> _runNext() async {
     if (_busy) return;
     setState(() => _busy = true);
@@ -361,74 +411,41 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     final TodayJourneyStore store = TodayJourneyStore(account, today);
     try {
       await _ensureQuotas(store);
-      if (!mounted) return;
+      if (!mounted || !store.studyPlan.quotasConfigured) return;
       await _syncProgress(store);
-      TodayStudyPlan plan = store.studyPlan;
-      if (!plan.quotasConfigured) return;
-      final bool sourcesReady = await _ensureContentSources(plan);
-      if (!sourcesReady || !mounted) return;
-      await offerTodayOralIntro(
-        context,
-        ref,
-        alreadyDone: store.oralIntroDone,
-        markDone: store.markOralIntroDone,
-      );
       if (!mounted) return;
-      plan = store.studyPlan;
-      if (plan.allTracksDone) {
+      final TodayLearningStep? step = _nextLearningStep(store);
+      if (step == null) {
         await _seedTomorrow(account, today, store);
         await store.saveStage(JourneyStage.done);
-        if (mounted) setState(() {});
-        await _openRefreshBatch();
         return;
       }
-      // Honor explicit pause first.
-      final JourneyActivity? stored = store.activity;
-      if (store.pausedExplicitly &&
-          stored != null &&
-          stored.route.isNotEmpty) {
-        await context.push(stored.route);
-        if (!mounted) return;
-        await _syncProgress(store);
-        if (mounted) setState(() {});
-        return;
-      }
-      // Planned from yesterday.
-      if (store.planned && stored != null && stored.route.isNotEmpty) {
-        final TodayStudyTrack track = learnModuleForRoute(stored.route) ==
-                LearnModule.reading
-            ? TodayStudyTrack.reading
-            : learnModuleForRoute(stored.route) == LearnModule.vocab
-                ? TodayStudyTrack.vocab
-                : TodayStudyTrack.video;
-        await store.saveProgress(lastTrack: track);
-        await store.saveActivity(stored); // clear planned flag on open
-        await context.push(stored.route);
-        if (!mounted) return;
-        await _syncProgress(store);
-        if (mounted) setState(() {});
-        return;
-      }
-      final TodayStudyTrack? track = plan.nextTrack;
-      if (track == null) return;
-      final JourneyTask? task = _pursuitFor(track);
-      if (task == null || task.route.isEmpty) {
-        await _openRefreshBatch(trackHint: track);
-        return;
-      }
-      await store.saveProgress(lastTrack: track);
-      await store.saveActivity((route: task.route, title: task.title));
+      final String route = switch (step) {
+        TodayLearningStep.newWords => _vocabPursuit()!.route,
+        TodayLearningStep.video => _videoPursuit()?.route ?? '/library',
+        TodayLearningStep.reviewWords => '/review/session?due=1&kind=word',
+        TodayLearningStep.reading => _readingPursuit()!.route,
+        TodayLearningStep.photoChat => '/digital-human?sceneMenu=1',
+      };
       await store.saveStage(JourneyStage.learn);
       if (!mounted) return;
-      await context.push(task.route);
+      if (step == TodayLearningStep.photoChat) {
+        await offerTodayOralIntro(
+          context,
+          ref,
+          alreadyDone: store.oralIntroDone,
+          markDone: store.markOralIntroDone,
+        );
+      } else {
+        await context.push(route);
+      }
       if (!mounted) return;
       await _syncProgress(store);
-      final TodayStudyPlan after = store.studyPlan;
-      if (after.allTracksDone) {
+      if (!mounted) return;
+      if (_nextLearningStep(store) == null) {
         await _seedTomorrow(account, today, store);
         await store.saveStage(JourneyStage.done);
       }
-      if (mounted) setState(() {});
     } finally {
       if (mounted) setState(() => _busy = false);
     }
@@ -600,30 +617,43 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     );
   }
 
-  String _ctaLabel(TodayStudyPlan plan, TodayJourneyStore store) {
-    if (!plan.quotasConfigured) return '设定今日配额';
-    if (plan.allTracksDone) return '刷一批 · 换点新鲜的';
-    if (store.pausedExplicitly &&
-        (store.activity?.route.isNotEmpty ?? false)) {
-      return '下一步：${_short(store.activity!.title)}';
-    }
-    if (store.planned && (store.activity?.route.isNotEmpty ?? false)) {
-      return '下一步：${_short(store.activity!.title)}';
-    }
-    final TodayStudyTrack? track = plan.nextTrack;
-    if (track == null) return '刷一批';
-    final JourneyTask? task = _pursuitFor(track);
-    if (task == null) return '下一步：选${_trackLabel(track)}';
-    return '下一步：${_short(task.title)}';
-  }
-
-  String _short(String raw) {
-    final String t = raw
-        .replaceFirst(RegExp(r'^下一步 · '), '')
-        .replaceFirst(RegExp(r'^继续 · '), '')
-        .trim();
-    if (t.length <= 18) return t;
-    return '${t.substring(0, 17)}…';
+  Future<void> _chooseStudyMaterial() async {
+    final String? route = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        top: false,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              const ListTile(title: Text('选择今日学习内容')),
+              ListTile(
+                leading: const Icon(Icons.play_circle_outline),
+                title: const Text('选择要看的视频'),
+                onTap: () => Navigator.pop(sheetContext, '/library'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.auto_stories_outlined),
+                title: const Text('选择要读的书'),
+                onTap: () => Navigator.pop(sheetContext, '/reading'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.menu_book_outlined),
+                title: const Text('选择要背的词书'),
+                onTap: () => Navigator.pop(sheetContext, '/words/syllabus'),
+              ),
+              ListTile(
+                leading: const Icon(Icons.photo_camera_outlined),
+                title: const Text('自由拍照学词'),
+                onTap: () => Navigator.pop(sheetContext, '/digital-human?sceneMenu=1'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (route != null && mounted) await context.push(route);
   }
 
   @override
@@ -646,6 +676,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     _scheduleProgressSync(store);
     final TodayStudyPlan plan = store.studyPlan;
     final int due = _unifiedDueCount();
+    final TodayLearningStep? nextStep = _nextLearningStep(store);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -663,7 +694,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               children: <Widget>[
                 Text(
                   plan.quotasConfigured
-                      ? (plan.allTracksDone ? '今日配额已完成' : '按配额接着学')
+                      ? (nextStep == null ? '今日计划已完成' : '按计划接着学')
                       : '先定今天学多少',
                   style: TextStyle(
                     color: AppDesignTokens.brandGreen,
@@ -672,41 +703,55 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                   ),
                 ),
                 const SizedBox(height: 6),
-                Text(
-                  '今日学习',
-                  style: TextStyle(
-                    color: AppDesignTokens.textPrimary,
-                    fontWeight: FontWeight.w800,
-                    fontSize: 24,
+                TextButton(
+                  onPressed: _chooseStudyMaterial,
+                  style: TextButton.styleFrom(
+                    padding: EdgeInsets.zero,
+                    foregroundColor: AppDesignTokens.textPrimary,
+                  ),
+                  child: const Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      Text('今日学习', style: TextStyle(
+                        fontWeight: FontWeight.w800,
+                        fontSize: 24,
+                      )),
+                      Icon(Icons.chevron_right),
+                    ],
                   ),
                 ),
-                const SizedBox(height: 6),
-                Text(
-                  plan.quotasConfigured
-                      ? (plan.allTracksDone
-                          ? '视频/单词/阅读都达标了。可以刷一批换点新鲜内容。'
-                          : '会先补齐词书/视频/读物，再用拍照学周围单词作口语引子。')
-                      : '设好视频分钟、背词个数、阅读词数；某一轨填 0 就跳过。',
-                  style: TextStyle(
-                    color: AppDesignTokens.textSecondary,
-                    height: 1.45,
-                    fontSize: 13,
-                  ),
-                ),
-                if (books.ready)
-                  TextButton.icon(
-                    onPressed: () {
+                Material(
+                  type: MaterialType.transparency,
+                  child: ListTile(
+                    contentPadding: EdgeInsets.zero,
+                    leading: const Icon(Icons.menu_book_outlined),
+                    title: const Text('当前词书'),
+                    subtitle: Text(
+                      activeBook == null
+                          ? (books.ready ? '尚未选择 · 去词书架' : '正在读取词书…')
+                          : '${activeBook.title}${books.isComplete(activeBook) ? '（已背完）' : ''}',
+                      key: const Key('home-active-vocabulary-book'),
+                      style: TextStyle(
+                        color: AppDesignTokens.textPrimary,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                      ),
+                    ),
+                    trailing: const Icon(Icons.chevron_right),
+                    onTap: () {
                       if (activeBook == null || books.isComplete(activeBook)) {
                         context.push('/words/syllabus');
                       } else {
                         startSyllabusBookSession(ref, context, activeBook);
                       }
                     },
-                    icon: const Icon(Icons.menu_book_outlined),
-                    label: Text(activeBook == null
-                        ? '选择一本词书'
-                        : '当前词书 · ${activeBook.title}${books.isComplete(activeBook) ? '（已背完）' : ''}'),
                   ),
+                ),
+                TextButton.icon(
+                  onPressed: () => context.push('/digital-human?sceneMenu=1'),
+                  icon: const Icon(Icons.photo_camera_outlined),
+                  label: const Text('自由拍照学词'),
+                ),
                 if (plan.quotasConfigured) ...<Widget>[
                   const SizedBox(height: 16),
                   _QuotaProgressRow(
@@ -740,20 +785,11 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                     done: plan.readingDone,
                   ),
                 ],
-                if (store.planned &&
-                    !store.pausedExplicitly &&
-                    (store.activity?.route.isNotEmpty ?? false)) ...<Widget>[
-                  const SizedBox(height: 12),
-                  _NextBanner(
-                    title: '昨天替你排好了',
-                    reason: store.reason ?? store.activity!.title,
-                  ),
-                ],
                 const SizedBox(height: 14),
                 SizedBox(
                   width: double.infinity,
                   child: FilledButton(
-                    onPressed: _busy ? null : _runNext,
+                    onPressed: _chooseStudyMaterial,
                     style: FilledButton.styleFrom(
                       backgroundColor: AppDesignTokens.brandGreen,
                       foregroundColor: AppDesignTokens.onAccent,
@@ -763,13 +799,30 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                       ),
                     ),
                     child: Text(
-                      _ctaLabel(plan, store),
+                      '选择学习内容',
                       style: const TextStyle(
                         fontWeight: FontWeight.w800,
                         fontSize: 16,
                       ),
                     ),
                   ),
+                ),
+                Text(
+                  store.learningOrder.map((TodayLearningStep step) => step.label).join(' → '),
+                ),
+                TextButton(
+                  onPressed: _busy ? null : () => _editLearningOrder(store),
+                  child: const Text('调整学习顺序'),
+                ),
+                FilledButton(
+                  onPressed: _busy || (plan.quotasConfigured && nextStep == null)
+                      ? null
+                      : _runNext,
+                  child: Text(nextStep == null && plan.quotasConfigured
+                      ? '今日计划已完成'
+                      : nextStep == null || !plan.quotasConfigured
+                          ? '继续学习'
+                          : '继续学习 · ${nextStep.label}'),
                 ),
                 if (plan.quotasConfigured) ...<Widget>[
                   const SizedBox(height: 8),
@@ -884,49 +937,6 @@ class _QuotaProgressRow extends StatelessWidget {
   }
 }
 
-class _NextBanner extends StatelessWidget {
-  const _NextBanner({required this.title, required this.reason});
-
-  final String title;
-  final String reason;
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: AppDesignTokens.successSoft,
-        borderRadius: BorderRadius.circular(14),
-        border: Border.all(
-          color: AppDesignTokens.brandGreen.withValues(alpha: 0.35),
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Text(
-            title,
-            style: TextStyle(
-              color: AppDesignTokens.textPrimary,
-              fontWeight: FontWeight.w800,
-              fontSize: 15,
-            ),
-          ),
-          const SizedBox(height: 4),
-          Text(
-            reason,
-            style: TextStyle(
-              color: AppDesignTokens.textSecondary,
-              height: 1.4,
-              fontSize: 12,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
 
 class _TodayQuotaSheet extends StatefulWidget {
   const _TodayQuotaSheet({

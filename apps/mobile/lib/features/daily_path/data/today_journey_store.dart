@@ -6,6 +6,18 @@ enum JourneyStage { review, learn, tomorrow, done }
 
 enum TodayStudyTrack { video, vocab, reading }
 
+// Declaration order is the default for each new day.
+enum TodayLearningStep {
+  newWords('背单词'),
+  video('看视频'),
+  reviewWords('复习单词'),
+  reading('阅读书籍'),
+  photoChat('拍照聊天');
+
+  const TodayLearningStep(this.label);
+  final String label;
+}
+
 typedef JourneyActivity = ({String route, String title});
 
 /// Thin read model over [TodayJourneyStore] quota + progress fields.
@@ -167,6 +179,24 @@ class TodayJourneyStore {
 
   Future<void> markOralIntroDone() async {
     await _write(<String, Object?>{..._read(), 'oralIntroDone': true});
+  }
+
+  List<TodayLearningStep> get learningOrder {
+    final Object? saved = _read()['learningOrder'];
+    if (saved is! List<Object?>) return TodayLearningStep.values;
+    return <TodayLearningStep>{
+      for (final Object? name in saved)
+        for (final TodayLearningStep step in TodayLearningStep.values)
+          if (step.name == name) step,
+      ...TodayLearningStep.values,
+    }.toList(growable: false);
+  }
+
+  Future<void> saveLearningOrder(List<TodayLearningStep> order) async {
+    await _write(<String, Object?>{
+      ..._read(),
+      'learningOrder': order.map((TodayLearningStep step) => step.name).toList(),
+    });
   }
 
   TodayStudyPlan get studyPlan {
