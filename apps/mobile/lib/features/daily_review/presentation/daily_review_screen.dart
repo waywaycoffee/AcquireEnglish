@@ -19,7 +19,6 @@ import '../../community/presentation/study_play_screen.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../player/domain/pronunciation_assessment.dart';
 import '../../player/presentation/widgets/pronunciation_assessment_dialog.dart';
-import '../../settings/data/pronunciation_credentials.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/audio/success_sfx.dart';
 import '../../shared/data/word_lookup_service.dart';
@@ -2710,17 +2709,6 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     ReviewRecord record,
   ) async {
     _stopSpeech();
-    PronunciationCredentials credentials = const PronunciationCredentials();
-    try {
-      credentials = await ref.read(pronunciationCredentialsProvider.future);
-    } catch (_) {
-      credentials = const PronunciationCredentials();
-    }
-    if (!mounted) return;
-    if (!credentials.isComplete) {
-      _message('请先在「设置 → 跟读评测」填写腾讯云密钥，或使用下方自评。');
-      return;
-    }
     final PronunciationAssessmentTarget target =
         PronunciationAssessmentTarget.wordOnly(source.question);
     await showPronunciationAssessmentDialog(

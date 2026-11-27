@@ -4,8 +4,8 @@
 
 | 路径 | 用途 | 配置位置 |
 |------|------|----------|
-| App 本机密钥 | 播放器跟读、背词本机打分 | App 设置 / `--dart-define` |
-| API 服务端密钥 | 学习模块云端评测 `/api/pronunciation/*` | ECS `services/api/.env` |
+| API 服务端密钥（**默认**） | 跟读对照 / 播放器跟读 / 背词打分 → `/api/pronunciation/evaluate` | ECS `services/api/.env` |
+| App 本机密钥（可选兜底） | 服务器不可用时的 BYOK / 本地调试 | App 设置 / `--dart-define` |
 
 ---
 

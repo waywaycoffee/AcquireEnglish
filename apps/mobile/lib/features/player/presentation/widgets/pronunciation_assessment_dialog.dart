@@ -464,42 +464,49 @@ class _PronunciationAssessmentDialogState
     });
     try {
       PronunciationAssessmentResult? result;
-      if (widget.readingPractice) {
-        try {
-          final response = await ref.read(acquireApiClientProvider)
-              .evaluateRecording(widget.target.text, base64Encode(audio.bytes))
-              .timeout(const Duration(seconds: 35));
-          result = PronunciationAssessmentResult.tryParse(response);
-        } catch (_) {
-          // Existing device-side credentials are an optional fallback.
+      Object? cloudError;
+      // Primary path: ECS /api/pronunciation/evaluate (server-side SOE keys).
+      try {
+        final Map<String, dynamic> response = await ref
+            .read(acquireApiClientProvider)
+            .evaluateRecording(widget.target.text, base64Encode(audio.bytes))
+            .timeout(const Duration(seconds: 45));
+        result = PronunciationAssessmentResult.tryParse(response);
+        if (result == null) {
+          cloudError = StateError('评测服务返回无法解析的结果');
         }
+      } catch (error) {
+        cloudError = error;
+        debugPrint('Pronunciation cloud score failed: $error');
       }
       if (!mounted || _resourcesReleased || attempt != _assessmentAttempt) return;
+
+      // Optional fallback: on-device Tencent keys from settings (dev / BYOK).
       if (result == null) {
-        final PronunciationCredentials credentials;
+        PronunciationCredentials credentials = const PronunciationCredentials();
         try {
-          credentials = await ref.read(pronunciationCredentialsProvider.future).timeout(const Duration(seconds: 5));
-        } catch (_) {
-          throw const PronunciationAssessmentException(
-            '读取评测密钥失败，请到「设置 - 跟读评测」检查配置。',
-          );
-        }
+          credentials = await ref
+              .read(pronunciationCredentialsProvider.future)
+              .timeout(const Duration(seconds: 5));
+        } catch (_) {}
         if (!mounted || _resourcesReleased || attempt != _assessmentAttempt) {
           return;
         }
-        if (!credentials.isComplete) {
-          throw const PronunciationAssessmentException(
-            '请先在「设置 - 跟读评测」中填写并保存腾讯云密钥。',
+        if (credentials.isComplete) {
+          result = await ref
+              .read(tencentPronunciationServiceProvider)
+              .evaluate(
+                credentials: credentials,
+                target: widget.target,
+                audio: audio,
+                onCancelAvailable: _registerAssessmentCancel,
+              )
+              .timeout(const Duration(seconds: 20));
+        } else {
+          throw PronunciationAssessmentException(
+            _learnerFacingCloudError(cloudError),
           );
         }
-        result = await ref
-            .read(tencentPronunciationServiceProvider)
-            .evaluate(
-              credentials: credentials,
-              target: widget.target,
-              audio: audio,
-              onCancelAvailable: _registerAssessmentCancel,
-            ).timeout(const Duration(seconds: 20));
       }
       final PronunciationAssessmentResult scored = result;
       _cancelAssessment = null;
@@ -542,6 +549,26 @@ class _PronunciationAssessmentDialogState
         _message = '评分失败，请稍后重试。';
       });
     }
+  }
+
+  String _learnerFacingCloudError(Object? error) {
+    final String raw = '$error';
+    if (raw.contains('401') ||
+        raw.toLowerCase().contains('not authenticated') ||
+        raw.contains('未登录') ||
+        raw.contains('Unauthorized')) {
+      return '请先登录后再评分';
+    }
+    if (raw.contains('429') || raw.contains('太频繁')) {
+      return '评分太频繁，请稍后再试';
+    }
+    if (raw.contains('尚未配置') || raw.contains('503')) {
+      return '评测服务暂未开通，请稍后再试或联系管理员';
+    }
+    if (raw.contains('Timeout') || raw.contains('超时')) {
+      return '评分超时，请稍后重试';
+    }
+    return '评测暂时不可用，请稍后重试';
   }
 
   Future<void> _deleteRecordingFile() async {
@@ -753,7 +780,7 @@ class _PronunciationAssessmentDialogState
                                     const SizedBox(height: 20),
                                     const Text(
                                       pronunciationScoringEnabled
-                                          ? '录音与波形在本地处理。点击「获取评分」才会发送本次录音及字幕至腾讯云，并按账号计费。密钥可在「设置 · 跟读评测」中配置。'
+                                          ? '录音与波形在本地处理。点击「获取评分」会把本次录音发到服务器评测（密钥保存在 ECS，无需在手机填写）。'
                                           : '录音与波形仅在本机处理。可反复录制、回放并与视频原声对照。',
                                       textAlign: TextAlign.center,
                                       style: TextStyle(
