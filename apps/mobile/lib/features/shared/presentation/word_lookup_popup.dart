@@ -283,6 +283,7 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
               child: ColoredVowelHeadword(
                 word: _entry?.word ?? widget.rawWord,
                 textAlign: TextAlign.start,
+                enableSyllableToggle: true,
               ),
             ),
             if (widget.onFavorite != null)

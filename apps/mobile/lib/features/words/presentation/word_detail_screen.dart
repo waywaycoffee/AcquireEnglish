@@ -483,6 +483,7 @@ class _WordHeader extends StatelessWidget {
                 word: entry.word,
                 fontSize: 30,
                 textAlign: TextAlign.start,
+                enableSyllableToggle: true,
               ),
               const SizedBox(height: 10),
               PhonicsSyllableBlocks(

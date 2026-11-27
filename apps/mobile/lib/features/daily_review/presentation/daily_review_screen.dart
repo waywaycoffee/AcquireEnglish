@@ -3240,7 +3240,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         ColoredVowelHeadword(
           word: word,
           showLegend: open,
-          onTap: () => setState(() => _phonicsOpen = !_phonicsOpen),
+          enableSyllableToggle: true,
         ),
         if (open) ...<Widget>[
           const SizedBox(height: 10),

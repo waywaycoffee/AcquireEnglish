@@ -62,13 +62,17 @@ Color _segmentTextColor(
 }
 
 /// Headword with vowel letters tinted for natural-phonics awareness.
-class ColoredVowelHeadword extends StatelessWidget {
+///
+/// When [enableSyllableToggle] is true, tapping toggles round-dot syllable
+/// separation (e.g. ability → a·bil·i·ty); tap again restores the whole word.
+class ColoredVowelHeadword extends StatefulWidget {
   const ColoredVowelHeadword({
     required this.word,
     this.fontSize = 34,
     this.textAlign = TextAlign.center,
     this.showLegend = false,
     this.onTap,
+    this.enableSyllableToggle = false,
     super.key,
   });
 
@@ -78,12 +82,26 @@ class ColoredVowelHeadword extends StatelessWidget {
   final bool showLegend;
   final VoidCallback? onTap;
 
+  /// Tap headword to show / hide `·` syllable separators.
+  final bool enableSyllableToggle;
+
   @override
-  Widget build(BuildContext context) {
-    final String raw = word.trim();
-    if (raw.isEmpty) return const SizedBox.shrink();
-    // Prefer Theme onSurface so dark scaffolds never get black consonants.
-    final Color consonant = _onSurfaceInk(context);
+  State<ColoredVowelHeadword> createState() => _ColoredVowelHeadwordState();
+}
+
+class _ColoredVowelHeadwordState extends State<ColoredVowelHeadword> {
+  bool _showSyllableDots = false;
+
+  @override
+  void didUpdateWidget(covariant ColoredVowelHeadword oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.word.trim().toLowerCase() !=
+        widget.word.trim().toLowerCase()) {
+      _showSyllableDots = false;
+    }
+  }
+
+  List<InlineSpan> _letterSpans(String raw, Color consonant) {
     final List<InlineSpan> spans = <InlineSpan>[];
     for (int i = 0; i < raw.length; i++) {
       final String ch = raw[i];
@@ -95,7 +113,7 @@ class ColoredVowelHeadword extends StatelessWidget {
         TextSpan(
           text: ch,
           style: TextStyle(
-            fontSize: fontSize,
+            fontSize: widget.fontSize,
             height: 1.2,
             fontWeight: FontWeight.w900,
             letterSpacing: 0.6,
@@ -104,33 +122,84 @@ class ColoredVowelHeadword extends StatelessWidget {
         ),
       );
     }
+    return spans;
+  }
+
+  List<InlineSpan> _syllableSpans(String raw, Color consonant, Color muted) {
+    final List<String> syllables = splitEnglishSyllables(raw);
+    if (syllables.length <= 1) {
+      return _letterSpans(raw, consonant);
+    }
+    final List<InlineSpan> spans = <InlineSpan>[];
+    for (int i = 0; i < syllables.length; i++) {
+      if (i > 0) {
+        spans.add(
+          TextSpan(
+            text: '·',
+            style: TextStyle(
+              fontSize: widget.fontSize * 0.85,
+              height: 1.2,
+              fontWeight: FontWeight.w800,
+              color: muted,
+            ),
+          ),
+        );
+      }
+      spans.addAll(_letterSpans(syllables[i], consonant));
+    }
+    return spans;
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final String raw = widget.word.trim();
+    if (raw.isEmpty) return const SizedBox.shrink();
+    final Color consonant = _onSurfaceInk(context);
+    final Color muted = _mutedInk(context);
+    final bool showDots =
+        widget.enableSyllableToggle && _showSyllableDots;
+    final List<InlineSpan> spans = showDots
+        ? _syllableSpans(raw, consonant, muted)
+        : _letterSpans(raw, consonant);
     final Widget rich = Text.rich(
       TextSpan(children: spans),
-      textAlign: textAlign,
+      textAlign: widget.textAlign,
     );
+    final String legend = widget.enableSyllableToggle
+        ? (showDots
+            ? '圆点 = 音节分界 · 再点恢复'
+            : '红色 = 元音 · 点单词显示音节')
+        : (widget.onTap == null
+            ? '红色 = 元音'
+            : '红色 = 元音 · 点单词展开音节 / 拼读');
     final Widget body = Column(
       mainAxisSize: MainAxisSize.min,
-      crossAxisAlignment: textAlign == TextAlign.start
+      crossAxisAlignment: widget.textAlign == TextAlign.start
           ? CrossAxisAlignment.start
           : CrossAxisAlignment.center,
       children: <Widget>[
         rich,
-        if (showLegend) ...<Widget>[
+        if (widget.showLegend) ...<Widget>[
           const SizedBox(height: 6),
           Text(
-            onTap == null ? '红色 = 元音' : '红色 = 元音 · 点单词展开音节 / 拼读',
+            legend,
             style: TextStyle(
               fontSize: 12,
               fontWeight: FontWeight.w700,
-              color: _mutedInk(context),
+              color: muted,
             ),
           ),
         ],
       ],
     );
-    if (onTap == null) return body;
+    final VoidCallback? handleTap = widget.enableSyllableToggle
+        ? () {
+            setState(() => _showSyllableDots = !_showSyllableDots);
+          }
+        : widget.onTap;
+    if (handleTap == null) return body;
     return InkWell(
-      onTap: onTap,
+      onTap: handleTap,
       borderRadius: BorderRadius.circular(12),
       child: Padding(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),

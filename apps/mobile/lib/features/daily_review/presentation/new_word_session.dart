@@ -355,7 +355,10 @@ class _NewWordSessionState extends ConsumerState<NewWordSession> {
       padding: const EdgeInsets.all(20),
       children: [
         Text('${words.indexOf(source) + 1} / ${words.length} · 上下滑动'),
-        ColoredVowelHeadword(word: source.question),
+        ColoredVowelHeadword(
+          word: source.question,
+          enableSyllableToggle: true,
+        ),
         if (entry?.phonetic.isNotEmpty ?? false) Text(entry!.phonetic),
         Text(
           _meaning(source, entry).isEmpty ? '暂无中文释义' : _meaning(source, entry),
@@ -400,7 +403,11 @@ class _NewWordSessionState extends ConsumerState<NewWordSession> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        if (stage == 1 || stage == 4) ColoredVowelHeadword(word: word.question),
+        if (stage == 1 || stage == 4)
+          ColoredVowelHeadword(
+            word: word.question,
+            enableSyllableToggle: true,
+          ),
         if (stage == 1) ...[
           Text('第 ${round + 1} / 2 轮'),
           if (meaning.isEmpty) ...[

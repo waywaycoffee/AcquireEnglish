@@ -99,6 +99,7 @@ class _VocabPreviewSheetState extends ConsumerState<VocabPreviewSheet> {
                         word: entry.word,
                         fontSize: 32,
                         textAlign: TextAlign.start,
+                        enableSyllableToggle: true,
                       ),
                     ),
                     IconButton(
