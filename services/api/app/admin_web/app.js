@@ -1421,13 +1421,13 @@
           )}</div>
         </div>
         <div class="dash-card full">
-          <h3>阿里云 BSS · 百炼 / 短信 / ECS（${escapeHtml(
+          <h3>阿里云 BSS · 百炼 / 短信 / ECS / CDT（${escapeHtml(
             (platform.billing_cycle || "").toString()
           )}）</h3>
           <div class="table-wrap"><table>
             <thead><tr><th>产品</th><th>明细</th><th>用量</th><th>税前 CNY</th><th>实例/模型</th></tr></thead>
             <tbody>
-              ${["sfm", "dysms", "dysms_system", "ecs"]
+              ${["sfm", "dysms", "dysms_system", "ecs", "cdt"]
                 .flatMap((code) => {
                   const prod = (aliyun.products || {})[code] || {};
                   return (prod.lines || []).map(
@@ -1443,7 +1443,7 @@
                   );
                 })
                 .join("") ||
-              `<tr><td colspan="5" class="muted">本月暂无百炼/短信/ECS 明细，或 AccessKey 无 BSS 权限。</td></tr>`}
+              `<tr><td colspan="5" class="muted">本月暂无百炼/短信/ECS/CDT 明细，或 AccessKey 无 BSS 权限。</td></tr>`}
             </tbody>
           </table></div>
           ${
@@ -1451,6 +1451,15 @@
               ? `<div class="note-box">百炼合计税前 ${money(sfm.pretax_cny)} · ${num(
                   sfm.count
                 )} 条计费项</div>`
+              : ""
+          }
+          ${
+            ((aliyun.products || {}).cdt || {}).count
+              ? `<div class="note-box">CDT 流量税前 ${money(
+                  ((aliyun.products || {}).cdt || {}).pretax_cny || 0
+                )} · ${num(((aliyun.products || {}).cdt || {}).count)} 条 · 版本 ${escapeHtml(
+                  ((((aliyun.products || {}).cdt || {}).cdt_versions || []).join("/") || "—")
+                )}（兼容 1.0 ECS_Out_Bytes 与 2.0 internet_traffic）</div>`
               : ""
           }
         </div>

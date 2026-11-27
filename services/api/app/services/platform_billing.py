@@ -354,6 +354,144 @@ def _bill_items(resp: dict[str, Any]) -> list[dict[str, Any]]:
     return [x for x in items if isinstance(x, dict)]
 
 
+# CDT 1.0 → 2.0 (2026-12): commodity/billing-item codes change; amounts stay the same.
+# Docs: https://help.aliyun.com/zh/cdt/product-overview/cdt-upgrade-to-2-0
+_CDT_BILLING_ITEM_LABELS: dict[str, str] = {
+    # CDT 2.0 (by traffic type)
+    "internet_traffic": "公网流量",
+    "inter_region_traffic": "跨地域流量",
+    "CU_inter_region_traffic": "跨境流量",
+    # CDT 1.0 public (by cloud product)
+    "ECS_Out_Bytes": "ECS 公网出流量",
+    "Eip_Out_Bytes": "EIP 出流量",
+    "clb_out_bytes": "CLB 出流量",
+    "Cbwp_Out_Bytes": "共享带宽出流量",
+    "Cbwp_Max_Bytes": "共享带宽峰值带宽",
+    "IPv6_Out_Bytes": "IPv6 出流量",
+    "GA_Max_Bytes": "全球加速峰值带宽",
+    "Fc_Out_Bytes": "函数计算出流量",
+    "MSE_Out_Bytes": "微服务引擎出流量",
+    "PAI_Eas_Out_Bytes": "PAI-EAS 出流量",
+    "Anycast_Max_Bytes": "Anycast EIP 峰值带宽",
+    "nativeapigw_Out_Bytes": "API 网关出流量",
+    "Miniappdev_Out_Bytes": "魔笔出流量",
+    # CDT 1.0 inter-region
+    "CDTIR_Out_Bytes": "跨地域出流量",
+    "GA_Inter_Region_MAX_Bytes": "全球加速跨地域峰值带宽",
+    "AnycastInterRegionTraffic": "Anycast 跨地域流量",
+    "ECR_Out_Bytes": "ECR 出流量",
+    "VPC_Peering_Out_Bytes": "VPC 对等连接出流量",
+    # CDT 1.0 cross-border
+    "CUCBDT_Out_Bytes": "跨境出流量",
+    "CUCBDT_VPC_Peering_Out_Bytes": "跨境 VPC 对等连接出流量",
+    "CUCBDT_GA_MAX_Bytes": "跨境全球加速峰值带宽",
+}
+
+_CDT_COMMODITY_CODES_V1 = frozenset(
+    {
+        "cdt_internet_public_cn",
+        "cdt_cdtir_public_cn",
+        "cdt_cucbdt_public_cn",
+    }
+)
+_CDT_COMMODITY_CODES_V2 = frozenset(
+    {
+        "cdt_DataTransfer_public_cn",
+        "cdt_cucbdt_public_cn",
+    }
+)
+
+
+def _cdt_commodity_code(row: dict[str, Any]) -> str:
+    for key in ("CommodityCode", "PipCode", "ProductType", "SubscriptionType"):
+        val = str(row.get(key) or "").strip()
+        if val.startswith("cdt_"):
+            return val
+    detail = str(row.get("ProductDetail") or "")
+    if "跨地域" in detail:
+        return "cdt_cdtir_public_cn"
+    if "跨境" in detail:
+        return "cdt_cucbdt_public_cn"
+    return ""
+
+
+def _cdt_billing_item_code(row: dict[str, Any]) -> str:
+    for key in ("BillingItemCode", "BillingItem", "ItemCode", "ChargeItem"):
+        raw = str(row.get(key) or "").strip()
+        if not raw:
+            continue
+        # Prefer machine codes over localized display names.
+        if raw in _CDT_BILLING_ITEM_LABELS or "_" in raw or raw.islower():
+            return raw
+    return str(row.get("BillingItemCode") or row.get("BillingItem") or "").strip()
+
+
+def _cdt_resource_type(row: dict[str, Any]) -> str:
+    """CDT 2.0 puts source product in price factors (资源类型), not billing item name."""
+    for key in ("InstanceConfig", "Tag", "NickName", "ProductDetail", "BillingItem"):
+        text = str(row.get(key) or "")
+        if "资源类型" in text:
+            # e.g. "计费类型：按流量计费;资源类型：云服务器 ECS实例;地域：华南1"
+            for part in text.replace("；", ";").replace("，", ",").split(";"):
+                part = part.strip()
+                if part.startswith("资源类型") or "资源类型：" in part or "资源类型:" in part:
+                    return part.split("：", 1)[-1].split(":", 1)[-1].strip()
+        for marker in ("云服务器 ECS", "弹性公网 IP", "共享带宽", "负载均衡", "函数计算"):
+            if marker in text:
+                return marker
+    return ""
+
+
+def _cdt_version_for(commodity: str, billing_item: str) -> str:
+    if commodity in _CDT_COMMODITY_CODES_V2 and billing_item in {
+        "internet_traffic",
+        "inter_region_traffic",
+        "CU_inter_region_traffic",
+    }:
+        return "2.0"
+    if commodity in _CDT_COMMODITY_CODES_V1 or billing_item in _CDT_BILLING_ITEM_LABELS:
+        if billing_item in {"internet_traffic", "inter_region_traffic", "CU_inter_region_traffic"}:
+            return "2.0"
+        if billing_item:
+            return "1.0"
+    if commodity == "cdt_DataTransfer_public_cn":
+        return "2.0"
+    return ""
+
+
+def normalize_cdt_bill_line(row: dict[str, Any]) -> dict[str, Any]:
+    """Normalize one DescribeInstanceBill row for CDT 1.0 and 2.0 side-by-side."""
+    commodity = _cdt_commodity_code(row)
+    item_code = _cdt_billing_item_code(row)
+    label = _CDT_BILLING_ITEM_LABELS.get(item_code) or str(
+        row.get("ProductDetail") or row.get("BillingItem") or item_code or "云数据传输"
+    )
+    resource_type = _cdt_resource_type(row)
+    version = _cdt_version_for(commodity, item_code)
+    detail_parts = [label]
+    if resource_type and resource_type not in label:
+        detail_parts.append(resource_type)
+    if version:
+        detail_parts.append(f"CDT {version}")
+    pretax = float(row.get("PretaxAmount") or row.get("PaymentAmount") or 0)
+    return {
+        "product_name": row.get("ProductName") or "云数据传输",
+        "detail": " · ".join(detail_parts),
+        "billing_item_code": item_code,
+        "commodity_code": commodity,
+        "cdt_version": version,
+        "resource_type": resource_type,
+        "instance_id": str(row.get("InstanceID") or "")[:120],
+        "usage": row.get("Usage"),
+        "usage_unit": row.get("UsageUnit"),
+        "list_price": row.get("ListPrice"),
+        "list_price_unit": row.get("ListPriceUnit"),
+        "pretax_cny": pretax,
+        "payment_cny": float(row.get("PaymentAmount") or 0),
+        "cost_type": str(row.get("Item") or row.get("BillingType") or ""),
+    }
+
+
 def _bss_credentials(file_env: dict[str, tuple[str, str]] | None = None) -> tuple[str, str]:
     """Billing / BSS only — never fall back to SMS AccessKeys (Aliyun flags that)."""
     ak = _settings_or_env(
@@ -440,6 +578,8 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
         "ecs": "阿里云 ECS",
         "disk": "阿里云云盘",
         "snapshot": "快照",
+        # CDT owns public / inter-region traffic after migrating off per-product Out_Bytes.
+        "cdt": "阿里云数据传输（CDT）",
     }
     for code, label in wanted.items():
         resp = _aliyun_bss_call(
@@ -457,10 +597,12 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
         lines = []
         pretax = 0.0
         for r in rows:
-            amt = float(r.get("PretaxAmount") or r.get("PaymentAmount") or 0)
-            pretax += amt
-            lines.append(
-                {
+            if code == "cdt":
+                line = normalize_cdt_bill_line(r)
+                amt = float(line.get("pretax_cny") or 0)
+            else:
+                amt = float(r.get("PretaxAmount") or r.get("PaymentAmount") or 0)
+                line = {
                     "product_name": r.get("ProductName"),
                     "detail": r.get("ProductDetail") or r.get("BillingItem") or "",
                     "instance_id": str(r.get("InstanceID") or "")[:120],
@@ -471,23 +613,52 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
                     "pretax_cny": amt,
                     "payment_cny": float(r.get("PaymentAmount") or 0),
                 }
-            )
-        out["products"][code] = {
+            pretax += amt
+            lines.append(line)
+        product_meta: dict[str, Any] = {
             "label": label,
             "pretax_cny": round(pretax, 4),
             "lines": lines,
             "count": len(lines),
         }
+        if code == "cdt":
+            versions = sorted(
+                {
+                    str(line.get("cdt_version") or "")
+                    for line in lines
+                    if line.get("cdt_version")
+                }
+            )
+            commodities = sorted(
+                {
+                    str(line.get("commodity_code") or "")
+                    for line in lines
+                    if line.get("commodity_code")
+                }
+            )
+            product_meta["cdt_versions"] = versions
+            product_meta["commodity_codes"] = commodities
+            product_meta["note"] = (
+                "兼容 CDT 1.0（ECS_Out_Bytes 等）与 2.0（internet_traffic / "
+                "cdt_DataTransfer_public_cn）；升级后金额口径不变，仅商品/计费项改名。"
+            )
+        out["products"][code] = product_meta
 
-    app_codes = {"sfm", "dysms", "dysms_system", "ecs", "disk"}
+    app_codes = {"sfm", "dysms", "dysms_system", "ecs", "disk", "cdt"}
     for row in out["overview"]:
         code = str(row.get("product_code") or "")
-        if code in app_codes or "百炼" in str(row.get("product_name") or "") or "短信" in str(
-            row.get("product_name") or ""
+        name = str(row.get("product_name") or "")
+        if (
+            code in app_codes
+            or code.startswith("cdt")
+            or "百炼" in name
+            or "短信" in name
+            or "云数据传输" in name
+            or "CDT" in name.upper()
         ):
             out["app_relevant"].append(row)
 
-    for code in ("sfm", "dysms", "dysms_system", "ecs"):
+    for code in ("sfm", "dysms", "dysms_system", "ecs", "cdt"):
         prod = out["products"].get(code) or {}
         if prod.get("count"):
             out["app_relevant"].append(
@@ -497,6 +668,7 @@ def fetch_aliyun_bss(month: str | None = None) -> dict[str, Any]:
                     "payment_cny": prod.get("pretax_cny"),
                     "pretax_cny": prod.get("pretax_cny"),
                     "source": "DescribeInstanceBill",
+                    "cdt_versions": prod.get("cdt_versions"),
                 }
             )
 
@@ -852,10 +1024,11 @@ def collect_platform_usage(*, month: str | None = None) -> dict[str, Any]:
     gpu = fetch_gpu_usage()
 
     aliyun_app_cny = 0.0
-    for code in ("sfm", "dysms", "dysms_system", "ecs"):
+    for code in ("sfm", "dysms", "dysms_system", "ecs", "cdt"):
         aliyun_app_cny += float(
             (aliyun.get("products") or {}).get(code, {}).get("pretax_cny") or 0
         )
+    cdt_prod = (aliyun.get("products") or {}).get("cdt") or {}
 
     configured = [k for k in keys if k.get("configured")]
     return {
@@ -886,15 +1059,17 @@ def collect_platform_usage(*, month: str | None = None) -> dict[str, Any]:
                 (aliyun.get("products") or {}).get("dysms_system", {}).get("pretax_cny")
                 or 0
             ),
+            "cdt_cny": float(cdt_prod.get("pretax_cny") or 0),
+            "cdt_versions": cdt_prod.get("cdt_versions") or [],
             "tencent_total_cny": float(tencent.get("total_cny") or 0)
             if tencent.get("ok")
             else None,
             "gpu_tokens_today": int(gpu.get("total_tokens") or 0) if gpu.get("ok") else None,
             "deepgram_projects": len(deepgram.get("projects") or []),
             "note": (
-                "平台账单聚合：阿里云 BSS + 腾讯云费用中心（需权限）+ Deepgram 项目校验；"
-                "DeepSeek / 本地 5060Ti 以 ApiUsageEvent 与 GPU usage_monitor 按模块对照；"
-                "App 内 ledger 是按次估算，与厂商账单口径不同可并存。"
+                "平台账单聚合：阿里云 BSS（含 CDT 1.0/2.0 流量）+ 腾讯云费用中心（需权限）"
+                "+ Deepgram 项目校验；DeepSeek / 本地 5060Ti 以 ApiUsageEvent 与 GPU "
+                "usage_monitor 按模块对照；App 内 ledger 是按次估算，与厂商账单口径不同可并存。"
             ),
         },
     }
