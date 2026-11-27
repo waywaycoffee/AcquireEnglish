@@ -1668,8 +1668,11 @@ class PadPortraitPlayerScreenState
     ).course;
     final bool isNetdiskStream = isNetdiskPlayUrl(_videoAsset) ||
         (netdiskCourseLookup != null && isNetdiskCourse(netdiskCourseLookup));
+    // Large demuxer cache only for progressive HTTP — local 2h MKV + 48MB OOMs.
+    final bool wantsLargeBuffer =
+        isBilibili || isNetdiskPlayUrl(_videoAsset);
     final Player player = createStudyVideoPlayer(
-      largeNetworkBuffer: isNetdiskStream || isBilibili,
+      largeNetworkBuffer: wantsLargeBuffer,
     );
     // Own the player before opening media so leaving during initialization
     // also releases its decoder and native video output.

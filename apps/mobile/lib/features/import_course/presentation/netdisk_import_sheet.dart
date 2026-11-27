@@ -397,6 +397,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
               importId: parseNetdiskImportIdFromUrl(ep.enSubtitleAsset) ??
                   parseNetdiskImportIdFromUrl(ep.cnSubtitleAsset) ??
                   parseNetdiskImportIdFromUrl(ep.videoAsset),
+              allowOnlineFetch: true,
             );
           } catch (_) {}
         }
@@ -418,6 +419,7 @@ class _NetdiskImportSheetState extends ConsumerState<_NetdiskImportSheet> {
             catalog: catalog,
             courseId: courseId,
             episode: episode,
+            allowOnlineFetch: true,
           );
         } catch (_) {}
       }

@@ -296,21 +296,28 @@ Future<({String uri, Map<String, String>? headers})>
       '继续下载本集 ${(live.progress! * 100).round()}%…',
     );
   } else {
-    onProgress?.call(0, '正在下载本集以流畅播放…');
+    onProgress?.call(0, '正在准备本集…');
   }
+  // Kick / join the download, but never block open on a multi‑GB film
+  // (哈利波特 ANR: UI froze while awaiting full download before player.open).
+  final Future<File> downloadFuture = cacheNetdiskEpisodeLocally(
+    playUrl: playUrl,
+    onProgress: (double? p) {
+      if (p == null) {
+        onProgress?.call(null, '后台下载本集…');
+      } else {
+        onProgress?.call(p, '后台下载本集 ${(p * 100).round()}%…');
+      }
+    },
+  );
   try {
-    final File local = await cacheNetdiskEpisodeLocally(
-      playUrl: playUrl,
-      onProgress: (double? p) {
-        if (p == null) {
-          onProgress?.call(null, '正在下载本集…');
-        } else {
-          onProgress?.call(p, '正在下载本集 ${(p * 100).round()}%…');
-        }
-      },
-    );
+    final File local = await downloadFuture.timeout(const Duration(seconds: 5));
     onProgress?.call(1, '本集已就绪');
     return (uri: local.path, headers: null);
+  } on TimeoutException {
+    onProgress?.call(null, '边下边播（后台继续下载）…');
+    // Keep downloadFuture running via _netdiskDownloadsInFlight.
+    return resolveNetdiskPlayableMedia(playUrl);
   } catch (e) {
     // Incomplete download kept as .part — try stream so user can still watch;
     // next open resumes the .part.
@@ -962,7 +969,8 @@ Future<void> materializeNetdiskSoftsubs({
   required String courseId,
   LibraryEpisodeItem? episode,
   int? importId,
-  bool allowOnlineFetch = true,
+  // Open path must pass false; only import/download flows opt into Subliminal.
+  bool allowOnlineFetch = false,
 }) async {
   final int? resolvedId = importId ??
       parseLinkImportId(courseId) ??
@@ -1157,6 +1165,7 @@ Future<void> downloadNetdiskCourseToLocal({
         importId: importId,
         episode: ep ??
             (target.episodes.isNotEmpty ? target.episodes.first : null),
+        allowOnlineFetch: true,
       );
 
       for (final LibraryCourseData course in readCourses()) {

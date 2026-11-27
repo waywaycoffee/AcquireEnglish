@@ -681,6 +681,9 @@ class SubtitleCompletionStatusNotifier
     bool? needChinese,
     SubtitleCompletionStatus? status,
   }) {
+    if (!ref.mounted) {
+      return;
+    }
     final String trimmed = label.trim();
     if (episodeId.trim().isEmpty || trimmed.isEmpty) {
       return;
@@ -702,6 +705,9 @@ class SubtitleCompletionStatusNotifier
       attempts: existing?.attempts ?? 0,
     );
     final bool clearActive = isSubtitleFillTerminalLabel(trimmed);
+    if (!ref.mounted) {
+      return;
+    }
     state = SubtitleCompletionStatusState(
       byEpisodeId: Map<String, SubtitleCompletionEpisodeUi>.unmodifiable(next),
       activeEpisodeId: clearActive ? null : episodeId,
@@ -743,6 +749,9 @@ class SubtitleCompletionStatusNotifier
   Future<int> stopAll({Iterable<String>? episodeIds}) async {
     final int removed = await SubtitleCompletionScheduler.instance
         .stopAndClearQueue(episodeIds: episodeIds);
+    if (!ref.mounted) {
+      return removed;
+    }
     state = state.copyWith(clearActive: true);
     await refresh();
     return removed;

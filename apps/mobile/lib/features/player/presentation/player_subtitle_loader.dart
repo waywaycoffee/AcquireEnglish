@@ -197,31 +197,44 @@ List<PlayerSubtitleLine> mergeSubtitleLines({
     return const <PlayerSubtitleLine>[];
   }
 
-  return sanitizeSubtitleLanguageFields(
-    List<PlayerSubtitleLine>.generate(enSanitized.length, (int index) {
-      final PlayerSubtitleLine englishLine = enSanitized[index];
-      final String chinese = _chineseForEnglishCue(
-        englishLine,
-        zhSanitized,
-        index,
-      );
-
-      return PlayerSubtitleLine(
+  // Two-pointer match: film bilingual SRT is thousands of cues; the old
+  // O(n·m) scan pegged the UI isolate (~97% usap64) and ANR'd on open.
+  int zhCursor = 0;
+  final List<PlayerSubtitleLine> merged = <PlayerSubtitleLine>[];
+  for (int index = 0; index < enSanitized.length; index++) {
+    final PlayerSubtitleLine englishLine = enSanitized[index];
+    final String chinese = _chineseForEnglishCueNear(
+      englishLine,
+      zhSanitized,
+      index,
+      zhCursor,
+    );
+    // Advance cursor past cues that end before this English start.
+    while (zhCursor < zhSanitized.length &&
+        zhSanitized[zhCursor].endMs <= englishLine.startMs) {
+      zhCursor += 1;
+    }
+    merged.add(
+      PlayerSubtitleLine(
         startTime: englishLine.startTime,
         english: englishLine.english,
         chinese: chinese,
         startMs: englishLine.startMs,
         endMs: englishLine.endMs,
         words: englishLine.words,
-      );
-    }),
-  );
+      ),
+    );
+  }
+
+  return sanitizeSubtitleLanguageFields(merged);
 }
 
-String _chineseForEnglishCue(
+/// Match Chinese near [zhHint] (plus same-index fallback). O(window) per cue.
+String _chineseForEnglishCueNear(
   PlayerSubtitleLine englishLine,
   List<PlayerSubtitleLine> chineseLines,
   int index,
+  int zhHint,
 ) {
   if (chineseLines.isEmpty) {
     return englishLine.chinese;
@@ -229,22 +242,23 @@ String _chineseForEnglishCue(
 
   int bestIndex = -1;
   int bestOverlap = 0;
-  for (int i = 0; i < chineseLines.length; i++) {
+  final int start = (zhHint - 8).clamp(0, chineseLines.length);
+  final int end = (zhHint + 48).clamp(0, chineseLines.length);
+  for (int i = start; i < end; i++) {
     final PlayerSubtitleLine zh = chineseLines[i];
-    final int start = englishLine.startMs > zh.startMs
+    final int overlapStart = englishLine.startMs > zh.startMs
         ? englishLine.startMs
         : zh.startMs;
-    final int end = englishLine.endMs < zh.endMs
+    final int overlapEnd = englishLine.endMs < zh.endMs
         ? englishLine.endMs
         : zh.endMs;
-    final int overlap = end - start;
+    final int overlap = overlapEnd - overlapStart;
     if (overlap > bestOverlap) {
       bestOverlap = overlap;
       bestIndex = i;
     }
   }
 
-  // Prefer time overlap; fall back to same index when tracks are aligned.
   final PlayerSubtitleLine? matched = bestOverlap > 0
       ? chineseLines[bestIndex]
       : (index < chineseLines.length ? chineseLines[index] : null);

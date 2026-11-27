@@ -183,6 +183,11 @@ Future<List<PlayerSubtitleLine>> _harvestTrackWithMediaKit({
     if (duration <= Duration.zero) {
       return const <PlayerSubtitleLine>[];
     }
+    // 2h+ films (哈利波特) must not open a second media_kit at 16× — that
+    // stacks demuxer memory on top of the study player and ANRs / OOMs.
+    if (duration.inMinutes >= 45) {
+      return const <PlayerSubtitleLine>[];
+    }
 
     void flushAt(int nowMs) {
       if (lastText != null && lastStartMs != null && nowMs > lastStartMs!) {
@@ -221,7 +226,7 @@ Future<List<PlayerSubtitleLine>> _harvestTrackWithMediaKit({
     } catch (_) {}
     await player.play();
     final int deadlineMs = duration.inMilliseconds;
-    final int maxWaitMs = (deadlineMs / 8).clamp(8000, 180000).toInt() + 5000;
+    final int maxWaitMs = (deadlineMs / 8).clamp(8000, 20000).toInt() + 2000;
     final DateTime started = DateTime.now();
     while (DateTime.now().difference(started).inMilliseconds < maxWaitMs) {
       final int pos = player.state.position.inMilliseconds;
