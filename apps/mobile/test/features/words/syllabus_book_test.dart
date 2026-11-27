@@ -3,7 +3,7 @@ import 'package:common_learn_english/features/words/presentation/syllabus_books_
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('only an unfinished current book blocks selecting another', () {
+  test('book completion requires every word in the selected book', () {
     const SyllabusBook first = SyllabusBook(
       id: 'first',
       title: 'First',
@@ -18,13 +18,12 @@ void main() {
       activeBookId: 'first',
       learnedByBook: <String, Set<String>>{'first': <String>{'apple', 'extra'}},
     );
-    expect(inProgress.blockingBook('first'), isNull);
-    expect(inProgress.blockingBook('second'), first);
+    expect(inProgress.isComplete(first), isFalse);
     expect(
       inProgress.copyWith(learnedByBook: <String, Set<String>>{
         'first': <String>{'apple', 'banana'},
-      }).blockingBook('second'),
-      isNull,
+      }).isComplete(first),
+      isTrue,
     );
   });
 

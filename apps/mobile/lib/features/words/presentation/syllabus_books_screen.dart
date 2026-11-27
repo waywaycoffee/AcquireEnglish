@@ -275,12 +275,6 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
   }
 
   Future<void> _confirmDelete(SyllabusBook book) async {
-    if (ref.read(syllabusBooksProvider).blockingBook('')?.id == book.id) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('背完当前词书后才可以移除。')),
-      );
-      return;
-    }
     final bool? ok = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(

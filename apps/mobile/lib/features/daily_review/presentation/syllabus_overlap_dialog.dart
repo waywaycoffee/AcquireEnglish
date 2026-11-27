@@ -42,15 +42,39 @@ Future<SyllabusImportOverlap?> startSyllabusBookSession(
   BuildContext context,
   SyllabusBook book,
 ) async {
+  final SyllabusBooksState books = ref.read(syllabusBooksProvider);
+  final SyllabusBook? current = books.activeBook;
+  if (current != null && current.id != book.id && !books.isComplete(current)) {
+    final bool? confirmed = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) => AlertDialog(
+        title: const Text('切换当前词书？'),
+        content: Text(
+          '正在学习「${current.title}」。切换到「${book.title}」后，会按每日新词数量重新安排新学计划，已学记录会保留。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(dialogContext, false),
+            child: const Text('继续当前词书'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(dialogContext, true),
+            child: const Text('切换词书'),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true || !context.mounted ||
+        ref.read(syllabusBooksProvider).activeBookId != current.id) {
+      return null;
+    }
+  }
   final SyllabusImportOverlap? overlap = await activateBookWithOverlap(ref, book);
   if (!context.mounted) return overlap;
   if (overlap == null) {
-    final SyllabusBook? blocking = ref.read(syllabusBooksProvider).blockingBook(book.id);
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-      content: Text(blocking == null
-          ? '词书还在准备，请稍后重试。'
-          : '请先背完「${blocking.title}」，再选择下一本。'),
-    ));
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(content: Text('词书还在准备，请稍后重试。')),
+    );
     return null;
   }
   await context.push(syllabusBookSessionRoute(book.id));

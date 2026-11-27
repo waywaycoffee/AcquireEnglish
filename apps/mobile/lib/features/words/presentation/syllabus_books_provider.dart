@@ -54,13 +54,6 @@ class SyllabusBooksState {
     );
   }
 
-  SyllabusBook? blockingBook(String requestedId) {
-    final SyllabusBook? book = activeBook;
-    return book != null && book.id != requestedId && !isComplete(book)
-        ? book
-        : null;
-  }
-
   int learnedCount(String bookId) => learnedByBook[bookId]?.length ?? 0;
 
   SyllabusBooksState copyWith({
@@ -216,7 +209,7 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
 
   Future<bool> setActiveBook(String bookId) async {
     final SyllabusBook? book = state.bookById(bookId);
-    if (!state.ready || book == null || state.blockingBook(bookId) != null) {
+    if (!state.ready || book == null) {
       return false;
     }
     state = state.copyWith(activeBookId: bookId);
@@ -305,7 +298,6 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
       state.imported.any((SyllabusBook b) => b.id == id);
 
   Future<void> deleteImported(String bookId) async {
-    if (state.blockingBook('')?.id == bookId) return;
     final List<SyllabusBook> next = state.imported
         .where((SyllabusBook b) => b.id != bookId)
         .toList(growable: false);
