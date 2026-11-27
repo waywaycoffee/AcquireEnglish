@@ -20,11 +20,19 @@ void main() {
 
       final DateTime today = DateTime(2026, 12, 31);
       final DateTime tomorrow = DateTime(2027, 1, 1);
-      const JourneyActivity video = (route: '/episodes/42', title: 'Travel');
+      const JourneyActivity video = (
+        route: '/episodes/42',
+        title: 'Travel',
+        durationMinutes: 12,
+      );
       final TodayJourneyStore journey = TodayJourneyStore('learner', today);
 
       await journey.saveSelectedMaterial(TodayStudyTrack.video, video);
-      const JourneyActivity reading = (route: '/reading/book', title: 'Book');
+      const JourneyActivity reading = (
+        route: '/reading/book',
+        title: 'Book',
+        durationMinutes: 0,
+      );
       await journey.saveSelectedMaterial(TodayStudyTrack.reading, reading);
       expect(journey.selectedMaterial(TodayStudyTrack.video), video);
       expect(journey.selectedMaterial(TodayStudyTrack.reading), reading);
@@ -94,7 +102,7 @@ void main() {
       DateTime(2026, 3, 1),
     );
     await store.saveActivity(
-      (route: '/episodes/1', title: '第 1 集'),
+      (route: '/episodes/1', title: '第 1 集', durationMinutes: 0),
       planned: true,
       reason: '按水平排好了',
     );
@@ -105,6 +113,7 @@ void main() {
     await store.saveActivity((
       route: '/episodes/1',
       title: '第 1 集',
+      durationMinutes: 0,
     ), pausedExplicitly: true);
     expect(store.pausedExplicitly, isTrue);
     expect(store.planned, isFalse);
@@ -184,6 +193,44 @@ void main() {
     expect(carried.videoMinutes, 20);
     expect(carried.vocabCount, 10);
     expect(carried.readingWords, 0);
+  });
+
+  test('video materials support multi append with duration', () async {
+    final Directory directory = await Directory.systemTemp.createTemp(
+      'today_journey_multi_video',
+    );
+    addTearDown(() async {
+      await Hive.close();
+      await directory.delete(recursive: true);
+    });
+    Hive.init(directory.path);
+    await Hive.openBox<String>('prefs');
+
+    final TodayJourneyStore store = TodayJourneyStore(
+      'learner',
+      DateTime(2026, 11, 27),
+    );
+    await store.addSelectedMaterial(
+      TodayStudyTrack.video,
+      (route: '/library?courseId=a', title: 'A', durationMinutes: 20),
+    );
+    await store.addSelectedMaterial(
+      TodayStudyTrack.video,
+      (route: '/library?courseId=b', title: 'B', durationMinutes: 15),
+    );
+    final bool third = await store.addSelectedMaterial(
+      TodayStudyTrack.video,
+      (route: '/library?courseId=a', title: 'A again', durationMinutes: 20),
+    );
+    expect(third, isFalse);
+    expect(store.selectedMaterials(TodayStudyTrack.video).length, 2);
+    expect(
+      store.selectedMaterials(TodayStudyTrack.video).fold<int>(
+        0,
+        (int sum, JourneyActivity e) => sum + e.durationMinutes,
+      ),
+      35,
+    );
   });
 
   test('nextTrack prefers lastTrack among unfinished quotas', () {

@@ -30,7 +30,7 @@ class _SelectedBooks extends SyllabusBooksNotifier {
 }
 
 void main() {
-  testWidgets('今日学习 shows the current book and offers material selection', (
+  testWidgets('今日学习 offers video/reading selection without vocab books', (
     WidgetTester tester,
   ) async {
     final GoRouter router = GoRouter(
@@ -70,13 +70,15 @@ void main() {
     expect(find.textContaining('第 1'), findsNothing);
     expect(find.text('英语之旅'), findsNothing);
 
-    expect(find.textContaining('测试词书'), findsOneWidget);
+    // Vocab books live outside this card now.
+    expect(find.text('当前词书'), findsNothing);
+    expect(find.text(kSceneMemoryBookTitle), findsNothing);
     expect(find.text('自由拍照学词'), findsOneWidget);
     await tester.tap(find.text('今日学习'));
     await tester.pumpAndSettle();
     expect(find.text('选择要看的视频'), findsOneWidget);
     expect(find.text('选择要读的书'), findsOneWidget);
-    expect(find.text('选择要背的词书'), findsOneWidget);
+    expect(find.text('选择要背的词书'), findsNothing);
     expect(find.text('自由拍照学词'), findsWidgets);
   });
 }

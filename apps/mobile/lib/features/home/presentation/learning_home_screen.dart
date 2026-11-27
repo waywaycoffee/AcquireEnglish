@@ -39,6 +39,7 @@ import 'pad_home_screen.dart' show DailyRecommendSection, RecentCourses;
 import 'product_feedback_sheet.dart';
 import 'widgets/continue_learning_poster.dart';
 import 'widgets/learning_activity_stats_card.dart';
+import 'widgets/level_vocab_book_modules.dart';
 
 class LearningHomeScreen extends ConsumerStatefulWidget {
   const LearningHomeScreen({super.key, this.focusVocab = false});
@@ -377,6 +378,8 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                         ),
                       ),
                     ),
+                    const SizedBox(height: 16),
+                    const LevelVocabBookModules(),
                     const SizedBox(height: 24),
                     const TodayActivityCard(),
                     const SizedBox(height: 12),

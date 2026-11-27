@@ -7,6 +7,9 @@ import 'package:go_router/go_router.dart';
 import 'package:hive_ce/hive.dart';
 
 import '../../../router/app_router.dart';
+import '../../authentication/presentation/account_storage.dart';
+import '../../daily_path/data/today_journey_store.dart';
+import '../../daily_path/presentation/today_plan_materials.dart';
 import '../../import_course/data/youtube_import_actions.dart';
 import '../../import_course/data/bilibili_collection_download.dart';
 import '../../import_course/data/bilibili_cover_refresh.dart';
@@ -270,25 +273,51 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _selectRemoteVideo(AcquireDailyFeedItemDto item) =>
-      _selectRemoteLink(item.title, item.watchUrl);
+      unawaited(_selectRemoteLink(item.title, item.watchUrl));
 
-  void _selectRemoteLink(String title, String url) {
+  Future<void> _selectRemoteLink(String title, String url) async {
     if (url.trim().isEmpty) return;
-    context.pop((
-      title: title,
-      route: Uri(path: '/library', queryParameters: <String, String>{
-        'watchUrl': url,
-      }).toString(),
-    ));
+    await _addVideoToTodayPlan(
+      journeyActivity(
+        title: title,
+        route: Uri(path: '/library', queryParameters: <String, String>{
+          'watchUrl': url,
+        }).toString(),
+        durationMinutes: 0,
+      ),
+    );
   }
 
-  void _selectCourse(LibraryCourseData course) {
-    context.pop((
-      title: libraryCourseDisplayTitle(course),
-      route: Uri(path: '/library', queryParameters: <String, String>{
-        'courseId': course.id,
-      }).toString(),
-    ));
+  Future<void> _selectCourse(LibraryCourseData course) async {
+    await _addVideoToTodayPlan(
+      journeyActivity(
+        title: libraryCourseDisplayTitle(course),
+        route: Uri(path: '/library', queryParameters: <String, String>{
+          'courseId': course.id,
+        }).toString(),
+        durationMinutes: libraryCourseDurationMinutes(course),
+      ),
+    );
+  }
+
+  Future<void> _addVideoToTodayPlan(JourneyActivity item) async {
+    final String message = await addVideoToTodayPlan(
+      context: context,
+      account: ref.read(studyAccountProvider),
+      item: item,
+    );
+    if (!mounted || message.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+    // Stay on library so the learner can keep adding; only auto-pop when
+    // opened as a one-shot picker and this was the first item.
+    if (widget.selectForStudy &&
+        TodayJourneyStore(ref.read(studyAccountProvider), DateTime.now())
+                .selectedMaterials(TodayStudyTrack.video)
+                .length <=
+            1 &&
+        context.canPop()) {
+      // Keep browsing — do not pop. User taps back when done.
+    }
   }
 
   Future<void> _openBilibiliSearchHit(AcquireDailyFeedItemDto hit) async {
@@ -523,7 +552,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   : '第 ${activeEpisode.numberStr} 集'
             : '影视库',
         description: widget.selectForStudy
-            ? '选一条视频或合集加入今日计划'
+            ? '点视频加入今日计划（可多选）'
             : showImport
             ? '把本地视频和字幕整理成新的学习片库。'
             : showDetail
@@ -2415,7 +2444,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
   void _handleCourseTap(LibraryCourseData course) {
     if (widget.selectForStudy) {
-      _selectCourse(course);
+      unawaited(_selectCourse(course));
       return;
     }
     if (!editMode) {
@@ -2747,6 +2776,16 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       ),
       items: <PopupMenuEntry<String>>[
         const PopupMenuItem<String>(
+          value: 'add_today',
+          child: Row(
+            children: <Widget>[
+              Icon(Icons.playlist_add_check_rounded, size: 20),
+              SizedBox(width: 10),
+              Text('加入今日计划'),
+            ],
+          ),
+        ),
+        const PopupMenuItem<String>(
           value: 'multi',
           child: Row(
             children: <Widget>[
@@ -2787,6 +2826,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       return;
     }
     switch (action) {
+      case 'add_today':
+        await _selectCourse(course);
       case 'multi':
         _enterEditModeWith(course);
       case 'delete_collection':

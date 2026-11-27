@@ -6,10 +6,14 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../authentication/presentation/account_storage.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../daily_path/data/today_journey_store.dart';
+import '../../daily_path/presentation/today_plan_materials.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
 import '../../navigation/presentation/navigation_destination.dart';
+import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../player/presentation/player_mock_state.dart';
 import '../../player/presentation/player_subtitle_loader.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
@@ -34,7 +38,10 @@ import 'reading_netdisk_shelf_provider.dart';
 import 'reading_vocab_lists_sheet.dart';
 
 class ReadingHubScreen extends ConsumerStatefulWidget {
-  const ReadingHubScreen({super.key});
+  const ReadingHubScreen({super.key, this.selectForStudy = false});
+
+  /// When true, tapping a book adds it to today's reading plan.
+  final bool selectForStudy;
 
   @override
   ConsumerState<ReadingHubScreen> createState() => _ReadingHubScreenState();
@@ -72,6 +79,78 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
         SnackBar(content: Text('已从百度网盘自动导入 ${outcome.imported} 本')),
       );
     } catch (_) {}
+  }
+
+  Future<void> _addDocToTodayPlan(ReadingDoc doc) async {
+    final String message = await addReadingToTodayPlan(
+      account: ref.read(studyAccountProvider),
+      item: journeyActivity(
+        title: doc.displayTitle,
+        route: '/reading/${Uri.encodeComponent(doc.id)}',
+      ),
+    );
+    if (!mounted || message.isEmpty) return;
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
+  }
+
+  Future<void> _showBookActions(BuildContext context, ReadingDoc doc) async {
+    final String? action = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      backgroundColor: AppDesignTokens.appWhite,
+      builder: (BuildContext sheetContext) => SafeArea(
+        top: false,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            ListTile(
+              title: Text(
+                doc.displayTitle,
+                style: TextStyle(
+                  color: AppDesignTokens.textPrimary,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              subtitle: Text(
+                widget.selectForStudy ? '点下方加入今日计划' : '选择操作',
+                style: TextStyle(color: AppDesignTokens.textSecondary),
+              ),
+            ),
+            ListTile(
+              leading: const Icon(Icons.playlist_add_check_rounded),
+              title: const Text('加入今日计划'),
+              onTap: () => Navigator.pop(sheetContext, 'today'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.menu_book_outlined),
+              title: const Text('打开阅读'),
+              onTap: () => Navigator.pop(sheetContext, 'open'),
+            ),
+            if (!doc.builtin)
+              ListTile(
+                leading: Icon(
+                  Icons.delete_outline,
+                  color: AppDesignTokens.dangerText,
+                ),
+                title: Text(
+                  '从书架移除',
+                  style: TextStyle(color: AppDesignTokens.dangerText),
+                ),
+                onTap: () => Navigator.pop(sheetContext, 'remove'),
+              ),
+          ],
+        ),
+      ),
+    );
+    if (!mounted || action == null) return;
+    switch (action) {
+      case 'today':
+        await _addDocToTodayPlan(doc);
+      case 'open':
+        await _openBook(context, doc);
+      case 'remove':
+        await _confirmRemove(context, doc);
+    }
   }
 
   Future<void> _confirmRemove(BuildContext context, ReadingDoc doc) async {
@@ -624,7 +703,9 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                 });
               },
               onSearch: () => setState(() => _searching = true),
-              subtitle: shelf.subtitle,
+              subtitle: widget.selectForStudy
+                  ? '点一本书加入今日计划 · 长按可打开或移除'
+                  : shelf.subtitle,
               onImport: () => unawaited(_importFile(context, ref)),
               onBack: () {
                 if (context.canPop()) {
@@ -634,10 +715,14 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
                 }
               },
               onOpen: (ReadingDoc doc) {
+                if (widget.selectForStudy) {
+                  unawaited(_addDocToTodayPlan(doc));
+                  return;
+                }
                 unawaited(_openBook(context, doc));
               },
               onLongPress: (ReadingDoc doc) {
-                unawaited(_confirmRemove(context, doc));
+                unawaited(_showBookActions(context, doc));
               },
               actions: <Widget>[
                 PopupMenuButton<String>(

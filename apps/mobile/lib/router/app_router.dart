@@ -706,8 +706,9 @@ GoRouter goRouter(Ref ref) {
     ).fade(),
     GoRoute(
       path: '/reading',
-      builder: (BuildContext context, GoRouterState state) =>
-          const ReadingHubScreen(),
+      builder: (BuildContext context, GoRouterState state) => ReadingHubScreen(
+        selectForStudy: state.uri.queryParameters['selectForStudy'] == '1',
+      ),
     ).fade(),
     GoRoute(
       path: '/reading/catalog',

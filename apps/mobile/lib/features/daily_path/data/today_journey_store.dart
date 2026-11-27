@@ -18,7 +18,18 @@ enum TodayLearningStep {
   final String label;
 }
 
-typedef JourneyActivity = ({String route, String title});
+typedef JourneyActivity = ({
+  String route,
+  String title,
+  int durationMinutes,
+});
+
+JourneyActivity journeyActivity({
+  required String route,
+  required String title,
+  int durationMinutes = 0,
+}) =>
+    (route: route, title: title, durationMinutes: durationMinutes);
 
 /// Thin read model over [TodayJourneyStore] quota + progress fields.
 class TodayStudyPlan {
@@ -150,7 +161,11 @@ class TodayJourneyStore {
     final Object? route = record['route'];
     final Object? title = record['title'];
     if (route is! String || title is! String) return null;
-    return (route: route, title: title);
+    return journeyActivity(
+      route: route,
+      title: title,
+      durationMinutes: _int(record, 'durationMinutes'),
+    );
   }
 
   /// True only when the learner tapped「稍后继续」— not when Journey merely
@@ -181,22 +196,97 @@ class TodayJourneyStore {
     await _write(<String, Object?>{..._read(), 'oralIntroDone': true});
   }
 
+  JourneyActivity? _parseActivity(Object? value) {
+    if (value is! Map) return null;
+    final Map<String, dynamic> map = Map<String, dynamic>.from(value);
+    final Object? route = map['route'];
+    final Object? title = map['title'];
+    if (route is! String || title is! String) return null;
+    return journeyActivity(
+      route: route,
+      title: title,
+      durationMinutes: _int(map, 'durationMinutes'),
+    );
+  }
+
+  Map<String, Object?> _activityJson(JourneyActivity item) => <String, Object?>{
+        'route': item.route,
+        'title': item.title,
+        'durationMinutes': item.durationMinutes.clamp(0, 24 * 60),
+      };
+
+  /// All materials picked for [track] today (videos/readings can be multi).
+  List<JourneyActivity> selectedMaterials(TodayStudyTrack track) {
+    final Map<String, Object?> record = _read();
+    final Object? multi = record['materials-${track.name}'];
+    if (multi is List) {
+      final List<JourneyActivity> out = <JourneyActivity>[];
+      for (final Object? item in multi) {
+        final JourneyActivity? parsed = _parseActivity(item);
+        if (parsed != null) out.add(parsed);
+      }
+      if (out.isNotEmpty) return List<JourneyActivity>.unmodifiable(out);
+    }
+    final JourneyActivity? legacy = _parseActivity(record['material-${track.name}']);
+    return legacy == null
+        ? const <JourneyActivity>[]
+        : List<JourneyActivity>.unmodifiable(<JourneyActivity>[legacy]);
+  }
+
+  /// First / primary material (backward compatible).
   JourneyActivity? selectedMaterial(TodayStudyTrack track) {
-    final Object? value = _read()['material-${track.name}'];
-    if (value is! Map<String, dynamic>) return null;
-    final Object? route = value['route'];
-    final Object? title = value['title'];
-    return route is String && title is String ? (route: route, title: title) : null;
+    final List<JourneyActivity> list = selectedMaterials(track);
+    return list.isEmpty ? null : list.first;
   }
 
   Future<void> saveSelectedMaterial(TodayStudyTrack track, JourneyActivity item) {
-    return _write(<String, Object?>{
+    return saveSelectedMaterials(track, <JourneyActivity>[item]);
+  }
+
+  Future<void> saveSelectedMaterials(
+    TodayStudyTrack track,
+    List<JourneyActivity> items,
+  ) {
+    final List<JourneyActivity> deduped = <JourneyActivity>[];
+    final Set<String> seen = <String>{};
+    for (final JourneyActivity item in items) {
+      if (item.route.trim().isEmpty) continue;
+      if (!seen.add(item.route)) continue;
+      deduped.add(item);
+    }
+    final Map<String, Object?> next = <String, Object?>{
       ..._read(),
-      'material-${track.name}': <String, String>{
-        'route': item.route,
-        'title': item.title,
-      },
-    });
+      'materials-${track.name}':
+          deduped.map(_activityJson).toList(growable: false),
+    };
+    if (deduped.isEmpty) {
+      next.remove('material-${track.name}');
+    } else {
+      next['material-${track.name}'] = _activityJson(deduped.first);
+    }
+    return _write(next);
+  }
+
+  /// Append one material; no-op if the same [route] already exists.
+  Future<bool> addSelectedMaterial(TodayStudyTrack track, JourneyActivity item) async {
+    final List<JourneyActivity> current = selectedMaterials(track);
+    if (current.any((JourneyActivity e) => e.route == item.route)) {
+      return false;
+    }
+    await saveSelectedMaterials(
+      track,
+      <JourneyActivity>[...current, item],
+    );
+    return true;
+  }
+
+  Future<void> removeSelectedMaterial(TodayStudyTrack track, String route) {
+    return saveSelectedMaterials(
+      track,
+      selectedMaterials(track)
+          .where((JourneyActivity e) => e.route != route)
+          .toList(growable: false),
+    );
   }
 
   List<TodayLearningStep> get learningOrder {
@@ -266,6 +356,7 @@ class TodayJourneyStore {
       ..._read(),
       'route': activity.route,
       'title': activity.title,
+      'durationMinutes': activity.durationMinutes.clamp(0, 24 * 60),
       'pausedExplicitly': pausedExplicitly,
       'planned': planned && !pausedExplicitly,
     };
