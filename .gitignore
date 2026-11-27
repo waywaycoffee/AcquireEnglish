@@ -136,3 +136,7 @@ tmp/_fix_dashscope_key.py
 tmp/reading_ebooks/
 tmp/reading_tts_worker.out.log
 tmp/reading_tts_worker.err.log
+
+# Wordroot: keep zip in git, not unzipped sqlite / local caches
+docs/wordroot/roots.db
+docs/wordroot/__pycache__/

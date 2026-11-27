@@ -36,7 +36,7 @@ word_root_rel(rel_id, word, root_id, root, type_cn, matched_form, position,
 - `position`: 词首 / 词中 / 词尾，由 `matched_form` 在词中的实际位置回填，做过一致性校验（异常 0 条）。
 - `root_cn_meaning`：该词根／词缀本身的中文义，如 `port=拿，运`，用于在单词卡上直接展示构词逻辑。
 - `word_gloss`：这个词整体的中文释义，如 `transport=运输`，**不是**词根在该词里的意思。
-- `root_sense`：预留字段，表示"该词根在这一个词里的具体含义"（如 transport 里 port=搬运）。目前为空，需要人工或 LLM 逐词补写，属于后续增值项，不要误当成自动结果。
+- `root_sense`：**在 `word_root_rel.csv`（关联表）**，不是 `roots` 主表。含义是「这个词根在当前这个单词里的具体语义」——同一词根在不同词里可以不同（如 port 在 transport≈搬运，在 portable≈可携带）。App 展示优先 `root_sense`，为空则回退 `root_cn_meaning`。当前数据尚未逐条填写（填充率 0%），补写后重跑 `export_full_json.py` 即可进 App。
 - `gloss_variants`: 同一个词在不同词根下释义不一致时保留的备选释义（21 个词），便于人工校正。
 
 ## 三、建库方式（AcquireEnglish App）
@@ -56,16 +56,30 @@ App 侧：
 - 查词拆解 / 同根词 / 词根反向检索 / 拼写建议：`WordRootCatalog`
 - 「加入背词」写入《情景记忆》并进入现有 FSRS 队列（不另起一套记忆库）
 
-Python 查询脚本（读 CSV，与 JSON 同源）：
+配套文件：
 
-- `word_query_api.py` → `query_word_detail("transport")`
+| 文件 | 用途 |
+|---|---|
+| `query_demo.py` | 三条核心查询示例（拆解 / 同根 / 按类型筛）；需本地 `roots.db` |
+| `roots.db.zip` | SQLite 离线库压缩包（解压得 `roots.db`） |
+| `roots.json` | 前端友好打包（roots 列表 + words 字典） |
+| `roots_full.json` | App 实际加载的紧凑包（含 rels，由 `export_full_json.py` 从 CSV 生成） |
+
+```bash
+unzip -o roots.db.zip   # → roots.db
+python3 query_demo.py
+```
+
+Python 查询脚本：
+
+- `word_query_api.py` → `query_word_detail("transport")`（读 CSV）
 - `root_reverse_api.py` → `query_root_words("port")`
-- `spell_suggest_api.py` → 需先有匹配 schema 的 `roots.db`（可选）
+- `spell_suggest_api.py` → 拼写建议（依赖 `roots.db` 时需表结构匹配）
 
 CSV 均为 UTF-8 BOM 编码；用 `utf-8-sig` 读取可去掉 BOM。
 
-> 注意：早期豆包草稿里的 `build_dataset.py` / SQLite 字段名与本目录 CSV **不一致**。
-> App 与 `export_full_json.py` 一律以 CSV / `roots_full.json` 为准。
+> App 离线包以 **CSV → `roots_full.json`** 为准（含完整 rel / `root_sense` 字段）。
+> `roots.json` / `roots.db` 便于脚本演示；字段略精简，勿与 CSV 行数强行对齐。
 
 ## 四、典型查询（对应 App 里的三个核心页面）
 

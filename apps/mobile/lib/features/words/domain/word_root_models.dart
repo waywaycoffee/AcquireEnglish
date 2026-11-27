@@ -145,14 +145,19 @@ class WordRootParsePart {
   final String typeCn;
   final String position;
   final String matchedForm;
+  /// Per-word sense of this root inside [word] (from word_root_rel.root_sense).
+  /// Empty until curated; fall back to [cnMeaning] (root's general gloss).
   final String rootSense;
   final String rootId;
 
+  /// Prefer contextual [rootSense]; otherwise the root's general [cnMeaning].
   String get displayMeaning {
     final String sense = rootSense.trim();
     if (sense.isNotEmpty) return sense;
     return cnMeaning;
   }
+
+  bool get hasContextualSense => rootSense.trim().isNotEmpty;
 }
 
 class WordRootDetail {

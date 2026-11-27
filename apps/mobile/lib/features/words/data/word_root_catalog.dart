@@ -126,33 +126,69 @@ class WordRootCatalog {
     final List<WordRootRel> wordRels = relsByWord[word] ?? const <WordRootRel>[];
     if (meta == null && wordRels.isEmpty) return null;
 
-    final List<WordRootParsePart> parse = <WordRootParsePart>[];
+    // Longest-span dedupe (same idea as docs/wordroot/query_demo.py):
+    // biology should keep ology, not also logy / log.
+    final List<({int start, int end, WordRootParsePart part})> spans =
+        <({int start, int end, WordRootParsePart part})>[];
     final Set<String> rootIds = <String>{};
     for (final WordRootRel rel in wordRels) {
       final WordRootEntry? root = rootsById[rel.rootId];
       rootIds.add(rel.rootId);
-      parse.add(
-        WordRootParsePart(
-          rootText: rel.root.isNotEmpty ? rel.root : (root?.root ?? ''),
-          cnMeaning: rel.rootCn.isNotEmpty ? rel.rootCn : (root?.cn ?? ''),
-          type: root?.type ?? '',
-          typeCn: rel.typeCn.isNotEmpty ? rel.typeCn : (root?.typeCn ?? ''),
-          position: rel.position,
-          matchedForm: rel.matchedForm,
-          rootSense: rel.rootSense,
-          rootId: rel.rootId,
-        ),
+      final String form = (rel.matchedForm.isNotEmpty
+              ? rel.matchedForm
+              : (rel.root.isNotEmpty ? rel.root : (root?.root ?? '')))
+          .toLowerCase()
+          .replaceAll(RegExp(r'^-+|-+$'), '');
+      final int start = form.isEmpty ? -1 : word.indexOf(form);
+      final WordRootParsePart part = WordRootParsePart(
+        rootText: rel.root.isNotEmpty ? rel.root : (root?.root ?? ''),
+        cnMeaning: rel.rootCn.isNotEmpty ? rel.rootCn : (root?.cn ?? ''),
+        type: root?.type ?? '',
+        typeCn: rel.typeCn.isNotEmpty ? rel.typeCn : (root?.typeCn ?? ''),
+        position: rel.position,
+        matchedForm: rel.matchedForm.isNotEmpty ? rel.matchedForm : form,
+        // Contextual sense in THIS word; empty → UI falls back to cnMeaning.
+        rootSense: rel.rootSense,
+        rootId: rel.rootId,
       );
+      if (start < 0) {
+        spans.add((start: 999, end: 999, part: part));
+        continue;
+      }
+      spans.add((start: start, end: start + form.length, part: part));
     }
-    const Map<String, int> posRank = <String, int>{
-      '词首': 0,
-      '词中': 1,
-      '词尾': 2,
-    };
-    parse.sort(
-      (WordRootParsePart a, WordRootParsePart b) =>
-          (posRank[a.position] ?? 9).compareTo(posRank[b.position] ?? 9),
-    );
+    spans.sort((a, b) {
+      final int byStart = a.start.compareTo(b.start);
+      if (byStart != 0) return byStart;
+      final int byLen = (b.end - b.start).compareTo(a.end - a.start);
+      if (byLen != 0) return byLen;
+      final bool aRoot = a.part.type == 'root' || a.part.typeCn == '词根';
+      final bool bRoot = b.part.type == 'root' || b.part.typeCn == '词根';
+      if (aRoot != bRoot) return aRoot ? -1 : 1;
+      return 0;
+    });
+    final List<({int start, int end, WordRootParsePart part})> kept =
+        <({int start, int end, WordRootParsePart part})>[];
+    for (final ({int start, int end, WordRootParsePart part}) sp in spans) {
+      if (kept.any(
+        (k) => k.start == sp.start && k.end == sp.end,
+      )) {
+        continue;
+      }
+      if (kept.any(
+        (k) =>
+            k.start <= sp.start &&
+            k.end >= sp.end &&
+            (k.end - k.start) > (sp.end - sp.start),
+      )) {
+        continue;
+      }
+      kept.add(sp);
+    }
+    kept.sort((a, b) => a.start.compareTo(b.start));
+    final List<WordRootParsePart> parse = <WordRootParsePart>[
+      for (final item in kept) item.part,
+    ];
 
     final List<WordRootWord> same = <WordRootWord>[];
     final Set<String> seen = <String>{word};
