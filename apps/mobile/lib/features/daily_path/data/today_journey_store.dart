@@ -162,6 +162,13 @@ class TodayJourneyStore {
     return trimmed.isEmpty ? null : trimmed;
   }
 
+  /// Camera-translate oral intro already offered (or skipped) today.
+  bool get oralIntroDone => _read()['oralIntroDone'] == true;
+
+  Future<void> markOralIntroDone() async {
+    await _write(<String, Object?>{..._read(), 'oralIntroDone': true});
+  }
+
   TodayStudyPlan get studyPlan {
     final Map<String, Object?> record = _read();
     final bool configured = record['quotasConfigured'] == true ||

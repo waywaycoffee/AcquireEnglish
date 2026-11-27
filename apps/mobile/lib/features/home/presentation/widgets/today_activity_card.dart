@@ -9,6 +9,7 @@ import '../../../authentication/presentation/account_storage.dart';
 import '../../../daily_path/data/journey_reminder.dart';
 import '../../../daily_path/data/today_journey_store.dart';
 import '../../../daily_path/domain/today_task.dart';
+import '../../../daily_path/presentation/today_learning_setup.dart';
 import '../../../daily_path/presentation/today_path_provider.dart';
 import '../../../daily_review/presentation/daily_review_provider.dart';
 import '../../../daily_review/presentation/syllabus_overlap_dialog.dart';
@@ -171,6 +172,28 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       readingWords: picked.readingWords,
     );
     if (mounted) setState(() {});
+  }
+
+  /// Ensure vocab book / video series / reading book exist for today's quotas.
+  Future<bool> _ensureContentSources(TodayStudyPlan plan) async {
+    if (!mounted) return false;
+    if (plan.vocabCount > 0) {
+      final bool ok = await ensureTodayVocabBook(context, ref);
+      if (!ok || !mounted) return false;
+    }
+    if (plan.videoMinutes > 0) {
+      final bool ok = await ensureTodayVideoSource(
+        context,
+        ref,
+        hasVideoTarget: () => _videoPursuit() != null,
+      );
+      if (!ok || !mounted) return false;
+    }
+    if (plan.readingWords > 0) {
+      final bool ok = await ensureTodayReadingBook(context, ref);
+      if (!ok || !mounted) return false;
+    }
+    return true;
   }
 
   JourneyTask? _videoPursuit() {
@@ -340,8 +363,18 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       await _ensureQuotas(store);
       if (!mounted) return;
       await _syncProgress(store);
-      final TodayStudyPlan plan = store.studyPlan;
+      TodayStudyPlan plan = store.studyPlan;
       if (!plan.quotasConfigured) return;
+      final bool sourcesReady = await _ensureContentSources(plan);
+      if (!sourcesReady || !mounted) return;
+      await offerTodayOralIntro(
+        context,
+        ref,
+        alreadyDone: store.oralIntroDone,
+        markDone: store.markOralIntroDone,
+      );
+      if (!mounted) return;
+      plan = store.studyPlan;
       if (plan.allTracksDone) {
         await _seedTomorrow(account, today, store);
         await store.saveStage(JourneyStage.done);
@@ -648,7 +681,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                   plan.quotasConfigured
                       ? (plan.allTracksDone
                           ? '视频/单词/阅读都达标了。可以刷一批换点新鲜内容。'
-                          : '点下一步，优先接着昨天的剧、词书或小说。')
+                          : '会先补齐词书/视频/读物，再用拍照学周围单词作口语引子。')
                       : '设好视频分钟、背词个数、阅读词数；某一轨填 0 就跳过。',
                   style: TextStyle(
                     color: AppDesignTokens.textSecondary,

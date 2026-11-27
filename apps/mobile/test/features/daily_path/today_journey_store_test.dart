@@ -82,6 +82,26 @@ void main() {
     expect(store.reason, isNull);
   });
 
+  test('oral intro flag persists for the day', () async {
+    final Directory directory = await Directory.systemTemp.createTemp(
+      'today_oral_intro',
+    );
+    addTearDown(() async {
+      await Hive.close();
+      await directory.delete(recursive: true);
+    });
+    Hive.init(directory.path);
+    await Hive.openBox<String>('prefs');
+
+    final TodayJourneyStore store = TodayJourneyStore(
+      'learner',
+      DateTime(2026, 3, 1),
+    );
+    expect(store.oralIntroDone, isFalse);
+    await store.markOralIntroDone();
+    expect(store.oralIntroDone, isTrue);
+  });
+
   test('quotas and progress track three study rails', () async {
     final Directory directory = await Directory.systemTemp.createTemp(
       'today_journey_quotas',
