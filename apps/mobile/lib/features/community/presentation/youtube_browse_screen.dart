@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../authentication/presentation/auth_session.dart';
+import '../../daily_path/presentation/today_plan_materials.dart';
 import '../../import_course/data/youtube_education_discovery.dart';
 import '../../import_course/data/youtube_import_actions.dart';
 import '../../import_course/presentation/bilibili_collection_reservation.dart';
@@ -20,11 +21,15 @@ class YoutubeBrowseScreen extends ConsumerStatefulWidget {
   const YoutubeBrowseScreen({
     this.embedded = false,
     this.initialLevel,
+    this.onSelectVideo,
+    this.isInTodayPlan,
     super.key,
   });
 
   final bool embedded;
   final String? initialLevel;
+  final ValueChanged<AcquireDailyFeedItemDto>? onSelectVideo;
+  final bool Function(String watchUrl)? isInTodayPlan;
 
   static const List<String> cefrLevels = <String>[
     'A1',
@@ -51,6 +56,20 @@ class _YoutubeBrowseScreenState extends ConsumerState<YoutubeBrowseScreen> {
     } finally {
       if (mounted) setState(() => _openingVideoId = null);
     }
+  }
+
+  Future<void> _joinTodayPlan(AcquireDailyFeedItemDto item) async {
+    final ValueChanged<AcquireDailyFeedItemDto>? select = widget.onSelectVideo;
+    if (select == null) return;
+    select(item);
+    if (mounted) setState(() {});
+  }
+
+  String _watchUrlFor(AcquireDailyFeedItemDto item) {
+    final String url = item.watchUrl.trim();
+    if (url.isNotEmpty) return url;
+    if (item.bvid.trim().isEmpty) return '';
+    return 'https://www.youtube.com/watch?v=${item.bvid}';
   }
 
   final TextEditingController _query = TextEditingController();
@@ -276,7 +295,16 @@ class _YoutubeBrowseScreenState extends ConsumerState<YoutubeBrowseScreen> {
                       ),
                     ),
                   ),
-                  if (reserveSource.isNotEmpty)
+                  if (widget.onSelectVideo != null) ...<Widget>[
+                    const SizedBox(width: 4),
+                    TodayPlanJoinChip(
+                      joined: widget.isInTodayPlan
+                              ?.call(_watchUrlFor(item)) ??
+                          false,
+                      busy: _openingVideoId == item.bvid,
+                      onPressed: () => unawaited(_joinTodayPlan(item)),
+                    ),
+                  ] else if (reserveSource.isNotEmpty)
                     BilibiliCollectionReservation(
                       key: ValueKey<String>('reserve-yt-${item.bvid}'),
                       source: reserveSource,

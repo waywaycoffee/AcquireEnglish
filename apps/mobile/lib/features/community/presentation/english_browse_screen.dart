@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../daily_path/presentation/today_plan_materials.dart';
 import '../../import_course/data/bilibili_open_or_import.dart';
 import '../../library/presentation/library_catalog_provider.dart';
 import '../../library/presentation/library_mock_data.dart';
@@ -23,6 +24,7 @@ class EnglishBrowseScreen extends ConsumerStatefulWidget {
     this.embedded = false,
     this.initialLevel = 'A2',
     this.onSelectVideo,
+    this.isInTodayPlan,
     super.key,
   });
 
@@ -32,6 +34,7 @@ class EnglishBrowseScreen extends ConsumerStatefulWidget {
   final bool embedded;
   final String initialLevel;
   final ValueChanged<AcquireDailyFeedItemDto>? onSelectVideo;
+  final bool Function(String watchUrl)? isInTodayPlan;
 
   static const List<String> cefrLevels = <String>[
     'A1',
@@ -123,12 +126,14 @@ class _EnglishBrowseScreenState extends ConsumerState<EnglishBrowseScreen> {
   }
 
   Future<void> _openFeedItem(AcquireDailyFeedItemDto item) async {
-    final ValueChanged<AcquireDailyFeedItemDto>? select = widget.onSelectVideo;
-    if (select != null) {
-      select(item);
-      return;
-    }
     await openEnglishBrowsePreview(context, ref, item: item);
+  }
+
+  Future<void> _joinTodayPlan(AcquireDailyFeedItemDto item) async {
+    final ValueChanged<AcquireDailyFeedItemDto>? select = widget.onSelectVideo;
+    if (select == null) return;
+    select(item);
+    if (mounted) setState(() {});
   }
 
   Future<void> _openStored(EnglishBrowseEntry entry) async {
@@ -140,10 +145,6 @@ class _EnglishBrowseScreenState extends ConsumerState<EnglishBrowseScreen> {
       author: entry.author,
       coverUrl: entry.coverUrl.isEmpty ? null : entry.coverUrl,
     );
-    if (widget.onSelectVideo != null) {
-      widget.onSelectVideo!(feedItem);
-      return;
-    }
     if (entry.episodeId.isNotEmpty) {
       final bool exists = ref.read(libraryCatalogProvider).any(
             (LibraryCourseData c) =>
@@ -288,6 +289,13 @@ class _EnglishBrowseScreenState extends ConsumerState<EnglishBrowseScreen> {
                 ),
               ),
             ),
+            if (widget.onSelectVideo != null) ...<Widget>[
+              const SizedBox(width: 4),
+              TodayPlanJoinChip(
+                joined: widget.isInTodayPlan?.call(item.watchUrl) ?? false,
+                onPressed: () => unawaited(_joinTodayPlan(item)),
+              ),
+            ],
             IconButton(
               tooltip: favorited ? '已收藏' : '收藏到学习列表',
               onPressed: () async {
@@ -323,70 +331,94 @@ class _EnglishBrowseScreenState extends ConsumerState<EnglishBrowseScreen> {
             if (entry.reserved) '已预约字幕',
           ].join(' · ')
         : '播放记录';
+    final AcquireDailyFeedItemDto feedItem = AcquireDailyFeedItemDto(
+      id: entry.bvid.isEmpty ? entry.watchUrl : entry.bvid,
+      bvid: entry.bvid,
+      title: entry.title,
+      watchUrl: entry.watchUrl,
+      author: entry.author,
+      coverUrl: entry.coverUrl.isEmpty ? null : entry.coverUrl,
+    );
     return Material(
       color: AppDesignTokens.appWhite,
       borderRadius: BorderRadius.circular(16),
-      child: InkWell(
-        borderRadius: BorderRadius.circular(16),
-        onTap: () => unawaited(_openStored(entry)),
-        child: Padding(
-          padding: const EdgeInsets.all(10),
-          child: Row(
-            children: <Widget>[
-              ClipRRect(
+      child: Padding(
+        padding: const EdgeInsets.all(10),
+        child: Row(
+          children: <Widget>[
+            Expanded(
+              child: InkWell(
                 borderRadius: BorderRadius.circular(12),
-                child: SizedBox(
-                  width: 118,
-                  height: 74,
-                  child: CoverImage(path: entry.coverUrl, fit: BoxFit.cover),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+                onTap: () => unawaited(_openStored(entry)),
+                child: Row(
                   children: <Widget>[
-                    Text(
-                      entry.title.isEmpty ? entry.watchUrl : entry.title,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 14,
-                        height: 1.25,
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: SizedBox(
+                        width: 118,
+                        height: 74,
+                        child: CoverImage(
+                          path: entry.coverUrl,
+                          fit: BoxFit.cover,
+                        ),
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      <String>[
-                        if (entry.author.isNotEmpty) entry.author,
-                        badge,
-                      ].join(' · '),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.w600,
-                        color: AppDesignTokens.textSecondary,
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: <Widget>[
+                          Text(
+                            entry.title.isEmpty ? entry.watchUrl : entry.title,
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(
+                              fontWeight: FontWeight.w800,
+                              fontSize: 14,
+                              height: 1.25,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          Text(
+                            <String>[
+                              if (entry.author.isNotEmpty) entry.author,
+                              badge,
+                            ].join(' · '),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: AppDesignTokens.textSecondary,
+                            ),
+                          ),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-              if (entry.inStudyList)
-                IconButton(
-                  tooltip: '下载合集',
-                  onPressed: () => unawaited(
-                    downloadBilibiliCollectionForWatchUrl(
-                      context,
-                      ref,
-                      watchUrl: entry.watchUrl,
-                    ),
-                  ),
-                  icon: const Icon(Icons.download_rounded),
-                ),
+            ),
+            if (widget.onSelectVideo != null) ...<Widget>[
+              const SizedBox(width: 4),
+              TodayPlanJoinChip(
+                joined: widget.isInTodayPlan?.call(entry.watchUrl) ?? false,
+                onPressed: () => unawaited(_joinTodayPlan(feedItem)),
+              ),
             ],
-          ),
+            if (entry.inStudyList)
+              IconButton(
+                tooltip: '下载合集',
+                onPressed: () => unawaited(
+                  downloadBilibiliCollectionForWatchUrl(
+                    context,
+                    ref,
+                    watchUrl: entry.watchUrl,
+                  ),
+                ),
+                icon: const Icon(Icons.download_rounded),
+              ),
+          ],
         ),
       ),
     );

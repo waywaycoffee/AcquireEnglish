@@ -1,0 +1,190 @@
+{
+  "version": "2.22",
+  "children": [
+    {
+      "type": "frame",
+      "id": "home-vocab-covers",
+      "name": "首页 · 两本词书封面",
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 420,
+      "fill": "#141218",
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "section-label",
+          "x": 24,
+          "y": 20,
+          "content": "我的词书",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "700",
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "frame",
+          "id": "cover-scene",
+          "name": "情景记忆封面",
+          "x": 24,
+          "y": 52,
+          "width": 160,
+          "height": 214,
+          "cornerRadius": 12,
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "colors": [
+              { "color": "#1A3D36", "position": 0 },
+              { "color": "#2F6B5C", "position": 0.55 },
+              { "color": "#7BC4A8", "position": 1 }
+            ],
+            "angle": 160
+          },
+          "layout": "none",
+          "children": [
+            {
+              "type": "rectangle",
+              "id": "scene-spine",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 214,
+              "fill": "#0F2A25",
+              "cornerRadius": 0
+            },
+            {
+              "type": "text",
+              "id": "scene-emoji",
+              "x": 28,
+              "y": 28,
+              "content": "🎬",
+              "fontSize": 28
+            },
+            {
+              "type": "text",
+              "id": "scene-title",
+              "x": 24,
+              "y": 150,
+              "content": "情景记忆",
+              "fontFamily": "Inter",
+              "fontSize": 20,
+              "fontWeight": "800",
+              "fill": "#F4FFFB"
+            },
+            {
+              "type": "text",
+              "id": "scene-sub",
+              "x": 24,
+              "y": 178,
+              "content": "收藏词会出现在这里",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fill": "#C9E8DC"
+            }
+          ]
+        },
+        {
+          "type": "frame",
+          "id": "cover-active",
+          "name": "当前词书封面",
+          "x": 206,
+          "y": 52,
+          "width": 160,
+          "height": 214,
+          "cornerRadius": 12,
+          "fill": {
+            "type": "gradient",
+            "gradientType": "linear",
+            "colors": [
+              { "color": "#2A2140", "position": 0 },
+              { "color": "#5640A0", "position": 0.55 },
+              { "color": "#B8A6F0", "position": 1 }
+            ],
+            "angle": 160
+          },
+          "layout": "none",
+          "children": [
+            {
+              "type": "rectangle",
+              "id": "active-spine",
+              "x": 0,
+              "y": 0,
+              "width": 12,
+              "height": 214,
+              "fill": "#1A1530",
+              "cornerRadius": 0
+            },
+            {
+              "type": "text",
+              "id": "active-emoji",
+              "x": 28,
+              "y": 28,
+              "content": "📘",
+              "fontSize": 28
+            },
+            {
+              "type": "text",
+              "id": "active-title",
+              "x": 24,
+              "y": 150,
+              "content": "当前词书",
+              "fontFamily": "Inter",
+              "fontSize": 20,
+              "fontWeight": "800",
+              "fill": "#F7F4FF"
+            },
+            {
+              "type": "text",
+              "id": "active-sub",
+              "x": 24,
+              "y": 178,
+              "content": "点此选择要背的词书",
+              "fontFamily": "Inter",
+              "fontSize": 11,
+              "fill": "#D9D0F5"
+            }
+          ]
+        },
+        {
+          "type": "text",
+          "id": "scene-count",
+          "x": 24,
+          "y": 280,
+          "width": 160,
+          "content": "情景记忆 · 128 个单词",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "600",
+          "fill": "#C8CDD8",
+          "textAlign": "center"
+        },
+        {
+          "type": "text",
+          "id": "active-count",
+          "x": 206,
+          "y": 280,
+          "width": 160,
+          "content": "四级核心 · 3200 个单词",
+          "fontFamily": "Inter",
+          "fontSize": 12,
+          "fontWeight": "600",
+          "fill": "#C8CDD8",
+          "textAlign": "center"
+        },
+        {
+          "type": "text",
+          "id": "note",
+          "x": 24,
+          "y": 320,
+          "width": 342,
+          "content": "封面插画见同目录 PNG：vocab-cover-scene-memory / vocab-cover-active-book。确认后嵌入 App。",
+          "fontFamily": "Inter",
+          "fontSize": 11,
+          "fill": "#7A8194"
+        }
+      ]
+    }
+  ]
+}

@@ -280,9 +280,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     await _addVideoToTodayPlan(
       journeyActivity(
         title: title,
-        route: Uri(path: '/library', queryParameters: <String, String>{
-          'watchUrl': url,
-        }).toString(),
+        route: libraryWatchPlanRoute(url),
         durationMinutes: 0,
       ),
     );
@@ -292,13 +290,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     await _addVideoToTodayPlan(
       journeyActivity(
         title: libraryCourseDisplayTitle(course),
-        route: Uri(path: '/library', queryParameters: <String, String>{
-          'courseId': course.id,
-        }).toString(),
+        route: libraryCoursePlanRoute(course.id),
         durationMinutes: libraryCourseDurationMinutes(course),
       ),
     );
   }
+
+  bool _isWatchUrlInTodayPlan(String url) => isVideoInTodayPlan(
+        account: ref.read(studyAccountProvider),
+        watchUrl: url,
+      );
+
+  bool _isCourseInTodayPlan(String courseId) => isVideoInTodayPlan(
+        account: ref.read(studyAccountProvider),
+        courseId: courseId,
+      );
 
   Future<void> _addVideoToTodayPlan(JourneyActivity item) async {
     final String message = await addVideoToTodayPlan(
@@ -307,17 +313,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       item: item,
     );
     if (!mounted || message.isEmpty) return;
+    setState(() {});
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message)));
-    // Stay on library so the learner can keep adding; only auto-pop when
-    // opened as a one-shot picker and this was the first item.
-    if (widget.selectForStudy &&
-        TodayJourneyStore(ref.read(studyAccountProvider), DateTime.now())
-                .selectedMaterials(TodayStudyTrack.video)
-                .length <=
-            1 &&
-        context.canPop()) {
-      // Keep browsing — do not pop. User taps back when done.
-    }
   }
 
   Future<void> _openBilibiliSearchHit(AcquireDailyFeedItemDto hit) async {
@@ -1479,7 +1476,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             '美剧',
                             Icons.live_tv_outlined,
                           ),
-                          if (!widget.selectForStudy) (
+                          (
                             LibraryShelfTab.youtube,
                             'YouTube',
                             Icons.ondemand_video_rounded,
@@ -1523,9 +1520,17 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           },
                         )
                       : shelfTab == LibraryShelfTab.englishBrowse
-                      ? EnglishBrowseScreen(embedded: true, onSelectVideo: widget.selectForStudy ? _selectRemoteVideo : null)
+                      ? EnglishBrowseScreen(
+                          embedded: true,
+                          onSelectVideo: _selectRemoteVideo,
+                          isInTodayPlan: _isWatchUrlInTodayPlan,
+                        )
                       : shelfTab == LibraryShelfTab.youtube
-                      ? const YoutubeBrowseScreen(embedded: true)
+                      ? YoutubeBrowseScreen(
+                          embedded: true,
+                          onSelectVideo: _selectRemoteVideo,
+                          isInTodayPlan: _isWatchUrlInTodayPlan,
+                        )
                       : shelfTab == LibraryShelfTab.dubbing
                       ? const DubClipHub()
                       : LayoutBuilder(
@@ -1797,7 +1802,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   if (!editMode) ...<Widget>[
                     const SizedBox(height: 18),
                     RecommendedBilibiliSection(
-                      onSelectVideo: widget.selectForStudy ? _selectRemoteLink : null,
+                      onSelectVideo: _selectRemoteLink,
+                      isInTodayPlan: _isWatchUrlInTodayPlan,
                     ),
                   ],
                 ],
@@ -2775,13 +2781,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         globalPosition.dy,
       ),
       items: <PopupMenuEntry<String>>[
-        const PopupMenuItem<String>(
+        PopupMenuItem<String>(
           value: 'add_today',
+          enabled: !_isCourseInTodayPlan(course.id),
           child: Row(
             children: <Widget>[
-              Icon(Icons.playlist_add_check_rounded, size: 20),
-              SizedBox(width: 10),
-              Text('加入今日计划'),
+              const Icon(Icons.playlist_add_check_rounded, size: 20),
+              const SizedBox(width: 10),
+              Text(_isCourseInTodayPlan(course.id) ? '已加入今日计划' : '加入今日计划'),
             ],
           ),
         ),

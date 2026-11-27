@@ -17,6 +17,7 @@ class LevelVocabBookModules extends ConsumerWidget {
     final SyllabusBook? scene = books.bookById(kSceneMemoryBookId);
     final SyllabusBook? active = books.activeBook;
     final int sceneCount = scene?.wordCount ?? 0;
+    final int activeCount = active?.wordCount ?? 0;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -31,12 +32,15 @@ class LevelVocabBookModules extends ConsumerWidget {
         ),
         const SizedBox(height: 10),
         Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
             Expanded(
               child: _BookModule(
                 key: const Key('home-scene-memory-book'),
                 title: kSceneMemoryBookTitle,
-                subtitle: sceneCount == 0 ? '收藏词' : '$sceneCount 词',
+                subtitle: sceneCount == 0
+                    ? '0 个单词 · 收藏词会出现在这里'
+                    : '$sceneCount 个单词',
                 spineColor: const Color(0xFF3D8B7A),
                 coverColor: AppDesignTokens.isDark
                     ? const Color(0xFF1F3A34)
@@ -56,8 +60,8 @@ class LevelVocabBookModules extends ConsumerWidget {
                 key: const Key('home-active-vocabulary-book'),
                 title: '当前词书',
                 subtitle: active == null
-                    ? (books.ready ? '去选择' : '读取中')
-                    : active.title,
+                    ? (books.ready ? '尚未选择 · 0 个单词' : '正在读取词书…')
+                    : '${active.title} · $activeCount 个单词',
                 spineColor: const Color(0xFF6B5B95),
                 coverColor: AppDesignTokens.isDark
                     ? const Color(0xFF2A2438)
@@ -168,13 +172,14 @@ class _BookModule extends StatelessWidget {
               const SizedBox(height: 8),
               Text(
                 subtitle,
-                maxLines: 1,
+                maxLines: 2,
                 overflow: TextOverflow.ellipsis,
                 textAlign: TextAlign.center,
                 style: TextStyle(
                   color: AppDesignTokens.textSecondary,
                   fontSize: 12,
                   fontWeight: FontWeight.w600,
+                  height: 1.25,
                 ),
               ),
             ],

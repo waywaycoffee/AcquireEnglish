@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../../utils/url_utils.dart';
 import '../../authentication/presentation/auth_session.dart';
+import '../../daily_path/presentation/today_plan_materials.dart';
 import '../../shared/presentation/media/cover_image.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../sync/data/acquire_api_client.dart';
@@ -15,9 +16,14 @@ import 'bilibili_collection_reservation.dart';
 
 /// Curated Bilibili UPs + sample videos on the import / 视频学习 page.
 class RecommendedBilibiliSection extends ConsumerWidget {
-  const RecommendedBilibiliSection({super.key, this.onSelectVideo});
+  const RecommendedBilibiliSection({
+    super.key,
+    this.onSelectVideo,
+    this.isInTodayPlan,
+  });
 
-  final void Function(String title, String url)? onSelectVideo;
+  final FutureOr<void> Function(String title, String url)? onSelectVideo;
+  final bool Function(String watchUrl)? isInTodayPlan;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -59,9 +65,10 @@ class RecommendedBilibiliSection extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              onSelectVideo != null ? '点封面或标题加入今日计划。' :
-              '点封面或标题在线播放。合集可先看第一集，再预约字幕或下载全集。'
-              '推荐片中英字幕已在云端缓存。关注仅保存在本 App，不会同步到 B 站。',
+              onSelectVideo != null
+                  ? '点「加入今日计划」可多选视频；已加入会显示状态。'
+                  : '点封面或标题在线播放。合集可先看第一集，再预约字幕或下载全集。'
+                      '推荐片中英字幕已在云端缓存。关注仅保存在本 App，不会同步到 B 站。',
               style: TextStyle(
                 fontSize: 12,
                 fontWeight: FontWeight.w600,
@@ -72,7 +79,11 @@ class RecommendedBilibiliSection extends ConsumerWidget {
             ...items.map(
               (RecommendedBilibiliCreatorDto item) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _CreatorCard(item: item, onSelectVideo: onSelectVideo),
+                child: _CreatorCard(
+                  item: item,
+                  onSelectVideo: onSelectVideo,
+                  isInTodayPlan: isInTodayPlan,
+                ),
               ),
             ),
           ],
@@ -83,9 +94,14 @@ class RecommendedBilibiliSection extends ConsumerWidget {
 }
 
 class _CreatorCard extends ConsumerStatefulWidget {
-  const _CreatorCard({required this.item, required this.onSelectVideo});
+  const _CreatorCard({
+    required this.item,
+    required this.onSelectVideo,
+    this.isInTodayPlan,
+  });
 
-  final void Function(String title, String url)? onSelectVideo;
+  final FutureOr<void> Function(String title, String url)? onSelectVideo;
+  final bool Function(String watchUrl)? isInTodayPlan;
 
   final RecommendedBilibiliCreatorDto item;
 
@@ -301,14 +317,7 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                       borderRadius: BorderRadius.circular(12),
                       onTap: _busy
                           ? null
-                          : () {
-                              final select = widget.onSelectVideo;
-                              if (select != null) {
-                                select(video.title, video.watchUrl);
-                              } else {
-                                unawaited(_openOneEpisode(video.watchUrl));
-                              }
-                            },
+                          : () => unawaited(_openOneEpisode(video.watchUrl)),
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
@@ -356,13 +365,11 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  widget.onSelectVideo == null ? '点此在线播放' : '加入今日计划',
+                                  video.hasSharedSubs ? '有云端字幕 · 点此播放' : '点此在线播放',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
-                                    color: video.hasSharedSubs
-                                        ? AppDesignTokens.brandGreen
-                                        : AppDesignTokens.textSecondary,
+                                    color: AppDesignTokens.textSecondary,
                                   ),
                                 ),
                               ],
@@ -372,6 +379,24 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                       ),
                     ),
                   ),
+                  if (widget.onSelectVideo != null) ...<Widget>[
+                    const SizedBox(width: 6),
+                    TodayPlanJoinChip(
+                      joined: widget.isInTodayPlan?.call(video.watchUrl) ?? false,
+                      busy: _busy,
+                      onPressed: () async {
+                        final FutureOr<void> Function(String, String)? select =
+                            widget.onSelectVideo;
+                        if (select == null || _busy) return;
+                        setState(() => _busy = true);
+                        try {
+                          await select(video.title, video.watchUrl);
+                        } finally {
+                          if (mounted) setState(() => _busy = false);
+                        }
+                      },
+                    ),
+                  ],
                   if (widget.onSelectVideo == null) BilibiliCollectionReservation(
                     key: ValueKey(video.watchUrl),
                     source: video.watchUrl,
@@ -386,6 +411,16 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                     icon: const Icon(Icons.download_rounded),
                   ),
                 ],
+              ),
+            ] else if (widget.onSelectVideo != null) ...<Widget>[
+              const SizedBox(height: 8),
+              Text(
+                '暂无样片可加入今日计划',
+                style: TextStyle(
+                  fontSize: 12,
+                  fontWeight: FontWeight.w600,
+                  color: AppDesignTokens.textSecondary,
+                ),
               ),
             ],
           ],

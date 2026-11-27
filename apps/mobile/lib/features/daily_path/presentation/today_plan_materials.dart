@@ -13,6 +13,50 @@ int libraryCourseDurationMinutes(LibraryCourseData course) {
   return total;
 }
 
+String libraryWatchPlanRoute(String watchUrl) => Uri(
+      path: '/library',
+      queryParameters: <String, String>{'watchUrl': watchUrl.trim()},
+    ).toString();
+
+String libraryCoursePlanRoute(String courseId) => Uri(
+      path: '/library',
+      queryParameters: <String, String>{'courseId': courseId.trim()},
+    ).toString();
+
+bool isVideoInTodayPlan({
+  required String account,
+  String? route,
+  String? watchUrl,
+  String? courseId,
+}) {
+  final List<JourneyActivity> items =
+      TodayJourneyStore(account, DateTime.now())
+          .selectedMaterials(TodayStudyTrack.video);
+  if (items.isEmpty) return false;
+  final String? normalizedRoute = route?.trim();
+  final String? normalizedUrl = watchUrl?.trim();
+  final String? normalizedCourse = courseId?.trim();
+  for (final JourneyActivity item in items) {
+    if (normalizedRoute != null &&
+        normalizedRoute.isNotEmpty &&
+        item.route == normalizedRoute) {
+      return true;
+    }
+    if (normalizedCourse != null &&
+        normalizedCourse.isNotEmpty &&
+        item.route.contains('courseId=$normalizedCourse')) {
+      return true;
+    }
+    if (normalizedUrl != null && normalizedUrl.isNotEmpty) {
+      if (item.route.contains(Uri.encodeQueryComponent(normalizedUrl)) ||
+          item.route.contains(normalizedUrl)) {
+        return true;
+      }
+    }
+  }
+  return false;
+}
+
 /// Soft gate when today's video list would get long.
 ///
 /// Triggers only when **after** adding, count **> 2** and total minutes **> 30**.
@@ -93,4 +137,55 @@ Future<String> addReadingToTodayPlan({
   }
   await store.addSelectedMaterial(TodayStudyTrack.reading, item);
   return '已加入今日计划 · ${item.title}';
+}
+
+/// Compact join / joined control for library browse cards.
+class TodayPlanJoinChip extends StatelessWidget {
+  const TodayPlanJoinChip({
+    required this.joined,
+    required this.onPressed,
+    this.busy = false,
+    super.key,
+  });
+
+  final bool joined;
+  final bool busy;
+  final VoidCallback? onPressed;
+
+  @override
+  Widget build(BuildContext context) {
+    if (joined) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        decoration: BoxDecoration(
+          color: AppDesignTokens.brandGreen.withValues(alpha: 0.14),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: AppDesignTokens.brandGreen),
+        ),
+        child: Text(
+          '已加入',
+          style: TextStyle(
+            fontSize: 12,
+            fontWeight: FontWeight.w800,
+            color: AppDesignTokens.brandGreen,
+          ),
+        ),
+      );
+    }
+    return FilledButton(
+      onPressed: busy ? null : onPressed,
+      style: FilledButton.styleFrom(
+        backgroundColor: AppDesignTokens.brandGreen,
+        foregroundColor: AppDesignTokens.onAccent,
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        visualDensity: VisualDensity.compact,
+      ),
+      child: Text(
+        busy ? '…' : '加入今日计划',
+        style: const TextStyle(fontSize: 12, fontWeight: FontWeight.w800),
+      ),
+    );
+  }
 }
