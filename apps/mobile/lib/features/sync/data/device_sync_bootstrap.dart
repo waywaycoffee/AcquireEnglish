@@ -13,6 +13,8 @@ import '../../home/presentation/read_aloud_report_provider.dart';
 import '../../exam/domain/exam_profile.dart';
 import '../../exam/presentation/exam_profile_provider.dart';
 import '../../reading/data/reading_vocab_lists.dart';
+import '../../reading/domain/reading_doc.dart';
+import '../../reading/domain/reading_shelf_prune.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../words/domain/word_review_settings.dart';
@@ -141,7 +143,9 @@ Future<void> _syncReadingBackup(
       : ReadingLibrarySnapshot.fromStateJson(cloud.state!);
 
   if (remote != null) {
-    final ReadingLibrarySnapshot merged = mergeReadingLibraries(local, remote);
+    final ReadingLibrarySnapshot merged = _shelfOzOnlySnapshot(
+      mergeReadingLibraries(local, remote),
+    );
     await (ref.read(readingLibraryProvider.notifier) as ReadingLibraryNotifier)
         .replaceUserLibraryFromCloud(
           userDocs: merged.docs,
@@ -151,6 +155,8 @@ Future<void> _syncReadingBackup(
             as ReadingVocabListsNotifier)
         .replaceFromCloud(merged.vocabLists);
     local = merged;
+  } else {
+    local = _shelfOzOnlySnapshot(local);
   }
 
   await DocumentRevisionStore.write('reading', account, cloud.revision);
@@ -173,9 +179,11 @@ Future<void> _syncReadingBackup(
         token: token,
       );
       if (again.state != null) {
-        final ReadingLibrarySnapshot merged = mergeReadingLibraries(
-          local,
-          ReadingLibrarySnapshot.fromStateJson(again.state!),
+        final ReadingLibrarySnapshot merged = _shelfOzOnlySnapshot(
+          mergeReadingLibraries(
+            local,
+            ReadingLibrarySnapshot.fromStateJson(again.state!),
+          ),
         );
         await (ref.read(readingLibraryProvider.notifier)
                 as ReadingLibraryNotifier)
@@ -196,6 +204,19 @@ Future<void> _syncReadingBackup(
       }
     }
   }
+}
+
+ReadingLibrarySnapshot _shelfOzOnlySnapshot(ReadingLibrarySnapshot snap) {
+  final List<ReadingDoc> kept = keepOnlyWizardOfOz(snap.docs);
+  final Set<String> ids = kept.map((ReadingDoc d) => d.id).toSet();
+  return ReadingLibrarySnapshot(
+    docs: kept,
+    progress: <String, ReadingProgress>{
+      for (final MapEntry<String, ReadingProgress> e in snap.progress.entries)
+        if (ids.contains(e.key)) e.key: e.value,
+    },
+    vocabLists: snap.vocabLists,
+  );
 }
 
 Future<void> _syncWordbookBackup(

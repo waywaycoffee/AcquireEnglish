@@ -99,9 +99,9 @@ class _ReadingHubScreenState extends ConsumerState<ReadingHubScreen> {
 
   List<ReadingDoc> _filteredBooks(ReadingLibraryState state) {
     final String query = _searchController.text.trim().toLowerCase();
+    // Personal shelf = user library only (no bundled A1 demo builtins).
     return <ReadingDoc>[
       ...state.userDocs.reversed,
-      ...state.builtin,
     ].where((ReadingDoc doc) {
       final double percent = state.progressFor(doc.id)?.percent ?? 0;
       final bool filterOk = _filter == 0 ||

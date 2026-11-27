@@ -13,9 +13,11 @@ import '../../sync/data/acquire_api_client.dart';
 import '../../sync/data/schedule_device_cloud_sync.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../domain/reading_doc.dart';
+import '../domain/reading_shelf_prune.dart';
 
 const String kReadingLibraryKey = 'reading_library_v1';
 const String kReadingProgressKey = 'reading_progress_v1';
+const String kReadingShelfOzOnlyKey = 'reading_shelf_oz_only_v1';
 const List<String> kBuiltinReadingAssetPaths = <String>[
   'assets/reading/a1_morning_walk.json',
   'assets/reading/a1_tech_robot.json',
@@ -142,6 +144,34 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
     if (titlesChanged) {
       unawaited(_persistLibrary(scheduleSync: false));
     }
+    unawaited(_pruneShelfToWizardOfOzIfNeeded());
+  }
+
+  /// One-shot: drop test/generated shelf books; keep only 绿野仙踪.
+  Future<void> _pruneShelfToWizardOfOzIfNeeded() async {
+    if (!Hive.isBoxOpen('prefs')) return;
+    final Box<String> box = Hive.box<String>('prefs');
+    final String flagKey = studyStorageKey(kReadingShelfOzOnlyKey, _account);
+    if (box.get(flagKey) == '1') return;
+    final List<ReadingDoc> kept = keepOnlyWizardOfOz(state.userDocs);
+    if (kept.length == state.userDocs.length &&
+        (kept.isEmpty ||
+            (kept.length == 1 && kept.first.id == state.userDocs.first.id))) {
+      await box.put(flagKey, '1');
+      return;
+    }
+    final Set<String> keepIds = kept.map((ReadingDoc d) => d.id).toSet();
+    final Map<String, ReadingProgress> progress = <String, ReadingProgress>{
+      for (final MapEntry<String, ReadingProgress> e in state.progress.entries)
+        if (keepIds.contains(e.key)) e.key: e.value,
+    };
+    state = state.copyWith(
+      userDocs: List<ReadingDoc>.unmodifiable(kept),
+      progress: progress,
+    );
+    await _persistLibrary();
+    await _persistProgress();
+    await box.put(flagKey, '1');
   }
 
   List<ReadingDoc> _loadUserDocs() {
