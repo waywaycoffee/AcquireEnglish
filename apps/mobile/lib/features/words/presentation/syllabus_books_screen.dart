@@ -23,9 +23,10 @@ import 'word_book_cover.dart';
 import 'word_book_library_theme.dart';
 
 class SyllabusBooksScreen extends ConsumerStatefulWidget {
-  const SyllabusBooksScreen({super.key, this.initialKind = SyllabusBookKind.word});
+  const SyllabusBooksScreen({super.key, this.initialKind = SyllabusBookKind.word, this.selectForStudy = false});
 
   final SyllabusBookKind initialKind;
+  final bool selectForStudy;
 
   @override
   ConsumerState<SyllabusBooksScreen> createState() => _SyllabusBooksScreenState();
@@ -98,6 +99,10 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
           .read(syllabusBooksProvider.notifier)
           .saveImportedBook(book.copyWith(builtin: false));
       if (!mounted) return;
+      if (widget.selectForStudy) {
+        await _startBook(saved);
+        return;
+      }
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -157,7 +162,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
         ),
       );
     }
-    for (final LilinjiCategory cat in kLilinjiCategories) {
+    for (final LilinjiCategory cat in widget.selectForStudy ? const <LilinjiCategory>[] : kLilinjiCategories) {
       final SyllabusBookCategory bucket = classifySyllabusBookCategory(
         title: cat.title,
         examTag: cat.tag,
@@ -267,7 +272,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
       return;
     }
     if (!context.mounted) return;
-    await startSyllabusBookSession(ref, context, book);
+    await _startBook(book);
   }
 
   /// Cover tap = start memorizing this book immediately (new learn).
@@ -278,7 +283,10 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
       await context.push(syllabusBookBrowseRoute(book.id));
       return;
     }
-    await startSyllabusBookSession(ref, context, book);
+    final overlap = await startSyllabusBookSession(
+      ref, context, book, openSession: !widget.selectForStudy,
+    );
+    if (widget.selectForStudy && mounted && overlap != null) context.pop(book.title);
   }
 
   Future<void> _confirmDelete(SyllabusBook book) async {
@@ -335,6 +343,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
     return PadScaffold(
       currentDestination: AppNavDestination.words,
       showContinueLearning: false,
+      showNavigation: !widget.selectForStudy,
       backgroundColor: theme.canvas,
       body: SafeArea(
         bottom: false,
@@ -360,7 +369,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: <Widget>[
                               Text(
-                                '词书',
+                                widget.selectForStudy ? '选择今日词书' : '词书',
                                 style: TextStyle(
                                   fontFamily: 'serif',
                                   fontSize: 28,
@@ -370,7 +379,9 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
                                 ),
                               ),
                               Text(
-                                examHint.isNotEmpty
+                                widget.selectForStudy
+                                    ? '点「选这本」设为当前词书'
+                                    : examHint.isNotEmpty
                                     ? examHint
                                     : '封面朝外 · 选一本开始背',
                                 style: TextStyle(
@@ -381,7 +392,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
                             ],
                           ),
                         ),
-                        IconButton(
+                        if (!widget.selectForStudy) IconButton(
                           tooltip: '云端书库',
                           onPressed: () => context.push(
                             '/words/syllabus/cloud?tab=${Uri.encodeComponent(_importKind.storageName)}',
@@ -418,6 +429,7 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
                     padding: const EdgeInsets.symmetric(horizontal: 14),
                     child: _MyShelf(
                       theme: theme,
+                      selectForStudy: widget.selectForStudy,
                       books: books,
                       state: state,
                       emptyLabel: '本地暂无词书，从下方挑一本',
@@ -633,6 +645,7 @@ class _BrowseRow extends StatelessWidget {
 class _MyShelf extends StatelessWidget {
   const _MyShelf({
     required this.theme,
+    required this.selectForStudy,
     required this.books,
     required this.state,
     required this.emptyLabel,
@@ -642,6 +655,7 @@ class _MyShelf extends StatelessWidget {
   });
 
   final WordBookLibraryTheme theme;
+  final bool selectForStudy;
   final List<SyllabusBook> books;
   final SyllabusBooksState state;
   final String emptyLabel;
@@ -683,6 +697,7 @@ class _MyShelf extends StatelessWidget {
                           if (i > 0) const SizedBox(width: 14),
                           _ShelfBook(
                             book: books[i],
+                            selectForStudy: selectForStudy && !isSceneMemoryBookId(books[i].id),
                             learned: state.learnedCount(books[i].id),
                             active: state.activeBookId == books[i].id,
                             onOpen: () => onOpen(books[i]),
@@ -701,7 +716,9 @@ class _MyShelf extends StatelessWidget {
           Text(
             books.isEmpty
                 ? '书架空着 · 从下方挑一本下载'
-                : '${books.length} 本 · 《情景记忆》点封面浏览 · 其它点封面开始背',
+                : selectForStudy
+                    ? '${books.length} 本'
+                    : '${books.length} 本 · 《情景记忆》点封面浏览 · 其它点封面开始背',
             style: TextStyle(color: theme.chip, fontSize: 11),
           ),
         ],
@@ -713,6 +730,7 @@ class _MyShelf extends StatelessWidget {
 class _ShelfBook extends StatelessWidget {
   const _ShelfBook({
     required this.book,
+    required this.selectForStudy,
     required this.learned,
     required this.active,
     required this.onOpen,
@@ -721,6 +739,7 @@ class _ShelfBook extends StatelessWidget {
   });
 
   final SyllabusBook book;
+  final bool selectForStudy;
   final int learned;
   final bool active;
   final VoidCallback onOpen;
@@ -759,7 +778,7 @@ class _ShelfBook extends StatelessWidget {
                 fontWeight: FontWeight.w800,
               ),
             ),
-            child: Text(remaining == 0 ? '再背' : '背词'),
+            child: Text(selectForStudy ? '选这本' : remaining == 0 ? '再背' : '背词'),
           ),
         ),
         if (onDelete != null)

@@ -22,6 +22,7 @@ class EnglishBrowseScreen extends ConsumerStatefulWidget {
   const EnglishBrowseScreen({
     this.embedded = false,
     this.initialLevel = 'A2',
+    this.onSelectVideo,
     super.key,
   });
 
@@ -30,6 +31,7 @@ class EnglishBrowseScreen extends ConsumerStatefulWidget {
   /// When true, omit Scaffold/AppBar for embedding in [LibraryScreen].
   final bool embedded;
   final String initialLevel;
+  final ValueChanged<AcquireDailyFeedItemDto>? onSelectVideo;
 
   static const List<String> cefrLevels = <String>[
     'A1',
@@ -121,6 +123,11 @@ class _EnglishBrowseScreenState extends ConsumerState<EnglishBrowseScreen> {
   }
 
   Future<void> _openFeedItem(AcquireDailyFeedItemDto item) async {
+    final ValueChanged<AcquireDailyFeedItemDto>? select = widget.onSelectVideo;
+    if (select != null) {
+      select(item);
+      return;
+    }
     await openEnglishBrowsePreview(context, ref, item: item);
   }
 
@@ -133,6 +140,10 @@ class _EnglishBrowseScreenState extends ConsumerState<EnglishBrowseScreen> {
       author: entry.author,
       coverUrl: entry.coverUrl.isEmpty ? null : entry.coverUrl,
     );
+    if (widget.onSelectVideo != null) {
+      widget.onSelectVideo!(feedItem);
+      return;
+    }
     if (entry.episodeId.isNotEmpty) {
       final bool exists = ref.read(libraryCatalogProvider).any(
             (LibraryCourseData c) =>

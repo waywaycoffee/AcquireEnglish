@@ -269,6 +269,26 @@ String libraryCourseDisplayTitle(
   return courseTitle.isNotEmpty ? courseTitle : '未命名课程';
 }
 
+LibraryEpisodeItem? nextStudyEpisode(
+  LibraryCourseData course, {
+  String? lastEpisodeId,
+}) {
+  final List<LibraryEpisodeItem> available = course.episodes
+      .where((LibraryEpisodeItem episode) => !episode.videoMissing)
+      .toList(growable: false);
+  bool unfinished(LibraryEpisodeItem episode) =>
+      !episode.completed && episode.progressPercent < 95;
+  final int recent = available.indexWhere((episode) => episode.id == lastEpisodeId);
+  if (recent >= 0) {
+    final LibraryEpisodeItem? next = available.skip(recent)
+        .where(unfinished).firstOrNull;
+    if (next != null) return next;
+  }
+  return available.where((episode) => unfinished(episode) && episode.progressPercent > 0).firstOrNull ??
+      available.where(unfinished).firstOrNull ??
+      available.lastOrNull;
+}
+
 const LibraryCourseData emptyLibraryCourse = LibraryCourseData(
   id: '',
   title: '',

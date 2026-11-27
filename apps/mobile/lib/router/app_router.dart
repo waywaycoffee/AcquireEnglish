@@ -496,6 +496,7 @@ GoRouter goRouter(Ref ref) {
         final String tab = (state.uri.queryParameters['tab'] ?? '').trim();
         return LibraryScreen(
           initialView: _parseLibraryView(initialView),
+          selectForStudy: state.uri.queryParameters['selectForStudy'] == '1',
           initialShelfTab: switch (tab) {
             'drama' => LibraryShelfTab.drama,
             'english' || 'browse' || 'english-browse' =>
@@ -655,7 +656,10 @@ GoRouter goRouter(Ref ref) {
         final SyllabusBookKind kind = SyllabusBookKind.fromName(
           tab.isEmpty ? 'word' : tab,
         );
-        return SyllabusBooksScreen(initialKind: kind);
+        return SyllabusBooksScreen(
+          initialKind: kind,
+          selectForStudy: state.uri.queryParameters['selectForStudy'] == '1',
+        );
       },
     ).fade(),
     GoRoute(

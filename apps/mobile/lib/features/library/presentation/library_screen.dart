@@ -90,10 +90,12 @@ class LibraryScreen extends ConsumerStatefulWidget {
     this.initialEpisodeId,
     this.pickCoverImage,
     this.openTranscriptReader,
+    this.selectForStudy = false,
   });
 
   final LibraryScreenView initialView;
   final LibraryShelfTab initialShelfTab;
+  final bool selectForStudy;
   final String? initialCourseId;
   final String? initialEpisodeId;
   final Future<String?> Function()? pickCoverImage;
@@ -267,7 +269,33 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
     }
   }
 
+  void _selectRemoteVideo(AcquireDailyFeedItemDto item) =>
+      _selectRemoteLink(item.title, item.watchUrl);
+
+  void _selectRemoteLink(String title, String url) {
+    if (url.trim().isEmpty) return;
+    context.pop((
+      title: title,
+      route: Uri(path: '/library', queryParameters: <String, String>{
+        'watchUrl': url,
+      }).toString(),
+    ));
+  }
+
+  void _selectCourse(LibraryCourseData course) {
+    context.pop((
+      title: libraryCourseDisplayTitle(course),
+      route: Uri(path: '/library', queryParameters: <String, String>{
+        'courseId': course.id,
+      }).toString(),
+    ));
+  }
+
   Future<void> _openBilibiliSearchHit(AcquireDailyFeedItemDto hit) async {
+    if (widget.selectForStudy) {
+      _selectRemoteVideo(hit);
+      return;
+    }
     await openBilibiliLearningOrImport(
       context,
       ref,
@@ -472,7 +500,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
         ref.watch(continueLearningTargetProvider) != null;
     return PadScaffold(
       // Always show: morphs to「补字幕」while fill jobs run (detail + list).
-      showContinueLearning: true,
+      showContinueLearning: !widget.selectForStudy,
+      showNavigation: !widget.selectForStudy,
       currentDestination: AppNavDestination.library,
       topBar: PadTopBar(
         title: showImport
@@ -493,7 +522,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   ? '暂无剧集'
                   : '第 ${activeEpisode.numberStr} 集'
             : '影视库',
-        description: showImport
+        description: widget.selectForStudy
+            ? '选一条视频或合集加入今日计划'
+            : showImport
             ? '把本地视频和字幕整理成新的学习片库。'
             : showDetail
             ? null
@@ -505,7 +536,9 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 LibraryShelfTab.youtube => '英语教育精选 · 按难度 · 需自备梯子',
                 LibraryShelfTab.dubbing => '看过的视频切成 1–3 分钟 · 人声分离配音',
               },
-        leading: showImport
+        leading: widget.selectForStudy
+            ? BackButton(onPressed: () => context.pop())
+            : showImport
             ? AnimatedBuilder(
                 animation: importFlowController,
                 builder: (BuildContext context, _) {
@@ -1417,12 +1450,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                             '美剧',
                             Icons.live_tv_outlined,
                           ),
-                          (
+                          if (!widget.selectForStudy) (
                             LibraryShelfTab.youtube,
                             'YouTube',
                             Icons.ondemand_video_rounded,
                           ),
-                          (
+                          if (!widget.selectForStudy) (
                             LibraryShelfTab.dubbing,
                             '配音',
                             Icons.mic_none_rounded,
@@ -1453,6 +1486,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                   child: shelfTab == LibraryShelfTab.drama
                       ? DramaHubScreen(
                           embedded: true,
+                          onSelectCourse: widget.selectForStudy ? _selectCourse : null,
                           onSwitchToVideos: () {
                             setState(() {
                               shelfTab = LibraryShelfTab.bilibili;
@@ -1460,7 +1494,7 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                           },
                         )
                       : shelfTab == LibraryShelfTab.englishBrowse
-                      ? const EnglishBrowseScreen(embedded: true)
+                      ? EnglishBrowseScreen(embedded: true, onSelectVideo: widget.selectForStudy ? _selectRemoteVideo : null)
                       : shelfTab == LibraryShelfTab.youtube
                       ? const YoutubeBrowseScreen(embedded: true)
                       : shelfTab == LibraryShelfTab.dubbing
@@ -1682,11 +1716,11 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 if (shelfTab == LibraryShelfTab.bilibili) ...<Widget>[
                   // Keep import actions on their own full-width row so B站 is
                   // never clipped by the phone's right edge. Same entry as 首页.
-                  CourseImportActionButtons(
+                  if (!widget.selectForStudy) CourseImportActionButtons(
                     enabled: !editMode,
                     showYoutube: false,
                   ),
-                  if (!editMode) ...<Widget>[
+                  if (!editMode && !widget.selectForStudy) ...<Widget>[
                     const SizedBox(height: 18),
                     Material(
                       color: AppDesignTokens.brandGreenDark.withValues(
@@ -1730,8 +1764,12 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                         ),
                       ),
                     ),
+                  ],
+                  if (!editMode) ...<Widget>[
                     const SizedBox(height: 18),
-                    const RecommendedBilibiliSection(),
+                    RecommendedBilibiliSection(
+                      onSelectVideo: widget.selectForStudy ? _selectRemoteLink : null,
+                    ),
                   ],
                 ],
                 if (shelfTab == LibraryShelfTab.bilibili &&
@@ -2376,6 +2414,10 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   }
 
   void _handleCourseTap(LibraryCourseData course) {
+    if (widget.selectForStudy) {
+      _selectCourse(course);
+      return;
+    }
     if (!editMode) {
       _openCourse(course);
       return;

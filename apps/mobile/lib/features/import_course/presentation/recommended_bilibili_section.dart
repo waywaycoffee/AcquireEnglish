@@ -15,7 +15,9 @@ import 'bilibili_collection_reservation.dart';
 
 /// Curated Bilibili UPs + sample videos on the import / 视频学习 page.
 class RecommendedBilibiliSection extends ConsumerWidget {
-  const RecommendedBilibiliSection({super.key});
+  const RecommendedBilibiliSection({super.key, this.onSelectVideo});
+
+  final void Function(String title, String url)? onSelectVideo;
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -57,6 +59,7 @@ class RecommendedBilibiliSection extends ConsumerWidget {
             ),
             const SizedBox(height: 4),
             Text(
+              onSelectVideo != null ? '点封面或标题加入今日计划。' :
               '点封面或标题在线播放。合集可先看第一集，再预约字幕或下载全集。'
               '推荐片中英字幕已在云端缓存。关注仅保存在本 App，不会同步到 B 站。',
               style: TextStyle(
@@ -69,7 +72,7 @@ class RecommendedBilibiliSection extends ConsumerWidget {
             ...items.map(
               (RecommendedBilibiliCreatorDto item) => Padding(
                 padding: const EdgeInsets.only(bottom: 12),
-                child: _CreatorCard(item: item),
+                child: _CreatorCard(item: item, onSelectVideo: onSelectVideo),
               ),
             ),
           ],
@@ -80,7 +83,9 @@ class RecommendedBilibiliSection extends ConsumerWidget {
 }
 
 class _CreatorCard extends ConsumerStatefulWidget {
-  const _CreatorCard({required this.item});
+  const _CreatorCard({required this.item, required this.onSelectVideo});
+
+  final void Function(String title, String url)? onSelectVideo;
 
   final RecommendedBilibiliCreatorDto item;
 
@@ -296,7 +301,14 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                       borderRadius: BorderRadius.circular(12),
                       onTap: _busy
                           ? null
-                          : () => unawaited(_openOneEpisode(video.watchUrl)),
+                          : () {
+                              final select = widget.onSelectVideo;
+                              if (select != null) {
+                                select(video.title, video.watchUrl);
+                              } else {
+                                unawaited(_openOneEpisode(video.watchUrl));
+                              }
+                            },
                       child: Row(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: <Widget>[
@@ -344,9 +356,7 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                                 ),
                                 const SizedBox(height: 4),
                                 Text(
-                                  video.hasSharedSubs
-                                      ? '点此在线播放'
-                                      : '点此在线播放',
+                                  widget.onSelectVideo == null ? '点此在线播放' : '加入今日计划',
                                   style: TextStyle(
                                     fontSize: 11,
                                     fontWeight: FontWeight.w700,
@@ -362,11 +372,11 @@ class _CreatorCardState extends ConsumerState<_CreatorCard> {
                       ),
                     ),
                   ),
-                  BilibiliCollectionReservation(
+                  if (widget.onSelectVideo == null) BilibiliCollectionReservation(
                     key: ValueKey(video.watchUrl),
                     source: video.watchUrl,
                   ),
-                  IconButton(
+                  if (widget.onSelectVideo == null) IconButton(
                     tooltip: '下载合集全部视频',
                     onPressed: _busy
                         ? null

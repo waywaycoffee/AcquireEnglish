@@ -70,7 +70,7 @@ void main() {
     expect(find.textContaining('第 1'), findsNothing);
     expect(find.text('英语之旅'), findsNothing);
 
-    expect(find.text('测试词书'), findsOneWidget);
+    expect(find.textContaining('测试词书'), findsOneWidget);
     expect(find.text('自由拍照学词'), findsOneWidget);
     await tester.tap(find.text('今日学习'));
     await tester.pumpAndSettle();

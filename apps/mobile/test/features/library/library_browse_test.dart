@@ -35,6 +35,36 @@ LibraryCourseData _course({
 }
 
 void main() {
+  test('study selection resumes a series and skips completed or missing episodes', () {
+    LibraryEpisodeItem episode(String id, int progress, {bool missing = false}) =>
+        LibraryEpisodeItem(
+          id: id,
+          numberStr: id,
+          title: id,
+          durationMinutes: 22,
+          hasChineseSubtitles: false,
+          hasEnglishSubtitles: false,
+          completed: progress == 100,
+          progressPercent: progress,
+          coverImage: '',
+          videoMissing: missing,
+        );
+
+    final LibraryCourseData course = _course(
+      id: 'show',
+      title: 'Show',
+      episodes: <LibraryEpisodeItem>[
+        episode('1', 100),
+        episode('2', 0, missing: true),
+        episode('3', 42),
+        episode('4', 0),
+      ],
+    );
+    expect(nextStudyEpisode(course, lastEpisodeId: '1')?.id, '3');
+    expect(nextStudyEpisode(course, lastEpisodeId: '3')?.id, '3');
+    expect(nextStudyEpisode(course)?.id, '3');
+  });
+
   test('search matches title, category, source and episode titles', () {
     final LibraryCourseData course = _course(
       id: 'c1',

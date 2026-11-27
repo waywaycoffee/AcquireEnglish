@@ -40,8 +40,9 @@ Future<SyllabusImportOverlap?> activateBookWithOverlap(
 Future<SyllabusImportOverlap?> startSyllabusBookSession(
   WidgetRef ref,
   BuildContext context,
-  SyllabusBook book,
-) async {
+  SyllabusBook book, {
+  bool openSession = true,
+}) async {
   final SyllabusBooksState books = ref.read(syllabusBooksProvider);
   final SyllabusBook? current = books.activeBook;
   if (current != null && current.id != book.id && !books.isComplete(current)) {
@@ -77,7 +78,7 @@ Future<SyllabusImportOverlap?> startSyllabusBookSession(
     );
     return null;
   }
-  await context.push(syllabusBookSessionRoute(book.id));
+  if (openSession) await context.push(syllabusBookSessionRoute(book.id));
   return overlap;
 }
 

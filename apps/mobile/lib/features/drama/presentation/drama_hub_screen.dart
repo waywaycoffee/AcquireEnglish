@@ -36,10 +36,12 @@ class DramaHubScreen extends ConsumerStatefulWidget {
   const DramaHubScreen({
     this.embedded = false,
     this.onSwitchToVideos,
+    this.onSelectCourse,
     super.key,
   });
 
   final bool embedded;
+  final ValueChanged<LibraryCourseData>? onSelectCourse;
   final VoidCallback? onSwitchToVideos;
 
   @override
@@ -433,6 +435,10 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
             ],
             onChanged: (String? id) {
               if (id == null) return;
+              if (widget.onSelectCourse != null) {
+                widget.onSelectCourse!(importedShelf.firstWhere((course) => course.id == id));
+                return;
+              }
               setState(() {
                 _selectedCatalogEntryId = null;
                 _selectedCourseId = id;
@@ -468,6 +474,10 @@ class _DramaHubScreenState extends ConsumerState<DramaHubScreen> {
     LibraryCourseData? owned,
   ) async {
     if (owned != null && owned.episodes.isNotEmpty) {
+      if (widget.onSelectCourse != null) {
+        widget.onSelectCourse!(owned);
+        return;
+      }
       setState(() {
         _selectedCatalogEntryId = entry.id;
         _selectedCourseId = owned.id;

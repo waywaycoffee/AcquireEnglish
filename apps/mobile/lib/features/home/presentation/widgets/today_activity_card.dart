@@ -6,6 +6,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../authentication/presentation/account_storage.dart';
+import '../../../community/data/english_browse_actions.dart';
 import '../../../daily_path/data/journey_reminder.dart';
 import '../../../daily_path/data/today_journey_store.dart';
 import '../../../daily_path/domain/today_task.dart';
@@ -247,7 +248,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       );
     }
     return const JourneyTask(
-      route: '/words/syllabus',
+      route: '/words/syllabus?selectForStudy=1',
       title: '选择一本词书',
       module: LearnModule.vocab,
     );
@@ -430,11 +431,13 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
             alreadyDone: store.oralIntroDone,
             markDone: store.markOralIntroDone,
           );
+        } else if ((step, store.selectedMaterial(TodayStudyTrack.video))
+            case (TodayLearningStep.video, final JourneyActivity selected)) {
+          await _openSelectedVideo(selected);
         } else {
           final String route = switch (step) {
             TodayLearningStep.newWords => _vocabPursuit()!.route,
-            TodayLearningStep.video => store.selectedMaterial(TodayStudyTrack.video)?.route ??
-                _videoPursuit()?.route ?? '/library',
+            TodayLearningStep.video => _videoPursuit()?.route ?? '/library',
             TodayLearningStep.reviewWords => '/review/session?due=1&kind=word',
             TodayLearningStep.reading => store.selectedMaterial(TodayStudyTrack.reading)?.route ??
                 _readingPursuit()!.route,
@@ -617,6 +620,43 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     );
   }
 
+  Future<void> _openSelectedVideo(JourneyActivity selected) async {
+    final Uri uri = Uri.parse(selected.route);
+    final String? url = uri.queryParameters['watchUrl'];
+    String? episodeId = uri.pathSegments.firstOrNull == 'episodes'
+        ? uri.pathSegments.lastOrNull : null;
+    if (url != null) {
+      try {
+        episodeId = await ensureEnglishBrowseEpisode(ref, item: AcquireDailyFeedItemDto(
+          id: url, bvid: '', title: selected.title, watchUrl: url, author: '',
+        ));
+      } catch (_) {
+        // The source may be temporarily unavailable.
+      }
+    }
+    if (!mounted) return;
+    final String? courseId = uri.queryParameters['courseId'];
+    final LibraryCourseData? course = ref.read(libraryCatalogProvider).where(
+      (LibraryCourseData course) => course.id == courseId ||
+          (episodeId != null && course.episodes.any((episode) => episode.id == episodeId)),
+    ).firstOrNull;
+    final LibraryEpisodeItem? episode = course == null ? null : nextStudyEpisode(
+      course,
+      lastEpisodeId: ref.read(lastLearningEpisodeProvider),
+    );
+    final String? id = episode?.id ?? (course == null ? episodeId : null);
+    if (id == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('暂时无法播放这项素材，可重试或重新选择。')),
+      );
+      return;
+    }
+    await context.push(Uri(
+      pathSegments: <String>['', 'episodes', id],
+      queryParameters: course == null ? null : <String, String>{'courseId': course.id},
+    ).toString());
+  }
+
   Future<void> _chooseStudyMaterial() async {
     final String account = ref.read(studyAccountProvider);
     final TodayJourneyStore store = TodayJourneyStore(account, DateTime.now());
@@ -645,7 +685,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               ListTile(
                 leading: const Icon(Icons.menu_book_outlined),
                 title: const Text('选择要背的词书'),
-                onTap: () => Navigator.pop(sheetContext, '/words/syllabus'),
+                onTap: () => Navigator.pop(sheetContext, '/words/syllabus?selectForStudy=1'),
               ),
               ListTile(
                 leading: const Icon(Icons.photo_camera_outlined),
@@ -662,7 +702,9 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       final TodayStudyTrack track = route == 'select-video'
           ? TodayStudyTrack.video
           : TodayStudyTrack.reading;
-      final JourneyActivity? selected = await _pickMaterial(track, store);
+      final JourneyActivity? selected = track == TodayStudyTrack.video
+          ? await context.push<JourneyActivity>('/library?selectForStudy=1')
+          : await _pickReadingMaterial(store);
       if (selected == null || !mounted || ref.read(studyAccountProvider) != account) return;
       await store.saveSelectedMaterial(track, selected);
       if (!mounted) return;
@@ -671,35 +713,24 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         SnackBar(content: Text('已加入今日计划 · ${selected.title}')),
       );
     } else {
-      await context.push(route);
+      final String? title = await context.push<String>(route);
+      if (mounted && title != null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('已设为当前词书 · $title')),
+        );
+      }
     }
   }
 
-  Future<JourneyActivity?> _pickMaterial(
-    TodayStudyTrack track,
+  Future<JourneyActivity?> _pickReadingMaterial(
     TodayJourneyStore store,
   ) {
-    final bool video = track == TodayStudyTrack.video;
-    final List<JourneyActivity> options = video
-        ? <JourneyActivity>[
-            for (final LibraryCourseData course in ref.read(libraryCatalogProvider))
-              for (final LibraryEpisodeItem episode in course.episodes)
-                if (!episode.videoMissing)
-                  (
-                    title: course.episodes.length == 1
-                        ? libraryEpisodeDisplayTitle(course, episode)
-                        : '${libraryCourseDisplayTitle(course)} · 第 ${episode.numberStr} 集 · ${libraryEpisodeDisplayTitle(course, episode)}',
-                    route: '/episodes/${Uri.encodeComponent(episode.id)}',
-                  ),
-          ]
-        : <JourneyActivity>[
-            for (final ReadingDoc doc in ref.read(readingLibraryProvider).all)
-              (
-                title: doc.displayTitle,
-                route: '/reading/${Uri.encodeComponent(doc.id)}',
-              ),
-          ];
-    final String? selectedRoute = store.selectedMaterial(track)?.route;
+    final List<JourneyActivity> options = <JourneyActivity>[
+      for (final ReadingDoc doc in ref.read(readingLibraryProvider).all)
+        (title: doc.displayTitle, route: '/reading/${Uri.encodeComponent(doc.id)}'),
+    ];
+    final String? selectedRoute =
+        store.selectedMaterial(TodayStudyTrack.reading)?.route;
     return showModalBottomSheet<JourneyActivity>(
       context: context,
       isScrollControlled: true,
@@ -710,11 +741,11 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           height: MediaQuery.sizeOf(sheetContext).height * 0.65,
           child: Column(
             children: <Widget>[
-              ListTile(title: Text(video ? '选择要看的视频' : '选择要读的书')),
+              const ListTile(title: Text('选择要读的书')),
               if (options.isEmpty)
                 Padding(
                   padding: const EdgeInsets.all(16),
-                  child: Text(video ? '视频库里还没有可选的视频。' : '书库里还没有可选的读物。'),
+                  child: const Text('书库里还没有可选的读物。'),
                 )
               else
                 Expanded(
@@ -822,7 +853,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                     }
                     context.push(syllabusBookBrowseRoute(activeBook.id));
                   },
-                  onPickActive: () => context.push('/words/syllabus'),
+                  onPickActive: () => context.push('/words/syllabus?selectForStudy=1'),
                 ),
                 TextButton.icon(
                   onPressed: () => context.push('/digital-human?sceneMenu=1'),
