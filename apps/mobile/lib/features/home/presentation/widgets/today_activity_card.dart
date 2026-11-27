@@ -432,9 +432,11 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         } else {
           final String route = switch (step) {
             TodayLearningStep.newWords => _vocabPursuit()!.route,
-            TodayLearningStep.video => _videoPursuit()?.route ?? '/library',
+            TodayLearningStep.video => store.selectedMaterial(TodayStudyTrack.video)?.route ??
+                _videoPursuit()?.route ?? '/library',
             TodayLearningStep.reviewWords => '/review/session?due=1&kind=word',
-            TodayLearningStep.reading => _readingPursuit()!.route,
+            TodayLearningStep.reading => store.selectedMaterial(TodayStudyTrack.reading)?.route ??
+                _readingPursuit()!.route,
             TodayLearningStep.photoChat => '/digital-human?sceneMenu=1',
           };
           await context.push(route);
@@ -615,6 +617,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
   }
 
   Future<void> _chooseStudyMaterial() async {
+    final String account = ref.read(studyAccountProvider);
+    final TodayJourneyStore store = TodayJourneyStore(account, DateTime.now());
     final String? route = await showModalBottomSheet<String>(
       context: context,
       showDragHandle: true,
@@ -628,12 +632,14 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               ListTile(
                 leading: const Icon(Icons.play_circle_outline),
                 title: const Text('选择要看的视频'),
-                onTap: () => Navigator.pop(sheetContext, '/library'),
+                subtitle: Text(store.selectedMaterial(TodayStudyTrack.video)?.title ?? '尚未选择'),
+                onTap: () => Navigator.pop(sheetContext, 'select-video'),
               ),
               ListTile(
                 leading: const Icon(Icons.auto_stories_outlined),
                 title: const Text('选择要读的书'),
-                onTap: () => Navigator.pop(sheetContext, '/reading'),
+                subtitle: Text(store.selectedMaterial(TodayStudyTrack.reading)?.title ?? '尚未选择'),
+                onTap: () => Navigator.pop(sheetContext, 'select-reading'),
               ),
               ListTile(
                 leading: const Icon(Icons.menu_book_outlined),
@@ -650,7 +656,86 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         ),
       ),
     );
-    if (route != null && mounted) await context.push(route);
+    if (route == null || !mounted || ref.read(studyAccountProvider) != account) return;
+    if (route == 'select-video' || route == 'select-reading') {
+      final TodayStudyTrack track = route == 'select-video'
+          ? TodayStudyTrack.video
+          : TodayStudyTrack.reading;
+      final JourneyActivity? selected = await _pickMaterial(track, store);
+      if (selected == null || !mounted || ref.read(studyAccountProvider) != account) return;
+      await store.saveSelectedMaterial(track, selected);
+      if (!mounted) return;
+      setState(() {});
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('已加入今日计划 · ${selected.title}')),
+      );
+    } else {
+      await context.push(route);
+    }
+  }
+
+  Future<JourneyActivity?> _pickMaterial(
+    TodayStudyTrack track,
+    TodayJourneyStore store,
+  ) {
+    final bool video = track == TodayStudyTrack.video;
+    final List<JourneyActivity> options = video
+        ? <JourneyActivity>[
+            for (final LibraryCourseData course in ref.read(libraryCatalogProvider))
+              for (final LibraryEpisodeItem episode in course.episodes)
+                if (!episode.videoMissing)
+                  (
+                    title: course.episodes.length == 1
+                        ? libraryEpisodeDisplayTitle(course, episode)
+                        : '${libraryCourseDisplayTitle(course)} · 第 ${episode.numberStr} 集 · ${libraryEpisodeDisplayTitle(course, episode)}',
+                    route: '/episodes/${Uri.encodeComponent(episode.id)}',
+                  ),
+          ]
+        : <JourneyActivity>[
+            for (final ReadingDoc doc in ref.read(readingLibraryProvider).all)
+              (
+                title: doc.displayTitle,
+                route: '/reading/${Uri.encodeComponent(doc.id)}',
+              ),
+          ];
+    final String? selectedRoute = store.selectedMaterial(track)?.route;
+    return showModalBottomSheet<JourneyActivity>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) => SafeArea(
+        top: false,
+        child: SizedBox(
+          height: MediaQuery.sizeOf(sheetContext).height * 0.65,
+          child: Column(
+            children: <Widget>[
+              ListTile(title: Text(video ? '选择要看的视频' : '选择要读的书')),
+              if (options.isEmpty)
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Text(video ? '视频库里还没有可选的视频。' : '书库里还没有可选的读物。'),
+                )
+              else
+                Expanded(
+                  child: ListView.builder(
+                    itemCount: options.length,
+                    itemBuilder: (BuildContext context, int index) {
+                      final JourneyActivity option = options[index];
+                      return ListTile(
+                        title: Text(option.title),
+                        trailing: Icon(option.route == selectedRoute
+                            ? Icons.check_circle_outline
+                            : Icons.add_circle_outline),
+                        onTap: () => Navigator.pop(sheetContext, option),
+                      );
+                    },
+                  ),
+                ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   @override
@@ -749,6 +834,12 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                   icon: const Icon(Icons.photo_camera_outlined),
                   label: const Text('自由拍照学词'),
                 ),
+                for (final TodayStudyTrack track in <TodayStudyTrack>[
+                  TodayStudyTrack.video,
+                  TodayStudyTrack.reading,
+                ])
+                  if (store.selectedMaterial(track) case final JourneyActivity item)
+                    Text('${track == TodayStudyTrack.video ? '今日视频' : '今日读物'} · ${item.title}'),
                 if (plan.quotasConfigured) ...<Widget>[
                   const SizedBox(height: 16),
                   _QuotaProgressRow(

@@ -23,6 +23,20 @@ void main() {
       const JourneyActivity video = (route: '/episodes/42', title: 'Travel');
       final TodayJourneyStore journey = TodayJourneyStore('learner', today);
 
+      await journey.saveSelectedMaterial(TodayStudyTrack.video, video);
+      const JourneyActivity reading = (route: '/reading/book', title: 'Book');
+      await journey.saveSelectedMaterial(TodayStudyTrack.reading, reading);
+      expect(journey.selectedMaterial(TodayStudyTrack.video), video);
+      expect(journey.selectedMaterial(TodayStudyTrack.reading), reading);
+      expect(journey.activity, isNull);
+      expect(
+        TodayJourneyStore(
+          'learner',
+          tomorrow,
+        ).selectedMaterial(TodayStudyTrack.video),
+        isNull,
+      );
+
       expect(journey.learningOrder, TodayLearningStep.values);
       await journey.saveLearningOrder(<TodayLearningStep>[
         TodayLearningStep.reading,

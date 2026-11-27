@@ -181,6 +181,24 @@ class TodayJourneyStore {
     await _write(<String, Object?>{..._read(), 'oralIntroDone': true});
   }
 
+  JourneyActivity? selectedMaterial(TodayStudyTrack track) {
+    final Object? value = _read()['material-${track.name}'];
+    if (value is! Map<String, dynamic>) return null;
+    final Object? route = value['route'];
+    final Object? title = value['title'];
+    return route is String && title is String ? (route: route, title: title) : null;
+  }
+
+  Future<void> saveSelectedMaterial(TodayStudyTrack track, JourneyActivity item) {
+    return _write(<String, Object?>{
+      ..._read(),
+      'material-${track.name}': <String, String>{
+        'route': item.route,
+        'title': item.title,
+      },
+    });
+  }
+
   List<TodayLearningStep> get learningOrder {
     final Object? saved = _read()['learningOrder'];
     if (saved is! List<Object?>) return TodayLearningStep.values;
