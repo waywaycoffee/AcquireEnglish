@@ -23,12 +23,15 @@ val patchMediaKitDisposeRace = tasks.register("patchMediaKitDisposeRace") {
     doLast {
         val pubCache = System.getenv("PUB_CACHE")?.let(::File)
             ?: File(System.getProperty("user.home"), ".pub-cache")
-        val packageDir = File(pubCache, "hosted/pub.dev/media_kit-1.2.6")
-        require(packageDir.isDirectory) {
-            "media_kit 1.2.6 is missing from $packageDir; run flutter pub get first."
+        val packageDirs = listOf(
+            File(pubCache, "hosted/pub.dev/media_kit-1.2.6"),
+            File(pubCache, "hosted/pub.flutter-io.cn/media_kit-1.2.6"),
+        ).filter { it.isDirectory }
+        require(packageDirs.isNotEmpty()) {
+            "media_kit 1.2.6 is missing under $pubCache/hosted; run flutter pub get first."
         }
 
-        fun patch(relative: String, old: String, replacement: String) {
+        fun patch(packageDir: File, relative: String, old: String, replacement: String) {
             val target = File(packageDir, relative)
             val source = target.readText()
             val marker = replacement.lineSequence()
@@ -51,71 +54,78 @@ val patchMediaKitDisposeRace = tasks.register("patchMediaKitDisposeRace") {
             )
         }
 
-        patch(
-            "lib/src/player/native/core/initializer_native_callable.dart",
-            """
-  void dispose(Pointer<generated.mpv_handle> ctx) {
-    _locks.remove(ctx.address);
-    _eventCallbacks.remove(ctx.address);
-
-    // Clear the wakeup callback in libmpv before closing NativeCallable
-    // to prevent libmpv from invoking a deleted callback
-    mpv.mpv_set_wakeup_callback(ctx, nullptr, nullptr);
-
-    _wakeUpNativeCallables.remove(ctx.address)?.close();
-  }
-""".trimIndent(),
-            """
-  WakeUpNativeCallable? dispose(Pointer<generated.mpv_handle> ctx) {
-    _locks.remove(ctx.address);
-    _eventCallbacks.remove(ctx.address);
-
-    // Stop new wakeups, but keep the callable alive until mpv's thread joins.
-    mpv.mpv_set_wakeup_callback(ctx, nullptr, nullptr);
-    return _wakeUpNativeCallables.remove(ctx.address);
-  }
-""".trimIndent(),
-        )
-        patch(
-            "lib/src/player/native/core/initializer.dart",
-            """
-  void dispose(Pointer<generated.mpv_handle> ctx) {
-    if (!isExecmemRestricted) {
-      InitializerNativeCallable(mpv).dispose(ctx);
-    } else {
-      InitializerIsolate().dispose(mpv, ctx);
-    }
-  }
-""".trimIndent(),
-            """
-  WakeUpNativeCallable? dispose(Pointer<generated.mpv_handle> ctx) {
-    if (!isExecmemRestricted) {
-      return InitializerNativeCallable(mpv).dispose(ctx);
-    } else {
-      InitializerIsolate().dispose(mpv, ctx);
-      return null;
-    }
-  }
-""".trimIndent(),
-        )
-        patch(
-            "lib/src/player/native/player/real.dart",
-            """
-      Initializer(mpv).dispose(ctx);
-
-      Future.delayed(const Duration(seconds: 5), () {
-        mpv.mpv_terminate_destroy(ctx);
-      });
-""".trimIndent(),
-            """
-      final callable = Initializer(mpv).dispose(ctx);
-
-      Future.delayed(const Duration(seconds: 5), () {
-        mpv.mpv_terminate_destroy(ctx);
-        callable?.close();
-      });
-""".trimIndent(),
-        )
+        // Keep Dart indentation exact — do not use trimIndent() (it eats the
+        // method-level indent and then fails to match pub.dev sources).
+        for (packageDir in packageDirs) {
+            patch(
+                packageDir,
+                "lib/src/player/native/core/initializer_native_callable.dart",
+                listOf(
+                    "  void dispose(Pointer<generated.mpv_handle> ctx) {",
+                    "    _locks.remove(ctx.address);",
+                    "    _eventCallbacks.remove(ctx.address);",
+                    "",
+                    "    // Clear the wakeup callback in libmpv before closing NativeCallable",
+                    "    // to prevent libmpv from invoking a deleted callback",
+                    "    mpv.mpv_set_wakeup_callback(ctx, nullptr, nullptr);",
+                    "",
+                    "    _wakeUpNativeCallables.remove(ctx.address)?.close();",
+                    "  }",
+                ).joinToString("\n"),
+                listOf(
+                    "  WakeUpNativeCallable? dispose(Pointer<generated.mpv_handle> ctx) {",
+                    "    _locks.remove(ctx.address);",
+                    "    _eventCallbacks.remove(ctx.address);",
+                    "",
+                    "    // Stop new wakeups, but keep the callable alive until mpv's thread joins.",
+                    "    mpv.mpv_set_wakeup_callback(ctx, nullptr, nullptr);",
+                    "    return _wakeUpNativeCallables.remove(ctx.address);",
+                    "  }",
+                ).joinToString("\n"),
+            )
+            patch(
+                packageDir,
+                "lib/src/player/native/core/initializer.dart",
+                listOf(
+                    "  void dispose(Pointer<generated.mpv_handle> ctx) {",
+                    "    if (!isExecmemRestricted) {",
+                    "      InitializerNativeCallable(mpv).dispose(ctx);",
+                    "    } else {",
+                    "      InitializerIsolate().dispose(mpv, ctx);",
+                    "    }",
+                    "  }",
+                ).joinToString("\n"),
+                listOf(
+                    "  WakeUpNativeCallable? dispose(Pointer<generated.mpv_handle> ctx) {",
+                    "    if (!isExecmemRestricted) {",
+                    "      return InitializerNativeCallable(mpv).dispose(ctx);",
+                    "    } else {",
+                    "      InitializerIsolate().dispose(mpv, ctx);",
+                    "      return null;",
+                    "    }",
+                    "  }",
+                ).joinToString("\n"),
+            )
+            patch(
+                packageDir,
+                "lib/src/player/native/player/real.dart",
+                listOf(
+                    "      Initializer(mpv).dispose(ctx);",
+                    "",
+                    "      Future.delayed(const Duration(seconds: 5), () {",
+                    "        mpv.mpv_terminate_destroy(ctx);",
+                    "      });",
+                ).joinToString("\n"),
+                listOf(
+                    "      final callable = Initializer(mpv).dispose(ctx);",
+                    "",
+                    "      Future.delayed(const Duration(seconds: 5), () {",
+                    "        mpv.mpv_terminate_destroy(ctx);",
+                    "        callable?.close();",
+                    "      });",
+                ).joinToString("\n"),
+            )
+        }
     }
 }
 
