@@ -58,6 +58,7 @@ import '../domain/weakest_rating.dart';
 import 'daily_review_provider.dart';
 import 'foundation_media_video_sheet.dart';
 import 'fsrs_sd_meter.dart';
+import 'new_word_session.dart';
 import 'review_source_context_panel.dart';
 import 'review_spelling_screen.dart';
 import 'word_occurrences_sheet.dart';
@@ -125,6 +126,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
   final ScrollController _sessionScroll = ScrollController();
   String? _currentKey;
   List<String>? _deckKeys;
+  List<ReviewSource>? _newWordBatch;
   final Set<String> _completedKeys = <String>{};
   final Set<String> _missedKeys = <String>{};
   final Map<String, int> _freshPasses = <String, int>{};
@@ -320,6 +322,7 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
         _stopSpeech();
         setState(() {
           _deckKeys = null;
+          _newWordBatch = null;
           _currentKey = null;
           _completedKeys.clear();
           _sessionRatings.clear();
@@ -746,6 +749,24 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     ReviewPlan plan,
     DateTime now,
   ) {
+    if (widget.learnNewOnly && !widget.practice) {
+      final Set<String> waiting = plan.waiting.map((record) => record.key).toSet();
+      final Set<String> seenWords = <String>{};
+      _newWordBatch ??= sources
+          .where((source) =>
+              source.kind == ReviewKind.word &&
+              waiting.contains(source.key) &&
+              (source.cardType == null || source.cardType == 'recognize') &&
+              seenWords.add(source.question.trim().toLowerCase()))
+          .take(plan.newAvailable)
+          .toList(growable: false);
+      if (_newWordBatch!.isNotEmpty) {
+        return NewWordSession(
+          key: ValueKey(ref.read(studyAccountProvider)),
+          words: _newWordBatch!,
+        );
+      }
+    }
     _prepareDeck(plan, state, sources, now);
     if (!_draftInitialized) {
       _draftInitialized = true;
