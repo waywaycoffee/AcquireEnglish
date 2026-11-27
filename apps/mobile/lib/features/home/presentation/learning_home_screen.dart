@@ -330,51 +330,75 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                       key: const Key('home-vocabulary-estimate'),
                       color: surface,
                       borderRadius: BorderRadius.circular(16),
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(16),
-                        onTap: () => context.push(
-                          hasPlacement
-                              ? SGRoute.growth.route
-                              : '${SGRoute.vocabularyPlacement.route}?firstOpen=1',
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 14,
+                          vertical: 8,
                         ),
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 14,
-                            vertical: 12,
-                          ),
-                          child: Row(
-                            children: <Widget>[
-                              Icon(
-                                Icons.insights_outlined,
-                                color: accent,
-                                size: 22,
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: <Widget>[
-                                    text('我的英语水平', 12, color: muted),
-                                    const SizedBox(height: 2),
-                                    text(levelLabel, 15, bold: true),
-                                  ],
+                        child: Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: InkWell(
+                                borderRadius: BorderRadius.circular(12),
+                                onTap: () => context.push(
+                                  hasPlacement
+                                      ? SGRoute.growth.route
+                                      : '${SGRoute.vocabularyPlacement.route}?firstOpen=1',
+                                ),
+                                child: Padding(
+                                  padding: const EdgeInsets.symmetric(
+                                    vertical: 4,
+                                  ),
+                                  child: Row(
+                                    children: <Widget>[
+                                      Icon(
+                                        Icons.insights_outlined,
+                                        color: accent,
+                                        size: 22,
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: <Widget>[
+                                            text('我的英语水平', 12, color: muted),
+                                            const SizedBox(height: 2),
+                                            text(levelLabel, 15, bold: true),
+                                            if (hasPlacement &&
+                                                placementEstimate != null) ...<Widget>[
+                                              const SizedBox(height: 2),
+                                              text(
+                                                '词汇量测试约 $placementEstimate · 点左侧看进步',
+                                                11,
+                                                color: muted,
+                                              ),
+                                            ],
+                                          ],
+                                        ),
+                                      ),
+                                      if (!hasPlacement) ...<Widget>[
+                                        text('去测试', 13, color: accent, bold: true),
+                                        Icon(
+                                          Icons.chevron_right,
+                                          color: accent,
+                                          size: 20,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
                                 ),
                               ),
-                              text(
-                                hasPlacement
-                                    ? '进步'
-                                    : '去测试',
-                                13,
-                                color: accent,
-                                bold: true,
+                            ),
+                            if (hasPlacement)
+                              TextButton(
+                                key: const Key('home-vocabulary-retest'),
+                                onPressed: () => context.push(
+                                  '${SGRoute.vocabularyPlacement.route}?retest=1',
+                                ),
+                                child: text('重新测试', 13, color: accent, bold: true),
                               ),
-                              Icon(
-                                Icons.chevron_right,
-                                color: accent,
-                                size: 20,
-                              ),
-                            ],
-                          ),
+                          ],
                         ),
                       ),
                     ),

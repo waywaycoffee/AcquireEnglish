@@ -151,6 +151,16 @@ class VocabularyPlacement extends Notifier<PlacementRow> {
     if (_key == key) state = result;
   }
 
+  /// Clear estimate so the learner can retake the adaptive placement.
+  Future<void> clearEstimateForRetest() async {
+    final String key = _key;
+    if (Hive.isBoxOpen('prefs')) {
+      await Hive.box<String>('prefs').delete(key);
+    }
+    if (_key == key) state = <String, dynamic>{};
+    resetVocabularyPlacementReminderForTest();
+  }
+
   Future<void> recordLearnedWord(
     String rawWord, {
     DateTime? previouslyLearnedAt,

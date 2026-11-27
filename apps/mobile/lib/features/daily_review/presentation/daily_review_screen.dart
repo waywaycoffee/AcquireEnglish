@@ -1542,9 +1542,20 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                 ),
               ),
               ActionChip(
-                label: const Text('词汇量测试'),
-                onPressed: () =>
-                    context.push(SGRoute.vocabularyPlacement.route),
+                label: Text(
+                  hasCompletedVocabularyPlacement(
+                    ref.read(vocabularyPlacementProvider),
+                  )
+                      ? '重新测词汇量'
+                      : '词汇量测试',
+                ),
+                onPressed: () => context.push(
+                  hasCompletedVocabularyPlacement(
+                    ref.read(vocabularyPlacementProvider),
+                  )
+                      ? '${SGRoute.vocabularyPlacement.route}?retest=1'
+                      : SGRoute.vocabularyPlacement.route,
+                ),
               ),
             ],
           ),

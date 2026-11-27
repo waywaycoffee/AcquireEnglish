@@ -557,6 +557,7 @@ GoRouter goRouter(Ref ref) {
           VocabularyPlacementScreen(
             forJourney: state.uri.queryParameters['journey'] == '1',
             firstOpen: state.uri.queryParameters['firstOpen'] == '1',
+            retest: state.uri.queryParameters['retest'] == '1',
           ),
     ).fade(),
     GoRoute(

@@ -16,12 +16,16 @@ class VocabularyPlacementScreen extends ConsumerStatefulWidget {
     super.key,
     this.forJourney = false,
     this.firstOpen = false,
+    this.retest = false,
   });
 
   final bool forJourney;
 
   /// After onboarding / cold offer: skippable, finish or skip goes home.
   final bool firstOpen;
+
+  /// Clear previous estimate before starting a fresh adaptive run.
+  final bool retest;
 
   @override
   ConsumerState<VocabularyPlacementScreen> createState() =>
@@ -46,6 +50,11 @@ class _VocabularyPlacementScreenState
   }
 
   Future<AdaptivePlacementEngine> _bootstrap() async {
+    if (widget.retest) {
+      await ref
+          .read(vocabularyPlacementProvider.notifier)
+          .clearEstimateForRetest();
+    }
     final String level = ref.read(learningPreferencesProvider).level;
     final List<PlacementRow> bands = await ref
         .read(vocabularyPlacementProvider.notifier)
@@ -88,6 +97,28 @@ class _VocabularyPlacementScreenState
           ),
         );
       }
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
+  }
+
+  Future<void> _retest() async {
+    if (_saving || _awaitingFeedback) return;
+    setState(() {
+      _saving = true;
+      _estimate = null;
+      _question = null;
+      _engine = null;
+      _lastKind = null;
+      _feedbackCorrectDef = null;
+      _awaitingFeedback = false;
+    });
+    try {
+      await ref
+          .read(vocabularyPlacementProvider.notifier)
+          .clearEstimateForRetest();
+      if (!mounted) return;
+      setState(() => _engineFuture = _bootstrap());
     } finally {
       if (mounted) setState(() => _saving = false);
     }
@@ -242,6 +273,13 @@ class _VocabularyPlacementScreenState
                                         ? '继续今日学习'
                                         : '前往背单词'),
                             ),
+                          ),
+                          const SizedBox(height: 8),
+                          OutlinedButton(
+                            onPressed: _saving
+                                ? null
+                                : () => unawaited(_retest()),
+                            child: const Text('觉得不准 · 重新测试'),
                           ),
                           if (widget.firstOpen && _estimate == null) ...<Widget>[
                             const SizedBox(height: 8),
