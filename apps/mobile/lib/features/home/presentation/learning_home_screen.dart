@@ -422,7 +422,7 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                           ),
                           const SizedBox(height: 4),
                           Text(
-                            '只复习到期内容 · 新学在上方「今日学习」',
+                            '只复习到期内容 · 新学点上方「开始背单词」',
                             style: TextStyle(color: muted, fontSize: 12),
                           ),
                           const SizedBox(height: 8),

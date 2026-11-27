@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../words/domain/syllabus_book.dart';
 import '../../../words/presentation/syllabus_book_browse_screen.dart';
@@ -10,6 +11,20 @@ import '../../../words/presentation/syllabus_books_provider.dart';
 /// English-level vocab modules: two book covers outside「今日学习」.
 class LevelVocabBookModules extends ConsumerWidget {
   const LevelVocabBookModules({super.key});
+
+  Future<void> _startVocabulary(BuildContext context, WidgetRef ref) async {
+    SyllabusBooksState books = ref.read(syllabusBooksProvider);
+    SyllabusBook? book = books.activeBook;
+    if (book == null || books.isComplete(book)) {
+      final String? selected = await context.push<String>(
+        '/words/syllabus?selectForStudy=1',
+      );
+      if (selected == null || !context.mounted) return;
+      books = ref.read(syllabusBooksProvider);
+      book = books.activeBook;
+    }
+    if (book != null) await startSyllabusBookSession(ref, context, book);
+  }
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -22,6 +37,27 @@ class LevelVocabBookModules extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
+        SizedBox(
+          width: double.infinity,
+          child: FilledButton.icon(
+            key: const Key('home-start-vocabulary'),
+            onPressed: books.ready
+                ? () => _startVocabulary(context, ref)
+                : null,
+            icon: const Icon(Icons.school_outlined),
+            label: const Text('开始背单词'),
+            style: FilledButton.styleFrom(
+              backgroundColor: AppDesignTokens.brandGreen,
+              foregroundColor: AppDesignTokens.onAccent,
+              minimumSize: const Size.fromHeight(52),
+              textStyle: const TextStyle(
+                fontSize: 17,
+                fontWeight: FontWeight.w800,
+              ),
+            ),
+          ),
+        ),
+        const SizedBox(height: 12),
         Text(
           '我的词书',
           style: TextStyle(
