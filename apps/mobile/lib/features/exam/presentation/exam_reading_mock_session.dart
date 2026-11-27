@@ -13,9 +13,14 @@ import 'exam_profile_provider.dart';
 
 /// Timed mock: 30s stem scan → timed passage + ABCD.
 class ExamReadingMockSession extends ConsumerStatefulWidget {
-  const ExamReadingMockSession({required this.paperId, super.key});
+  const ExamReadingMockSession({
+    required this.paperId,
+    this.practicePaper,
+    super.key,
+  });
 
   final String paperId;
+  final ExamRcPaper? practicePaper;
 
   @override
   ConsumerState<ExamReadingMockSession> createState() =>
@@ -38,9 +43,17 @@ class _ExamReadingMockSessionState
   @override
   void initState() {
     super.initState();
+    final ExamRcPaper? practicePaper = widget.practicePaper;
+    if (practicePaper != null) {
+      _paper = practicePaper;
+      _scanning = false;
+      return;
+    }
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final ExamRcPaper? p =
-          ref.read(examReadingPaperProvider.notifier).byId(widget.paperId);
+      if (!mounted) return;
+      final ExamRcPaper? p = ref
+          .read(examReadingPaperProvider.notifier)
+          .byId(widget.paperId);
       final int mins = ((p?.questions.length ?? 1) * 2).clamp(4, 20);
       setState(() {
         _paper = p;
@@ -106,7 +119,9 @@ class _ExamReadingMockSessionState
     });
     if (!ok) {
       final ExamProfile profile = ref.read(examProfileProvider);
-      await ref.read(examErrorBookProvider.notifier).add(
+      await ref
+          .read(examErrorBookProvider.notifier)
+          .add(
             ExamErrorItem(
               id: 'mock_${q.id}_${DateTime.now().millisecondsSinceEpoch}',
               familyId: profile.familyId ?? '',
@@ -132,7 +147,9 @@ class _ExamReadingMockSessionState
     }
     if (_finished) {
       return Scaffold(
-        appBar: AppBar(title: const Text('模考结束')),
+        appBar: AppBar(
+          title: Text(widget.practicePaper == null ? '模考结束' : '练习完成'),
+        ),
         body: Padding(
           padding: const EdgeInsets.all(24),
           child: Column(
@@ -146,7 +163,7 @@ class _ExamReadingMockSessionState
               const Text('复盘时对照证据句与干扰项套路，再开技巧模式精练错题。'),
               const Spacer(),
               FilledButton(
-                onPressed: () => context.pop(),
+                onPressed: () => Navigator.of(context).pop(),
                 child: const Text('完成'),
               ),
               TextButton(
@@ -179,8 +196,9 @@ class _ExamReadingMockSessionState
               Wrap(
                 spacing: 6,
                 children: <Widget>[
-                  for (final String w
-                      in extractExamRcLocators(paper.questions[i].stem))
+                  for (final String w in extractExamRcLocators(
+                    paper.questions[i].stem,
+                  ))
                     Chip(
                       label: Text(w, style: const TextStyle(fontSize: 11)),
                       visualDensity: VisualDensity.compact,
@@ -205,14 +223,20 @@ class _ExamReadingMockSessionState
     const List<String> labels = <String>['A', 'B', 'C', 'D'];
     return Scaffold(
       appBar: AppBar(
-        title: Text('模考 ${_qIndex + 1}/${paper.questions.length}'),
+        title: Text(
+          '${widget.practicePaper == null ? '模考' : '答题'} ${_qIndex + 1}/${paper.questions.length}',
+        ),
         actions: <Widget>[
-          Center(
-            child: Padding(
-              padding: const EdgeInsets.only(right: 16),
-              child: Text(_clock, style: const TextStyle(fontWeight: FontWeight.w800)),
+          if (widget.practicePaper == null)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(right: 16),
+                child: Text(
+                  _clock,
+                  style: const TextStyle(fontWeight: FontWeight.w800),
+                ),
+              ),
             ),
-          ),
         ],
       ),
       body: ListView(
@@ -250,10 +274,7 @@ class _ExamReadingMockSessionState
             return Card(
               color: color,
               child: ListTile(
-                leading: CircleAvatar(
-                  radius: 14,
-                  child: Text(labels[i]),
-                ),
+                leading: CircleAvatar(radius: 14, child: Text(labels[i])),
                 title: Text(q.options[i]),
                 onTap: _revealed ? null : () => setState(() => _selected = i),
               ),
@@ -278,9 +299,7 @@ class _ExamReadingMockSessionState
                   _revealed = false;
                 });
               },
-              child: Text(
-                _qIndex + 1 >= paper.questions.length ? '交卷' : '下一题',
-              ),
+              child: Text(_qIndex + 1 >= paper.questions.length ? '交卷' : '下一题'),
             ),
           ] else
             FilledButton(

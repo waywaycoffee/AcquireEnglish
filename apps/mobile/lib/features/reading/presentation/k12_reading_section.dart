@@ -4,6 +4,8 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
 import '../../../constants/endpoints.dart';
+import '../../exam/domain/exam_reading_paper.dart';
+import '../../exam/presentation/exam_reading_mock_session.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../domain/reading_doc.dart';
 import 'reading_library_provider.dart';
@@ -76,6 +78,69 @@ class K12ReadingSection extends ConsumerWidget {
     }
   }
 
+  void _startPractice(BuildContext context, Map<String, dynamic> item) {
+    final Map<String, dynamic> article =
+        item['article'] as Map<String, dynamic>;
+    final String id = item['id'] as String? ?? 'k12-reading:$gradeId';
+    final List<ExamRcQuestion> questions = <ExamRcQuestion>[];
+    const List<String> labels = <String>['A', 'B', 'C', 'D'];
+    final Object? rawQuestions = item['questions'];
+    if (rawQuestions is List && rawQuestions.length == 4) {
+      for (final Object? raw in rawQuestions) {
+        if (raw is! Map<dynamic, dynamic>) break;
+        final Object? options = raw['options'];
+        final Object? answerLabel = raw['answer'];
+        if (options is! Map<dynamic, dynamic> || answerLabel is! String) break;
+        final Map<dynamic, dynamic> choices = options;
+        final int answer = labels.indexOf(answerLabel);
+        final Object? stem = raw['question'];
+        if (answer < 0 ||
+            stem is! String ||
+            stem.trim().isEmpty ||
+            labels.any((String label) {
+              final Object? option = choices[label];
+              return option is! String || option.trim().isEmpty;
+            })) {
+          break;
+        }
+        questions.add(
+          ExamRcQuestion(
+            id: '$id:q${questions.length + 1}',
+            stem: stem,
+            options: <String>[
+              for (final String label in labels) choices[label] as String,
+            ],
+            answer: choices[labels[answer]] as String,
+            explain: raw['analysis'] as String? ?? '',
+            evidence: raw['evidence_quote'] as String? ?? '',
+          ),
+        );
+      }
+    }
+    if (questions.length != 4) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('这篇文章的试题暂不可用')));
+      return;
+    }
+    final ExamRcPaper paper = ExamRcPaper(
+      id: id,
+      title:
+          article['title_zh'] as String? ??
+          article['title'] as String? ??
+          '时文阅读',
+      passage: article['passage'] as String,
+      questions: questions,
+      source: 'k12_reading',
+    );
+    Navigator.of(context).push<void>(
+      MaterialPageRoute<void>(
+        builder: (_) =>
+            ExamReadingMockSession(paperId: id, practicePaper: paper),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     return Column(
@@ -116,7 +181,10 @@ class K12ReadingSection extends ConsumerWidget {
                           subtitle: Text(
                             '${item['level']} · ${(item['article'] as Map<dynamic, dynamic>)['word_count']} 词 · AI 审校',
                           ),
-                          trailing: const Icon(Icons.chevron_right),
+                          trailing: TextButton(
+                            onPressed: () => _startPractice(context, item),
+                            child: const Text('开始答题'),
+                          ),
                           onTap: () => _open(context, ref, item),
                         ),
                       ),
