@@ -109,8 +109,10 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     WidgetsBinding.instance.addPostFrameCallback((_) async {
       _syncScheduled = false;
       if (!mounted) return;
+      final bool seeded = await _ensureTodayContinuity(store);
+      if (!mounted) return;
       final bool changed = await _syncProgress(store);
-      if (changed && mounted) setState(() {});
+      if ((seeded || changed) && mounted) setState(() {});
     });
   }
 
@@ -134,29 +136,48 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     );
   }
 
-  Future<void> _ensureQuotas(TodayJourneyStore store) async {
-    final TodayStudyPlan plan = store.studyPlan;
-    if (plan.quotasConfigured) return;
-    // Carry yesterday quotas when present.
+  /// Silently carry yesterday's quotas + materials so continue opens the next
+  /// episode without a force-select popup. Explicit change stays on「今日学习 ›」.
+  Future<bool> _ensureTodayContinuity(TodayJourneyStore store) async {
     final TodayJourneyStore yesterday = TodayJourneyStore(
       ref.read(studyAccountProvider),
       DateTime.now().subtract(const Duration(days: 1)),
     );
-    final TodayStudyPlan y = yesterday.studyPlan;
-    final ({int videoMinutes, int vocabCount, int readingWords})? picked =
-        await _askQuotas(
-      videoMinutes: y.quotasConfigured ? y.videoMinutes : 20,
-      vocabCount: y.quotasConfigured ? y.vocabCount : 20,
-      readingWords: y.quotasConfigured ? y.readingWords : 500,
-    );
-    if (picked == null || !mounted) return;
-    await store.saveQuotas(
-      videoMinutes: picked.videoMinutes,
-      vocabCount: picked.vocabCount,
-      readingWords: picked.readingWords,
-    );
-    await ref.read(wordReviewSettingsProvider.notifier).setDailyNewLimit(picked.vocabCount);
-    if (mounted) setState(() {});
+    bool changed = false;
+
+    if (!store.studyPlan.quotasConfigured) {
+      final TodayStudyPlan y = yesterday.studyPlan;
+      final int videoMinutes = y.quotasConfigured ? y.videoMinutes : 20;
+      final int vocabCount = y.quotasConfigured
+          ? (yesterday.vocabBaseCount > 0
+              ? yesterday.vocabBaseCount
+              : y.vocabCount)
+          : 20;
+      final int readingWords = y.quotasConfigured ? y.readingWords : 500;
+      await store.saveQuotas(
+        videoMinutes: videoMinutes,
+        vocabCount: vocabCount,
+        readingWords: readingWords,
+      );
+      await ref
+          .read(wordReviewSettingsProvider.notifier)
+          .setDailyNewLimit(vocabCount);
+      changed = true;
+    }
+
+    for (final TodayStudyTrack track in <TodayStudyTrack>[
+      TodayStudyTrack.video,
+      TodayStudyTrack.reading,
+    ]) {
+      if (store.selectedMaterials(track).isNotEmpty) continue;
+      final List<JourneyActivity> prior =
+          yesterday.selectedMaterials(track);
+      if (prior.isEmpty) continue;
+      await store.saveSelectedMaterials(track, prior);
+      changed = true;
+    }
+
+    return changed;
   }
 
   Future<void> _editQuotas(TodayJourneyStore store) async {
@@ -325,6 +346,17 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
         reason: '接着昨天继续${_trackLabel(last!)}',
       );
     }
+    // Carry today's picked materials so tomorrow continues the same series.
+    for (final TodayStudyTrack track in <TodayStudyTrack>[
+      TodayStudyTrack.video,
+      TodayStudyTrack.reading,
+    ]) {
+      final List<JourneyActivity> materials =
+          store.selectedMaterials(track);
+      if (materials.isEmpty) continue;
+      if (tomorrow.selectedMaterials(track).isNotEmpty) continue;
+      await tomorrow.saveSelectedMaterials(track, materials);
+    }
     if (ref.read(learningSettingsProvider).reminder && pursuit != null) {
       await scheduleJourneyReminder(
         day: _nextDay(today),
@@ -411,7 +443,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     final String account = ref.read(studyAccountProvider);
     final TodayJourneyStore store = TodayJourneyStore(account, today);
     try {
-      await _ensureQuotas(store);
+      await _ensureTodayContinuity(store);
       if (!mounted || !store.studyPlan.quotasConfigured) return;
       await _syncProgress(store);
       while (mounted && ref.read(studyAccountProvider) == account) {
@@ -432,14 +464,28 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           );
         } else if ((step, store.selectedMaterial(TodayStudyTrack.video))
             case (TodayLearningStep.video, final JourneyActivity selected)) {
+          // Prefer next episode of yesterday's / today's picked series.
           await _openSelectedVideo(selected);
+        } else if (step == TodayLearningStep.video) {
+          final JourneyTask? pursuit = _videoPursuit();
+          if (pursuit != null) {
+            await context.push(pursuit.route);
+          } else if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(
+                content: Text('点「今日学习」旁三角选择要看的视频'),
+              ),
+            );
+          }
+          return;
         } else {
           final String route = switch (step) {
             TodayLearningStep.newWords => _vocabPursuit()!.route,
             TodayLearningStep.video => _videoPursuit()?.route ?? '/library',
             TodayLearningStep.reviewWords => '/review/session?due=1&kind=word',
-            TodayLearningStep.reading => store.selectedMaterial(TodayStudyTrack.reading)?.route ??
-                _readingPursuit()!.route,
+            TodayLearningStep.reading =>
+              store.selectedMaterial(TodayStudyTrack.reading)?.route ??
+                  _readingPursuit()!.route,
             TodayLearningStep.photoChat => '/digital-human?sceneMenu=1',
           };
           await context.push(route);
@@ -673,23 +719,26 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              const ListTile(title: Text('选择今日学习内容')),
+              const ListTile(
+                title: Text('更换今日学习内容'),
+                subtitle: Text('未改动时会优先接着昨天的下一集'),
+              ),
               ListTile(
                 leading: const Icon(Icons.play_circle_outline),
-                title: const Text('选择要看的视频'),
+                title: Text(videos.isEmpty ? '选择要看的视频' : '更换视频'),
                 subtitle: Text(
                   videos.isEmpty
-                      ? '尚未选择'
+                      ? '尚未选择 · 可接着上次进度'
                       : videos.map((JourneyActivity e) => e.title).join(' · '),
                 ),
                 onTap: () => Navigator.pop(sheetContext, 'select-video'),
               ),
               ListTile(
                 leading: const Icon(Icons.auto_stories_outlined),
-                title: const Text('选择要读的书'),
+                title: Text(readings.isEmpty ? '选择要读的书' : '更换读物'),
                 subtitle: Text(
                   readings.isEmpty
-                      ? '尚未选择'
+                      ? '尚未选择 · 可接着上次进度'
                       : readings.map((JourneyActivity e) => e.title).join(' · '),
                 ),
                 onTap: () => Navigator.pop(sheetContext, 'select-reading'),
@@ -762,9 +811,11 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 Text(
-                  plan.quotasConfigured
-                      ? (nextStep == null ? '今日计划已完成' : '按计划接着学')
-                      : '先定今天学多少',
+                  nextStep == null && plan.quotasConfigured
+                      ? '今日计划已完成'
+                      : (todayVideos.isNotEmpty || todayReadings.isNotEmpty
+                          ? '接着昨天的内容继续'
+                          : '按计划接着学'),
                   style: TextStyle(
                     color: AppDesignTokens.brandGreen,
                     fontWeight: FontWeight.w700,
@@ -785,10 +836,19 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                         fontWeight: FontWeight.w800,
                         fontSize: 24,
                       )),
-                      Icon(Icons.chevron_right),
+                      Icon(Icons.arrow_drop_down_rounded, size: 28),
                     ],
                   ),
                 ),
+                if (todayVideos.isEmpty && todayReadings.isEmpty)
+                  Text(
+                    '点三角可选择或更换学习内容',
+                    style: TextStyle(
+                      color: AppDesignTokens.textSecondary,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
                 TextButton.icon(
                   onPressed: () => context.push('/digital-human?sceneMenu=1'),
                   icon: const Icon(Icons.photo_camera_outlined),
@@ -854,27 +914,6 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                   ),
                 ],
                 const SizedBox(height: 14),
-                SizedBox(
-                  width: double.infinity,
-                  child: FilledButton(
-                    onPressed: _chooseStudyMaterial,
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppDesignTokens.brandGreen,
-                      foregroundColor: AppDesignTokens.onAccent,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(14),
-                      ),
-                    ),
-                    child: Text(
-                      '选择学习内容',
-                      style: const TextStyle(
-                        fontWeight: FontWeight.w800,
-                        fontSize: 16,
-                      ),
-                    ),
-                  ),
-                ),
                 Text(
                   store.learningOrder.map((TodayLearningStep step) => step.label).join(' → '),
                 ),
@@ -1195,7 +1234,7 @@ class _TodayQuotaSheetState extends State<_TodayQuotaSheet> {
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
                 child: const Text(
-                  '开始今日学习',
+                  '保存配额',
                   style: TextStyle(fontWeight: FontWeight.w800),
                 ),
               ),
