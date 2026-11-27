@@ -569,6 +569,9 @@ GoRouter goRouter(Ref ref) {
           dueOnly: state.uri.queryParameters['due'] == '1',
           journeyReview: state.uri.queryParameters['journeyReview'] == '1',
           expressions: kindName == 'expressions',
+          practiceKind: ReviewKind.values
+              .where((ReviewKind kind) => kind.name == kindName)
+              .firstOrNull,
           recommended: deck == 'recommended',
           missedOnly: deck == 'missed',
           syllabusOnly: deck == 'syllabus',
@@ -578,9 +581,6 @@ GoRouter goRouter(Ref ref) {
           sourceLabel: state.uri.queryParameters['source'],
           sourceEpisodeId: state.uri.queryParameters['sourceEpisode'],
           todayTaskId: state.uri.queryParameters['todayTask'],
-          practiceKind: ReviewKind.values
-              .where((ReviewKind kind) => kind.name == kindName)
-              .firstOrNull,
         );
       },
     ).fade(),

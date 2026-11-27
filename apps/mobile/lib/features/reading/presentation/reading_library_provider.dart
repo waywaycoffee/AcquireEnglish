@@ -17,7 +17,7 @@ import '../domain/reading_shelf_prune.dart';
 
 const String kReadingLibraryKey = 'reading_library_v1';
 const String kReadingProgressKey = 'reading_progress_v1';
-const String kReadingShelfOzOnlyKey = 'reading_shelf_oz_only_v1';
+const String kReadingShelfDropSeedsKey = 'reading_shelf_drop_seeds_v2';
 const List<String> kBuiltinReadingAssetPaths = <String>[
   'assets/reading/a1_morning_walk.json',
   'assets/reading/a1_tech_robot.json',
@@ -144,19 +144,17 @@ class ReadingLibraryNotifier extends Notifier<ReadingLibraryState> {
     if (titlesChanged) {
       unawaited(_persistLibrary(scheduleSync: false));
     }
-    unawaited(_pruneShelfToWizardOfOzIfNeeded());
+    unawaited(_pruneGeneratedShelfSeedsIfNeeded());
   }
 
-  /// One-shot: drop test/generated shelf books; keep only 绿野仙踪.
-  Future<void> _pruneShelfToWizardOfOzIfNeeded() async {
+  /// One-shot: drop starter/course-seed demos; keep Oz + real imports (HP…).
+  Future<void> _pruneGeneratedShelfSeedsIfNeeded() async {
     if (!Hive.isBoxOpen('prefs')) return;
     final Box<String> box = Hive.box<String>('prefs');
-    final String flagKey = studyStorageKey(kReadingShelfOzOnlyKey, _account);
+    final String flagKey = studyStorageKey(kReadingShelfDropSeedsKey, _account);
     if (box.get(flagKey) == '1') return;
-    final List<ReadingDoc> kept = keepOnlyWizardOfOz(state.userDocs);
-    if (kept.length == state.userDocs.length &&
-        (kept.isEmpty ||
-            (kept.length == 1 && kept.first.id == state.userDocs.first.id))) {
+    final List<ReadingDoc> kept = prunePersonalReadingShelf(state.userDocs);
+    if (kept.length == state.userDocs.length) {
       await box.put(flagKey, '1');
       return;
     }

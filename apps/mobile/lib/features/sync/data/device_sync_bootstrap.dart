@@ -143,7 +143,7 @@ Future<void> _syncReadingBackup(
       : ReadingLibrarySnapshot.fromStateJson(cloud.state!);
 
   if (remote != null) {
-    final ReadingLibrarySnapshot merged = _shelfOzOnlySnapshot(
+    final ReadingLibrarySnapshot merged = _shelfDropSeedSnapshot(
       mergeReadingLibraries(local, remote),
     );
     await (ref.read(readingLibraryProvider.notifier) as ReadingLibraryNotifier)
@@ -156,7 +156,7 @@ Future<void> _syncReadingBackup(
         .replaceFromCloud(merged.vocabLists);
     local = merged;
   } else {
-    local = _shelfOzOnlySnapshot(local);
+    local = _shelfDropSeedSnapshot(local);
   }
 
   await DocumentRevisionStore.write('reading', account, cloud.revision);
@@ -179,7 +179,7 @@ Future<void> _syncReadingBackup(
         token: token,
       );
       if (again.state != null) {
-        final ReadingLibrarySnapshot merged = _shelfOzOnlySnapshot(
+        final ReadingLibrarySnapshot merged = _shelfDropSeedSnapshot(
           mergeReadingLibraries(
             local,
             ReadingLibrarySnapshot.fromStateJson(again.state!),
@@ -206,8 +206,8 @@ Future<void> _syncReadingBackup(
   }
 }
 
-ReadingLibrarySnapshot _shelfOzOnlySnapshot(ReadingLibrarySnapshot snap) {
-  final List<ReadingDoc> kept = keepOnlyWizardOfOz(snap.docs);
+ReadingLibrarySnapshot _shelfDropSeedSnapshot(ReadingLibrarySnapshot snap) {
+  final List<ReadingDoc> kept = prunePersonalReadingShelf(snap.docs);
   final Set<String> ids = kept.map((ReadingDoc d) => d.id).toSet();
   return ReadingLibrarySnapshot(
     docs: kept,

@@ -22,14 +22,30 @@ bool isGeneratedTestReadingDoc(ReadingDoc doc) {
   return false;
 }
 
-/// Keep only Wizard of Oz (dedupe if both catalog_… and se:… exist).
-List<ReadingDoc> keepOnlyWizardOfOz(Iterable<ReadingDoc> docs) {
-  final List<ReadingDoc> oz = docs.where(isWizardOfOzReadingDoc).toList();
-  if (oz.isEmpty) return const <ReadingDoc>[];
-  // Prefer the Standard Ebooks stable catalog id when both exist.
+/// Drop demo seeds; keep 绿野仙踪、哈利波特等真实导入/书目。
+List<ReadingDoc> dropGeneratedTestReadingDocs(Iterable<ReadingDoc> docs) {
+  return docs.where((ReadingDoc d) => !isGeneratedTestReadingDoc(d)).toList();
+}
+
+/// Prefer a single Oz entry when duplicates exist (catalog_… vs se:…).
+List<ReadingDoc> dedupeWizardOfOz(Iterable<ReadingDoc> docs) {
+  final List<ReadingDoc> list = docs.toList();
+  final List<ReadingDoc> oz = list.where(isWizardOfOzReadingDoc).toList();
+  if (oz.length <= 1) return list;
   final String preferredId = kDefaultWizardOfOzEntry.stableDocId;
+  ReadingDoc keep = oz.first;
   for (final ReadingDoc doc in oz) {
-    if (doc.id == preferredId) return <ReadingDoc>[doc];
+    if (doc.id == preferredId) {
+      keep = doc;
+      break;
+    }
   }
-  return <ReadingDoc>[oz.first];
+  return <ReadingDoc>[
+    for (final ReadingDoc doc in list)
+      if (!isWizardOfOzReadingDoc(doc) || doc.id == keep.id) doc,
+  ];
+}
+
+List<ReadingDoc> prunePersonalReadingShelf(Iterable<ReadingDoc> docs) {
+  return dedupeWizardOfOz(dropGeneratedTestReadingDocs(docs));
 }

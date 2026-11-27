@@ -4,7 +4,7 @@ import 'package:common_learn_english/features/reading/domain/reading_shelf_prune
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
-  test('keeps only Wizard of Oz and drops starter seeds', () {
+  test('drops starter seeds but keeps Oz and Harry Potter', () {
     final List<ReadingDoc> docs = <ReadingDoc>[
       const ReadingDoc(
         id: 'starter-first-morning',
@@ -32,9 +32,11 @@ void main() {
         sourceType: ReadingSourceType.import,
       ),
     ];
-    final List<ReadingDoc> kept = keepOnlyWizardOfOz(docs);
-    expect(kept, hasLength(1));
-    expect(kept.single.titleZh, '绿野仙踪');
+    final List<ReadingDoc> kept = prunePersonalReadingShelf(docs);
+    expect(kept.map((ReadingDoc d) => d.id), <String>[
+      kDefaultWizardOfOzEntry.stableDocId,
+      'ebook-harry-potter-01',
+    ]);
     expect(isGeneratedTestReadingDoc(docs.first), isTrue);
   });
 }
