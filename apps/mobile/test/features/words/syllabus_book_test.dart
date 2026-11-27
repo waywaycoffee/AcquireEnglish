@@ -1,7 +1,33 @@
 import 'package:common_learn_english/features/words/domain/syllabus_book.dart';
+import 'package:common_learn_english/features/words/presentation/syllabus_books_provider.dart';
 import 'package:flutter_test/flutter_test.dart';
 
 void main() {
+  test('only an unfinished current book blocks selecting another', () {
+    const SyllabusBook first = SyllabusBook(
+      id: 'first',
+      title: 'First',
+      examTag: '',
+      words: <SyllabusWord>[
+        SyllabusWord(word: 'apple'),
+        SyllabusWord(word: 'banana'),
+      ],
+    );
+    const SyllabusBooksState inProgress = SyllabusBooksState(
+      imported: <SyllabusBook>[first],
+      activeBookId: 'first',
+      learnedByBook: <String, Set<String>>{'first': <String>{'apple', 'extra'}},
+    );
+    expect(inProgress.blockingBook('first'), isNull);
+    expect(inProgress.blockingBook('second'), first);
+    expect(
+      inProgress.copyWith(learnedByBook: <String, Set<String>>{
+        'first': <String>{'apple', 'banana'},
+      }).blockingBook('second'),
+      isNull,
+    );
+  });
+
   group('parseSyllabusImport', () {
     test('parses one word per line and skips blanks/comments', () {
       final List<SyllabusWord> words = parseSyllabusImport('''

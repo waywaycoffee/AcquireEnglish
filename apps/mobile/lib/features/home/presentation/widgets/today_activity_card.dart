@@ -256,9 +256,9 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
   }
 
   JourneyTask? _vocabPursuit() {
-    final SyllabusBook? book =
-        ref.read(syllabusBooksProvider).activeBook;
-    if (book != null) {
+    final SyllabusBooksState books = ref.read(syllabusBooksProvider);
+    final SyllabusBook? book = books.activeBook;
+    if (book != null && !books.isComplete(book)) {
       return JourneyTask(
         route: syllabusBookSessionRoute(book.id),
         title: '背词 · ${book.title}',
@@ -266,8 +266,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       );
     }
     return const JourneyTask(
-      route: '/words',
-      title: '打开词书挑一组新词',
+      route: '/words/syllabus',
+      title: '选择一本词书',
       module: LearnModule.vocab,
     );
   }
@@ -574,13 +574,16 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
     }
 
     // Vocab: prefer active book level band.
-    final SyllabusBook? active = ref.read(syllabusBooksProvider).activeBook;
+    final SyllabusBooksState books = ref.read(syllabusBooksProvider);
+    final SyllabusBook? selected = books.activeBook;
+    final SyllabusBook? active =
+        selected != null && !books.isComplete(selected) ? selected : null;
     candidates.add(
       LearnCandidate(
         id: active?.id ?? 'vocab-books',
         title: active == null ? '打开词书挑一组新词' : '继续背 · ${active.title}',
         route: active == null
-            ? '/words'
+            ? '/words/syllabus'
             : syllabusBookSessionRoute(active.id),
         module: LearnModule.vocab,
         contentBand: profile.estimate(LearnerSkill.vocab).band,
@@ -626,6 +629,8 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
   @override
   Widget build(BuildContext context) {
     final String account = ref.watch(studyAccountProvider);
+    final SyllabusBooksState books = ref.watch(syllabusBooksProvider);
+    final SyllabusBook? activeBook = books.activeBook;
     ref
       ..watch(continueLearningTargetProvider)
       ..watch(readingLibraryProvider)
@@ -633,7 +638,6 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       ..watch(currentLearningKindProvider)
       ..watch(libraryCatalogProvider)
       ..watch(learningActivityProvider)
-      ..watch(syllabusBooksProvider)
       ..watch(todayPathProvider)
       ..watch(dailyReviewProvider)
       ..watch(learnerSkillProfileProvider);
@@ -689,6 +693,20 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                     fontSize: 13,
                   ),
                 ),
+                if (books.ready)
+                  TextButton.icon(
+                    onPressed: () {
+                      if (activeBook == null || books.isComplete(activeBook)) {
+                        context.push('/words/syllabus');
+                      } else {
+                        startSyllabusBookSession(ref, context, activeBook);
+                      }
+                    },
+                    icon: const Icon(Icons.menu_book_outlined),
+                    label: Text(activeBook == null
+                        ? '选择一本词书'
+                        : '当前词书 · ${activeBook.title}${books.isComplete(activeBook) ? '（已背完）' : ''}'),
+                  ),
                 if (plan.quotasConfigured) ...<Widget>[
                   const SizedBox(height: 16),
                   _QuotaProgressRow(

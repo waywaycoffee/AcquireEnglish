@@ -917,11 +917,8 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
   Future<SyllabusImportOverlap> applySyllabusImportOverlap(
     SyllabusBook book,
   ) async {
-    // New lemmas are only sourced from the *active* book in
-    // [reviewSourcesProvider]. Force-activate so download/shelf paths that
-    // skipped setActive still enqueue this book's words.
     if (ref.read(syllabusBooksProvider).activeBookId != book.id) {
-      await ref.read(syllabusBooksProvider.notifier).setActiveBook(book.id);
+      throw StateError('请先选择这本词书。');
     }
     final DateTime now = ref.read(reviewClockProvider)();
     final List<WordEntry> words = ref.read(wordBookProvider);
@@ -948,10 +945,17 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
     final SyllabusBooksNotifier books = ref.read(
       syllabusBooksProvider.notifier,
     );
-    for (final String lemma in <String>[
-      ...overlap.freshFavoriteLemmas,
+    final Set<String> previouslyCompleted = <String>{
+      for (final SyllabusWord item in book.words)
+        if (state.records[syllabusReviewKey(book.id, item.word)]
+            case final ReviewRecord record
+            when !record.isNew && record.lastRating != fsrs.Rating.again.value)
+          item.word,
+    };
+    for (final String lemma in <String>{
       ...overlap.knownLemmas,
-    ]) {
+      ...previouslyCompleted,
+    }) {
       await books.recordLearned(book.id, lemma);
     }
     if (overlap.knownLemmas.isNotEmpty) {
@@ -1055,13 +1059,17 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
         previouslyLearnedAt: previouslyLearnedAt,
         accountAtReview: account,
       );
-      if (key.startsWith('syllabus:')) {
-        final List<String> parts = key.split(':');
-        if (parts.length >= 3) {
-          await ref
-              .read(syllabusBooksProvider.notifier)
-              .recordLearned(parts[1], gradedSource!.question);
-        }
+    }
+    if (!_disposed && generation == _generation && rating != fsrs.Rating.again) {
+      final SyllabusBook? book = ref.read(syllabusBooksProvider).activeBook;
+      final String? lemma = lemmaFromReviewKey(key);
+      final SyllabusWord? studied = book?.words.where((SyllabusWord item) {
+        return syllabusReviewKey(book.id, item.word) == key ||
+            (key.startsWith('entry:') && normalizeWord(item.word) == lemma);
+      }).firstOrNull;
+      if (book != null && studied != null) {
+        await ref.read(syllabusBooksProvider.notifier)
+            .recordLearned(book.id, studied.word);
       }
     }
     if (_disposed || generation != _generation || !key.startsWith('phrase:')) {

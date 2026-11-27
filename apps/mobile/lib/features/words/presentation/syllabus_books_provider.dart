@@ -47,6 +47,20 @@ class SyllabusBooksState {
   SyllabusBook? get activeBook =>
       activeBookId.isEmpty ? null : bookById(activeBookId);
 
+  bool isComplete(SyllabusBook book) {
+    final Set<String>? learned = learnedByBook[book.id];
+    return learned != null && book.words.every(
+      (SyllabusWord word) => learned.contains(word.word.trim().toLowerCase()),
+    );
+  }
+
+  SyllabusBook? blockingBook(String requestedId) {
+    final SyllabusBook? book = activeBook;
+    return book != null && book.id != requestedId && !isComplete(book)
+        ? book
+        : null;
+  }
+
   int learnedCount(String bookId) => learnedByBook[bookId]?.length ?? 0;
 
   SyllabusBooksState copyWith({
@@ -110,7 +124,7 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
     final bool activeOk =
         active.isNotEmpty && available.any((SyllabusBook b) => b.id == active);
     if (!activeOk) {
-      active = available.isNotEmpty ? available.first.id : '';
+      active = '';
     }
     state = SyllabusBooksState(
       builtin: List<SyllabusBook>.unmodifiable(builtin),
@@ -200,19 +214,22 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
     await Hive.box<String>('prefs').put(_storageKey, jsonEncode(payload));
   }
 
-  Future<void> setActiveBook(String bookId) async {
+  Future<bool> setActiveBook(String bookId) async {
     final SyllabusBook? book = state.bookById(bookId);
-    if (book == null) return;
+    if (!state.ready || book == null || state.blockingBook(bookId) != null) {
+      return false;
+    }
+    state = state.copyWith(activeBookId: bookId);
+    await _persist();
     ref.read(currentLearningKindProvider.notifier).record('book');
     if (Hive.isBoxOpen('prefs'))
       await Hive.box<String>('prefs').put('current_learning_kind', 'book');
-    state = state.copyWith(activeBookId: bookId);
-    await _persist();
     // Active syllabus book CEFR strongly sets vocab skill band.
     await ref.read(learnerSkillProfileProvider.notifier).alignVocabBandFromSyllabus(
           examTag: book.examTag,
           title: book.title,
         );
+    return true;
   }
 
   Future<void> recordLearned(String bookId, String word) async {
@@ -279,13 +296,8 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
     ];
     state = state.copyWith(
       imported: List<SyllabusBook>.unmodifiable(next),
-      activeBookId: book.id,
     );
     await _persist();
-    await ref.read(learnerSkillProfileProvider.notifier).alignVocabBandFromSyllabus(
-          examTag: book.examTag,
-          title: book.title,
-        );
     return book;
   }
 
@@ -293,6 +305,7 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
       state.imported.any((SyllabusBook b) => b.id == id);
 
   Future<void> deleteImported(String bookId) async {
+    if (state.blockingBook('')?.id == bookId) return;
     final List<SyllabusBook> next = state.imported
         .where((SyllabusBook b) => b.id != bookId)
         .toList(growable: false);
@@ -302,9 +315,7 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
     };
     String active = state.activeBookId;
     if (active == bookId) {
-      active = state.builtin.isNotEmpty
-          ? state.builtin.first.id
-          : (next.isNotEmpty ? next.first.id : '');
+      active = '';
     }
     state = state.copyWith(
       imported: List<SyllabusBook>.unmodifiable(next),

@@ -2,9 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:go_router/go_router.dart';
 
-import '../../daily_review/domain/vocab_unified_queue.dart';
 import '../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../settings/presentation/settings_provider.dart';
@@ -120,7 +118,7 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
 
   void _popStack() {
     if (_stack.isEmpty) {
-      context.pop();
+      Navigator.of(context).pop();
       return;
     }
     _stack.removeLast();
@@ -160,13 +158,6 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
           .downloadBook(entry: entry, examTag: _examTag);
       final SyllabusBook book = result.book;
       await ref.read(syllabusBooksProvider.notifier).saveImportedBook(book);
-      // Activate + ingest into today's FSRS waiting pool (new-learn quota).
-      final SyllabusImportOverlap? overlap =
-          await activateBookWithOverlap(ref, book);
-      if (!mounted) return;
-      if (overlap != null) {
-        await showSyllabusOverlapDialog(context, book, overlap);
-      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -174,7 +165,7 @@ class _LilinjiCatalogScreenState extends ConsumerState<LilinjiCatalogScreen> {
           action: SnackBarAction(
             label: '开始背',
             onPressed: () {
-              context.push(syllabusBookSessionRoute(book.id));
+              startSyllabusBookSession(ref, context, book);
             },
           ),
         ),

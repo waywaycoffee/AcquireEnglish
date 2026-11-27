@@ -19,17 +19,15 @@ String syllabusBookSessionRoute(String bookId) {
 
 /// Activate [book] for the unified 背单词 queue and ingest FSRS cards.
 ///
-/// Aligns the FSRS new-learn quota with word settings, then runs overlap
-/// seeding so new lemmas enter today's waiting pool. Pass [setActive] false
-/// only when the caller already persisted this book as the active source.
+/// Aligns the daily quota and seeds the chosen book's FSRS cards.
 Future<SyllabusImportOverlap?> activateBookWithOverlap(
   WidgetRef ref,
-  SyllabusBook book, {
-  bool setActive = true,
-}) async {
-  if (setActive) {
-    await ref.read(syllabusBooksProvider.notifier).setActiveBook(book.id);
-  }
+  SyllabusBook book,
+) async {
+  final bool activated = await ref
+      .read(syllabusBooksProvider.notifier)
+      .setActiveBook(book.id);
+  if (!activated) return null;
   final int quota =
       ref.read(wordReviewSettingsProvider).dailyNewLimit.clamp(0, 150);
   await ref
@@ -42,15 +40,19 @@ Future<SyllabusImportOverlap?> activateBookWithOverlap(
 Future<SyllabusImportOverlap?> startSyllabusBookSession(
   WidgetRef ref,
   BuildContext context,
-  SyllabusBook book, {
-  bool setActive = true,
-}) async {
-  final SyllabusImportOverlap? overlap = await activateBookWithOverlap(
-    ref,
-    book,
-    setActive: setActive,
-  );
+  SyllabusBook book,
+) async {
+  final SyllabusImportOverlap? overlap = await activateBookWithOverlap(ref, book);
   if (!context.mounted) return overlap;
+  if (overlap == null) {
+    final SyllabusBook? blocking = ref.read(syllabusBooksProvider).blockingBook(book.id);
+    ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+      content: Text(blocking == null
+          ? '词书还在准备，请稍后重试。'
+          : '请先背完「${blocking.title}」，再选择下一本。'),
+    ));
+    return null;
+  }
   await context.push(syllabusBookSessionRoute(book.id));
   return overlap;
 }

@@ -750,6 +750,18 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
     DateTime now,
   ) {
     if (widget.learnNewOnly && !widget.practice) {
+      final SyllabusBooksState books = ref.watch(syllabusBooksProvider);
+      final String? requestedId = widget.syllabusBookId;
+      if (requestedId != null && requestedId != books.activeBookId) {
+        final SyllabusBook? blocking = books.blockingBook(requestedId);
+        return Center(
+          child: Text(!books.ready
+              ? '正在读取当前词书…'
+              : blocking == null
+                  ? '请从词书架选择要背的词书。'
+                  : '请先背完「${blocking.title}」，再选择下一本。'),
+        );
+      }
       final Set<String> waiting = plan.waiting.map((record) => record.key).toSet();
       final Set<String> seenWords = <String>{};
       _newWordBatch ??= sources

@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../../daily_review/domain/vocab_unified_queue.dart';
 import '../../daily_review/presentation/syllabus_overlap_dialog.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
@@ -81,12 +80,6 @@ class _ServerSyllabusCatalogScreenState
       final SyllabusBook saved = await ref
           .read(syllabusBooksProvider.notifier)
           .saveImportedBook(book.copyWith(builtin: false));
-      final SyllabusImportOverlap? overlap =
-          await activateBookWithOverlap(ref, saved);
-      if (!mounted) return;
-      if (overlap != null) {
-        await showSyllabusOverlapDialog(context, saved, overlap);
-      }
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -95,7 +88,7 @@ class _ServerSyllabusCatalogScreenState
           ),
           action: SnackBarAction(
             label: '开始背',
-            onPressed: () => context.push(syllabusBookSessionRoute(saved.id)),
+            onPressed: () => startSyllabusBookSession(ref, context, saved),
           ),
         ),
       );
