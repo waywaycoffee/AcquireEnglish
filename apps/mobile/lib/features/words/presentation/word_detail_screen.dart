@@ -16,8 +16,10 @@ import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../data/offline_word_dictionary.dart';
 import '../data/vocab_card_enrichment_service.dart';
 import '../domain/word_morphology.dart';
+import '../domain/word_root_models.dart';
 import 'word_book_provider.dart';
 import 'word_context_progress.dart';
+import 'word_root_provider.dart';
 import 'word_video_relink.dart';
 import 'widgets/phonics_syllable_blocks.dart';
 
@@ -355,6 +357,33 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                     builder: (BuildContext context) {
                       final MorphologyInsight morph =
                           analyzeWordMorphology(entry.word);
+                      final WordRootDetail? rootDetail =
+                          ref.watch(wordRootDetailProvider(entry.word));
+                      final List<AffixHit> affixes =
+                          (rootDetail != null && rootDetail.parse.isNotEmpty)
+                          ? <AffixHit>[
+                              for (final WordRootParsePart part
+                                  in rootDetail.parse)
+                                AffixHit(
+                                  part: part.matchedForm.isNotEmpty
+                                      ? part.matchedForm
+                                      : part.rootText,
+                                  kind: part.type == 'prefix' ||
+                                          part.typeCn == '前缀'
+                                      ? 'prefix'
+                                      : part.type == 'suffix' ||
+                                              part.typeCn == '后缀'
+                                          ? 'suffix'
+                                          : 'root',
+                                  meaningCn: part.displayMeaning,
+                                  examples: rootDetail.sameRootWords
+                                      .take(3)
+                                      .map((WordRootWord w) => w.word)
+                                      .toList(growable: false),
+                                ),
+                            ]
+                          : morph.affixes;
+                      final String formula = rootDetail?.parseFormula ?? '';
                       return Column(
                         crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
@@ -365,17 +394,32 @@ class _WordDetailDialogState extends ConsumerState<WordDetailDialog> {
                           ),
                           const SizedBox(height: 16),
                           RootsAffixesCard(
-                            affixes: morph.affixes,
-                            aiText: entry.rootsAffixesCn ?? '',
+                            affixes: affixes,
+                            aiText: formula.isNotEmpty
+                                ? formula
+                                : (entry.rootsAffixesCn ?? ''),
                           ),
-                          if (morph.affixes.isNotEmpty ||
+                          if (affixes.isNotEmpty ||
+                              formula.isNotEmpty ||
                               (entry.rootsAffixesCn ?? '')
                                   .trim()
                                   .isNotEmpty) ...<Widget>[
-                            const SizedBox(height: 16),
+                            Align(
+                              alignment: Alignment.centerLeft,
+                              child: TextButton.icon(
+                                onPressed: () => context.push(
+                                  '/words/roots?q=${Uri.encodeComponent(entry.word)}&mode=word',
+                                ),
+                                icon: const Icon(Icons.account_tree_outlined),
+                                label: const Text('打开词根词缀'),
+                              ),
+                            ),
+                            const SizedBox(height: 8),
                           ],
                           EtymologyCard(
-                            localHint: morph.etymologyHintCn,
+                            localHint: rootDetail?.parse.isNotEmpty == true
+                                ? '构词：${rootDetail!.parseFormula}'
+                                : morph.etymologyHintCn,
                             aiText: entry.etymologyCn ?? '',
                           ),
                           const SizedBox(height: 16),

@@ -350,6 +350,11 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
                                 runSpacing: 8,
                                 children: <Widget>[
                                   ActionChip(
+                                    label: const Text('词根词缀'),
+                                    onPressed: () =>
+                                        context.push('/words/roots'),
+                                  ),
+                                  ActionChip(
                                     label: const Text('背推荐单词'),
                                     onPressed: () => context.push(
                                       ref.read(recommendedWordsProvider).isEmpty

@@ -78,6 +78,7 @@ import '../features/words/presentation/server_syllabus_catalog_screen.dart';
 import '../features/words/presentation/syllabus_books_screen.dart';
 import '../features/words/presentation/syllabus_book_browse_screen.dart';
 import '../features/words/presentation/favorite_word_book_screen.dart';
+import '../features/words/presentation/word_root_explorer_screen.dart';
 import '../features/words/presentation/words_screen.dart';
 import '../features/words/presentation/vocabulary_placement_screen.dart';
 import 'fade_extension.dart';
@@ -655,6 +656,20 @@ GoRouter goRouter(Ref ref) {
           tab.isEmpty ? 'word' : tab,
         );
         return SyllabusBooksScreen(initialKind: kind);
+      },
+    ).fade(),
+    GoRoute(
+      path: '/words/roots',
+      builder: (BuildContext context, GoRouterState state) {
+        final String q = (state.uri.queryParameters['q'] ?? '').trim();
+        final String modeRaw =
+            (state.uri.queryParameters['mode'] ?? '').trim();
+        final WordRootExplorerMode mode = switch (modeRaw) {
+          'root' => WordRootExplorerMode.root,
+          'browse' => WordRootExplorerMode.browse,
+          _ => WordRootExplorerMode.word,
+        };
+        return WordRootExplorerScreen(initialQuery: q, mode: mode);
       },
     ).fade(),
     GoRoute(
