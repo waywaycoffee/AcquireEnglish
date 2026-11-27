@@ -36,7 +36,10 @@ word_root_rel(rel_id, word, root_id, root, type_cn, matched_form, position,
 - `position`: 词首 / 词中 / 词尾，由 `matched_form` 在词中的实际位置回填，做过一致性校验（异常 0 条）。
 - `root_cn_meaning`：该词根／词缀本身的中文义，如 `port=拿，运`，用于在单词卡上直接展示构词逻辑。
 - `word_gloss`：这个词整体的中文释义，如 `transport=运输`，**不是**词根在该词里的意思。
-- `root_sense`：**在 `word_root_rel.csv`（关联表）**，不是 `roots` 主表。含义是「这个词根在当前这个单词里的具体语义」——同一词根在不同词里可以不同（如 port 在 transport≈搬运，在 portable≈可携带）。App 展示优先 `root_sense`，为空则回退 `root_cn_meaning`。当前数据尚未逐条填写（填充率 0%），补写后重跑 `export_full_json.py` 即可进 App。
+- `root_sense`：**在 `word_root_rel.csv`（关联表）**，不是 `roots` 主表。含义是「这个词根在当前这个单词里的具体语义」——同一词根在不同词里可以不同（如 port 在 transport≈运送，在 report≈携带信息）。App 两行展示：本词内=`root_sense`（可空）、通用义=`root_cn_meaning`。**禁止**把规则猜测写入 `root_sense`。补写后重跑 `export_full_json.py`。
+- **表头勿改**：当前 CSV 表头是  
+  `rel_id,word,root_id,root,type_cn,matched_form,position,root_cn_meaning,root_sense,word_gloss`  
+  豆包草稿里的 `rel_id,word_id,root_id,root_sense,position,note` **不兼容**本仓库数据，强行切换会导致列错位、全库变空。
 - `gloss_variants`: 同一个词在不同词根下释义不一致时保留的备选释义（21 个词），便于人工校正。
 
 ## 三、建库方式（AcquireEnglish App）
@@ -54,7 +57,9 @@ App 侧：
 
 - 单词页入口「词根词缀」→ `/words/roots`
 - 查词拆解 / 同根词 / 词根反向检索 / 拼写建议：`WordRootCatalog`
-- 「加入背词」写入《情景记忆》并进入现有 FSRS 队列（不另起一套记忆库）
+- 「加入背词」写入《情景记忆》并进入现有 FSRS 队列（**已删除**独立 `fsrs_memory_api.py`）
+- 主学习流自动注入：新学卡 / 复习揭晓后 / 查词弹层 / 词卡详情；设置「自动显示词根拆解」默认开
+- 库外单词：形态规则降级，标记 `is_manual: false`，文案提示「仅供参考」
 
 配套文件：
 

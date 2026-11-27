@@ -10,7 +10,7 @@ final wordRootDetailProvider =
     Provider.family<WordRootDetail?, String>((Ref ref, String word) {
   final AsyncValue<WordRootCatalog> catalog = ref.watch(wordRootCatalogProvider);
   return catalog.maybeWhen(
-    data: (WordRootCatalog c) => c.queryWordDetail(word),
+    data: (WordRootCatalog c) => c.resolveWord(word),
     orElse: () => null,
   );
 });

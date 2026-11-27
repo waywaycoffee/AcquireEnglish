@@ -91,6 +91,7 @@ def export_all(*, copy_to_flutter: bool = True) -> Path:
             }
         )
 
+    sense_filled = sum(1 for r in rels if (r.get("sense") or "").strip())
     payload = {
         "meta": {
             "desc": "词根词缀离线库 · AcquireEnglish",
@@ -98,6 +99,7 @@ def export_all(*, copy_to_flutter: bool = True) -> Path:
             "root_count": len(roots),
             "word_count": len(words),
             "rel_count": len(rels),
+            "root_sense_filled": sense_filled,
         },
         "roots": roots,
         "words": words,
@@ -113,6 +115,16 @@ def export_all(*, copy_to_flutter: bool = True) -> Path:
         f"词根：{len(roots)} | 单词：{len(words)} | 关联：{len(rels)} | "
         f"{OUTPUT.stat().st_size // 1024} KB"
     )
+    if rels and sense_filled == 0:
+        print(
+            "⚠️ root_sense 全部为空：请在 word_root_rel.csv 的 root_sense 列补「本词内语义」；"
+            "不要改成豆包草稿表头（word_id…），否则会与现有 CSV 错位。"
+        )
+    elif rels and sense_filled < len(rels):
+        print(
+            f"⚠️ root_sense 已填 {sense_filled}/{len(rels)}；"
+            "空行仍会入库并回退 root_cn_meaning，禁止用规则猜测写入 root_sense。"
+        )
 
     if copy_to_flutter:
         FLUTTER_ASSET.parent.mkdir(parents=True, exist_ok=True)

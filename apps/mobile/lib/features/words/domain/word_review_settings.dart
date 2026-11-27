@@ -59,6 +59,7 @@ class WordReviewSettings {
     this.requireSpelling = false,
     this.dailyNewLimit = 20,
     this.dailyReviewLimit = 50,
+    this.showWordRoots = true,
     this.enabledModes = const <WordPracticeMode>[
       WordPracticeMode.recognize,
       WordPracticeMode.listen,
@@ -69,6 +70,9 @@ class WordReviewSettings {
   final bool requireSpelling;
   final int dailyNewLimit;
   final int dailyReviewLimit;
+
+  /// Auto-show root breakdown on review / lookup / detail (default on).
+  final bool showWordRoots;
   final List<WordPracticeMode> enabledModes;
 
   static const WordReviewSettings defaults = WordReviewSettings();
@@ -85,6 +89,7 @@ class WordReviewSettings {
     bool? requireSpelling,
     int? dailyNewLimit,
     int? dailyReviewLimit,
+    bool? showWordRoots,
     List<WordPracticeMode>? enabledModes,
   }) {
     final List<WordPracticeMode> modes = enabledModes ?? this.enabledModes;
@@ -96,6 +101,7 @@ class WordReviewSettings {
         0,
         500,
       ),
+      showWordRoots: showWordRoots ?? this.showWordRoots,
       enabledModes: modes.isEmpty
           ? const <WordPracticeMode>[WordPracticeMode.recognize]
           : List<WordPracticeMode>.unmodifiable(modes),
@@ -107,6 +113,7 @@ class WordReviewSettings {
     'requireSpelling': requireSpelling,
     'dailyNewLimit': dailyNewLimit,
     'dailyReviewLimit': dailyReviewLimit,
+    'showWordRoots': showWordRoots,
     'enabledModes': enabledModes.map((WordPracticeMode m) => m.name).toList(),
   };
 
@@ -128,6 +135,7 @@ class WordReviewSettings {
       requireSpelling: json['requireSpelling'] == true,
       dailyNewLimit: (json['dailyNewLimit'] as num?)?.toInt() ?? 20,
       dailyReviewLimit: (json['dailyReviewLimit'] as num?)?.toInt() ?? 50,
+      showWordRoots: json['showWordRoots'] as bool? ?? true,
       enabledModes: modes.isEmpty
           ? WordReviewSettings.defaults.enabledModes
           : modes,

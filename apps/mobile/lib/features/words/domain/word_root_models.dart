@@ -167,6 +167,8 @@ class WordRootDetail {
     required this.level,
     required this.parse,
     required this.sameRootWords,
+    this.isManual = true,
+    this.warning = '',
   });
 
   final String word;
@@ -174,6 +176,12 @@ class WordRootDetail {
   final String level;
   final List<WordRootParsePart> parse;
   final List<WordRootWord> sameRootWords;
+
+  /// True when parse comes from curated word_root_rel (may still lack root_sense).
+  final bool isManual;
+
+  /// Shown when [isManual] is false (rule/morphology guess only).
+  final String warning;
 
   String get parseFormula {
     if (parse.isEmpty) return '';
@@ -184,6 +192,23 @@ class WordRootDetail {
               '(${p.displayMeaning})',
         )
         .join(' + ');
+  }
+
+  WordRootDetail copyWith({
+    List<WordRootParsePart>? parse,
+    List<WordRootWord>? sameRootWords,
+    bool? isManual,
+    String? warning,
+  }) {
+    return WordRootDetail(
+      word: word,
+      gloss: gloss,
+      level: level,
+      parse: parse ?? this.parse,
+      sameRootWords: sameRootWords ?? this.sameRootWords,
+      isManual: isManual ?? this.isManual,
+      warning: warning ?? this.warning,
+    );
   }
 }
 

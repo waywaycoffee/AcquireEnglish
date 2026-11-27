@@ -182,6 +182,22 @@ class _WordRecallOptions extends ConsumerWidget {
         SwitchListTile(
           contentPadding: EdgeInsets.zero,
           title: const Text(
+            '自动显示词根拆解',
+            style: TextStyle(color: Colors.white),
+          ),
+          subtitle: const Text(
+            '背词 / 查词 / 词卡里展示构词与同根词；可关闭',
+            style: TextStyle(color: Color(0xFF94A3B8), fontSize: 12),
+          ),
+          value: settings.showWordRoots,
+          activeThumbColor: const Color(0xFF22C55E),
+          onChanged: (bool value) => notifier.update(
+            settings.copyWith(showWordRoots: value),
+          ),
+        ),
+        SwitchListTile(
+          contentPadding: EdgeInsets.zero,
+          title: const Text(
             '认记后强制拼写门禁',
             style: TextStyle(color: Colors.white),
           ),

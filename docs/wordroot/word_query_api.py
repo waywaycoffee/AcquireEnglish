@@ -88,6 +88,19 @@ def query_word_detail(word: str) -> dict:
     level_rank = {"高频": 0, "进阶": 1}
     same.sort(key=lambda x: (level_rank.get(x["word_level"], 9), x["word"]))
 
+    if not parse_list:
+        # Do NOT invent root_sense. Morphology guess is Flutter-side with is_manual=false.
+        return {
+            "ok": False,
+            "msg": f"词汇【{word}】无人工词根关联；App 可降级为自动推测并标记 is_manual=false",
+            "word": needle,
+            "cn_def": (meta.get("cn_gloss") or "").strip(),
+            "word_level": (meta.get("level_suggest") or "").strip(),
+            "parse": [],
+            "same_root_words": [],
+            "is_manual": False,
+        }
+
     return {
         "ok": True,
         "word": needle,
@@ -95,6 +108,11 @@ def query_word_detail(word: str) -> dict:
         "word_level": (meta.get("level_suggest") or "").strip(),
         "parse": parse_list,
         "same_root_words": same,
+        "is_manual": True,
+        "root_sense_note": (
+            "parse[].root_sense = 本词内语义（可空）；"
+            "parse[].cn_meaning = 词根通用义"
+        ),
     }
 
 

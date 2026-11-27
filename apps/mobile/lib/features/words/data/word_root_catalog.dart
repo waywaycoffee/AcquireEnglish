@@ -220,6 +220,45 @@ class WordRootCatalog {
       level: meta?.level ?? '',
       parse: List<WordRootParsePart>.unmodifiable(parse),
       sameRootWords: List<WordRootWord>.unmodifiable(same),
+      isManual: true,
+    );
+  }
+
+  /// Curated catalog first; if missing, light morphology guess (never writes root_sense).
+  WordRootDetail? resolveWord(String raw) {
+    final WordRootDetail? curated = queryWordDetail(raw);
+    if (curated != null && curated.parse.isNotEmpty) {
+      return curated;
+    }
+    final List<AffixHit> guessed = matchRootsAndAffixes(raw);
+    if (guessed.isEmpty) {
+      return curated;
+    }
+    final String word = _normalizeWord(raw);
+    return WordRootDetail(
+      word: word,
+      gloss: curated?.gloss ?? '',
+      level: curated?.level ?? '',
+      parse: List<WordRootParsePart>.unmodifiable(<WordRootParsePart>[
+        for (final AffixHit hit in guessed)
+          WordRootParsePart(
+            rootText: hit.part,
+            cnMeaning: hit.meaningCn,
+            type: hit.kind,
+            typeCn: switch (hit.kind) {
+              'prefix' => '前缀',
+              'suffix' => '后缀',
+              _ => '词根',
+            },
+            position: '',
+            matchedForm: hit.part,
+            rootSense: '',
+            rootId: '',
+          ),
+      ]),
+      sameRootWords: const <WordRootWord>[],
+      isManual: false,
+      warning: '词缀自动推测，未人工标注，仅供参考',
     );
   }
 

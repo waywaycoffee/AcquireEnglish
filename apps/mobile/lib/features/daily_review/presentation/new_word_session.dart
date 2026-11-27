@@ -13,8 +13,8 @@ import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_lookup_service.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/domain/word_lookup_entry.dart';
-import '../../words/domain/word_morphology.dart';
 import '../../words/presentation/widgets/phonics_syllable_blocks.dart';
+import '../../words/presentation/widgets/word_root_breakdown_panel.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
 import '../domain/daily_review.dart';
 import 'daily_review_provider.dart';
@@ -289,9 +289,7 @@ class _NewWordSessionState extends ConsumerState<NewWordSession> {
                 Expanded(
                   child: Center(
                     child: Text(
-                      '${stages[i]}\n${i == 4
-                          ? '待词根资料'
-                          : complete || i < stage
+                      '${stages[i]}\n${complete || i < stage
                           ? '已完成'
                           : i == stage
                           ? '进行中'
@@ -351,7 +349,6 @@ class _NewWordSessionState extends ConsumerState<NewWordSession> {
   }
 
   Widget _wordCard(ReviewSource source, WordLookupEntry? entry) {
-    final MorphologyInsight morphology = analyzeWordMorphology(source.question);
     return ListView(
       physics: const NeverScrollableScrollPhysics(),
       padding: const EdgeInsets.all(20),
@@ -368,8 +365,12 @@ class _NewWordSessionState extends ConsumerState<NewWordSession> {
               : source.english,
         ),
         if (source.chinese.isNotEmpty) Text(source.chinese),
-        for (final AffixHit part in morphology.affixes)
-          Text('${part.part} · ${part.meaningCn}'),
+        const SizedBox(height: 10),
+        WordRootBreakdownPanel(
+          word: source.question,
+          compact: true,
+          initiallyExpanded: true,
+        ),
         TextButton(
           onPressed: () => _play(source.question),
           child: const Text('听示范'),

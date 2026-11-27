@@ -49,6 +49,7 @@ import '../../words/presentation/widgets/phonics_syllable_blocks.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../../words/presentation/word_review_settings_provider.dart';
 import '../../words/presentation/word_review_settings_sheet.dart';
+import '../../words/presentation/widgets/word_root_breakdown_panel.dart';
 import '../../micro_review/presentation/micro_review_controller.dart';
 import '../data/missed_review_book.dart';
 import '../data/review_session_draft.dart';
@@ -1764,6 +1765,13 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   color: AppDesignTokens.textPrimary,
                 ),
               ),
+            if (word && _revealed) ...<Widget>[
+              const SizedBox(height: 10),
+              WordRootBreakdownPanel(
+                word: source.question,
+                compact: true,
+              ),
+            ],
             if (word &&
                 (source.english.trim().isNotEmpty ||
                     (source.episodeId?.trim().isNotEmpty ?? false) ||

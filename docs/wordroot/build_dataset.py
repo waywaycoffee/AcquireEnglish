@@ -1,3 +1,8 @@
+"""Legacy Doubao draft importer — schema does NOT match roots.csv / word_root_rel.csv.
+
+Prefer: export_full_json.py (CSV → roots_full.json for Flutter) and roots.db.zip.
+Do not rewrite word_root_rel.csv to word_id-only headers; that breaks the real dataset.
+"""
 import sqlite3
 import csv
 import os

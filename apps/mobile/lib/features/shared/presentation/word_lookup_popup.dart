@@ -7,6 +7,7 @@ import '../../phrases/presentation/phrase_book_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../words/presentation/word_book_provider.dart';
 import '../../words/presentation/widgets/phonics_syllable_blocks.dart';
+import '../../words/presentation/widgets/word_root_breakdown_panel.dart';
 import '../data/word_lookup_service.dart';
 import '../data/word_pronunciation_service.dart';
 import '../domain/word_lookup_entry.dart';
@@ -387,10 +388,29 @@ class _WordLookupPopupCardState extends ConsumerState<WordLookupPopupCard> {
           compact: true,
         ),
         const SizedBox(height: 8),
-        if (widget.maxHeight == null)
-          body
-        else
-          Flexible(child: SingleChildScrollView(child: body)),
+        if (widget.maxHeight == null) ...<Widget>[
+          body,
+          const SizedBox(height: 8),
+          WordRootBreakdownPanel(
+            word: _entry?.word ?? widget.rawWord,
+            compact: true,
+          ),
+        ] else
+          Flexible(
+            child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.stretch,
+                children: <Widget>[
+                  body,
+                  const SizedBox(height: 8),
+                  WordRootBreakdownPanel(
+                    word: _entry?.word ?? widget.rawWord,
+                    compact: true,
+                  ),
+                ],
+              ),
+            ),
+          ),
       ],
     );
 
