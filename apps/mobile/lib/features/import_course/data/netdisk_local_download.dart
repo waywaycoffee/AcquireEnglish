@@ -952,12 +952,17 @@ int pendingNetdiskEpisodes(LibraryCourseData course) {
 }
 
 /// Write API softsubs for a netdisk import onto disk and catalog.
+///
+/// [allowOnlineFetch] triggers Shooter/Subliminal when EN is missing. Keep it
+/// false on player cold-open — that path can take tens of seconds and freeze
+/// 美剧（哈利波特）开播；online refill belongs in import/download flows.
 Future<void> materializeNetdiskSoftsubs({
   required AcquireApiClient api,
   required LibraryCatalogNotifier catalog,
   required String courseId,
   LibraryEpisodeItem? episode,
   int? importId,
+  bool allowOnlineFetch = true,
 }) async {
   final int? resolvedId = importId ??
       parseLinkImportId(courseId) ??
@@ -973,7 +978,7 @@ Future<void> materializeNetdiskSoftsubs({
     lang: 'en',
   );
   // Older imports may predate Subliminal — ask API to match online EN once.
-  if (enBody == null || enBody.trim().isEmpty) {
+  if (allowOnlineFetch && (enBody == null || enBody.trim().isEmpty)) {
     final bool filled = await api.fetchNetdiskOnlineSubtitles(
       importId: resolvedId,
     );

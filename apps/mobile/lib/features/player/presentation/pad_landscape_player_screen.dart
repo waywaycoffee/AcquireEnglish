@@ -426,7 +426,8 @@ class PadLandscapePlayerScreenState
           importId: parseNetdiskImportIdFromUrl(resource.videoAsset) ??
               parseNetdiskImportIdFromUrl(enSub) ??
               parseNetdiskImportIdFromUrl(zhSub),
-        );
+          allowOnlineFetch: false,
+        ).timeout(const Duration(seconds: 8));
         resource = resolvePlayerCourseForEpisode(
           courses: ref.read(libraryCatalogProvider),
           episodeId: widget.episodeId,

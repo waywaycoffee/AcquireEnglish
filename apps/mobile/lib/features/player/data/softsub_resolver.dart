@@ -236,6 +236,8 @@ Future<({String? en, String? zh})> resolveEpisodeSoftsubs({
           courseId: courseId,
           episode: episode,
           importId: importId,
+          // Playback resolve must stay fast; online Subliminal is import-time.
+          allowOnlineFetch: false,
         );
       } catch (_) {}
     }

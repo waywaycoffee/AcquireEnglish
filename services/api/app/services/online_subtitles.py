@@ -37,6 +37,7 @@ _OS_HASH_BLOCK = 65536
 _ENGLISH_SEARCH_ALIASES: dict[str, str] = {
     "哈利·波特": "Harry Potter",
     "哈利波特": "Harry Potter",
+    "哈利丶波特": "Harry Potter",
     "老友记": "Friends",
     "绝望主妇": "Desperate Housewives",
     "绝望的主妇": "Desperate Housewives",
@@ -232,6 +233,19 @@ def _ascii_slug(text: str) -> str:
     return cleaned.strip(".")
 
 
+def _normalize_cjk_title(text: str) -> str:
+    """Strip mid-dot / 丶 noise so 哈利丶波特 / 魔丶法石 still match aliases."""
+    return (
+        (text or "")
+        .replace("\u30fb", "")  # katakana mid-dot
+        .replace("\u00b7", "")  # middle dot ·
+        .replace("\u2022", "")
+        .replace("丶", "")
+        .replace("·", "")
+        .replace(" ", "")
+    )
+
+
 def _english_alias(title: str | None) -> str | None:
     raw = (title or "").strip()
     if not raw:
@@ -239,8 +253,12 @@ def _english_alias(title: str | None) -> str | None:
     if raw in _ENGLISH_SEARCH_ALIASES:
         return _ENGLISH_SEARCH_ALIASES[raw]
     lower = raw.lower()
+    compact = _normalize_cjk_title(lower)
     for zh, en in _ENGLISH_SEARCH_ALIASES.items():
-        if zh.lower() in lower or en.lower() in lower:
+        zh_l = zh.lower()
+        if zh_l in lower or en.lower() in lower:
+            return en
+        if _normalize_cjk_title(zh_l) and _normalize_cjk_title(zh_l) in compact:
             return en
     if re.search(r"[A-Za-z]", raw):
         return raw
@@ -249,22 +267,30 @@ def _english_alias(title: str | None) -> str | None:
 
 def _infer_harry_potter_index(filename: str, episode_index: int | None) -> int | None:
     stem = Path(filename or "").stem.lower()
+    compact = _normalize_cjk_title(stem)
     # Prefer explicit Part markers for Deathly Hallows.
-    if re.search(r"(死.?亡.?圣器|deathly)", stem, re.I):
-        if re.search(r"(下|part\s*2|pt\.?\s*2)", stem, re.I):
+    if re.search(r"(死.?亡.?圣器|deathly)", stem, re.I) or "死亡圣器" in compact:
+        if re.search(r"(下|part\s*2|pt\.?\s*2)", stem, re.I) or "下" in compact:
             return 8
-        if re.search(r"(上|part\s*1|pt\.?\s*1)", stem, re.I):
+        if re.search(r"(上|part\s*1|pt\.?\s*1)", stem, re.I) or "上" in compact:
             return 7
     for hint, idx in _HARRY_POTTER_TITLE_HINTS:
-        if hint in stem:
-            if idx == 7 and re.search(r"(下|part\s*2|pt\.?\s*2)", stem, re.I):
+        hint_l = hint.lower()
+        if hint_l in stem or _normalize_cjk_title(hint_l) in compact:
+            if idx == 7 and (
+                re.search(r"(下|part\s*2|pt\.?\s*2)", stem, re.I) or "下" in compact
+            ):
                 return 8
             return idx
     m = re.search(r"(?:哈利.?波特|harry.?potter)\D{0,6}([1-8])", stem, re.I)
+    if m is None:
+        m = re.search(r"(?:哈利波特|harrypotter)\D{0,6}([1-8])", compact, re.I)
     if m:
         n = int(m.group(1))
         # Filenames often keep "7" for both Deathly Hallows parts.
-        if n == 7 and re.search(r"(下|part\s*2|pt\.?\s*2)", stem, re.I):
+        if n == 7 and (
+            re.search(r"(下|part\s*2|pt\.?\s*2)", stem, re.I) or "下" in compact
+        ):
             return 8
         return n
     if episode_index in _HARRY_POTTER_FILMS:

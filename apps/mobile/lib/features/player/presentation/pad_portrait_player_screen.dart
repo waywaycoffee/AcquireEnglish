@@ -633,7 +633,9 @@ class PadPortraitPlayerScreenState
           importId: parseNetdiskImportIdFromUrl(resource.videoAsset) ??
               parseNetdiskImportIdFromUrl(enSub) ??
               parseNetdiskImportIdFromUrl(zhSub),
-        );
+          // Never block 美剧开播 on Subliminal/Shooter (can hang 30–90s).
+          allowOnlineFetch: false,
+        ).timeout(const Duration(seconds: 8));
         resource = resolvePlayerCourseForEpisode(
           courses: ref.read(libraryCatalogProvider),
           episodeId: widget.episodeId,

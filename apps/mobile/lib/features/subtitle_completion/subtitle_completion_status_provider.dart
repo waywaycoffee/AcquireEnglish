@@ -465,7 +465,12 @@ class SubtitleCompletionStatusNotifier
     _poll?.cancel();
     void startPolling() {
       _poll?.cancel();
+      if (!ref.mounted) return;
       _poll = Timer.periodic(const Duration(seconds: 2), (_) {
+        if (!ref.mounted) {
+          _poll?.cancel();
+          return;
+        }
         unawaited(refresh());
       });
     }
@@ -477,10 +482,22 @@ class SubtitleCompletionStatusNotifier
   }
 
   Future<void> refresh() async {
-    await _pollTrackedCloudJobs();
-    final List<SubtitleCompletionJob> jobs = await SubtitleCompletionQueue
-        .shared
-        .loadJobs();
+    if (!ref.mounted) return;
+    try {
+      await _pollTrackedCloudJobs();
+      if (!ref.mounted) return;
+      final List<SubtitleCompletionJob> jobs = await SubtitleCompletionQueue
+          .shared
+          .loadJobs();
+      if (!ref.mounted) return;
+      await _applyRefreshJobs(jobs);
+    } catch (_) {
+      // AutoDispose + Timer can finish after the provider is gone.
+    }
+  }
+
+  Future<void> _applyRefreshJobs(List<SubtitleCompletionJob> jobs) async {
+    if (!ref.mounted) return;
     final Map<String, SubtitleCompletionEpisodeUi> next =
         <String, SubtitleCompletionEpisodeUi>{};
     for (final SubtitleCompletionJob job in jobs) {
@@ -565,6 +582,7 @@ class SubtitleCompletionStatusNotifier
         );
       }
     }
+    if (!ref.mounted) return;
     state = state.copyWith(
       byEpisodeId: Map<String, SubtitleCompletionEpisodeUi>.unmodifiable(next),
     );
@@ -572,6 +590,7 @@ class SubtitleCompletionStatusNotifier
 
   /// Refresh cloud-only EN jobs that never enter the local Whisper queue.
   Future<void> _pollTrackedCloudJobs() async {
+    if (!ref.mounted) return;
     final List<CloudSubtitleJobTrack> tracks =
         CloudSubtitleJobTracker.instance.activeTracks;
     if (tracks.isEmpty) {

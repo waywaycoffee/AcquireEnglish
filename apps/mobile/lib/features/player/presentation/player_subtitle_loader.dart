@@ -1,5 +1,6 @@
 import 'dart:convert';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 
 import 'bilingual_subtitle_helpers.dart';
@@ -9,16 +10,28 @@ import 'subtitle_language_sanitize.dart';
 
 export 'subtitle_language_sanitize.dart' show sanitizeSubtitleLanguageFields;
 
+/// Film softsubs (哈利波特等) often exceed 100KB / 1k+ cues — parse off UI isolate.
+const int _kParseOnIsolateMinChars = 24000;
+
 Future<List<PlayerSubtitleLine>> loadSubtitleLinesFromAsset(
   String assetPath,
 ) async {
   final String raw = await rootBundle.loadString(assetPath);
-  return parseSubtitleLines(raw);
+  return _parseSubtitleLinesMaybeIsolate(raw);
 }
 
 Future<List<PlayerSubtitleLine>> loadSubtitleLines(String source) async {
   final String raw = await loadPlayerTextSource(source);
-  return parseSubtitleLines(raw);
+  return _parseSubtitleLinesMaybeIsolate(raw);
+}
+
+Future<List<PlayerSubtitleLine>> _parseSubtitleLinesMaybeIsolate(
+  String raw,
+) async {
+  if (raw.length < _kParseOnIsolateMinChars) {
+    return parseSubtitleLines(raw);
+  }
+  return compute(parseSubtitleLines, raw);
 }
 
 /// Official Chinese-only CC/AI tracks parse into [PlayerSubtitleLine.english]
