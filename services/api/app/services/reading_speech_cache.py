@@ -77,11 +77,12 @@ def save_bytes(
         raise ValueError("empty audio payload")
     digest = speech_hash(spoken, voice=voice, language=language)
     path = cache_file_path(voice=voice, digest=digest)
-    path.parent.mkdir(parents=True, exist_ok=True)
-    path.write_bytes(data)
     # TTS is content-addressed under reading/tts/ and looked up by hash —
     # do not rebuild the book media manifest (expensive rglob) on every synth.
     rel = cache_relative_path(voice=voice, digest=digest)
+    from app.services import oss_storage
+
+    oss_storage.persist_bytes(f"reading/{rel}", data, local_path=path)
     return {
         "hash": digest,
         "voice": voice_segment(voice),

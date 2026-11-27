@@ -1,12 +1,13 @@
-# 音视频：ECS 存储与按需播放
+# 音视频：OSS（主）/ ECS 缓存 与按需播放
 
 ## 原则
 
 | 允许 | 禁止 |
 |---|---|
-| API/ECS 磁盘保存 `.mp3` / `.mp4` 等 | 打进 `apps/mobile/assets` |
-| App 经 manifest/lookup 拿 URL 后流式播放 | 第三方音视频原文件随包分发 |
-| 文本 JSON/TXT/CSV/EPUB 按需下载到本地缓存 | 把 Magic/GitHub 的 mp3 拷进工程 |
+| 阿里云 OSS 保存 `.mp3` / `.mp4` / PDF 等（主存储） | 打进 `apps/mobile/assets` |
+| ECS `{media_cache_dir}` 作迁移期本地缓存 | 第三方音视频原文件随包分发 |
+| App 经 manifest/lookup 拿 URL 后流式播放 | 把 Magic/GitHub 的 mp3 拷进工程 |
+| 文本 JSON/TXT/CSV/EPUB 按需下载到本地缓存 | 把 `*.sqlite3` 任务库上传到 OSS |
 
 ## 首页技能模块（秒播）
 
@@ -49,7 +50,40 @@ PYTHONPATH=/opt/acquireenglish/services/api \
   imports/{import_id}/study.m4a   # 外链课缓存，服务端生成
 ```
 
-公开基址：`MEDIA_PUBLIC_BASE`（默认 `https://acquireenglish.curlhairai.com`）。
+公开基址：`MEDIA_PUBLIC_BASE`（默认 `https://acquireenglish.curlhairai.com`）。  
+启用 OSS 后，manifest 里的播放 URL 优先用 `OSS_PUBLIC_BASE`（或 `https://{bucket}.{endpoint}/…`）。
+
+## 迁到阿里云 OSS
+
+1. 控制台创建 Bucket（建议与 ECS 同区域，如 `oss-cn-guangzhou`），容量按套餐（如 500GB）。
+2. 建 RAM 用户，授予该 Bucket 的 `oss:PutObject` / `GetObject` / `ListObjects` / `DeleteObject`（勿用短信专用 AK）。
+3. Bucket 读权限：公共读，或私有 + CDN 回源；把对外 HTTPS 基址写入 `OSS_PUBLIC_BASE`。
+4. 在 API 机 `services/api/.env` 配置：
+
+```bash
+OSS_ENABLED=1
+OSS_ACCESS_KEY_ID=...
+OSS_ACCESS_KEY_SECRET=...
+OSS_ENDPOINT=oss-cn-guangzhou.aliyuncs.com
+OSS_BUCKET=your-bucket
+OSS_KEY_PREFIX=media
+OSS_PUBLIC_BASE=https://your-bucket.oss-cn-guangzhou.aliyuncs.com
+OSS_KEEP_LOCAL_CACHE=1
+```
+
+5. 安装依赖并全量上传（约数 GB，可重复跑）：
+
+```bash
+cd /opt/acquireenglish/services/api
+.venv/bin/pip install -q oss2
+.venv/bin/python scripts/migrate_media_to_oss.py --dry-run
+.venv/bin/python scripts/migrate_media_to_oss.py --skip-existing
+systemctl restart acquireenglish-api
+```
+
+6. 抽查一条 URL（manifest / `OSS_PUBLIC_BASE/...`）能 Range 播放后，再把 `OSS_KEEP_LOCAL_CACHE=0`，并视情况清理 ECS 本地副本（`--delete-local-after` 仅在确认无误后使用）。
+
+对象键：`media/{namespace}/…`（与本地相对路径一致）。任务库 `reading-tts-jobs.sqlite3` 等留在 ECS。
 
 ## API
 

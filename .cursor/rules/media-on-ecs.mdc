@@ -1,13 +1,15 @@
 ---
-description: Audio/video must live on ECS, not in the mobile app package
+description: Audio/video must live on OSS/API storage, not in the mobile app package
 alwaysApply: true
 ---
 
-# Media on ECS only
+# Media on OSS / API host only (never in APK)
 
 - **Never** add `.mp3` / `.mp4` / `.m4a` / `.aac` / `.wav` / `.webm` / `.mov` under `apps/mobile/assets` (or any Flutter asset path shipped in the APK).
-- Store speech and video on the API host (ECS) under `{media_cache_dir}/{namespace}/…` and expose via `/media/{namespace}/…`.
-- App playback must resolve URLs through API manifests (`/api/foundation/media/*` or `/api/content/media/*`) then stream from the server; do not hardcode third-party audio CDNs into the APK as bundled files.
+- Canonical blob store is **Aliyun OSS** (`OSS_*` settings); ECS `{media_cache_dir}` may keep a local cache during migration (`OSS_KEEP_LOCAL_CACHE`).
+- Object keys: `{oss_key_prefix}/{namespace}/…` (default prefix `media`). Serve via `OSS_PUBLIC_BASE` or legacy `{MEDIA_PUBLIC_BASE}/media/{namespace}/…`.
+- App playback must resolve URLs through API manifests (`/api/foundation/media/*` or `/api/content/media/*`) then stream; do not hardcode third-party audio CDNs into the APK as bundled files.
 - Namespaces: `foundation` | `reading` | `oral` | `course` | `misc` | `exam`.
-- Text corpora (JSON/TXT/CSV/EPUB text) may still be cached on device after download; accompanying **audio/video** for those texts must be uploaded to ECS (`reading` namespace) before the app plays them.
+- Text corpora (JSON/TXT/CSV/EPUB text) may still be cached on device after download; accompanying **audio/video** for those texts must be uploaded to OSS/`reading` before the app plays them.
 - Imported Bilibili/YouTube study media is cached server-side (`media/imports/`), not in the app package.
+- Job SQLite files (`*.sqlite3`) stay on the ECS disk — do not put them on OSS.

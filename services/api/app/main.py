@@ -210,6 +210,7 @@ async def health() -> dict[str, str]:
     from app.models import SharedBilibiliSubtitle
     from app.services.email_auth import email_mock_enabled, email_provider
     from app.services.livekit_tokens import livekit_configured
+    from app.services.oss_storage import oss_configured
     from app.services.phone_auth import sms_mock_enabled, sms_provider
 
     shared_count = "unset"
@@ -259,6 +260,8 @@ async def health() -> dict[str, str]:
         "admin": "/admin/",
         "openlist": "configured" if settings.openlist_configured else "unset",
         "netdisk": "/api/netdisk",
+        "oss": "configured" if oss_configured() else "unset",
+        "oss_bucket": (settings.oss_bucket or "").strip() or "unset",
         "scene_vl_model": (settings.scene_vl_model or "qwen3-vl-plus").strip()
         or "qwen3-vl-plus",
         "scene_vl": (

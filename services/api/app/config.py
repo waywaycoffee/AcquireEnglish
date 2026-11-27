@@ -170,6 +170,22 @@ class Settings(BaseSettings):
     openmaic_access_code: str = ""
     openmaic_bearer_token: str = ""
 
+    # Aliyun OSS for media blobs (audio/video/PDF/docs). App still must not
+    # bundle media; playback URLs resolve via API → OSS/CDN stream.
+    oss_enabled: bool = False
+    oss_access_key_id: str = ""
+    oss_access_key_secret: str = ""
+    # e.g. oss-cn-guangzhou.aliyuncs.com (https:// optional)
+    oss_endpoint: str = ""
+    oss_bucket: str = ""
+    # Object key prefix; files land at {prefix}/{namespace}/…
+    oss_key_prefix: str = "media"
+    # Public HTTPS base for clients (custom domain or
+    # https://{bucket}.{endpoint}). Empty → virtual-host URL from bucket+endpoint.
+    oss_public_base: str = ""
+    # During migration keep a local copy under media_cache_dir; set false after cutover.
+    oss_keep_local_cache: bool = True
+
     def validate_auth_configuration(self) -> None:
         if self.production_mode and (
             not self.secret_key.strip()

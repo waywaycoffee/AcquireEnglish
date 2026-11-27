@@ -17,3 +17,5 @@ pytest==8.3.4
 pytest-asyncio==0.25.0
 # Netdisk online EN subtitles (OpenSubtitles / Podnapisi / …).
 subliminal==2.8.0
+# Aliyun OSS media blobs (audio / video / docs).
+oss2==2.19.1

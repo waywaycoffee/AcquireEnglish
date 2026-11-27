@@ -92,7 +92,9 @@ def save_bytes(
     dest = absolute_path(rel)
     dest.parent.mkdir(parents=True, exist_ok=True)
     if not dest.is_file():
-        dest.write_bytes(data)
+        from app.services import oss_storage
+
+        oss_storage.persist_bytes(f"exam/{rel}", data, local_path=dest)
     return {
         "sha256": digest,
         "storage_path": rel,

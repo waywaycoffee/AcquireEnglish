@@ -1,8 +1,8 @@
-"""ECS-hosted audio/video for the app (never packaged into the mobile APK).
+"""Server-hosted audio/video for the app (never packaged into the mobile APK).
 
-Layout on disk::
+Layout (local cache and/or Aliyun OSS object key)::
 
-    {media_cache_dir}/{namespace}/{book_or_pack_id}/{key}.{ext}
+    {media_cache_dir|oss:media}/{namespace}/{book_or_pack_id}/{key}.{ext}
 
 Namespaces (examples)::
 
@@ -13,11 +13,10 @@ Namespaces (examples)::
 
 Public URLs::
 
-    {media_public_base}/media/{namespace}/...
+    Prefer OSS/CDN when configured; else ``{media_public_base}/media/{namespace}/...``.
 
-Clients must resolve playback URLs via the API (manifest / lookup), then stream
-from ``/media/...``. Do not ship ``.mp3`` / ``.mp4`` / ``.m4a`` / ``.webm``
-inside ``apps/mobile/assets``.
+Clients must resolve playback URLs via the API (manifest / lookup), then stream.
+Do not ship ``.mp3`` / ``.mp4`` / ``.m4a`` / ``.webm`` inside ``apps/mobile/assets``.
 """
 
 from __future__ import annotations
@@ -28,6 +27,7 @@ from pathlib import Path
 from typing import Any
 
 from app.config import settings
+from app.services import oss_storage
 
 ALLOWED_NAMESPACES = frozenset(
     {"foundation", "reading", "oral", "course", "misc", "exam"}
@@ -73,9 +73,13 @@ def sanitize_segment(raw: str, *, fallback: str = "item") -> str:
 
 
 def public_url(namespace: str, relative: str) -> str:
-    base = (settings.media_public_base or "").rstrip("/")
     rel = relative.lstrip("/")
     ns = assert_namespace(namespace)
+    cache_rel = f"{ns}/{rel}"
+    oss_url = oss_storage.public_url_for_relative(cache_rel)
+    if oss_url:
+        return oss_url
+    base = (settings.media_public_base or "").rstrip("/")
     if base:
         return f"{base}/media/{ns}/{rel}"
     return f"/media/{ns}/{rel}"
@@ -198,7 +202,8 @@ def save_upload(
         dest = dest / segment
     dest.mkdir(parents=True, exist_ok=True)
     dest = dest / parts[-1]
-    dest.write_bytes(data)
+    rel = dest.relative_to(media_cache_root()).as_posix()
+    oss_storage.persist_bytes(rel, data, local_path=dest)
     # Audio/video rebuild book/key manifest; subtitle files are served via /media.
     if ext in _AUDIO_EXT or ext in _VIDEO_EXT:
         manifest = rebuild_manifest(namespace)
