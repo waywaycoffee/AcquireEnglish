@@ -1,0 +1,8 @@
+.env
+.learning_service_token
+.ecs_livekit.env.tmp
+.ae_set_learning_token.py
+scripts/_probe_env.py
+scripts/_bootstrap_env.py
+scripts/_fetch_ecs_livekit.py
+scripts/_sync_learning_token_ecs.py
