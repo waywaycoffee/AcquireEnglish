@@ -8,6 +8,7 @@ import 'package:hive_ce/hive.dart';
 import '../../authentication/presentation/account_storage.dart';
 import '../../learner_model/presentation/learner_skill_profile_provider.dart';
 import '../domain/syllabus_book.dart';
+import 'word_book_provider.dart';
 
 const String kSyllabusStateKey = 'syllabus_books_v1';
 
@@ -126,6 +127,15 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
       learnedByBook: persisted.learned,
       ready: true,
     );
+    // Ensure 《情景记忆》 exists, then fill from favorites once word book is ready.
+    if (state.bookById(kSceneMemoryBookId) == null) {
+      await syncSceneMemoryWords(const <SyllabusWord>[]);
+    }
+    if (!ref.mounted) return;
+    Future<void>.microtask(() async {
+      if (!ref.mounted) return;
+      await ref.read(wordBookProvider.notifier).resyncSceneMemory();
+    });
   }
 
   ({
@@ -162,7 +172,9 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
             Map<String, dynamic>.from(item),
             builtin: false,
           );
-          if (book.id.isNotEmpty && book.words.isNotEmpty) {
+          // 《情景记忆》 may be empty until the first favorite; still keep it.
+          if (book.id.isNotEmpty &&
+              (book.words.isNotEmpty || isSceneMemoryBookId(book.id))) {
             imported.add(book);
           }
         }
@@ -207,7 +219,33 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
     await Hive.box<String>('prefs').put(_storageKey, jsonEncode(payload));
   }
 
+  /// Rebuild 《情景记忆》 from favorited lemmas (custom shelf + study queue).
+  Future<void> syncSceneMemoryWords(List<SyllabusWord> words) async {
+    if (!state.ready) return;
+    final SyllabusBook next = SyllabusBook(
+      id: kSceneMemoryBookId,
+      title: kSceneMemoryBookTitle,
+      examTag: 'SCENE',
+      disclaimer: '由收藏词自动生成，随收藏增减同步。',
+      words: List<SyllabusWord>.unmodifiable(words),
+      builtin: false,
+      kind: SyllabusBookKind.word,
+    );
+    final SyllabusBook? current = state.bookById(kSceneMemoryBookId);
+    if (current != null &&
+        current.wordCount == next.wordCount &&
+        current.words.map((SyllabusWord w) => w.word).join('|') ==
+            next.words.map((SyllabusWord w) => w.word).join('|')) {
+      return;
+    }
+    await saveImportedBook(next);
+  }
+
   Future<bool> setActiveBook(String bookId) async {
+    // 《情景记忆》 always rides alongside the chosen system book — never replace it.
+    if (isSceneMemoryBookId(bookId)) {
+      return false;
+    }
     final SyllabusBook? book = state.bookById(bookId);
     if (!state.ready || book == null) {
       return false;
@@ -282,10 +320,18 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
 
   /// Upsert an imported / downloaded book (same [SyllabusBook.id] replaces).
   Future<SyllabusBook> saveImportedBook(SyllabusBook book) async {
-    final List<SyllabusBook> next = <SyllabusBook>[
+    final List<SyllabusBook> others = <SyllabusBook>[
       for (final SyllabusBook item in state.imported)
-        if (item.id != book.id) item,
-      book,
+        if (item.id != book.id && !isSceneMemoryBookId(item.id)) item,
+    ];
+    // Keep 《情景记忆》 pinned at the front of the custom shelf.
+    final SyllabusBook? scene = isSceneMemoryBookId(book.id)
+        ? book
+        : state.bookById(kSceneMemoryBookId);
+    final List<SyllabusBook> next = <SyllabusBook>[
+      if (scene != null) scene,
+      if (!isSceneMemoryBookId(book.id)) book,
+      ...others,
     ];
     state = state.copyWith(
       imported: List<SyllabusBook>.unmodifiable(next),
@@ -298,6 +344,10 @@ class SyllabusBooksNotifier extends Notifier<SyllabusBooksState> {
       state.imported.any((SyllabusBook b) => b.id == id);
 
   Future<void> deleteImported(String bookId) async {
+    if (isSceneMemoryBookId(bookId)) {
+      // System-managed book — clear words by unfavoriting, not by deleting.
+      return;
+    }
     final List<SyllabusBook> next = state.imported
         .where((SyllabusBook b) => b.id != bookId)
         .toList(growable: false);

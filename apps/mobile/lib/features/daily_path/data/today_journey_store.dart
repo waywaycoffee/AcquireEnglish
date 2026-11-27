@@ -217,6 +217,11 @@ class TodayJourneyStore {
     });
   }
 
+  /// Base daily vocab quota (excludes same-day「再背 n 个」bonus).
+  int get vocabBaseCount => _int(_read(), 'vocabCount');
+
+  int get vocabBonus => _int(_read(), 'vocabBonus');
+
   TodayStudyPlan get studyPlan {
     final Map<String, Object?> record = _read();
     final bool configured = record['quotasConfigured'] == true ||
@@ -233,9 +238,11 @@ class TodayJourneyStore {
         }
       }
     }
+    final int baseVocab = _int(record, 'vocabCount');
+    final int bonusVocab = _int(record, 'vocabBonus');
     return TodayStudyPlan(
       videoMinutes: _int(record, 'videoMinutes'),
-      vocabCount: _int(record, 'vocabCount'),
+      vocabCount: (baseVocab + bonusVocab).clamp(0, 200),
       readingWords: _int(record, 'readingWords'),
       videoDoneMs: _int(record, 'videoDoneMs'),
       vocabDone: _int(record, 'vocabDone'),
@@ -292,10 +299,29 @@ class TodayJourneyStore {
       'videoMinutes': videoMinutes.clamp(0, 180),
       'vocabCount': vocabCount.clamp(0, 200),
       'readingWords': readingWords.clamp(0, 20000),
+      // Fresh quota pick resets same-day bonus.
+      'vocabBonus': 0,
       'quotasConfigured': true,
       'stage': JourneyStage.learn.name,
     };
     await _write(next);
+  }
+
+  /// After today's base quota is done, let the learner add [count] more new words.
+  Future<int> addVocabBonus(int count) async {
+    final int add = count.clamp(1, 100);
+    final Map<String, Object?> record = _read();
+    final int base = _int(record, 'vocabCount');
+    final int bonus = _int(record, 'vocabBonus') + add;
+    final int effective = (base + bonus).clamp(0, 200);
+    final int nextBonus = (effective - base).clamp(0, 200);
+    await _write(<String, Object?>{
+      ...record,
+      'vocabBonus': nextBonus,
+      'quotasConfigured': true,
+      'stage': JourneyStage.learn.name,
+    });
+    return effective;
   }
 
   Future<void> saveProgress({
@@ -326,7 +352,8 @@ class TodayJourneyStore {
     if (!plan.quotasConfigured) return;
     await other.saveQuotas(
       videoMinutes: plan.videoMinutes,
-      vocabCount: plan.vocabCount,
+      // Carry base quota only — same-day「再背」bonus does not roll over.
+      vocabCount: vocabBaseCount > 0 ? vocabBaseCount : plan.vocabCount,
       readingWords: plan.readingWords,
     );
     final JourneyActivity? act = activity;

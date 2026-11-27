@@ -14,6 +14,8 @@ import '../domain/sm2_scheduler.dart';
 import '../domain/vocab_card_kind.dart';
 import '../domain/vocab_entry.dart';
 
+import '../domain/syllabus_book.dart';
+import 'syllabus_books_provider.dart';
 import 'vocabulary_placement_provider.dart';
 
 export '../domain/vocab_card_kind.dart';
@@ -701,6 +703,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     // Always push — unfavorite must delete/clear the cloud vocab row, otherwise
     // the next pull resurrected favorite=true from an older snapshot.
     unawaited(ref.read(vocabSyncServiceProvider).pushEntry(updated));
+    unawaited(_syncSceneMemoryBook(next));
     return updated.favorite;
   }
 
@@ -971,6 +974,7 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
     }
     unawaited(_persist());
     unawaited(_fillOfflineDefinitions(<String>[word]));
+    unawaited(_syncSceneMemoryBook(state));
     final int favIndex = state.indexWhere((WordEntry e) => e.word == word);
     if (favIndex >= 0 && state[favIndex].favorite) {
       unawaited(ref.read(vocabSyncServiceProvider).pushEntry(state[favIndex]));
@@ -1615,6 +1619,27 @@ class WordBookNotifier extends Notifier<List<WordEntry>> {
       studyStorageKey(_wordBookStorageKey, _studyAccount),
       jsonEncode(state.map((WordEntry item) => item.toJson()).toList()),
     );
+    unawaited(_syncSceneMemoryBook(state));
+  }
+
+  /// Rebuild 《情景记忆》 from the current favorite list (safe after both providers ready).
+  Future<void> resyncSceneMemory() => _syncSceneMemoryBook(state);
+
+  Future<void> _syncSceneMemoryBook(List<WordEntry> entries) async {
+    final List<SyllabusWord> words = <SyllabusWord>[];
+    final Set<String> seen = <String>{};
+    for (final WordEntry entry in entries) {
+      if (!entry.favorite) continue;
+      if (entry.scheduleStatus == VocabScheduleStatus.archived) continue;
+      final String lemma = entry.word.trim().toLowerCase();
+      if (lemma.isEmpty || !seen.add(lemma)) continue;
+      final String gloss =
+          (entry.definitionCn ?? entry.offlineDefinitionCn ?? '').trim();
+      words.add(SyllabusWord(word: lemma, gloss: gloss));
+    }
+    await ref
+        .read(syllabusBooksProvider.notifier)
+        .syncSceneMemoryWords(words);
   }
 }
 

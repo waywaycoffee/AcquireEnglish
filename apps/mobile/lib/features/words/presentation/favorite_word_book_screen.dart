@@ -151,7 +151,10 @@ class _FavoriteWordBookScreenState
     final MaterialLocalizations locale = MaterialLocalizations.of(context);
     return PadScaffold(
       currentDestination: AppNavDestination.home,
-      topBar: PadTopBar(title: '收藏词本', description: '单词、短语和句子'),
+      topBar: PadTopBar(
+        title: '情景记忆',
+        description: '收藏词自动生成的词书 · 单词、短语和句子',
+      ),
       body: ListView.builder(
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
         itemCount: items.isEmpty ? 2 : items.length + 1,
@@ -341,8 +344,8 @@ class FavoriteWordDetailScreen extends ConsumerWidget {
     );
     if (entry == null) {
       return Scaffold(
-        appBar: AppBar(title: const Text('收藏词本')),
-        body: const Center(child: Text('这个词已从收藏词本移除。')),
+        appBar: AppBar(title: const Text('情景记忆')),
+        body: const Center(child: Text('这个词已从情景记忆移除。')),
       );
     }
     final int scenes = favoriteWordSceneCount(entry);

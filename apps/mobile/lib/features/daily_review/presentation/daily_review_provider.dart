@@ -109,18 +109,30 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
   final SyllabusBooksState syllabus = ref.watch(syllabusBooksProvider);
   final ExamProfile examProfile = ref.watch(examProfileProvider);
   final SyllabusBook? activeBook = syllabus.activeBook;
+  final SyllabusBook? sceneMemory = syllabus.bookById(kSceneMemoryBookId);
   final Iterable<SyllabusBook> syllabusBooksForReview = () {
-    // Unified queue: favorites first, then active book lemmas not already
-    // covered. Optional exam filter still applies when choosing books.
-    if (activeBook == null) return const <SyllabusBook>[];
+    // 《情景记忆》(favorites mirror) + chosen system book both feed the plan.
+    // Favorite WordEntry cards still lead; coveredLemmas avoids duplicate cards.
+    final List<SyllabusBook> books = <SyllabusBook>[
+      if (sceneMemory != null && sceneMemory.words.isNotEmpty) sceneMemory,
+      if (activeBook != null && !isSceneMemoryBookId(activeBook.id)) activeBook,
+    ];
+    if (books.isEmpty) return const <SyllabusBook>[];
     if (examProfile.hasExamTarget) {
       final List<SyllabusBook> matched = filterSyllabusForExam(
-        <SyllabusBook>[activeBook],
+        books,
         examProfile.family,
       );
-      return matched.isEmpty ? <SyllabusBook>[activeBook] : matched;
+      // Keep scene memory even when exam tags do not match SCENE.
+      final bool hasScene =
+          matched.any((SyllabusBook b) => isSceneMemoryBookId(b.id));
+      if (matched.isEmpty) return books;
+      if (hasScene || sceneMemory == null || sceneMemory.words.isEmpty) {
+        return matched;
+      }
+      return <SyllabusBook>[sceneMemory, ...matched];
     }
-    return <SyllabusBook>[activeBook];
+    return books;
   }();
   final Map<String, String> bookLabelByLemma = <String, String>{};
   for (final SyllabusBook book in syllabusBooksForReview) {
@@ -177,8 +189,10 @@ reviewSourcesProvider = Provider<List<ReviewSource>>((Ref ref) {
             chinese: book.isPatternBook || book.isFoundationBook
                 ? entry.gloss
                 : '',
-            sourceLabel: '词书 · ${book.title} · ${book.examTag}',
-            origin: 'syllabus',
+            sourceLabel: isSceneMemoryBookId(book.id)
+                ? '情景记忆 · ${entry.word}'
+                : '词书 · ${book.title} · ${book.examTag}',
+            origin: isSceneMemoryBookId(book.id) ? 'scene_memory' : 'syllabus',
           ),
   ];
 

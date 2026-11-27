@@ -1,3 +1,4 @@
+import '../../daily_path/data/today_journey_store.dart';
 import '../../daily_path/presentation/today_path_provider.dart';
 import 'dart:async';
 import 'dart:convert';
@@ -1403,6 +1404,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           ],
           if (!empty && done && plan.waiting.isNotEmpty) ...<Widget>[
             const SizedBox(height: 12),
+            FilledButton.icon(
+              key: const Key('daily-review-vocab-bonus'),
+              onPressed: () => unawaited(_addMoreNewWordsToday()),
+              style: _primaryButtonStyle,
+              icon: const Icon(Icons.add_rounded),
+              label: const Text('再背几个'),
+            ),
+            const SizedBox(height: 10),
             OutlinedButton.icon(
               onPressed: () => _showSettings(state.dailyNewLimit),
               icon: const Icon(Icons.tune_rounded),
@@ -3311,6 +3320,80 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
       if (mounted && sequence == _speechSequence)
         setState(() => _speaking = false);
     }
+  }
+
+  Future<void> _addMoreNewWordsToday() async {
+    final int? n = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: AppDesignTokens.appWhite,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '再背几个？',
+                  style: TextStyle(
+                    color: AppDesignTokens.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '只增加今天的新学额度，明天仍按你设定的基础数量。',
+                  style: TextStyle(
+                    color: AppDesignTokens.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    for (final int n in const <int>[5, 10, 15, 20, 30])
+                      ActionChip(
+                        label: Text('+$n'),
+                        onPressed: () => Navigator.pop(sheetContext, n),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (n == null || !mounted) return;
+    final TodayJourneyStore store = TodayJourneyStore(
+      ref.read(studyAccountProvider),
+      DateTime.now(),
+    );
+    final int effective;
+    if (!store.studyPlan.quotasConfigured) {
+      await store.saveQuotas(
+        videoMinutes: 0,
+        vocabCount: n,
+        readingWords: 0,
+      );
+      effective = n;
+    } else {
+      effective = await store.addVocabBonus(n);
+    }
+    await ref.read(wordReviewSettingsProvider.notifier).setDailyNewLimit(
+          effective.clamp(0, 150),
+        );
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text('今日新学额度 +$n，现在可继续背词')),
+    );
+    setState(() {});
   }
 
   Future<void> _showSettings(int currentLimit) async {

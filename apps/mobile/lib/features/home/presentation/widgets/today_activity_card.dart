@@ -32,6 +32,7 @@ import '../../../shared/presentation/pad/app_design_tokens.dart';
 import '../../../sync/data/acquire_api_client.dart';
 import '../../../sync/presentation/daily_feed_provider.dart';
 import '../../../words/domain/syllabus_book.dart';
+import '../../../words/presentation/syllabus_book_browse_screen.dart';
 import '../../../words/presentation/syllabus_books_provider.dart';
 import '../../../words/presentation/word_review_settings_provider.dart';
 import '../learning_dashboard_provider.dart';
@@ -802,32 +803,26 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                     ],
                   ),
                 ),
-                Material(
-                  type: MaterialType.transparency,
-                  child: ListTile(
-                    contentPadding: EdgeInsets.zero,
-                    leading: const Icon(Icons.menu_book_outlined),
-                    title: const Text('当前词书'),
-                    subtitle: Text(
-                      activeBook == null
-                          ? (books.ready ? '尚未选择 · 去词书架' : '正在读取词书…')
-                          : '${activeBook.title}${books.isComplete(activeBook) ? '（已背完）' : ''}',
-                      key: const Key('home-active-vocabulary-book'),
-                      style: TextStyle(
-                        color: AppDesignTokens.textPrimary,
-                        fontSize: 16,
-                        fontWeight: FontWeight.w700,
-                      ),
-                    ),
-                    trailing: const Icon(Icons.chevron_right),
-                    onTap: () {
-                      if (activeBook == null || books.isComplete(activeBook)) {
-                        context.push('/words/syllabus');
-                      } else {
-                        startSyllabusBookSession(ref, context, activeBook);
-                      }
-                    },
-                  ),
+                _HomeWordBookTiles(
+                  books: books,
+                  activeBook: activeBook,
+                  onBrowseScene: () {
+                    final SyllabusBook? scene =
+                        books.bookById(kSceneMemoryBookId);
+                    if (scene == null) {
+                      context.push('/words?favorites=1');
+                      return;
+                    }
+                    context.push(syllabusBookBrowseRoute(kSceneMemoryBookId));
+                  },
+                  onBrowseActive: () {
+                    if (activeBook == null) {
+                      context.push('/words/syllabus');
+                      return;
+                    }
+                    context.push(syllabusBookBrowseRoute(activeBook.id));
+                  },
+                  onPickActive: () => context.push('/words/syllabus'),
                 ),
                 TextButton.icon(
                   onPressed: () => context.push('/digital-human?sceneMenu=1'),
@@ -861,6 +856,22 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                     skipped: plan.vocabCount <= 0,
                     done: plan.vocabTrackDone,
                   ),
+                  if (plan.quotasConfigured &&
+                      plan.vocabCount > 0 &&
+                      plan.vocabTrackDone) ...<Widget>[
+                    const SizedBox(height: 8),
+                    Align(
+                      alignment: Alignment.centerLeft,
+                      child: OutlinedButton.icon(
+                        key: const Key('home-vocab-bonus'),
+                        onPressed: _busy
+                            ? null
+                            : () => unawaited(_addMoreVocab(store)),
+                        icon: const Icon(Icons.add_rounded, size: 18),
+                        label: const Text('再背几个'),
+                      ),
+                    ),
+                  ],
                   const SizedBox(height: 8),
                   _QuotaProgressRow(
                     label: '阅读',
@@ -955,6 +966,148 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               due > 0 ? '去今日复习 · 到期 $due' : '自己去复习 / 词书',
               style: TextStyle(color: AppDesignTokens.textSecondary),
             ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  Future<void> _addMoreVocab(TodayJourneyStore store) async {
+    final int? n = await showModalBottomSheet<int>(
+      context: context,
+      backgroundColor: AppDesignTokens.appWhite,
+      showDragHandle: true,
+      builder: (BuildContext sheetContext) {
+        return SafeArea(
+          top: false,
+          child: Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 20),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Text(
+                  '再背几个？',
+                  style: TextStyle(
+                    color: AppDesignTokens.textPrimary,
+                    fontWeight: FontWeight.w800,
+                    fontSize: 18,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  '今日额度加完后可继续新学，不影响明天的基础配额。',
+                  style: TextStyle(
+                    color: AppDesignTokens.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+                const SizedBox(height: 14),
+                Wrap(
+                  spacing: 8,
+                  runSpacing: 8,
+                  children: <Widget>[
+                    for (final int n in const <int>[5, 10, 15, 20, 30])
+                      ActionChip(
+                        label: Text('+$n'),
+                        onPressed: () => Navigator.pop(sheetContext, n),
+                      ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
+    if (n == null || !mounted) return;
+    final int effective = await store.addVocabBonus(n);
+    await ref.read(wordReviewSettingsProvider.notifier).setDailyNewLimit(
+          effective.clamp(0, 150),
+        );
+    if (mounted) setState(() {});
+  }
+}
+
+class _HomeWordBookTiles extends StatelessWidget {
+  const _HomeWordBookTiles({
+    required this.books,
+    required this.activeBook,
+    required this.onBrowseScene,
+    required this.onBrowseActive,
+    required this.onPickActive,
+  });
+
+  final SyllabusBooksState books;
+  final SyllabusBook? activeBook;
+  final VoidCallback onBrowseScene;
+  final VoidCallback onBrowseActive;
+  final VoidCallback onPickActive;
+
+  @override
+  Widget build(BuildContext context) {
+    final SyllabusBook? scene = books.bookById(kSceneMemoryBookId);
+    final int sceneCount = scene?.wordCount ?? 0;
+    return Column(
+      children: <Widget>[
+        Material(
+          color: AppDesignTokens.softGray,
+          borderRadius: BorderRadius.circular(14),
+          child: ListTile(
+            key: const Key('home-scene-memory-book'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            leading: Icon(
+              Icons.auto_stories_outlined,
+              color: AppDesignTokens.brandGreen,
+            ),
+            title: Text(
+              kSceneMemoryBookTitle,
+              style: TextStyle(
+                color: AppDesignTokens.textPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: Text(
+              sceneCount == 0 ? '收藏词会出现在这里' : '$sceneCount 个收藏词 · 点开浏览',
+              style: TextStyle(color: AppDesignTokens.textSecondary),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: onBrowseScene,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Material(
+          color: AppDesignTokens.softGray,
+          borderRadius: BorderRadius.circular(14),
+          child: ListTile(
+            key: const Key('home-active-vocabulary-book'),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(14),
+            ),
+            leading: Icon(
+              Icons.menu_book_outlined,
+              color: AppDesignTokens.brandGreen,
+            ),
+            title: Text(
+              '当前词书',
+              style: TextStyle(
+                color: AppDesignTokens.textPrimary,
+                fontWeight: FontWeight.w800,
+                fontSize: 16,
+              ),
+            ),
+            subtitle: Text(
+              activeBook == null
+                  ? (books.ready ? '尚未选择 · 去词书架' : '正在读取词书…')
+                  : '${activeBook!.title}${books.isComplete(activeBook!) ? '（已背完）' : ''} · 点开浏览',
+              style: TextStyle(color: AppDesignTokens.textSecondary),
+            ),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: activeBook == null ? onPickActive : onBrowseActive,
+            onLongPress: onPickActive,
           ),
         ),
       ],
@@ -1128,8 +1281,8 @@ class _TodayQuotaSheetState extends State<_TodayQuotaSheet> {
             ),
             const SizedBox(height: 14),
             _chipRow(
-              label: '背单词',
-              presets: const <int>[10, 20, 30],
+              label: '今天背几个单词',
+              presets: const <int>[5, 10, 15, 20, 30, 50],
               value: _vocab,
               unit: ' 个',
               onChanged: (int v) => setState(() => _vocab = v),

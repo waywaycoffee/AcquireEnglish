@@ -17,6 +17,7 @@ import '../data/lilinji_catalog.dart';
 import '../domain/server_syllabus_catalog.dart';
 import '../domain/syllabus_book.dart';
 import '../domain/syllabus_book_category.dart';
+import 'syllabus_book_browse_screen.dart';
 import 'syllabus_books_provider.dart';
 import 'word_book_cover.dart';
 import 'word_book_library_theme.dart';
@@ -271,10 +272,23 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
 
   /// Cover tap = start memorizing this book immediately (new learn).
   Future<void> _startBook(SyllabusBook book) async {
+    if (isSceneMemoryBookId(book.id)) {
+      // Browse only — never replace the chosen system book as active.
+      if (!context.mounted) return;
+      await context.push(syllabusBookBrowseRoute(book.id));
+      return;
+    }
     await startSyllabusBookSession(ref, context, book);
   }
 
   Future<void> _confirmDelete(SyllabusBook book) async {
+    if (isSceneMemoryBookId(book.id)) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('《情景记忆》由收藏词自动维护，取消收藏即可减少词条')),
+      );
+      return;
+    }
     final bool? ok = await showDialog<bool>(
       context: context,
       builder: (BuildContext ctx) => AlertDialog(
@@ -306,8 +320,12 @@ class _SyllabusBooksScreenState extends ConsumerState<SyllabusBooksScreen>
     final List<SyllabusBook> matched = examProfile.hasExamTarget
         ? filterSyllabusForExam(raw, examProfile.family)
         : raw;
-    final List<SyllabusBook> books =
+    final List<SyllabusBook> unordered =
         matched.isEmpty && examProfile.hasExamTarget ? raw : matched;
+    final List<SyllabusBook> books = <SyllabusBook>[
+      ...unordered.where((SyllabusBook b) => isSceneMemoryBookId(b.id)),
+      ...unordered.where((SyllabusBook b) => !isSceneMemoryBookId(b.id)),
+    ];
     final String examHint = examProfile.hasExamTarget
         ? (matched.isEmpty
             ? '考试目标「${examProfile.family!.label}」：暂无匹配标签，先显示全部。'
@@ -669,7 +687,8 @@ class _MyShelf extends StatelessWidget {
                             active: state.activeBookId == books[i].id,
                             onOpen: () => onOpen(books[i]),
                             onStart: () => onStart(books[i]),
-                            onDelete: books[i].builtin
+                            onDelete: books[i].builtin ||
+                                    isSceneMemoryBookId(books[i].id)
                                 ? null
                                 : () => onDelete(books[i]),
                           ),
@@ -682,7 +701,7 @@ class _MyShelf extends StatelessWidget {
           Text(
             books.isEmpty
                 ? '书架空着 · 从下方挑一本下载'
-                : '${books.length} 本 · 点封面开始背词',
+                : '${books.length} 本 · 《情景记忆》点封面浏览 · 其它点封面开始背',
             style: TextStyle(color: theme.chip, fontSize: 11),
           ),
         ],

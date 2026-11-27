@@ -76,6 +76,7 @@ import '../features/digital_human/presentation/digital_human_coach_screen.dart';
 import '../features/digital_human/presentation/peer_oral_practice_screen.dart';
 import '../features/words/presentation/server_syllabus_catalog_screen.dart';
 import '../features/words/presentation/syllabus_books_screen.dart';
+import '../features/words/presentation/syllabus_book_browse_screen.dart';
 import '../features/words/presentation/favorite_word_book_screen.dart';
 import '../features/words/presentation/words_screen.dart';
 import '../features/words/presentation/vocabulary_placement_screen.dart';
@@ -654,6 +655,14 @@ GoRouter goRouter(Ref ref) {
           tab.isEmpty ? 'word' : tab,
         );
         return SyllabusBooksScreen(initialKind: kind);
+      },
+    ).fade(),
+    GoRoute(
+      path: '/words/syllabus/browse',
+      builder: (BuildContext context, GoRouterState state) {
+        final String book =
+            (state.uri.queryParameters['book'] ?? '').trim();
+        return SyllabusBookBrowseScreen(bookId: book);
       },
     ).fade(),
     GoRoute(

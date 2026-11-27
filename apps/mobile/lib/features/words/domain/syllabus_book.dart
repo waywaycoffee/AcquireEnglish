@@ -1,3 +1,11 @@
+/// Auto-built custom book from favorited / collected words (情景记忆).
+const String kSceneMemoryBookId = 'scene_memory';
+
+const String kSceneMemoryBookTitle = '情景记忆';
+
+bool isSceneMemoryBookId(String id) =>
+    id.trim() == kSceneMemoryBookId;
+
 enum SyllabusBookKind {
   word,
   pattern,
