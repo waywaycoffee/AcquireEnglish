@@ -105,12 +105,11 @@ final readingBookPrepProvider = StreamProvider.autoDispose
           docId: doc.id,
           text: doc.plainText,
           voice: voice,
-          processOnEcs: true,
+          // Queue only — CosyVoice runs on the 5060 Ti worker, not ECS drain.
+          processOnEcs: false,
         ) ??
         latest;
   }
-  DateTime progressAnchor = DateTime.now();
-  DateTime lastFallbackAt = DateTime.fromMillisecondsSinceEpoch(0);
   int lastPercent = -1;
   int lastPagesReady = -1;
 
@@ -133,27 +132,9 @@ final readingBookPrepProvider = StreamProvider.autoDispose
     if (status.percent != lastPercent || status.pagesReady != lastPagesReady) {
       lastPercent = status.percent;
       lastPagesReady = status.pagesReady;
-      progressAnchor = DateTime.now();
     }
 
-    // Stalled ~25s without progress → kick ECS filler again (repeatable).
-    // One-shot fallback left Oz frozen at 99% when a page lease went stale.
-    final DateTime now = DateTime.now();
-    final bool stalled =
-        now.difference(progressAnchor) > const Duration(seconds: 25);
-    final bool canFallback =
-        now.difference(lastFallbackAt) > const Duration(seconds: 45);
-    if (stalled && canFallback) {
-      lastFallbackAt = now;
-      latest = await api.readingBookPregenFallback(
-        docId: doc.id,
-        text: doc.plainText,
-        voice: voice,
-      );
-      progressAnchor = DateTime.now();
-      continue;
-    }
-
+    // No ECS DashScope fallback — keep tts_worker.py running on the 5060 Ti.
     await Future<void>.delayed(const Duration(seconds: 3));
     if (!ref.mounted) return;
     latest = await api.readingBookPregenStatus(docId: doc.id, voice: voice);

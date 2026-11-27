@@ -105,8 +105,9 @@ class PregenIn(BaseModel):
     voice: str = ""
     page_index: int = 0
     language: str = "en"
-    ## When true, ECS fills missing sentences if the 5060 Ti worker is idle.
-    process_on_ecs: bool = True
+    ## Default false: only the 5060 Ti worker claims jobs. Opt in to ECS drain
+    ## (DashScope spend on the API box) with READING_ALLOW_ECS_TTS_DRAIN=1.
+    process_on_ecs: bool = False
 
 
 class BookPregenIn(BaseModel):
@@ -114,9 +115,8 @@ class BookPregenIn(BaseModel):
     text: str = Field(..., min_length=1, max_length=600_000)
     voice: str = ""
     language: str = "en"
-    ## CosyVoice runs on DashScope either way; default ECS drain so Tailscale
-    ## SSH blips on the 5060 Ti worker cannot leave books stuck at 0%.
-    process_on_ecs: bool = True
+    ## Default false — prefer RTX 5060 Ti worker. ECS CosyVoice drain is opt-in.
+    process_on_ecs: bool = False
 
 
 def _resolve_voice(raw: str) -> str:
@@ -128,6 +128,18 @@ def _resolve_voice(raw: str) -> str:
 
 def _configured() -> bool:
     return bool((settings.dashscope_api_key or "").strip())
+
+
+def _ecs_tts_drain_allowed() -> bool:
+    """ECS CosyVoice drain is separate from RPC cloud TTS.
+
+    READING_ALLOW_CLOUD_TTS only gates on-demand RPC synthesize. Queue drain
+    (which can burn hours of DashScope) needs READING_ALLOW_ECS_TTS_DRAIN=1.
+    """
+    import os
+
+    raw = (os.environ.get("READING_ALLOW_ECS_TTS_DRAIN") or "").strip().lower()
+    return raw in {"1", "true", "yes", "on"}
 
 
 def _spawn_book_drain(*, doc_id: str, voice: str, user_id: int | None) -> None:
@@ -337,7 +349,7 @@ async def _synthesize_and_cache(
 
 async def process_pregen_job(job_id: str, *, user_id: int | None = None) -> None:
     """ECS fallback filler when the 5060 Ti worker is not claiming jobs."""
-    if not _configured():
+    if not _configured() or not _ecs_tts_drain_allowed():
         return
     claimed = rtq.claim_id(job_id, lease_seconds=600)
     if claimed is None:
@@ -420,7 +432,12 @@ async def enqueue_pregen(
         voice=voice,
         page_index=body.page_index,
     )
-    if job.get("state") != "done" and body.process_on_ecs and _configured():
+    if (
+        job.get("state") != "done"
+        and body.process_on_ecs
+        and _configured()
+        and _ecs_tts_drain_allowed()
+    ):
         background.add_task(process_pregen_job, job["id"], user_id=user.id)
     return {
         "job": job,
@@ -572,7 +589,7 @@ async def enqueue_book_pregen(
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     del background  # book drain is detached; keep signature for FastAPI DI
-    if body.process_on_ecs and _configured():
+    if body.process_on_ecs and _configured() and _ecs_tts_drain_allowed():
         for voice in voices:
             status = next((s for s in statuses if s.get("voice") == voice), None)
             if status and not status.get("ready"):
@@ -623,6 +640,14 @@ async def book_pregen_ecs_fallback(
                 )
         except ValueError as exc:
             raise HTTPException(status_code=400, detail=str(exc)) from exc
+    if not _ecs_tts_drain_allowed():
+        raise HTTPException(
+            status_code=403,
+            detail=(
+                "ECS TTS drain disabled — keep tools/reading/tts_worker.py "
+                "running on the 5060 Ti (set READING_ALLOW_ECS_TTS_DRAIN=1 to opt in)"
+            ),
+        )
     if not _configured():
         raise HTTPException(status_code=503, detail="阿里云配音尚未配置")
     del background

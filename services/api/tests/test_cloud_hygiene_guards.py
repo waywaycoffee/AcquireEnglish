@@ -39,6 +39,15 @@ def test_reading_cloud_tts_opt_in_default_off(monkeypatch) -> None:
     assert allow is False
 
 
+def test_reading_ecs_tts_drain_opt_in_default_off(monkeypatch) -> None:
+    monkeypatch.delenv("READING_ALLOW_ECS_TTS_DRAIN", raising=False)
+    monkeypatch.setenv("READING_ALLOW_CLOUD_TTS", "1")
+    from app.routers.reading_speech import _ecs_tts_drain_allowed
+
+    # Cloud TTS RPC opt-in must not silently enable ECS book drain.
+    assert _ecs_tts_drain_allowed() is False
+
+
 def test_usage_daily_monitor_callable() -> None:
     from app.services import api_usage
 

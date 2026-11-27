@@ -20,10 +20,15 @@ text into pages and queues **both emotional CosyVoice packs** (女声
 `longanfengyue` + 男声 `longze_v3.1`) for the 5060 Ti worker / ECS. The tile
 shows combined progress; **opening is blocked until both voices are `ready`**.
 
-- Prefer GPU worker (`process_on_ecs: false`)
-- If GPU is offline ~90s, App calls `/book-pregen/fallback` so ECS fills gaps
+- Prefer GPU worker only (`process_on_ecs: false`, App never kicks ECS drain)
+- ECS DashScope drain is **off by default** — set `READING_ALLOW_ECS_TTS_DRAIN=1`
+  on the API box only when the 5060 Ti worker is down and cloud spend is OK
 - Status: `GET /api/reading/speech/book-pregen?doc_id=&voice=` (aggregates pair)
 - Voice catalog: `GET /api/reading/voices` → `default_female` / `default_male` / `book_pair`
+
+**Cost note:** CosyVoice itself is still DashScope (cloud). The 5060 Ti only runs
+the queue worker; it does not replace CosyVoice weights. Saving money means
+stopping **duplicate** ECS drains and keeping one worker claiming jobs.
 
 ## Single page (short articles / while reading)
 

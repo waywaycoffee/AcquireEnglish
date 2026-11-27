@@ -3747,7 +3747,8 @@ class AcquireApiClient {
           'voice': voice.trim(),
           'page_index': pageIndex,
           'language': 'en',
-          'process_on_ecs': true,
+          // GPU worker only — ECS DashScope drain is opt-in on the server.
+          'process_on_ecs': false,
         },
         options: Options(
           receiveTimeout: const Duration(seconds: 20),
