@@ -2640,7 +2640,11 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
           MaterialPageRoute<SpellStageResult>(
             builder: (_) => ReviewSpellingScreen(
               word: source.question,
-              meaning: source.answer,
+              meaning: source.answer.trim().isEmpty
+                  ? (_reviewMeanings[source.question] ?? '')
+                  : source.answer,
+              fillMissingLetters:
+                  !ref.read(wordReviewSettingsProvider).requireSpelling,
               prompt: preferListen
                   ? SpellPromptKind.listen
                   : SpellPromptKind.meaning,
@@ -3317,13 +3321,14 @@ class _DailyReviewScreenState extends ConsumerState<DailyReviewScreen>
                   ],
                   decoration: const InputDecoration(
                     labelText: '每天新学数量',
-                    helperText: '单词和短语合计，0–100 条；设为 0 可暂停新学。',
+                    helperText: '每日 5–150 条，输入 0 可暂停新学。',
                     border: OutlineInputBorder(),
                   ),
                   validator: (String? value) {
                     final int? count = int.tryParse(value ?? '');
-                    return count == null || count < 0 || count > 100
-                        ? '请输入 0–100 的整数'
+                    return count == null ||
+                            (count != 0 && (count < 5 || count > 150))
+                        ? '请输入 5–150 的整数，或输入 0 暂停'
                         : null;
                   },
                 ),

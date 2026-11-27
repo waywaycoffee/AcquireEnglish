@@ -31,7 +31,7 @@ Future<SyllabusImportOverlap?> activateBookWithOverlap(
     await ref.read(syllabusBooksProvider.notifier).setActiveBook(book.id);
   }
   final int quota =
-      ref.read(wordReviewSettingsProvider).dailyNewLimit.clamp(0, 100);
+      ref.read(wordReviewSettingsProvider).dailyNewLimit.clamp(0, 150);
   await ref
       .read(dailyReviewProvider.notifier)
       .syncNewLimitFromWordSettings(quota);

@@ -20,12 +20,12 @@ Future<void> showWordReviewSettingsSheet(BuildContext context) {
 class WordReviewSettingsSheet extends ConsumerWidget {
   const WordReviewSettingsSheet({super.key});
 
-  static const List<int> _newPresets = <int>[0, 5, 10, 20];
+  static const List<int> _newPresets = <int>[0, 5, 10, 20, 30, 50, 75, 100, 125, 150];
   static const List<int> _reviewPresets = <int>[20, 50, 100, 200];
 
   Future<void> _applyNewLimit(WidgetRef ref, int newLimit) async {
     final WordReviewSettings settings = ref.read(wordReviewSettingsProvider);
-    final int clamped = newLimit.clamp(0, 100);
+    final int clamped = newLimit.clamp(0, 150);
     await ref
         .read(wordReviewSettingsProvider.notifier)
         .update(settings.copyWith(dailyNewLimit: clamped));

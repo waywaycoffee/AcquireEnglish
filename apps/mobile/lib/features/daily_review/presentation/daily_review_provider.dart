@@ -970,8 +970,7 @@ class DailyReviewNotifier extends Notifier<DailyReviewState> {
 
   /// Keep FSRS new-learn quota aligned with the words-plan setting.
   Future<void> syncNewLimitFromWordSettings(int wordPlanLimit) async {
-    // Persist layer caps at 100 (see [DailyReviewState.withLimit]).
-    final int next = wordPlanLimit.clamp(0, 100);
+    final int next = wordPlanLimit.clamp(0, 150);
     if (state.dailyNewLimit == next) return;
     await setDailyNewLimit(next);
   }

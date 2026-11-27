@@ -179,7 +179,7 @@ class _WordsScreenState extends ConsumerState<WordsScreen> {
         )
         .toList(growable: false);
     final DateTime now = DateTime.now();
-    final int newLimit = reviewSettings.dailyNewLimit.clamp(0, 100);
+    final int newLimit = reviewSettings.dailyNewLimit.clamp(0, 150);
     final ReviewPlan wordPlan = reviewPlanForLearnerLevel(
       state: reviewState.withLimit(newLimit),
       sources: wordSources,

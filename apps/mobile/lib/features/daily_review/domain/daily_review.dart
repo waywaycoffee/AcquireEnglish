@@ -238,7 +238,7 @@ class DailyReviewState {
       throw const FormatException('Unknown review version');
     }
     final int limit = json['dailyNewLimit'] as int;
-    if (limit < 0 || limit > 100) {
+    if (limit < 0 || limit > 150) {
       throw const FormatException('Invalid daily limit');
     }
     final Map<String, dynamic> rawDays = Map<String, dynamic>.from(
@@ -275,7 +275,7 @@ class DailyReviewState {
   final String? storageError;
 
   DailyReviewState withLimit(int limit) {
-    if (limit < 0 || limit > 100) throw ArgumentError.value(limit);
+    if (limit < 0 || limit > 150) throw ArgumentError.value(limit);
     return DailyReviewState(
       records: records,
       days: days,

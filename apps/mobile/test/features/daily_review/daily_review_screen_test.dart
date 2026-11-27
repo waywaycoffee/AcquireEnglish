@@ -721,11 +721,11 @@ void main() {
     await tester.pumpAndSettle();
     await tester.enterText(
       find.byKey(const Key('daily-review-new-limit')),
-      '101',
+      '151',
     );
     await tester.tap(find.text('保存设置'));
     await tester.pumpAndSettle();
-    expect(find.text('请输入 0–100 的整数'), findsOneWidget);
+    expect(find.text('请输入 5–150 的整数，或输入 0 暂停'), findsOneWidget);
     await tester.enterText(
       find.byKey(const Key('daily-review-new-limit')),
       '0',

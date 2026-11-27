@@ -91,7 +91,7 @@ class WordReviewSettings {
     return WordReviewSettings(
       recallStyle: recallStyle ?? this.recallStyle,
       requireSpelling: requireSpelling ?? this.requireSpelling,
-      dailyNewLimit: (dailyNewLimit ?? this.dailyNewLimit).clamp(0, 200),
+      dailyNewLimit: (dailyNewLimit ?? this.dailyNewLimit).clamp(0, 150),
       dailyReviewLimit: (dailyReviewLimit ?? this.dailyReviewLimit).clamp(
         0,
         500,
