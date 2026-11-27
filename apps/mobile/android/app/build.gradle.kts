@@ -168,18 +168,23 @@ android {
             keyPassword = "android"
         }
         create("release") {
-            if (keystorePropertiesFile.exists()) {
-                keyAlias = keystoreProperties["keyAlias"] as String
-                keyPassword = keystoreProperties["keyPassword"] as String
-                storeFile = rootProject.file(keystoreProperties["storeFile"] as String)
-                storePassword = keystoreProperties["storePassword"] as String
-                // Some OEM package installers (and Edge/sideload parsers) still
-                // require JAR v1 META-INF certs; v2-only APKs show
-                // "parser did not find any certificates".
-                enableV1Signing = true
-                enableV2Signing = true
-                enableV3Signing = true
+            require(keystorePropertiesFile.isFile) {
+                "Missing $keystorePropertiesFile — copy release key.properties before building."
             }
+            val releaseStore = rootProject.file(keystoreProperties["storeFile"] as String)
+            require(releaseStore.isFile) {
+                "Missing $releaseStore — copy acquireenglish-upload.jks before building."
+            }
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+            storeFile = releaseStore
+            storePassword = keystoreProperties["storePassword"] as String
+            // Some OEM package installers (and Edge/sideload parsers) still
+            // require JAR v1 META-INF certs; v2-only APKs show
+            // "parser did not find any certificates".
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
         }
     }
 
@@ -206,11 +211,8 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
-            signingConfig = if (keystorePropertiesFile.exists()) {
-                signingConfigs.getByName("release")
-            } else {
-                signingConfigs.getByName("debug")
-            }
+            // Always upload/release cert — never silent fallback to debug.
+            signingConfig = signingConfigs.getByName("release")
             // ML Kit keep rules live in proguard-rules.pro — validate on device
             // after every minify-on release (cold-start MlKitInitProvider).
             isMinifyEnabled = true
