@@ -413,38 +413,35 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
       await _ensureQuotas(store);
       if (!mounted || !store.studyPlan.quotasConfigured) return;
       await _syncProgress(store);
-      if (!mounted) return;
-      final TodayLearningStep? step = _nextLearningStep(store);
-      if (step == null) {
-        await _seedTomorrow(account, today, store);
-        await store.saveStage(JourneyStage.done);
-        return;
-      }
-      final String route = switch (step) {
-        TodayLearningStep.newWords => _vocabPursuit()!.route,
-        TodayLearningStep.video => _videoPursuit()?.route ?? '/library',
-        TodayLearningStep.reviewWords => '/review/session?due=1&kind=word',
-        TodayLearningStep.reading => _readingPursuit()!.route,
-        TodayLearningStep.photoChat => '/digital-human?sceneMenu=1',
-      };
-      await store.saveStage(JourneyStage.learn);
-      if (!mounted) return;
-      if (step == TodayLearningStep.photoChat) {
-        await offerTodayOralIntro(
-          context,
-          ref,
-          alreadyDone: store.oralIntroDone,
-          markDone: store.markOralIntroDone,
-        );
-      } else {
-        await context.push(route);
-      }
-      if (!mounted) return;
-      await _syncProgress(store);
-      if (!mounted) return;
-      if (_nextLearningStep(store) == null) {
-        await _seedTomorrow(account, today, store);
-        await store.saveStage(JourneyStage.done);
+      while (mounted && ref.read(studyAccountProvider) == account) {
+        final TodayLearningStep? step = _nextLearningStep(store);
+        if (step == null) {
+          await _seedTomorrow(account, today, store);
+          await store.saveStage(JourneyStage.done);
+          return;
+        }
+        await store.saveStage(JourneyStage.learn);
+        if (!mounted) return;
+        if (step == TodayLearningStep.photoChat) {
+          await offerTodayOralIntro(
+            context,
+            ref,
+            alreadyDone: store.oralIntroDone,
+            markDone: store.markOralIntroDone,
+          );
+        } else {
+          final String route = switch (step) {
+            TodayLearningStep.newWords => _vocabPursuit()!.route,
+            TodayLearningStep.video => _videoPursuit()?.route ?? '/library',
+            TodayLearningStep.reviewWords => '/review/session?due=1&kind=word',
+            TodayLearningStep.reading => _readingPursuit()!.route,
+            TodayLearningStep.photoChat => '/digital-human?sceneMenu=1',
+          };
+          await context.push(route);
+        }
+        if (!mounted || ref.read(studyAccountProvider) != account) return;
+        await _syncProgress(store);
+        if (!mounted || _nextLearningStep(store) == step) return;
       }
     } finally {
       if (mounted) setState(() => _busy = false);
