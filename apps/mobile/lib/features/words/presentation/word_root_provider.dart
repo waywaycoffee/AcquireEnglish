@@ -7,7 +7,7 @@ final FutureProvider<WordRootCatalog> wordRootCatalogProvider =
     FutureProvider<WordRootCatalog>((Ref ref) => WordRootCatalog.load());
 
 /// Detail lookup with optional rule-guess (lookup / detail pages).
-final ProviderFamily<WordRootDetail?, String> wordRootDetailProvider =
+final wordRootDetailProvider =
     Provider.family<WordRootDetail?, String>((Ref ref, String word) {
   final AsyncValue<WordRootCatalog> catalog = ref.watch(wordRootCatalogProvider);
   return catalog.maybeWhen(
@@ -17,7 +17,7 @@ final ProviderFamily<WordRootDetail?, String> wordRootDetailProvider =
 });
 
 /// Curated-only detail for recite / review cards (never injects guess).
-final ProviderFamily<WordRootDetail?, String> wordRootCuratedDetailProvider =
+final wordRootCuratedDetailProvider =
     Provider.family<WordRootDetail?, String>((Ref ref, String word) {
   final AsyncValue<WordRootCatalog> catalog = ref.watch(wordRootCatalogProvider);
   return catalog.maybeWhen(
