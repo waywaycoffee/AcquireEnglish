@@ -1,0 +1,1993 @@
+{
+  "version": "2.22",
+  "children": [
+    {
+      "type": "frame",
+      "id": "art-01",
+      "name": "01 视频主页",
+      "x": 0,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "s1-time",
+          "x": 24,
+          "y": 10,
+          "content": "9:41",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "text",
+          "id": "s1-sys",
+          "x": 300,
+          "y": 10,
+          "content": "5G  ■",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "text",
+          "id": "s1-title",
+          "x": 20,
+          "y": 40,
+          "content": "视频",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 28,
+          "fill": "#F5F5F5",
+          "fontWeight": "bold"
+        },
+        {
+          "type": "text",
+          "id": "s1-search",
+          "x": 280,
+          "y": 46,
+          "content": "⌕",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 20,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "text",
+          "id": "s1-files",
+          "x": 318,
+          "y": 48,
+          "content": "本地文件",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#E85A4F"
+        },
+        {
+          "type": "frame",
+          "id": "s1-strip",
+          "name": "source strip",
+          "x": 16,
+          "y": 88,
+          "width": 358,
+          "height": 32,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s1-strip-t",
+              "x": 12,
+              "y": 8,
+              "content": "精选 · B站 / YouTube",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "text",
+          "id": "s1-sec1",
+          "x": 20,
+          "y": 136,
+          "content": "每日精选",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 16,
+          "fill": "#F5F5F5",
+          "fontWeight": "bold"
+        },
+        {
+          "type": "text",
+          "id": "s1-more1",
+          "x": 330,
+          "y": 138,
+          "content": "更多",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "frame",
+          "id": "s1-c1",
+          "name": "card1",
+          "x": 16,
+          "y": 168,
+          "width": 172,
+          "height": 118,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s1-b1",
+              "x": 8,
+              "y": 8,
+              "content": "双语",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#2BB673",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s1-t1",
+              "x": 8,
+              "y": 90,
+              "content": "Daily Conversation",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#F5F5F5"
+            }
+          ],
+          "fill": "#2A2D36",
+          "cornerRadius": 12
+        },
+        {
+          "type": "frame",
+          "id": "s1-c2",
+          "name": "card2",
+          "x": 202,
+          "y": 168,
+          "width": 172,
+          "height": 118,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s1-b2",
+              "x": 8,
+              "y": 8,
+              "content": "双语",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#2BB673",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s1-t2",
+              "x": 8,
+              "y": 90,
+              "content": "Business Podcast",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#F5F5F5"
+            }
+          ],
+          "fill": "#2A2D36",
+          "cornerRadius": 12
+        },
+        {
+          "type": "text",
+          "id": "s1-sec2",
+          "x": 20,
+          "y": 304,
+          "content": "TED / 演讲",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 16,
+          "fill": "#F5F5F5",
+          "fontWeight": "bold"
+        },
+        {
+          "type": "text",
+          "id": "s1-more2",
+          "x": 330,
+          "y": 306,
+          "content": "更多",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "frame",
+          "id": "s1-c3",
+          "name": "card3",
+          "x": 16,
+          "y": 336,
+          "width": 172,
+          "height": 118,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s1-b3",
+              "x": 8,
+              "y": 8,
+              "content": "双语",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#2BB673",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s1-t3",
+              "x": 8,
+              "y": 90,
+              "content": "Power of Language",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#F5F5F5"
+            }
+          ],
+          "fill": "#2A2D36",
+          "cornerRadius": 12
+        },
+        {
+          "type": "frame",
+          "id": "s1-c4",
+          "name": "card4",
+          "x": 202,
+          "y": 336,
+          "width": 172,
+          "height": 118,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s1-b4",
+              "x": 8,
+              "y": 8,
+              "content": "仅英",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s1-t4",
+              "x": 8,
+              "y": 90,
+              "content": "Learning Styles",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#F5F5F5"
+            }
+          ],
+          "fill": "#2A2D36",
+          "cornerRadius": 12
+        },
+        {
+          "type": "text",
+          "id": "s1-sec3",
+          "x": 20,
+          "y": 472,
+          "content": "口语实战",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 16,
+          "fill": "#F5F5F5",
+          "fontWeight": "bold"
+        },
+        {
+          "type": "text",
+          "id": "s1-more3",
+          "x": 330,
+          "y": 474,
+          "content": "更多",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "frame",
+          "id": "s1-c5",
+          "name": "card5",
+          "x": 16,
+          "y": 504,
+          "width": 172,
+          "height": 118,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s1-b5",
+              "x": 8,
+              "y": 8,
+              "content": "双语",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#2BB673",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s1-t5",
+              "x": 8,
+              "y": 90,
+              "content": "At the Airport",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#F5F5F5"
+            }
+          ],
+          "fill": "#2A2D36",
+          "cornerRadius": 12
+        },
+        {
+          "type": "frame",
+          "id": "s1-c6",
+          "name": "card6",
+          "x": 202,
+          "y": 504,
+          "width": 172,
+          "height": 118,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s1-b6",
+              "x": 8,
+              "y": 8,
+              "content": "双语",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#2BB673",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s1-t6",
+              "x": 8,
+              "y": 90,
+              "content": "Ordering Coffee",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#F5F5F5"
+            }
+          ],
+          "fill": "#2A2D36",
+          "cornerRadius": 12
+        },
+        {
+          "type": "text",
+          "id": "s1-note",
+          "x": 20,
+          "y": 640,
+          "content": "VIP 磨耳朵精选 · 珊瑚 CTA",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#E85A4F"
+        },
+        {
+          "type": "frame",
+          "id": "s1-nav",
+          "name": "App Bottom Nav",
+          "x": 0,
+          "y": 780,
+          "width": 390,
+          "height": 64,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s1-tab-0",
+              "x": 12,
+              "y": 18,
+              "content": "首页",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s1-tab-1",
+              "x": 90,
+              "y": 18,
+              "content": "视频",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s1-tab-2",
+              "x": 168,
+              "y": 18,
+              "content": "阅读",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s1-tab-3",
+              "x": 246,
+              "y": 18,
+              "content": "应试",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s1-tab-4",
+              "x": 324,
+              "y": 18,
+              "content": "我的",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#1A1C20"
+        }
+      ],
+      "fill": "#1A1C20"
+    },
+    {
+      "type": "frame",
+      "id": "art-02",
+      "name": "02 本地文件管理器",
+      "x": 430,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "s2-time",
+          "x": 24,
+          "y": 10,
+          "content": "9:41",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "text",
+          "id": "s2-sys",
+          "x": 300,
+          "y": 10,
+          "content": "5G  ■",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "text",
+          "id": "s2-back",
+          "x": 16,
+          "y": 42,
+          "content": "‹",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 24,
+          "fill": "#E85A4F"
+        },
+        {
+          "type": "text",
+          "id": "s2-title",
+          "x": 48,
+          "y": 44,
+          "content": "本地文件",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 22,
+          "fill": "#F5F5F5",
+          "fontWeight": "bold"
+        },
+        {
+          "type": "text",
+          "id": "s2-sub",
+          "x": 48,
+          "y": 74,
+          "content": "网盘 / 相册 / 链接 / 本地 / 电脑",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "frame",
+          "id": "s2-imp",
+          "name": "import",
+          "x": 16,
+          "y": 104,
+          "width": 358,
+          "height": 120,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s2-imp-t",
+              "x": 16,
+              "y": 14,
+              "content": "导入外部资源",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fill": "#F5F5F5",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s2-imp-icons",
+              "x": 16,
+              "y": 48,
+              "content": "网盘   相册   链接   本地   电脑",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "frame",
+              "id": "s2-cta",
+              "name": "cta",
+              "x": 16,
+              "y": 78,
+              "width": 326,
+              "height": 30,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "s2-cta-t",
+                  "x": 140,
+                  "y": 6,
+                  "content": "导入",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 13,
+                  "fill": "#FFFFFF",
+                  "fontWeight": "bold"
+                }
+              ],
+              "fill": "#E85A4F",
+              "cornerRadius": 8
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 14
+        },
+        {
+          "type": "frame",
+          "id": "s2-stor",
+          "name": "storage",
+          "x": 16,
+          "y": 240,
+          "width": 358,
+          "height": 52,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s2-stor-t",
+              "x": 16,
+              "y": 10,
+              "content": "本地存储  128.4 / 512 GB",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "frame",
+              "id": "s2-bar-bg",
+              "name": "barbg",
+              "x": 16,
+              "y": 34,
+              "width": 326,
+              "height": 6,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "frame",
+                  "id": "s2-bar",
+                  "name": "bar",
+                  "x": 0,
+                  "y": 0,
+                  "width": 120,
+                  "height": 6,
+                  "layout": "none",
+                  "children": [],
+                  "fill": "#E85A4F",
+                  "cornerRadius": 3
+                }
+              ],
+              "fill": "#33363F",
+              "cornerRadius": 3
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 12
+        },
+        {
+          "type": "text",
+          "id": "s2-tabs",
+          "x": 20,
+          "y": 310,
+          "content": "全部(12)   视频(8)   字幕(4)",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "frame",
+          "id": "s2-row1",
+          "name": "r1",
+          "x": 16,
+          "y": 340,
+          "width": 358,
+          "height": 56,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s2-r1a",
+              "x": 14,
+              "y": 10,
+              "content": "MP4  Friends S01E01.mp4",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#F5F5F5"
+            },
+            {
+              "type": "text",
+              "id": "s2-r1b",
+              "x": 14,
+              "y": 32,
+              "content": "1920x1080 · 22:14 · 480 MB",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s2-row2",
+          "name": "r2",
+          "x": 16,
+          "y": 406,
+          "width": 358,
+          "height": 56,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s2-r2a",
+              "x": 14,
+              "y": 10,
+              "content": "SRT  Friends S01E01.srt",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#F5F5F5"
+            },
+            {
+              "type": "text",
+              "id": "s2-r2b",
+              "x": 14,
+              "y": 32,
+              "content": "UTF-8 · 双语就绪 · 48 KB",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#2BB673"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s2-row3",
+          "name": "r3",
+          "x": 16,
+          "y": 472,
+          "width": 358,
+          "height": 56,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s2-r3a",
+              "x": 14,
+              "y": 10,
+              "content": "MP4  TED Power of Language.mp4",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#F5F5F5"
+            },
+            {
+              "type": "text",
+              "id": "s2-r3b",
+              "x": 14,
+              "y": 32,
+              "content": "1280x720 · 08:42 · 180 MB",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "text",
+          "id": "s2-note",
+          "x": 20,
+          "y": 550,
+          "content": "无独立底栏 · 返回视频 Tab",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#9AA0AE"
+        }
+      ],
+      "fill": "#1A1C20"
+    },
+    {
+      "type": "frame",
+      "id": "art-03",
+      "name": "03 播放页入口示意",
+      "x": 860,
+      "y": 0,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "s3-time",
+          "x": 24,
+          "y": 10,
+          "content": "9:41",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "text",
+          "id": "s3-sys",
+          "x": 300,
+          "y": 10,
+          "content": "5G  ■",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "text",
+          "id": "s3-back",
+          "x": 16,
+          "y": 40,
+          "content": "‹",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 24,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "text",
+          "id": "s3-brand",
+          "x": 130,
+          "y": 44,
+          "content": "AcquireEnglish",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 14,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "text",
+          "id": "s3-more",
+          "x": 350,
+          "y": 44,
+          "content": "...",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 18,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "frame",
+          "id": "s3-vid",
+          "name": "video",
+          "x": 16,
+          "y": 76,
+          "width": 358,
+          "height": 180,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s3-vid-t",
+              "x": 100,
+              "y": 78,
+              "content": "播放区（沿用 AE 壳）",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s3-cue",
+              "x": 20,
+              "y": 148,
+              "content": "It's about making others feel safe…",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#F5F5F5"
+            }
+          ],
+          "fill": "#111318",
+          "cornerRadius": 12
+        },
+        {
+          "type": "text",
+          "id": "s3-sec",
+          "x": 20,
+          "y": 272,
+          "content": "句子列表",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 14,
+          "fill": "#F5F5F5",
+          "fontWeight": "bold"
+        },
+        {
+          "type": "text",
+          "id": "s3-more-menu",
+          "x": 280,
+          "y": 272,
+          "content": "更多 › 台词本",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#E85A4F"
+        },
+        {
+          "type": "frame",
+          "id": "s3-line1",
+          "name": "l1",
+          "x": 16,
+          "y": 300,
+          "width": 358,
+          "height": 52,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s3-l1n",
+              "x": 12,
+              "y": 8,
+              "content": "01",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s3-l1t",
+              "x": 40,
+              "y": 8,
+              "content": "In times of crisis, leadership…",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#F5F5F5"
+            },
+            {
+              "type": "text",
+              "id": "s3-l1a",
+              "x": 40,
+              "y": 30,
+              "content": "听写    练习",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#E85A4F"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s3-line2",
+          "name": "l2",
+          "x": 16,
+          "y": 362,
+          "width": 358,
+          "height": 72,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s3-l2n",
+              "x": 12,
+              "y": 8,
+              "content": "02",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#E85A4F"
+            },
+            {
+              "type": "text",
+              "id": "s3-l2t",
+              "x": 40,
+              "y": 8,
+              "content": "It's about making others feel safe…",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#F5F5F5"
+            },
+            {
+              "type": "text",
+              "id": "s3-l2a",
+              "x": 40,
+              "y": 32,
+              "content": "听写  ·  练习  ·  行内入口",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F",
+              "fontWeight": "bold"
+            }
+          ],
+          "fill": "#2E2430",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s3-pop",
+          "name": "popup",
+          "x": 200,
+          "y": 440,
+          "width": 170,
+          "height": 90,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s3-p1",
+              "x": 14,
+              "y": 12,
+              "content": "台词本",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#F5F5F5",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s3-p2",
+              "x": 14,
+              "y": 36,
+              "content": "已收藏",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s3-p3",
+              "x": 14,
+              "y": 58,
+              "content": "跳过空白",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "text",
+          "id": "s3-note",
+          "x": 20,
+          "y": 560,
+          "content": "示意入口 · 不改播放器壳",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#9AA0AE"
+        }
+      ],
+      "fill": "#1A1C20"
+    },
+    {
+      "type": "frame",
+      "id": "art-04",
+      "name": "04 台词本",
+      "x": 0,
+      "y": 900,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "s4-time",
+          "x": 24,
+          "y": 10,
+          "content": "9:41",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "text",
+          "id": "s4-sys",
+          "x": 300,
+          "y": 10,
+          "content": "5G  ■",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "text",
+          "id": "s4-back",
+          "x": 16,
+          "y": 40,
+          "content": "‹",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 24,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "text",
+          "id": "s4-title",
+          "x": 48,
+          "y": 44,
+          "content": "台词本",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 22,
+          "fill": "#F5F5F5",
+          "fontWeight": "bold"
+        },
+        {
+          "type": "frame",
+          "id": "s4-search",
+          "name": "search",
+          "x": 16,
+          "y": 84,
+          "width": 358,
+          "height": 36,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s4-st",
+              "x": 14,
+              "y": 10,
+              "content": "⌕  搜索台词",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s4-row1",
+          "name": "row1",
+          "x": 16,
+          "y": 136,
+          "width": 358,
+          "height": 78,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s4-n1",
+              "x": 12,
+              "y": 10,
+              "content": "01",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s4-ts1",
+              "x": 280,
+              "y": 10,
+              "content": "00:00:04",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s4-en1",
+              "x": 40,
+              "y": 10,
+              "content": "Are you nervous?",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#F5F5F5"
+            },
+            {
+              "type": "text",
+              "id": "s4-zh1",
+              "x": 40,
+              "y": 32,
+              "content": "你紧张吗？",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s4-act1",
+              "x": 40,
+              "y": 54,
+              "content": "听写    练习",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#E85A4F"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s4-row2",
+          "name": "row2",
+          "x": 16,
+          "y": 222,
+          "width": 358,
+          "height": 78,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s4-n2",
+              "x": 12,
+              "y": 10,
+              "content": "02",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s4-ts2",
+              "x": 280,
+              "y": 10,
+              "content": "00:00:07",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s4-en2",
+              "x": 40,
+              "y": 10,
+              "content": "A little. Everyone is watching.",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#F5F5F5"
+            },
+            {
+              "type": "text",
+              "id": "s4-zh2",
+              "x": 40,
+              "y": 32,
+              "content": "有一点。大家都在看。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s4-act2",
+              "x": 40,
+              "y": 54,
+              "content": "听写    练习",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#E85A4F"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s4-row3",
+          "name": "row3",
+          "x": 16,
+          "y": 308,
+          "width": 358,
+          "height": 78,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s4-n3",
+              "x": 12,
+              "y": 10,
+              "content": "03",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s4-ts3",
+              "x": 280,
+              "y": 10,
+              "content": "00:00:11",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s4-en3",
+              "x": 40,
+              "y": 10,
+              "content": "Just be yourself.",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#F5F5F5"
+            },
+            {
+              "type": "text",
+              "id": "s4-zh3",
+              "x": 40,
+              "y": 32,
+              "content": "做你自己就好。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s4-act3",
+              "x": 40,
+              "y": 54,
+              "content": "听写    练习",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#E85A4F"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s4-row4",
+          "name": "row4",
+          "x": 16,
+          "y": 394,
+          "width": 358,
+          "height": 78,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s4-n4",
+              "x": 12,
+              "y": 10,
+              "content": "04",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s4-ts4",
+              "x": 280,
+              "y": 10,
+              "content": "00:00:14",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s4-en4",
+              "x": 40,
+              "y": 10,
+              "content": "That's the hardest part.",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#F5F5F5"
+            },
+            {
+              "type": "text",
+              "id": "s4-zh4",
+              "x": 40,
+              "y": 32,
+              "content": "那才是最难的。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s4-act4",
+              "x": 40,
+              "y": 54,
+              "content": "听写    练习",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#E85A4F"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s4-row5",
+          "name": "row5",
+          "x": 16,
+          "y": 480,
+          "width": 358,
+          "height": 78,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s4-n5",
+              "x": 12,
+              "y": 10,
+              "content": "05",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s4-ts5",
+              "x": 280,
+              "y": 10,
+              "content": "00:00:18",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 10,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s4-en5",
+              "x": 40,
+              "y": 10,
+              "content": "We'll walk through it together.",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#F5F5F5"
+            },
+            {
+              "type": "text",
+              "id": "s4-zh5",
+              "x": 40,
+              "y": 32,
+              "content": "我们一起过。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            },
+            {
+              "type": "text",
+              "id": "s4-act5",
+              "x": 40,
+              "y": 54,
+              "content": "听写    练习",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#E85A4F"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s4-bot",
+          "name": "bottom",
+          "x": 16,
+          "y": 700,
+          "width": 358,
+          "height": 48,
+          "layout": "none",
+          "children": [
+            {
+              "type": "frame",
+              "id": "s4-vocab",
+              "name": "vocab",
+              "x": 0,
+              "y": 0,
+              "width": 170,
+              "height": 44,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "s4-vt",
+                  "x": 40,
+                  "y": 12,
+                  "content": "字幕词汇",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14,
+                  "fill": "#FFFFFF",
+                  "fontWeight": "bold"
+                }
+              ],
+              "fill": "#2BB673",
+              "cornerRadius": 10
+            },
+            {
+              "type": "frame",
+              "id": "s4-pdf",
+              "name": "pdf",
+              "x": 188,
+              "y": 0,
+              "width": 170,
+              "height": 44,
+              "layout": "none",
+              "children": [
+                {
+                  "type": "text",
+                  "id": "s4-pt",
+                  "x": 48,
+                  "y": 12,
+                  "content": "导出 PDF",
+                  "fontFamily": "Noto Sans SC",
+                  "fontSize": 14,
+                  "fill": "#FFFFFF",
+                  "fontWeight": "bold"
+                }
+              ],
+              "fill": "#E85A4F",
+              "cornerRadius": 10
+            }
+          ]
+        }
+      ],
+      "fill": "#1A1C20"
+    },
+    {
+      "type": "frame",
+      "id": "art-05",
+      "name": "05 字幕词汇/词频",
+      "x": 430,
+      "y": 900,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "s5-time",
+          "x": 24,
+          "y": 10,
+          "content": "9:41",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "text",
+          "id": "s5-sys",
+          "x": 300,
+          "y": 10,
+          "content": "5G  ■",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "text",
+          "id": "s5-back",
+          "x": 16,
+          "y": 40,
+          "content": "‹",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 24,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "text",
+          "id": "s5-title",
+          "x": 48,
+          "y": 44,
+          "content": "字幕词汇",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 22,
+          "fill": "#F5F5F5",
+          "fontWeight": "bold"
+        },
+        {
+          "type": "text",
+          "id": "s5-sub",
+          "x": 48,
+          "y": 74,
+          "content": "词频 · 考级 · 按水平置顶生词",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "text",
+          "id": "s5-chips",
+          "x": 16,
+          "y": 104,
+          "content": "全部  生词  高频  CET4  CET6  IELTS",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "frame",
+          "id": "s5-w0",
+          "name": "w0",
+          "x": 16,
+          "y": 140,
+          "width": 358,
+          "height": 70,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s5-wn0",
+              "x": 14,
+              "y": 10,
+              "content": "crisis",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fill": "#F5F5F5",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s5-wf0",
+              "x": 220,
+              "y": 12,
+              "content": "出现 6 次",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F"
+            },
+            {
+              "type": "text",
+              "id": "s5-wd0",
+              "x": 14,
+              "y": 40,
+              "content": "n. 危机；紧要关头  · CET6",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s5-w1",
+          "name": "w1",
+          "x": 16,
+          "y": 220,
+          "width": 358,
+          "height": 70,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s5-wn1",
+              "x": 14,
+              "y": 10,
+              "content": "empathy",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fill": "#F5F5F5",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s5-wf1",
+              "x": 220,
+              "y": 12,
+              "content": "出现 4 次",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F"
+            },
+            {
+              "type": "text",
+              "id": "s5-wd1",
+              "x": 14,
+              "y": 40,
+              "content": "n. 共情；同感  · IELTS",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s5-w2",
+          "name": "w2",
+          "x": 16,
+          "y": 300,
+          "width": 358,
+          "height": 70,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s5-wn2",
+              "x": 14,
+              "y": 10,
+              "content": "courage",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fill": "#F5F5F5",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s5-wf2",
+              "x": 220,
+              "y": 12,
+              "content": "出现 3 次",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F"
+            },
+            {
+              "type": "text",
+              "id": "s5-wd2",
+              "x": 14,
+              "y": 40,
+              "content": "n. 勇气  · CET4",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s5-w3",
+          "name": "w3",
+          "x": 16,
+          "y": 380,
+          "width": 358,
+          "height": 70,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s5-wn3",
+              "x": 14,
+              "y": 10,
+              "content": "advantage",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fill": "#F5F5F5",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s5-wf3",
+              "x": 220,
+              "y": 12,
+              "content": "出现 3 次",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F"
+            },
+            {
+              "type": "text",
+              "id": "s5-wd3",
+              "x": 14,
+              "y": 40,
+              "content": "n. 优势  · CET4",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s5-w4",
+          "name": "w4",
+          "x": 16,
+          "y": 460,
+          "width": 358,
+          "height": 70,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s5-wn4",
+              "x": 14,
+              "y": 10,
+              "content": "leadership",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 16,
+              "fill": "#F5F5F5",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s5-wf4",
+              "x": 220,
+              "y": 12,
+              "content": "出现 5 次",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#E85A4F"
+            },
+            {
+              "type": "text",
+              "id": "s5-wd4",
+              "x": 14,
+              "y": 40,
+              "content": "n. 领导力  · 商务",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#9AA0AE"
+            }
+          ],
+          "fill": "#24262C",
+          "cornerRadius": 10
+        },
+        {
+          "type": "frame",
+          "id": "s5-export",
+          "name": "export",
+          "x": 16,
+          "y": 740,
+          "width": 358,
+          "height": 44,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s5-et",
+              "x": 140,
+              "y": 12,
+              "content": "导出词汇",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 15,
+              "fill": "#FFFFFF",
+              "fontWeight": "bold"
+            }
+          ],
+          "fill": "#E85A4F",
+          "cornerRadius": 12
+        }
+      ],
+      "fill": "#1A1C20"
+    },
+    {
+      "type": "frame",
+      "id": "art-06",
+      "name": "06 导出 PDF 预览",
+      "x": 860,
+      "y": 900,
+      "width": 390,
+      "height": 844,
+      "layout": "none",
+      "children": [
+        {
+          "type": "text",
+          "id": "s6-time",
+          "x": 24,
+          "y": 10,
+          "content": "9:41",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 12,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "text",
+          "id": "s6-sys",
+          "x": 300,
+          "y": 10,
+          "content": "5G  ■",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 11,
+          "fill": "#9AA0AE"
+        },
+        {
+          "type": "text",
+          "id": "s6-back",
+          "x": 16,
+          "y": 40,
+          "content": "‹",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 24,
+          "fill": "#F5F5F5"
+        },
+        {
+          "type": "text",
+          "id": "s6-title",
+          "x": 120,
+          "y": 44,
+          "content": "导出预览",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 20,
+          "fill": "#F5F5F5",
+          "fontWeight": "bold"
+        },
+        {
+          "type": "text",
+          "id": "s6-exp",
+          "x": 320,
+          "y": 46,
+          "content": "导出",
+          "fontFamily": "Noto Sans SC",
+          "fontSize": 14,
+          "fill": "#E85A4F",
+          "fontWeight": "bold"
+        },
+        {
+          "type": "frame",
+          "id": "s6-prev",
+          "name": "preview",
+          "x": 28,
+          "y": 90,
+          "width": 334,
+          "height": 620,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s6-pt",
+              "x": 20,
+              "y": 24,
+              "content": "台词本 · Leadership in Crisis",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 14,
+              "fill": "#1A1C20",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s6-pm",
+              "x": 20,
+              "y": 52,
+              "content": "AcquireEnglish  ·  双语 PDF 预览",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#666666"
+            },
+            {
+              "type": "text",
+              "id": "s6-p1",
+              "x": 20,
+              "y": 90,
+              "content": "01  In times of crisis…",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#222222"
+            },
+            {
+              "type": "text",
+              "id": "s6-p1z",
+              "x": 40,
+              "y": 110,
+              "content": "危机时刻……",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#666666"
+            },
+            {
+              "type": "text",
+              "id": "s6-p2",
+              "x": 20,
+              "y": 140,
+              "content": "02  It's about making others…",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#222222"
+            },
+            {
+              "type": "text",
+              "id": "s6-p2z",
+              "x": 40,
+              "y": 160,
+              "content": "在于让别人感到安全……",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#666666"
+            },
+            {
+              "type": "text",
+              "id": "s6-p3",
+              "x": 20,
+              "y": 190,
+              "content": "03  People don't follow titles.",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 12,
+              "fill": "#222222"
+            },
+            {
+              "type": "text",
+              "id": "s6-p3z",
+              "x": 40,
+              "y": 210,
+              "content": "人们追随的不是头衔。",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#666666"
+            },
+            {
+              "type": "text",
+              "id": "s6-vocab",
+              "x": 20,
+              "y": 260,
+              "content": "附录 · 字幕词汇（词频）",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 13,
+              "fill": "#1A1C20",
+              "fontWeight": "bold"
+            },
+            {
+              "type": "text",
+              "id": "s6-vw",
+              "x": 20,
+              "y": 290,
+              "content": "crisis (6)  ·  empathy (4)  ·  courage (3)",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 11,
+              "fill": "#444444"
+            }
+          ],
+          "fill": "#F7F4EF",
+          "cornerRadius": 8
+        },
+        {
+          "type": "frame",
+          "id": "s6-cta",
+          "name": "cta",
+          "x": 16,
+          "y": 740,
+          "width": 358,
+          "height": 44,
+          "layout": "none",
+          "children": [
+            {
+              "type": "text",
+              "id": "s6-ct",
+              "x": 120,
+              "y": 12,
+              "content": "确认导出 PDF",
+              "fontFamily": "Noto Sans SC",
+              "fontSize": 15,
+              "fill": "#FFFFFF",
+              "fontWeight": "bold"
+            }
+          ],
+          "fill": "#E85A4F",
+          "cornerRadius": 12
+        }
+      ],
+      "fill": "#1A1C20"
+    }
+  ]
+}
