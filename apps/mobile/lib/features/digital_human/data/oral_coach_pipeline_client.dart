@@ -218,9 +218,10 @@ class OralCoachPipelineClient {
       '$base/api/tts/speak',
       data: <String, dynamic>{
         'text': spoken,
-        'digital_human_id': digitalHumanId.trim().isEmpty
-            ? 'mia'
-            : digitalHumanId.trim(),
+        // Never invent Mia here — empty id means "caller forgot selection".
+        // Server maps known persona ids; keep the selected avatar authoritative.
+        if (digitalHumanId.trim().isNotEmpty)
+          'digital_human_id': digitalHumanId.trim(),
         if ((ttsVoice ?? '').trim().isNotEmpty) 'tts_voice': ttsVoice!.trim(),
         'language': language.trim().isEmpty ? 'en' : language.trim(),
       },

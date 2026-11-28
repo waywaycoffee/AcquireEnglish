@@ -1185,7 +1185,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       isBilingualCoachVoice(_englishVoiceId ?? persona.recommendedVoiceId);
 
   String _coachVoice(DigitalHumanPersona persona) {
-    // Chinese reply without a bilingual cloud voice → Edge zh.
+    // Always bind to *this* persona — never a stale global / Mia hardcode.
+    // Chinese reply without a bilingual cloud voice → that persona's Edge zh.
     if (_preferChineseReply && !_usesCloudVoice(persona)) {
       return persona.edgeVoice(chinese: true);
     }
@@ -1651,9 +1652,11 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       // Letting it synthesize here can replace a male coach with its default
       // female voice. Keep the selected persona voice authoritative; realtime
       // lip-sync may render the avatar but must not take over speech audio.
-      final bool usesCloudVoice = _usesCloudVoice(
-        settings.selectedDigitalHuman,
-      );
+      // Re-read selection at speak time (photo chat may open after a late tap).
+      final DigitalHumanPersona persona = ref
+          .read(learningSettingsProvider)
+          .selectedDigitalHuman;
+      final bool usesCloudVoice = _usesCloudVoice(persona);
       String? remote = ttsUrl;
       String provider = '';
       if (remote == null || remote.isEmpty) {
@@ -1662,8 +1665,8 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
               await _pipelineClient.synthesizeSpeechWithProvider(
             rawBaseUrl: settings.oralCoachPipelineUrl,
             text: speak,
-            digitalHumanId: settings.selectedDigitalHuman.id,
-            ttsVoice: _coachVoice(settings.selectedDigitalHuman),
+            digitalHumanId: persona.id,
+            ttsVoice: _coachVoice(persona),
             language: _preferChineseReply ? 'zh' : 'en',
             // Normal Q&A responsiveness is the priority. If cloud TTS cannot
             // produce first audio quickly, fall back to on-device speech;
@@ -1692,7 +1695,7 @@ class _StudyOralCoachTabState extends ConsumerState<StudyOralCoachTab>
       }
       if (!mounted || !_started || gen != _speakGen) return;
       setState(() => _voicePlaybackLabel = '流畅模式 · 本机音色');
-      await _configureLocalPersonaVoice(settings.selectedDigitalHuman);
+      await _configureLocalPersonaVoice(persona);
       await _cartoonTts.awaitSpeakCompletion(true);
       if (!mounted || !_started || gen != _speakGen) return;
       await _cartoonTts.speak(speak).timeout(const Duration(seconds: 90));
