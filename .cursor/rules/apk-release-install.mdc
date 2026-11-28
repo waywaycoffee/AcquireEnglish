@@ -8,4 +8,19 @@ When building an APK to sideload / overwrite-install onto a connected phone:
 4. Install with `adb install -r` to preserve app data. Never uninstall just to switch signatures.
 5. `team-debug.keystore` is for local debug runs only, not for covering a release-signed device install.
 
+## Dual-install compare（上架原签 + 旧版新签）
+
+**改版上架继续用原 `com.acquire.english` + upload 签名，不换签、不影响已审流程。**  
+旧版对照才用新签名 + `.legacy` 包名（不上架）：
+
+| 用途 | flavor | applicationId | 签名 | 图标 |
+|------|--------|---------------|------|------|
+| 上架 / 改版 | `prod` | `com.acquire.english` | **原 upload** | 爱快英语 |
+| 旧版对照 | `legacy` | `com.acquire.english.legacy` | **新** `acquireenglish-legacy.jks` | 爱快英语·旧版 |
+
+```bash
+flutter build apk --release --flavor legacy --no-pub
+```
+
+归档到本机 `artifacts/dual-install/`（apk gitignored）。改版后悔：用归档的 prod APK（仍是原签）`adb install -r` 覆盖正式包。
 This supersedes older AGENTS wording that used `--debug --flavor prod`.

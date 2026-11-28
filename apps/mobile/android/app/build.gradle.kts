@@ -15,6 +15,12 @@ if (keystorePropertiesFile.exists()) {
     keystoreProperties.load(FileInputStream(keystorePropertiesFile))
 }
 
+val legacyKeystoreProperties = Properties()
+val legacyKeystorePropertiesFile = rootProject.file("key-legacy.properties")
+if (legacyKeystorePropertiesFile.exists()) {
+    legacyKeystoreProperties.load(FileInputStream(legacyKeystorePropertiesFile))
+}
+
 // media_kit 1.2.6 has an Android release-only disposal race on Flutter 3.38+:
 // it closes NativeCallable, then waits 5 seconds before joining mpv's thread.
 // An in-flight callback in that window aborts the process. This applies the
@@ -196,6 +202,24 @@ android {
             enableV2Signing = true
             enableV3Signing = true
         }
+        // Side-by-side compare / pre-redesign rollback install.
+        // Different cert + applicationIdSuffix=.legacy so it can sit next to prod.
+        create("legacy") {
+            require(legacyKeystorePropertiesFile.isFile) {
+                "Missing $legacyKeystorePropertiesFile — copy key-legacy.properties before building legacy."
+            }
+            val legacyStore = rootProject.file(legacyKeystoreProperties["storeFile"] as String)
+            require(legacyStore.isFile) {
+                "Missing $legacyStore — generate acquireenglish-legacy.jks before building legacy."
+            }
+            keyAlias = legacyKeystoreProperties["keyAlias"] as String
+            keyPassword = legacyKeystoreProperties["keyPassword"] as String
+            storeFile = legacyStore
+            storePassword = legacyKeystoreProperties["storePassword"] as String
+            enableV1Signing = true
+            enableV2Signing = true
+            enableV3Signing = true
+        }
     }
 
     flavorDimensions += "env"
@@ -214,6 +238,13 @@ android {
         create("prod") {
             dimension = "env"
         }
+        // Dual-install compare slot: com.acquire.english.legacy
+        // Launcher name: 爱快英语·旧版. Does not overwrite prod data.
+        create("legacy") {
+            dimension = "env"
+            applicationIdSuffix = ".legacy"
+            versionNameSuffix = "-legacy"
+        }
     }
 
     buildTypes {
@@ -221,8 +252,18 @@ android {
             signingConfig = signingConfigs.getByName("debug")
         }
         release {
-            // Always upload/release cert — never silent fallback to debug.
-            signingConfig = signingConfigs.getByName("release")
+            // Flutter `assembleLegacyRelease` → legacy compare cert;
+            // all other release flavors → upload/prod cert.
+            val assemblingLegacy =
+                gradle.startParameter.taskNames.any {
+                    it.contains("Legacy", ignoreCase = true)
+                }
+            signingConfig =
+                if (assemblingLegacy) {
+                    signingConfigs.getByName("legacy")
+                } else {
+                    signingConfigs.getByName("release")
+                }
             // ML Kit keep rules live in proguard-rules.pro — validate on device
             // after every minify-on release (cold-start MlKitInitProvider).
             isMinifyEnabled = true
