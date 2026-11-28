@@ -816,3 +816,16 @@ def unfinished_page_job_ids(*, doc_id: str, voice: str) -> list[str]:
             continue
         out.append(str(row["id"]))
     return out
+
+
+def list_book_jobs(*, limit: int = 40) -> list[dict]:
+    """Admin summary of long-novel book TTS jobs (ECS queue / 5060 worker)."""
+    with connection() as db:
+        rows = db.execute(
+            "SELECT doc_id, voice FROM book_jobs "
+            "ORDER BY updated DESC LIMIT ?",
+            (max(1, min(int(limit), 200)),),
+        ).fetchall()
+    return [
+        book_status(doc_id=str(r["doc_id"]), voice=str(r["voice"])) for r in rows
+    ]

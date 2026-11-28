@@ -10,6 +10,7 @@ from app.database import Base, engine
 from app.routers import (
     admin,
     admin_analytics,
+    tts_progress,
     app_settings_backup,
     assets,
     auth,
@@ -127,6 +128,7 @@ app.include_router(auth.router, prefix="/api")
 app.include_router(bilibili_oauth.router, prefix="/api")
 app.include_router(admin.router, prefix="/api")
 app.include_router(admin_analytics.router, prefix="/api")
+app.include_router(tts_progress.admin_router, prefix="/api")
 app.include_router(usage.router, prefix="/api")
 app.include_router(courses.router, prefix="/api")
 app.include_router(progress.router, prefix="/api")
