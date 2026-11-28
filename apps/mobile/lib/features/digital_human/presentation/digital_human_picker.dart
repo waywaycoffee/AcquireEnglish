@@ -535,10 +535,9 @@ class _PersonaCard extends StatelessWidget {
                         persona.assetPath,
                         fit: BoxFit.cover,
                         width: double.infinity,
+                        // Only cacheWidth: specifying both width+height forces a
+                        // stretched decode that elongates faces in the card.
                         cacheWidth: (cardWidth *
-                                MediaQuery.devicePixelRatioOf(context))
-                            .round(),
-                        cacheHeight: (cardHeight *
                                 MediaQuery.devicePixelRatioOf(context))
                             .round(),
                         errorBuilder: (_, __, ___) => ColoredBox(
