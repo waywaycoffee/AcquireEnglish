@@ -217,11 +217,17 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: selected
-                              ? AppDesignTokens.brandGreen
+                              ? AppDesignTokens.navAccent
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: selected
-                              ? AppDesignTokens.toyButtonShadow
+                              ? <BoxShadow>[
+                                  BoxShadow(
+                                    color: AppDesignTokens.navAccent
+                                        .withValues(alpha: 0.45),
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ]
                               : const <BoxShadow>[],
                         ),
                         child: Padding(
@@ -246,7 +252,7 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
                                         ? destination.activeIcon
                                         : destination.icon,
                                     color: selected
-                                        ? AppDesignTokens.brandGreenDark
+                                        ? AppDesignTokens.navAccent
                                         : AppDesignTokens.textSecondary,
                                     size: compact ? 21 : 23,
                                   ),

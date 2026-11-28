@@ -1,7 +1,5 @@
 import 'package:flutter/material.dart';
 
-import '../../navigation/presentation/floating_bottom_nav.dart';
-
 /// Shared [GlobalKey]s so the coach overlay can measure real widgets.
 class FeatureTourKeys {
   FeatureTourKeys._();
@@ -26,8 +24,8 @@ class FeatureTourKeys {
     debugLabel: 'feature_tour_nav_more',
   );
 
-  static final GlobalKey<FloatingBottomNavState> bottomNav =
-      GlobalKey<FloatingBottomNavState>(
-    debugLabel: 'feature_tour_bottom_nav',
+  /// Host key for the primary nav chrome (icon rail).
+  static final GlobalKey bottomNav = GlobalKey(
+    debugLabel: 'feature_tour_nav_rail',
   );
 }

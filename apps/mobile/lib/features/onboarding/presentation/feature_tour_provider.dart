@@ -1,8 +1,6 @@
 import 'package:flutter/widgets.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../navigation/presentation/floating_bottom_nav.dart';
-import '../../navigation/presentation/navigation_destination.dart';
 import '../data/feature_tour_prefs.dart';
 import 'feature_tour_keys.dart';
 
@@ -126,27 +124,28 @@ class FeatureTourNotifier extends Notifier<FeatureTourState> {
   }
 
   void _prepareStep(FeatureTourStep step) {
-    final FloatingBottomNavState? nav =
-        FeatureTourKeys.bottomNav.currentState;
+    void ensure(GlobalKey key) {
+      final BuildContext? ctx = key.currentContext;
+      if (ctx == null) return;
+      Scrollable.ensureVisible(
+        ctx,
+        duration: const Duration(milliseconds: 280),
+        curve: Curves.easeOutCubic,
+        alignment: 0.35,
+      );
+    }
+
     switch (step) {
       case FeatureTourStep.recentWatched:
-        final BuildContext? ctx = FeatureTourKeys.recentWatched.currentContext;
-        if (ctx != null) {
-          Scrollable.ensureVisible(
-            ctx,
-            duration: const Duration(milliseconds: 280),
-            curve: Curves.easeOutCubic,
-            alignment: 0.2,
-          );
-        }
+        ensure(FeatureTourKeys.recentWatched);
       case FeatureTourStep.navLibrary:
-        nav?.ensureDestinationVisible(AppNavDestination.library);
+        ensure(FeatureTourKeys.navLibrary);
       case FeatureTourStep.navReading:
-        nav?.ensureDestinationVisible(AppNavDestination.reading);
+        ensure(FeatureTourKeys.navReading);
       case FeatureTourStep.navOral:
-        nav?.ensureDestinationVisible(AppNavDestination.oralCoach);
+        ensure(FeatureTourKeys.navOral);
       case FeatureTourStep.navMore:
-        nav?.ensureMoreVisible();
+        ensure(FeatureTourKeys.navMore);
       case FeatureTourStep.wrapUp:
         break;
     }
