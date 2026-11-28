@@ -204,21 +204,22 @@ android {
         }
         // Side-by-side compare / pre-redesign rollback install.
         // Different cert + applicationIdSuffix=.legacy so it can sit next to prod.
-        create("legacy") {
-            require(legacyKeystorePropertiesFile.isFile) {
-                "Missing $legacyKeystorePropertiesFile — copy key-legacy.properties before building legacy."
+        // Optional on machines that only ship prod/iOS (legacy APK may be copied
+        // from the dual-install archive). Required when assembling Legacy*.
+        if (legacyKeystorePropertiesFile.isFile) {
+            create("legacy") {
+                val legacyStore = rootProject.file(legacyKeystoreProperties["storeFile"] as String)
+                require(legacyStore.isFile) {
+                    "Missing $legacyStore — generate acquireenglish-legacy.jks before building legacy."
+                }
+                keyAlias = legacyKeystoreProperties["keyAlias"] as String
+                keyPassword = legacyKeystoreProperties["keyPassword"] as String
+                storeFile = legacyStore
+                storePassword = legacyKeystoreProperties["storePassword"] as String
+                enableV1Signing = true
+                enableV2Signing = true
+                enableV3Signing = true
             }
-            val legacyStore = rootProject.file(legacyKeystoreProperties["storeFile"] as String)
-            require(legacyStore.isFile) {
-                "Missing $legacyStore — generate acquireenglish-legacy.jks before building legacy."
-            }
-            keyAlias = legacyKeystoreProperties["keyAlias"] as String
-            keyPassword = legacyKeystoreProperties["keyPassword"] as String
-            storeFile = legacyStore
-            storePassword = legacyKeystoreProperties["storePassword"] as String
-            enableV1Signing = true
-            enableV2Signing = true
-            enableV3Signing = true
         }
     }
 
@@ -260,6 +261,9 @@ android {
                 }
             signingConfig =
                 if (assemblingLegacy) {
+                    require(signingConfigs.findByName("legacy") != null) {
+                        "Missing $legacyKeystorePropertiesFile — copy key-legacy.properties before building legacy."
+                    }
                     signingConfigs.getByName("legacy")
                 } else {
                     signingConfigs.getByName("release")
