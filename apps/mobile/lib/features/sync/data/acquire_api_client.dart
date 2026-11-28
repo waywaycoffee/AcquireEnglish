@@ -4189,6 +4189,62 @@ class AcquireApiClient {
     );
   }
 
+  /// Short authentic story from today's lemmas (DeepSeek on ECS).
+  Future<({String title, String story, List<String> sentences})?>
+  generateStoryFromWords({
+    required List<String> words,
+    String? cefr,
+    int maxSentences = 8,
+  }) async {
+    final List<String> cleaned = words
+        .map((String w) => w.trim().toLowerCase())
+        .where((String w) => w.length >= 2)
+        .take(24)
+        .toList(growable: false);
+    if (cleaned.isEmpty) return null;
+    try {
+      final Response<dynamic> response = await _dio.post(
+        Endpoints.learningStoryFromWords,
+        data: <String, dynamic>{
+          'words': cleaned,
+          if (cefr != null && cefr.trim().isNotEmpty) 'cefr': cefr.trim(),
+          'max_sentences': maxSentences,
+        },
+        options: Options(
+          extra: _noCache.extra,
+          receiveTimeout: const Duration(seconds: 30),
+          sendTimeout: const Duration(seconds: 15),
+        ),
+      );
+      final Object? data = response.data;
+      if (data is! Map) return null;
+      final String title = '${data['title'] ?? ''}'.trim();
+      final String story = '${data['story'] ?? ''}'.trim();
+      final Object? rawSentences = data['sentences'];
+      final List<String> sentences = <String>[];
+      if (rawSentences is List) {
+        for (final Object? row in rawSentences) {
+          final String text = '$row'.trim();
+          if (text.length >= 3) sentences.add(text);
+        }
+      }
+      if (story.isEmpty && sentences.isEmpty) return null;
+      return (
+        title: title.isEmpty ? '今日新词故事' : title,
+        story: story.isEmpty ? sentences.join(' ') : story,
+        sentences: sentences.isEmpty
+            ? story
+                  .split(RegExp(r'(?<=[.!?])\s+'))
+                  .map((String s) => s.trim())
+                  .where((String s) => s.length >= 3)
+                  .toList(growable: false)
+            : sentences,
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
   /// Continuous 口播 narration (single or dual host). No learner-turn pauses.
   Future<List<PodcastGuideSegment>> generatePodcastScript(
     String excerpt, {

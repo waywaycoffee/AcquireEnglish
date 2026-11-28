@@ -32,12 +32,12 @@ extension TutorLessonStepX on TutorLessonStep {
   static const List<TutorLessonStep> all = TutorLessonStep.values;
 }
 
-List<String> tutorSourceLines(String raw) {
+List<String> tutorSourceLines(String raw, {int maxLines = 8}) {
   return raw
       .split(RegExp(r'[\n。.!?]'))
       .map((String s) => s.trim())
       .where((String s) => s.length >= 3)
-      .take(4)
+      .take(maxLines.clamp(1, 12))
       .toList(growable: false);
 }
 

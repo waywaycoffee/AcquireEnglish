@@ -73,12 +73,12 @@ void main() {
     // Vocab books live outside this card now.
     expect(find.text('当前词书'), findsNothing);
     expect(find.text(kSceneMemoryBookTitle), findsNothing);
-    expect(find.text('自由拍照学词'), findsOneWidget);
+    expect(find.text('拍照聊天'), findsOneWidget);
     await tester.tap(find.text('今日学习'));
     await tester.pumpAndSettle();
     expect(find.text('选择要看的视频'), findsOneWidget);
     expect(find.text('选择要读的书'), findsOneWidget);
     expect(find.text('选择要背的词书'), findsNothing);
-    expect(find.text('自由拍照学词'), findsWidgets);
+    expect(find.text('拍照聊天'), findsWidgets);
   });
 }

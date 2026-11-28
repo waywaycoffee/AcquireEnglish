@@ -745,7 +745,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
               ),
               ListTile(
                 leading: const Icon(Icons.photo_camera_outlined),
-                title: const Text('自由拍照学词'),
+                title: const Text('拍照聊天'),
                 onTap: () => Navigator.pop(sheetContext, '/digital-human?sceneMenu=1'),
               ),
             ],
@@ -852,7 +852,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                 TextButton.icon(
                   onPressed: () => context.push('/digital-human?sceneMenu=1'),
                   icon: const Icon(Icons.photo_camera_outlined),
-                  label: const Text('自由拍照学词'),
+                  label: const Text('拍照聊天'),
                 ),
                 if (todayVideos.isNotEmpty)
                   Text(

@@ -6,12 +6,17 @@ import 'package:go_router/go_router.dart';
 import 'package:media_kit/media_kit.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../daily_review/presentation/daily_review_provider.dart';
 import '../../settings/presentation/settings_provider.dart';
 import '../../shared/data/word_pronunciation_service.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
+import '../../sync/data/acquire_api_client.dart';
+import '../../words/presentation/word_book_provider.dart';
 import '../data/coach_english_voices.dart';
 import '../data/digital_human_catalog.dart';
 import '../data/oral_coach_pipeline_client.dart';
+import '../data/today_learned_words.dart';
+import 'digital_human_coach_screen.dart';
 
 /// Home-page row: pick a near-real digital-human coach persona.
 class DigitalHumanPicker extends ConsumerStatefulWidget {
@@ -50,6 +55,7 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
   Completer<bool>? _previewDone;
   String? _previewing;
   bool _loadingPreview = false;
+  bool _storyBusy = false;
   int _previewRequest = 0;
 
   @override
@@ -102,6 +108,55 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
       await player.dispose();
     } catch (_) {
       // Ignore dispose races when switching previews quickly.
+    }
+  }
+
+  Future<void> _startTodayWordsStory() async {
+    if (_storyBusy) return;
+    await _stopPreview();
+    if (!mounted) return;
+    final List<String> lemmas = todayLearnedLemmas(
+      review: ref.read(dailyReviewProvider),
+      favorites: ref.read(wordBookProvider),
+    );
+    if (lemmas.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('今天还没有新学单词，先去背几个词或拍照学词吧')),
+      );
+      return;
+    }
+    setState(() => _storyBusy = true);
+    final ScaffoldMessengerState messenger = ScaffoldMessenger.of(context);
+    messenger.hideCurrentSnackBar();
+    messenger.showSnackBar(
+      SnackBar(content: Text('正在用今日 ${lemmas.length} 个新词生成故事…')),
+    );
+    try {
+      final ({String title, String story, List<String> sentences})? story =
+          await ref.read(acquireApiClientProvider).generateStoryFromWords(
+                words: lemmas,
+              );
+      if (!mounted) return;
+      if (story == null || story.sentences.isEmpty) {
+        messenger.showSnackBar(
+          const SnackBar(content: Text('故事生成失败，请先登录后重试')),
+        );
+        return;
+      }
+      final String lessonText = story.sentences.join('\n');
+      await Navigator.of(context).push(
+        MaterialPageRoute<void>(
+          builder: (_) => DigitalHumanCoachScreen(
+            guidedLesson: true,
+            lessonTitle: story.title,
+            lessonText: lessonText,
+            practiceRole: 'learner',
+          ),
+        ),
+      );
+      if (mounted) await _refreshVoices();
+    } finally {
+      if (mounted) setState(() => _storyBusy = false);
     }
   }
 
@@ -365,11 +420,12 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
                   onPressed: () async {
                     await _stopPreview();
                     if (!context.mounted) return;
-                    await context.push('/digital-human');
+                    // Photo learning lives in the digital-human module.
+                    await context.push('/digital-human?sceneMenu=1');
                     if (mounted) await _refreshVoices();
                   },
-                  icon: const Icon(Icons.record_voice_over_rounded, size: 18),
-                  label: const Text('开始情景口语'),
+                  icon: const Icon(Icons.photo_camera_outlined, size: 18),
+                  label: const Text('拍照聊天'),
                 ),
               ),
               TextButton(
@@ -389,6 +445,27 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
                 child: const Text('更多 ›'),
               ),
             ],
+          ),
+          const SizedBox(height: 8),
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              style: OutlinedButton.styleFrom(
+                visualDensity: VisualDensity.compact,
+                minimumSize: const Size(0, 40),
+                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                foregroundColor: AppDesignTokens.textPrimary,
+              ),
+              onPressed: _storyBusy ? null : _startTodayWordsStory,
+              icon: _storyBusy
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2),
+                    )
+                  : const Icon(Icons.auto_stories_outlined, size: 18),
+              label: Text(_storyBusy ? '正在生成故事…' : '今日新词故事跟读'),
+            ),
           ),
         ],
       ],
