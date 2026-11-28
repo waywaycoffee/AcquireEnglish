@@ -318,8 +318,15 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
 
   @override
   Widget build(BuildContext context) {
-    final LearningSettingsState settings = ref.watch(learningSettingsProvider);
-    final DigitalHumanPersona selected = settings.selectedDigitalHuman;
+    final String selectedId = ref.watch(
+      learningSettingsProvider.select(
+        (LearningSettingsState s) => s.digitalHumanId,
+      ),
+    );
+    final DigitalHumanPersona selected = digitalHumanCatalog.firstWhere(
+      (DigitalHumanPersona p) => p.id == selectedId,
+      orElse: () => digitalHumanCatalog.first,
+    );
     final List<DigitalHumanPersona> visible = digitalHumanCatalog
         .where(_filter.matches)
         .toList(growable: false);
@@ -528,6 +535,12 @@ class _PersonaCard extends StatelessWidget {
                         persona.assetPath,
                         fit: BoxFit.cover,
                         width: double.infinity,
+                        cacheWidth: (cardWidth *
+                                MediaQuery.devicePixelRatioOf(context))
+                            .round(),
+                        cacheHeight: (cardHeight *
+                                MediaQuery.devicePixelRatioOf(context))
+                            .round(),
                         errorBuilder: (_, __, ___) => ColoredBox(
                           color: AppDesignTokens.skyLight,
                           child: Icon(

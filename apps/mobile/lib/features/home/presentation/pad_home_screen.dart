@@ -119,8 +119,8 @@ class _PadHomeScreenState extends ConsumerState<PadHomeScreen> {
   @override
   Widget build(BuildContext context) {
     // Provider Refs stay valid across rebuilds (unlike WidgetRef after unmount).
-    ref.watch(cloudCatalogSyncProvider);
-    ref.watch(bilibiliCoverRefreshProvider);
+    ref.listen(cloudCatalogSyncProvider, (_, __) {});
+    ref.listen(bilibiliCoverRefreshProvider, (_, __) {});
     final LearningDashboardStats stats = ref.watch(learningDashboardProvider);
     final UserGrowth growth = ref.watch(userGrowthProvider);
     final AuthSessionState auth = ref.watch(authSessionProvider);

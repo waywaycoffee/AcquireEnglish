@@ -174,8 +174,9 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
 
   @override
   Widget build(BuildContext context) {
-    ref.watch(cloudCatalogSyncProvider);
-    ref.watch(bilibiliCoverRefreshProvider);
+    // Kick sync without rebuilding the whole home when futures settle.
+    ref.listen(cloudCatalogSyncProvider, (_, __) {});
+    ref.listen(bilibiliCoverRefreshProvider, (_, __) {});
     final ContinueLearningTarget? video = ref.watch(
       continueLearningTargetProvider,
     );
@@ -197,19 +198,14 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
     }();
     final AcquirePreferencesDto prefs = ref.watch(learningPreferencesProvider);
     final int? vocabulary = ref.watch(estimatedVocabularyProvider);
-    final int? placementEstimate = ref.watch(
-      vocabularyPlacementProvider.select(
-        (PlacementRow profile) => profile['estimate'] as int?,
-      ),
-    );
+    final PlacementRow placement = ref.watch(vocabularyPlacementProvider);
+    final int? placementEstimate = placement['estimate'] as int?;
     final LearnerSkillProfile skillProfile = ref.watch(
       learnerSkillProfileProvider,
     );
     final SkillEstimate vocabSkill = skillProfile.estimate(LearnerSkill.vocab);
     final String prefsLevel = prefs.level.trim();
-    final bool hasPlacement = hasCompletedVocabularyPlacement(
-      ref.watch(vocabularyPlacementProvider),
-    );
+    final bool hasPlacement = hasCompletedVocabularyPlacement(placement);
     final String levelLabel = () {
       if (!hasPlacement) {
         return '还没测词汇量 · 点这里去测';

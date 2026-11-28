@@ -120,24 +120,34 @@ class TodayJourneyStore {
           '${date.year}-${date.month}-${date.day}';
 
   final String _key;
+  Map<String, Object?>? _cached;
 
   Box<String>? get _prefs =>
       Hive.isBoxOpen('prefs') ? Hive.box<String>('prefs') : null;
 
   Map<String, Object?> _read() {
+    final Map<String, Object?>? hit = _cached;
+    if (hit != null) return hit;
     final String? raw = _prefs?.get(_key);
     if (raw != null) {
       try {
         final Object? decoded = jsonDecode(raw);
-        if (decoded is Map<String, dynamic>) return decoded;
+        if (decoded is Map) {
+          final Map<String, Object?> mapped = Map<String, Object?>.from(decoded);
+          _cached = mapped;
+          return mapped;
+        }
       } on FormatException {
         // Recover from an unreadable local journey.
       }
     }
-    return <String, Object?>{};
+    final Map<String, Object?> empty = <String, Object?>{};
+    _cached = empty;
+    return empty;
   }
 
   Future<void> _write(Map<String, Object?> next) async {
+    _cached = next;
     await _prefs?.put(_key, jsonEncode(next));
   }
 

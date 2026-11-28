@@ -1,5 +1,3 @@
-import 'dart:ui';
-
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 
@@ -44,7 +42,7 @@ class FloatingBottomNav extends StatefulWidget {
 class FloatingBottomNavState extends State<FloatingBottomNav> {
   final ScrollController _scrollController = ScrollController();
   bool _showHint = false;
-  double _scrollProgress = 0;
+  final ValueNotifier<double> _scrollProgress = ValueNotifier<double>(0);
 
   /// Destinations + trailing 「更多」 action index.
   static List<AppNavDestination> get barDestinations =>
@@ -111,6 +109,7 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
   void dispose() {
     _scrollController.removeListener(_onScroll);
     _scrollController.dispose();
+    _scrollProgress.dispose();
     super.dispose();
   }
 
@@ -120,8 +119,8 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
     final double next = max <= 0
         ? 0
         : (_scrollController.offset / max).clamp(0.0, 1.0);
-    if ((next - _scrollProgress).abs() > 0.002) {
-      setState(() => _scrollProgress = next);
+    if ((next - _scrollProgress.value).abs() > 0.002) {
+      _scrollProgress.value = next;
     }
     // First intentional pan teaches discoverability — clear the tip.
     if (_showHint && _scrollController.offset > 8) {
@@ -219,24 +218,23 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
         mainAxisSize: MainAxisSize.min,
         children: <Widget>[
           if (_showHint) _ScrollHintBanner(onDismiss: _dismissHint),
+          // Opaque bar — skip BackdropFilter blur (sigma 18) which janks mid-range GPUs.
           ClipRRect(
             borderRadius: BorderRadius.circular(compact ? 22 : 28),
-            child: BackdropFilter(
-              filter: ImageFilter.blur(sigmaX: 18, sigmaY: 18),
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  color: AppDesignTokens.appWhite.withValues(alpha: 0.94),
-                  borderRadius: BorderRadius.circular(compact ? 22 : 28),
-                  boxShadow: AppDesignTokens.toyCardShadow,
-                ),
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: <Widget>[
-                    Padding(
-                      padding: EdgeInsets.symmetric(
-                        horizontal: compact ? 2 : 6,
-                        vertical: compact ? 4 : 6,
-                      ),
+            child: DecoratedBox(
+              decoration: BoxDecoration(
+                color: AppDesignTokens.appWhite,
+                borderRadius: BorderRadius.circular(compact ? 22 : 28),
+                boxShadow: AppDesignTokens.toyCardShadow,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: <Widget>[
+                  Padding(
+                    padding: EdgeInsets.symmetric(
+                      horizontal: compact ? 2 : 6,
+                      vertical: compact ? 4 : 6,
+                    ),
                       child: LayoutBuilder(
                         builder:
                             (BuildContext context, BoxConstraints constraints) {
@@ -306,13 +304,16 @@ class FloatingBottomNavState extends State<FloatingBottomNav> {
                           );
                         },
                       ),
-                    ),
-                    _ScrollTrack(
-                      progress: _scrollProgress,
+                  ),
+                  ValueListenableBuilder<double>(
+                    valueListenable: _scrollProgress,
+                    builder: (BuildContext context, double progress, _) =>
+                        _ScrollTrack(
+                      progress: progress,
                       compact: compact,
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
             ),
           ),

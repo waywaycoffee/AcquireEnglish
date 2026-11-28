@@ -774,17 +774,34 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
   @override
   Widget build(BuildContext context) {
     final String account = ref.watch(studyAccountProvider);
+    // Only watch fields that paint this card. Action handlers use ref.read.
     ref
-      ..watch(continueLearningTargetProvider)
-      ..watch(readingLibraryProvider)
-      ..watch(learningPreferencesProvider)
-      ..watch(currentLearningKindProvider)
-      ..watch(libraryCatalogProvider)
-      ..watch(learningActivityProvider)
-      ..watch(todayPathProvider)
-      ..watch(dailyReviewProvider)
-      ..watch(learnerSkillProfileProvider)
-      ..watch(syllabusBooksProvider);
+      ..watch(
+        continueLearningTargetProvider.select(
+          (ContinueLearningTarget? t) => t?.episode.id,
+        ),
+      )
+      ..watch(
+        learningActivityProvider.select(
+          (LearningActivityState a) => (
+            a.today.videoStudyMilliseconds,
+            a.today.savedWordCount,
+            a.today.readingStudyMilliseconds,
+          ),
+        ),
+      )
+      ..watch(
+        dailyReviewProvider.select((DailyReviewState s) {
+          final ReviewDay? day =
+              s.days[reviewDayKey(ref.read(reviewClockProvider)())];
+          return (day?.newLearned, day?.reviews, s.dailyNewLimit);
+        }),
+      )
+      ..watch(
+        syllabusBooksProvider.select(
+          (SyllabusBooksState b) => b.activeBookId,
+        ),
+      );
     final DateTime today = DateTime.now();
     final TodayJourneyStore store = TodayJourneyStore(account, today);
     _scheduleProgressSync(store);
