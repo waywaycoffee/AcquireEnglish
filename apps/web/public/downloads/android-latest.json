@@ -1,11 +1,11 @@
 {
-  "version": "0.2.275",
-  "version_code": 298,
-  "apk_name": "AcquireEnglish-android-0.2.275+298.apk",
+  "version": "0.2.279",
+  "version_code": 302,
+  "apk_name": "AcquireEnglish-android-0.2.279+302.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "9093fb9975129e3d574c07980c2ec535f9b0f2e727cb7d58e5e74977d08e5a5b",
+  "sha256": "80b5b581fc06241597b44b3fe2aed392fc3a47ca846a7ab5e3ecc8f94bd3ec2a",
   "force": true,
   "min_version_code": 293,
-  "notes": "首页改为「今日学习」配额；词书架扁平化与开源分类直达；K12 教材封面与 PDF 翻页同步朗读；影集字幕匹配与复习打分按钮可见性修复。",
-  "published_at": "2026-11-27T06:06:12+08:00"
+  "notes": "首页导航更顺滑；数字人入口支持拍照对话；今日词故事跟读；哈利波特影集卡顿/字幕错配修复；词书架封面与考试中心入口完善；跟读评分走云端服务。",
+  "published_at": "2026-11-28T13:13:33+08:00"
 }
