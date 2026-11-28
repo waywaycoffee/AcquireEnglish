@@ -387,6 +387,43 @@ th { color: var(--muted); font-weight: 700; }
 .alert.info { background: #eef4ff; color: #2c4a7c; }
 .chip.ok { background: var(--accent-soft); color: var(--accent); }
 .chip.bad { background: #fde8e8; color: var(--danger); }
+.chip.warn { background: #fff3d6; color: #8a5a00; }
+.chip.muted-chip { background: #ece8df; color: var(--muted); }
+.uploads-filters {
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.check-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--muted);
+  font-weight: 600;
+  white-space: nowrap;
+}
+.check-inline input { width: auto; margin: 0; }
+.uploads-row { cursor: pointer; }
+.uploads-row:hover td { background: rgba(47, 93, 58, 0.06); }
+.uploads-row.is-stuck td { background: #fff6f0; }
+.uploads-detail-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 16px;
+  font-size: 13px;
+}
+.uploads-detail-grid strong { display: block; margin-top: 2px; color: var(--ink); word-break: break-all; }
+.fail-reason {
+  margin: 10px 0 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #fde8e8;
+  color: var(--danger);
+  font-size: 13px;
+  white-space: pre-wrap;
+  word-break: break-word;
+}
 
 .notify-host {
   position: fixed;

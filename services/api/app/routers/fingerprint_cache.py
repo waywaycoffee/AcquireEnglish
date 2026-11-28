@@ -685,6 +685,58 @@ async def mark_upload_failed(
 # ----- admin APIs -----
 
 
+@admin_router.get("/upload-tasks")
+async def admin_list_upload_tasks(
+    status: str | None = Query(
+        None,
+        description="pending|processing|queue_gpu|success|failed|ready|in_flight|…",
+    ),
+    file_type: str | None = Query(None, description="pdf|epub|…"),
+    user_id: int | None = Query(None, ge=1),
+    q: str | None = Query(None, max_length=120),
+    created_from: str | None = Query(None, description="YYYY-MM-DD (Asia/Shanghai)"),
+    created_to: str | None = Query(None, description="YYYY-MM-DD inclusive"),
+    stuck_only: bool = Query(False),
+    stuck_after_minutes: int = Query(30, ge=1, le=24 * 60),
+    limit: int = Query(50, ge=1, le=200),
+    offset: int = Query(0, ge=0),
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    """Monitor user material uploads (upload_task) for ops."""
+    try:
+        return await fp_svc.admin_list_upload_tasks(
+            db,
+            status=status,
+            file_type=file_type,
+            user_id=user_id,
+            q=q,
+            created_from=created_from,
+            created_to=created_to,
+            stuck_only=stuck_only,
+            stuck_after_minutes=stuck_after_minutes,
+            limit=limit,
+            offset=offset,
+        )
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+
+
+@admin_router.get("/upload-tasks/{task_id}")
+async def admin_get_upload_task(
+    task_id: str,
+    stuck_after_minutes: int = Query(30, ge=1, le=24 * 60),
+    _: str = Depends(require_admin_token),
+    db: AsyncSession = Depends(get_db),
+) -> dict[str, Any]:
+    row = await fp_svc.admin_get_upload_task(
+        db, task_id=task_id, stuck_after_minutes=stuck_after_minutes
+    )
+    if row is None:
+        raise HTTPException(status_code=404, detail="任务不存在")
+    return row
+
+
 @admin_router.get("/stats")
 async def admin_cache_stats(
     days: int = Query(30, ge=1, le=365),

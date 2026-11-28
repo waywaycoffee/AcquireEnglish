@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AcquireEnglish 运营后台</title>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="./styles.css?v=20261126a" />
+  <link rel="stylesheet" href="./styles.css?v=20261128a" />
 </head>
 <body>
   <div id="loginView" class="shell login-shell hidden">
@@ -51,6 +51,7 @@
     <nav class="tabs" id="tabs">
       <button type="button" data-tab="dashboard" class="tab active">看板</button>
       <button type="button" data-tab="feedback" class="tab">优化建议</button>
+      <button type="button" data-tab="uploads" class="tab">上传资料监控</button>
       <button type="button" data-tab="exam-assets" class="tab">考试资料审核</button>
       <button type="button" data-tab="commerce" class="tab">订单 / 会员</button>
       <button type="button" data-tab="infra" class="tab">ECS / 云盘监控</button>
@@ -95,6 +96,59 @@
           <button id="feedbackNext" class="btn ghost" type="button">下一页</button>
         </div>
         <p class="muted">App「设置 → 软件优化建议」与首页「优化建议」提交；仅后台可见，不进社区。</p>
+      </div>
+    </section>
+    <section id="panel-uploads" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>上传资料监控 <span id="uploadsBadge" class="muted"></span></h2>
+          <form id="uploadsFilterForm" class="search uploads-filters">
+            <select id="uploadsStatusFilter">
+              <option value="">全部状态</option>
+              <option value="in_flight">进行中</option>
+              <option value="ready">已完成 / 命中</option>
+              <option value="failed">失败</option>
+              <option value="pending">pending</option>
+              <option value="pending_confirm">pending_confirm</option>
+              <option value="queue_gpu">queue_gpu</option>
+              <option value="processing">processing</option>
+              <option value="fingerprint_match">fingerprint_match</option>
+              <option value="success">success</option>
+            </select>
+            <select id="uploadsTypeFilter">
+              <option value="">全部类型</option>
+              <option value="pdf">pdf</option>
+              <option value="epub">epub</option>
+              <option value="srt">srt</option>
+              <option value="txt">txt</option>
+            </select>
+            <input id="uploadsFromInput" type="date" title="起始日（上海时区）" />
+            <input id="uploadsToInput" type="date" title="结束日（上海时区）" />
+            <input id="uploadsSearchInput" type="search" placeholder="文件名 / 用户 / 任务 ID / 错误" />
+            <label class="check-inline">
+              <input id="uploadsStuckOnly" type="checkbox" />
+              仅卡住
+            </label>
+            <label class="check-inline">
+              <input id="uploadsAutoRefresh" type="checkbox" />
+              30s 自动刷新
+            </label>
+            <button class="btn primary" type="submit">筛选</button>
+            <button id="uploadsDrainBtn" class="btn ghost" type="button">排空 GPU 队列</button>
+          </form>
+        </div>
+        <div id="uploadsKpis" class="kpi-row"></div>
+        <div id="uploadsTable" class="table-wrap"></div>
+        <div class="pager">
+          <button id="uploadsPrev" class="btn ghost" type="button">上一页</button>
+          <span id="uploadsPageInfo" class="muted"></span>
+          <button id="uploadsNext" class="btn ghost" type="button">下一页</button>
+        </div>
+        <p class="muted">
+          对应 App「教材上传 / 指纹解构」的 <code>upload_task</code>：pending → queue_gpu / processing → success|failed。
+          社区考试「上传资料」审核请用「考试资料审核」页。点任务可看失败原因与关联课程。
+        </p>
+        <div id="uploadsDetail" class="section hidden"></div>
       </div>
     </section>
     <section id="panel-exam-assets" class="tab-panel hidden">
@@ -199,6 +253,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=20261126a"></script>
+  <script src="./app.js?v=20261128a"></script>
 </body>
 </html>
