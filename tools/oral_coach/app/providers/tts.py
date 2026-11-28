@@ -40,7 +40,15 @@ class EdgeTts:
             import edge_tts  # type: ignore
         except ImportError as exc:
             raise RuntimeError('pip install edge-tts, or set TTS_PROVIDER=mock.') from exc
-        communicate = edge_tts.Communicate(text, voice or ('zh-CN-XiaoxiaoNeural' if (language or '').startswith('zh') else 'en-US-JennyNeural'))
+        # Prefer the selected avatar's Edge Neural id over Jenny/global defaults.
+        chosen = (voice or '').strip()
+        if not chosen or _is_cloud_voice(chosen):
+            chosen = _edge_voice_for(
+                voice=voice,
+                digital_human_id=digital_human_id,
+                language=language,
+            )
+        communicate = edge_tts.Communicate(text, chosen)
         await communicate.save(out_path)
         return TtsResult(audio_path=out_path, provider=self.name, mime='audio/mpeg')
 
@@ -67,6 +75,28 @@ _MALE_PERSONAS = frozenset({
     'leo', 'arun', 'alexander', 'adrian', 'james', 'ryan', 'finley', 'miles',
 })
 
+# Must stay in sync with apps/mobile/.../digital_human_catalog.dart edgeVoiceEn/Zh.
+# Never collapse every female→Aria / male→Guy: that erases the selected avatar.
+_PERSONA_EDGE_VOICES: dict[str, tuple[str, str]] = {
+    # id: (en, zh)
+    'mia': ('en-US-AriaNeural', 'zh-CN-XiaoxiaoNeural'),
+    'leo': ('en-US-GuyNeural', 'zh-CN-YunxiNeural'),
+    'emma': ('en-US-JennyNeural', 'zh-CN-XiaoyiNeural'),
+    'arun': ('en-IN-PrabhatNeural', 'zh-CN-YunjianNeural'),
+    'olivia': ('en-US-AriaNeural', 'zh-CN-XiaoxiaoNeural'),
+    'luna': ('en-US-AriaNeural', 'zh-CN-XiaoxiaoNeural'),
+    'nora': ('en-US-AriaNeural', 'zh-CN-XiaoxiaoNeural'),
+    'ivy': ('en-US-AriaNeural', 'zh-CN-XiaoxiaoNeural'),
+    'alexander': ('en-US-GuyNeural', 'zh-CN-YunxiNeural'),
+    'adrian': ('en-US-GuyNeural', 'zh-CN-YunxiNeural'),
+    'james': ('en-US-GuyNeural', 'zh-CN-YunxiNeural'),
+    'ryan': ('en-US-GuyNeural', 'zh-CN-YunxiNeural'),
+    'finley': ('en-US-ChristopherNeural', 'zh-CN-YunxiNeural'),
+    'miles': ('en-US-ChristopherNeural', 'zh-CN-YunxiNeural'),
+    'ruby': ('en-US-AnaNeural', 'zh-CN-XiaoxiaoNeural'),
+    'sophie': ('en-US-AnaNeural', 'zh-CN-XiaoxiaoNeural'),
+}
+
 
 def _is_cloud_voice(voice: str | None) -> bool:
     name = (voice or '').strip().lower()
@@ -79,8 +109,13 @@ def _is_cloud_voice(voice: str | None) -> bool:
 
 
 def _edge_voice_for(*, voice: str | None, digital_human_id: str | None, language: str | None) -> str:
+    """Edge Neural fallback for the *selected* digital-human, not a global default."""
     chinese = (language or '').lower().startswith('zh')
-    male = (digital_human_id or '').strip().lower() in _MALE_PERSONAS
+    persona = (digital_human_id or '').strip().lower()
+    pair = _PERSONA_EDGE_VOICES.get(persona)
+    if pair:
+        return pair[1] if chinese else pair[0]
+    male = persona in _MALE_PERSONAS
     if chinese:
         return 'zh-CN-YunxiNeural' if male else 'zh-CN-XiaoxiaoNeural'
     return 'en-US-GuyNeural' if male else 'en-US-AriaNeural'

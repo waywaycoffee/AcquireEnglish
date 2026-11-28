@@ -60,6 +60,28 @@ PERSONA_VOICES = {
     'sophie': 'longanlingxi',
 }
 
+_MALE_PERSONAS = frozenset({
+    'leo', 'arun', 'alexander', 'adrian', 'james', 'ryan', 'finley', 'miles',
+})
+
+
+def resolve_persona_speaker(*, voice: str | None, digital_human_id: str | None) -> str:
+    """Bind TTS to the selected digital-human; never silently force Mia.
+
+    Prefer an explicit cloud voice id when valid; otherwise map persona id →
+    catalog recommended voice. Unknown personas fall back by gender, not to Mia.
+    """
+    name = (voice or '').strip()
+    if name in VOICES or name in BILINGUAL_VOICES:
+        return name
+    persona = (digital_human_id or '').strip().lower()
+    if persona in PERSONA_VOICES:
+        return PERSONA_VOICES[persona]
+    if persona in _MALE_PERSONAS:
+        return 'longshu_v3.1'
+    # Only when both voice and persona are missing/unknown.
+    return 'longanfengyue'
+
 
 def model_for_voice(voice: str) -> str:
     """DashScope rejects cross-model voice ids; route each speaker to its model."""
@@ -83,9 +105,7 @@ class QwenAudioTts:
         from websockets.asyncio.client import connect
 
         task_id = str(uuid4())
-        speaker = voice if voice in VOICES or voice in BILINGUAL_VOICES else PERSONA_VOICES.get(
-            (digital_human_id or '').strip().lower(), PERSONA_VOICES['mia']
-        )
+        speaker = resolve_persona_speaker(voice=voice, digital_human_id=digital_human_id)
         model = model_for_voice(speaker)
 
         def event(action: str, **payload: object) -> str:

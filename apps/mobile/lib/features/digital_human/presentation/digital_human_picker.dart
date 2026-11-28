@@ -427,6 +427,13 @@ class _DigitalHumanPickerState extends ConsumerState<DigitalHumanPicker> {
                   onPressed: () async {
                     await _stopPreview();
                     if (!context.mounted) return;
+                    // Bind TTS to the currently highlighted avatar before photo chat.
+                    final DigitalHumanPersona selected = ref
+                        .read(learningSettingsProvider)
+                        .selectedDigitalHuman;
+                    ref
+                        .read(learningSettingsProvider.notifier)
+                        .setDigitalHumanId(selected.id);
                     // Photo learning lives in the digital-human module.
                     await context.push('/digital-human?sceneMenu=1');
                     if (mounted) await _refreshVoices();
