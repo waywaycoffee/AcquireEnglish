@@ -63,6 +63,13 @@ class AppDesignTokens {
   static Color get dangerText =>
       isDark ? const Color(0xFFFF8A80) : const Color(0xFFBA1A1A);
 
+  /// Sidebar / icon-rail active accent (dark coral · light teal).
+  static Color get navAccent =>
+      isDark ? const Color(0xFFE85D4C) : const Color(0xFF0D9488);
+
+  static Color get navAccentSoft =>
+      isDark ? const Color(0xFF3A2422) : const Color(0xFFCCFBF1);
+
   static List<BoxShadow> get toyCardShadow => <BoxShadow>[
         BoxShadow(
           color: isDark ? const Color(0x66000000) : const Color(0x14000000),

@@ -391,16 +391,16 @@ void main() {
     await tester.pumpWidget(const SizedBox.shrink());
   });
 
-  test('vocab review hub is folded into home bottom IA', () {
+  test('vocab review hub stays off primary sidebar rail', () {
     expect(
-      AppNavDestination.bottomBarDestinations,
+      AppNavDestination.sidebarRailDestinations,
       isNot(contains(AppNavDestination.review)),
     );
     expect(AppNavDestination.review.showInBottomNav, isFalse);
-    expect(AppNavDestination.phrases.showInBottomNav, isFalse);
+    expect(AppNavDestination.review.showInNav, isFalse);
     expect(
-      AppNavDestination.moreMenuDestinations,
-      contains(AppNavDestination.review),
+      AppNavDestination.sidebarRailDestinations,
+      contains(AppNavDestination.phrases),
     );
   });
 

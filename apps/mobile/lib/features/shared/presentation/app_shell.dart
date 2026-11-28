@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../navigation/presentation/floating_bottom_nav.dart';
+import '../../navigation/presentation/app_nav_rail.dart';
 import '../../navigation/presentation/navigation_destination.dart';
+import 'pad/app_design_tokens.dart';
 
 class AppShell extends StatelessWidget {
   const AppShell({
@@ -9,37 +10,53 @@ class AppShell extends StatelessWidget {
     super.key,
     this.header,
     this.currentDestination,
-    this.backgroundColor = const Color(0xFFEFEFF2),
+    this.backgroundColor,
     this.useSafeArea = true,
   });
 
   final Widget body;
   final Widget? header;
   final AppNavDestination? currentDestination;
-  final Color backgroundColor;
+  final Color? backgroundColor;
   final bool useSafeArea;
 
   @override
   Widget build(BuildContext context) {
-    final Widget content = Align(
-      alignment: Alignment.topCenter,
-      child: ConstrainedBox(
-        constraints: const BoxConstraints(maxWidth: 460),
-        child: Column(
-          children: <Widget>[
-            if (header != null) header!,
-            Expanded(child: body),
-          ],
-        ),
-      ),
+    final Color canvas = backgroundColor ?? AppDesignTokens.softWhite;
+    final Widget column = Column(
+      children: <Widget>[
+        if (header != null) header!,
+        Expanded(child: body),
+      ],
     );
 
+    final Widget content = currentDestination == null
+        ? Align(
+            alignment: Alignment.topCenter,
+            child: ConstrainedBox(
+              constraints: const BoxConstraints(maxWidth: 460),
+              child: column,
+            ),
+          )
+        : Row(
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: <Widget>[
+              AppNavRail(current: currentDestination!),
+              Expanded(
+                child: Align(
+                  alignment: Alignment.topCenter,
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 460),
+                    child: column,
+                  ),
+                ),
+              ),
+            ],
+          );
+
     return Scaffold(
-      backgroundColor: backgroundColor,
+      backgroundColor: canvas,
       body: useSafeArea ? SafeArea(child: content) : content,
-      bottomNavigationBar: currentDestination == null
-          ? null
-          : FloatingBottomNav(current: currentDestination!),
     );
   }
 }
