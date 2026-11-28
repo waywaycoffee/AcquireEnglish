@@ -64,6 +64,7 @@ import 'dub_clip_hub.dart';
 import 'library_browse.dart';
 import 'library_catalog_provider.dart';
 import 'library_mock_data.dart';
+import 'local_files_hub_screen.dart';
 import 'video_difficulty_provider.dart';
 import 'widgets/course_episode_tile.dart';
 import 'widgets/course_overview_card.dart';
@@ -539,13 +540,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
       showContinueLearning: !widget.selectForStudy,
       showNavigation: !widget.selectForStudy,
       currentDestination: AppNavDestination.library,
-      topBar: PadTopBar(
+      // Pencil video-home owns its chrome; avoid double headers.
+      topBar: showVideoHome
+          ? null
+          : PadTopBar(
         title: showImport
             ? '导入影视'
             : showDetail
             ? selectedCourse.title
-            : showVideoHome
-            ? '视频'
             : switch (shelfTab) {
                 LibraryShelfTab.bilibili => 'B站',
                 LibraryShelfTab.englishBrowse => '全英可逛',
@@ -559,8 +561,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ? activeEpisode == null
                   ? '暂无剧集'
                   : '第 ${activeEpisode.numberStr} 集'
-            : showVideoHome
-            ? '精选 · B站 / YouTube'
             : '影视库',
         description: widget.selectForStudy
             ? '点视频加入今日计划（可多选）'
@@ -568,8 +568,6 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ? '把本地视频和字幕整理成新的学习片库。'
             : showDetail
             ? null
-            : showVideoHome
-            ? '每日精选、TED、口语实战等栏目；顶栏可搜或导入本地文件。'
             : switch (shelfTab) {
                 LibraryShelfTab.bilibili => 'B 站 / 本地短片 · 搜索或导入练耳朵',
                 LibraryShelfTab.englishBrowse =>
@@ -1462,12 +1460,21 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
               ],
             )
           : showVideoHome
-          ? VideoHomeCategoriesView(
-              courses: shelfCourses,
-              onOpenCourse: _handleCourseTap,
-              onMore: (_) {
-                setState(() => preferClassicLibrary = true);
-              },
+          ? SafeArea(
+              bottom: false,
+              child: VideoHomeCategoriesView(
+                courses: shelfCourses,
+                onOpenCourse: _handleCourseTap,
+                onSearchTap: () {
+                  setState(() => preferClassicLibrary = true);
+                },
+                onFilesTap: () {
+                  context.push(LocalFilesHubScreen.route);
+                },
+                onMore: (_) {
+                  setState(() => preferClassicLibrary = true);
+                },
+              ),
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

@@ -4,16 +4,24 @@ import 'package:go_router/go_router.dart';
 import '../../navigation/presentation/navigation_destination.dart';
 import 'pad/app_design_tokens.dart';
 
-/// Pencil shell header: search field + local-files + notifications.
+/// Pencil shell header: search field + local-files (+ optional notifications).
 class ShellTopChrome extends StatelessWidget {
   const ShellTopChrome({
     super.key,
     this.searchHint = '搜索',
     this.onSearchTap,
+    this.onFilesTap,
+    this.showNotifications = true,
+    this.filesLabeled = false,
   });
 
   final String searchHint;
   final VoidCallback? onSearchTap;
+  final VoidCallback? onFilesTap;
+  final bool showNotifications;
+
+  /// Pencil video-home: show「本地文件」caption under the folder icon.
+  final bool filesLabeled;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +37,6 @@ class ShellTopChrome extends StatelessWidget {
                 borderRadius: BorderRadius.circular(22),
                 onTap: onSearchTap ??
                     () {
-                      // Prefer library search when available.
                       context.go(AppNavDestination.library.route);
                     },
                 child: Padding(
@@ -59,18 +66,63 @@ class ShellTopChrome extends StatelessWidget {
               ),
             ),
           ),
-          const SizedBox(width: 8),
-          _ChromeIconButton(
-            icon: Icons.folder_outlined,
-            tooltip: '本地文件',
-            onTap: () => context.push('/importCourse'),
-          ),
-          _ChromeIconButton(
-            icon: Icons.notifications_none_rounded,
-            tooltip: '通知',
-            onTap: () => context.push(AppNavDestination.settings.route),
-          ),
+          const SizedBox(width: 4),
+          if (filesLabeled)
+            _LabeledFilesButton(
+              onTap: onFilesTap ?? () => context.push('/library/local-files'),
+            )
+          else
+            _ChromeIconButton(
+              icon: Icons.folder_outlined,
+              tooltip: '本地文件',
+              onTap: onFilesTap ?? () => context.push('/library/local-files'),
+            ),
+          if (showNotifications)
+            _ChromeIconButton(
+              icon: Icons.notifications_none_rounded,
+              tooltip: '通知',
+              onTap: () => context.push(AppNavDestination.settings.route),
+            ),
         ],
+      ),
+    );
+  }
+}
+
+class _LabeledFilesButton extends StatelessWidget {
+  const _LabeledFilesButton({required this.onTap});
+
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    return Tooltip(
+      message: '本地文件',
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: <Widget>[
+              Icon(
+                Icons.folder_outlined,
+                size: 22,
+                color: AppDesignTokens.textPrimary,
+              ),
+              const SizedBox(height: 2),
+              Text(
+                '本地文件',
+                style: TextStyle(
+                  color: AppDesignTokens.textSecondary,
+                  fontSize: 10,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

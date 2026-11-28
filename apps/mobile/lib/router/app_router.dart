@@ -52,6 +52,7 @@ import '../features/growth/presentation/growth_screen.dart';
 import '../features/guide/presentation/guide_screen.dart';
 import '../features/home/presentation/learning_home_screen.dart';
 import '../features/import_course/presentation/import_course_screen.dart';
+import '../features/library/presentation/local_files_hub_screen.dart';
 import '../features/learner_model/domain/learner_skill_profile.dart';
 import '../features/learner_model/presentation/skill_probe_screen.dart';
 import '../features/library/presentation/library_screen.dart';
@@ -830,6 +831,11 @@ GoRouter goRouter(Ref ref) {
       path: SGRoute.importCourse.route,
       builder: (BuildContext context, GoRouterState state) =>
           const ImportCourseScreen(),
+    ).fade(),
+    GoRoute(
+      path: LocalFilesHubScreen.route,
+      builder: (BuildContext context, GoRouterState state) =>
+          const LocalFilesHubScreen(),
     ).fade(),
     GoRoute(
       path: TvHomeScreen.route,
