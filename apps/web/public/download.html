@@ -61,6 +61,21 @@
         color: var(--accent);
         border: 1px solid #35507a;
       }
+      .btn-stack {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+        align-items: stretch;
+      }
+      .btn-stack .btn { width: 100%; }
+      .ver-label {
+        display: block;
+        margin-bottom: 4px;
+        color: var(--muted);
+        font-size: 12px;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+      }
       .meta { margin-top: 28px; color: var(--muted); font-size: 13px; }
       .meta code { color: #dbeafe; }
       a { color: var(--accent); }
@@ -105,11 +120,22 @@
           <h2>Android</h2>
           <p>
             包名 <code>com.acquire.english</code> · 正式签名 Release APK<br />
-            当前版本 <code>0.2.279+302</code>。首次安装需允许「未知来源 / 安装未知应用」。打开 App 后会自动检查官网新版本。
+            首次安装需允许「未知来源 / 安装未知应用」。打开 App 后会按最新版自动检查更新。
           </p>
-          <a class="btn android" href="/downloads/AcquireEnglish-android-latest.apk">
-            下载 Android APK
-          </a>
+          <div class="btn-stack">
+            <div>
+              <span class="ver-label">最新版 · 推荐</span>
+              <a class="btn android" href="/downloads/AcquireEnglish-android-0.2.279+302.apk">
+                下载 0.2.279+302
+              </a>
+            </div>
+            <div>
+              <span class="ver-label">上一版 · 可回退</span>
+              <a class="btn ghost" href="/downloads/AcquireEnglish-android-0.2.275+298.apk">
+                下载 0.2.275+298
+              </a>
+            </div>
+          </div>
         </section>
 
         <section class="card">
