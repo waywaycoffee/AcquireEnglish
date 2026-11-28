@@ -7,8 +7,7 @@ import 'navigation_destination.dart';
 
 /// Phone / narrow shell: vertical icon rail (no bottom tabs).
 ///
-/// Wide layouts keep [PadSidebar]; this rail is the phone form-factor
-/// counterpart aligned with feature-entry-map primary entries.
+/// Visual: Pencil charcoal rail + coral selected pill.
 class AppNavRail extends StatelessWidget {
   const AppNavRail({
     required this.current,
@@ -19,7 +18,7 @@ class AppNavRail extends StatelessWidget {
   final AppNavDestination current;
   final bool attachTourKeys;
 
-  static const double width = 64;
+  static const double width = 72;
 
   @override
   Widget build(BuildContext context) {
@@ -28,30 +27,42 @@ class AppNavRail extends StatelessWidget {
     final List<AppNavDestination> primary =
         AppNavDestination.sidebarRailDestinations;
     final Color accent = AppDesignTokens.navAccent;
-    final Color accentSoft = AppDesignTokens.navAccentSoft;
 
     return Material(
-      color: AppDesignTokens.appWhite,
+      color: AppDesignTokens.softWhite,
       child: SizedBox(
         width: width,
         child: Column(
           children: <Widget>[
-            SizedBox(height: topInset + 8),
+            SizedBox(height: topInset + 10),
             Padding(
-              padding: const EdgeInsets.only(bottom: 8),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(12),
-                child: Image.asset(
-                  'assets/img/app_icon.png',
-                  width: 36,
-                  height: 36,
-                  fit: BoxFit.cover,
-                ),
+              padding: const EdgeInsets.only(bottom: 10),
+              child: Column(
+                children: <Widget>[
+                  ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: Image.asset(
+                      'assets/img/app_icon.png',
+                      width: 32,
+                      height: 32,
+                      fit: BoxFit.cover,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    '爱快',
+                    style: TextStyle(
+                      color: AppDesignTokens.brandTeal,
+                      fontSize: 10,
+                      fontWeight: FontWeight.w800,
+                    ),
+                  ),
+                ],
               ),
             ),
             Expanded(
               child: ListView.builder(
-                padding: const EdgeInsets.symmetric(vertical: 4),
+                padding: const EdgeInsets.symmetric(vertical: 2),
                 itemCount: primary.length,
                 itemBuilder: (BuildContext context, int index) {
                   final AppNavDestination destination = primary[index];
@@ -73,7 +84,6 @@ class AppNavRail extends StatelessWidget {
                     destination: destination,
                     selected: selected,
                     accent: accent,
-                    accentSoft: accentSoft,
                     onTap: () {
                       if (!selected) {
                         context.go(destination.route);
@@ -87,7 +97,6 @@ class AppNavRail extends StatelessWidget {
               destination: AppNavDestination.settings,
               selected: current == AppNavDestination.settings,
               accent: accent,
-              accentSoft: accentSoft,
               onTap: () {
                 if (current != AppNavDestination.settings) {
                   context.go(AppNavDestination.settings.route);
@@ -106,7 +115,6 @@ class AppNavRail extends StatelessWidget {
     AppNavDestination item,
   ) {
     if (current == item) return true;
-    // Word-book subroutes still highlight 课程.
     if (item == AppNavDestination.words &&
         current.route.startsWith('/words')) {
       return true;
@@ -128,7 +136,6 @@ class _RailItem extends StatelessWidget {
     required this.destination,
     required this.selected,
     required this.accent,
-    required this.accentSoft,
     required this.onTap,
     super.key,
   });
@@ -136,7 +143,6 @@ class _RailItem extends StatelessWidget {
   final AppNavDestination destination;
   final bool selected;
   final Color accent;
-  final Color accentSoft;
   final VoidCallback onTap;
 
   @override
@@ -144,39 +150,43 @@ class _RailItem extends StatelessWidget {
     return Tooltip(
       message: destination.label,
       waitDuration: const Duration(milliseconds: 400),
-      child: InkWell(
-        onTap: onTap,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 4),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              AnimatedContainer(
-                duration: const Duration(milliseconds: 180),
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  color: selected ? accentSoft : Colors.transparent,
-                  borderRadius: BorderRadius.circular(14),
-                ),
-                child: Icon(
-                  selected ? destination.activeIcon : destination.icon,
-                  size: 22,
-                  color: selected ? accent : AppDesignTokens.textSecondary,
-                ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+        child: Material(
+          color: selected ? accent : Colors.transparent,
+          borderRadius: BorderRadius.circular(14),
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(14),
+            child: SizedBox(
+              height: 52,
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Icon(
+                    selected ? destination.activeIcon : destination.icon,
+                    size: 22,
+                    color: selected
+                        ? AppDesignTokens.onAccent
+                        : AppDesignTokens.textSecondary,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    destination.label,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight:
+                          selected ? FontWeight.w800 : FontWeight.w600,
+                      color: selected
+                          ? AppDesignTokens.onAccent
+                          : AppDesignTokens.textSecondary,
+                    ),
+                  ),
+                ],
               ),
-              const SizedBox(height: 2),
-              Text(
-                destination.label,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 9,
-                  fontWeight: selected ? FontWeight.w800 : FontWeight.w600,
-                  color: selected ? accent : AppDesignTokens.textSecondary,
-                ),
-              ),
-            ],
+            ),
           ),
         ),
       ),

@@ -187,27 +187,28 @@ void main() {
     );
     await tester.pumpAndSettle();
 
-    expect(find.text('学习'), findsOneWidget);
+    // Legacy FloatingBottomNav mirrors primary rail IA (design mock 7).
+    expect(find.text('首页'), findsOneWidget);
+    expect(find.text('课程'), findsOneWidget);
     expect(find.text('视频'), findsOneWidget);
-    expect(find.text('阅读'), findsOneWidget);
     expect(find.text('口语'), findsOneWidget);
-    expect(find.text('社区'), findsOneWidget);
+    expect(find.text('阅读'), findsOneWidget);
     expect(find.text('更多', skipOffstage: false), findsOneWidget);
-    expect(find.text('单词'), findsNothing);
-    expect(find.text('短语'), findsNothing);
+    expect(find.text('社区'), findsNothing);
+    expect(find.text('对战'), findsNothing);
+    expect(find.text('应试'), findsNothing);
 
     await tester.drag(
       find.byKey(const Key('bottom-nav-scroll')),
       const Offset(-320, 0),
     );
     await tester.pumpAndSettle();
+    expect(find.text('收藏', skipOffstage: false), findsWidgets);
+    expect(find.text('历史', skipOffstage: false), findsWidgets);
     await tester.tap(find.byKey(const Key('bottom-nav-more')));
     await tester.pumpAndSettle();
-    expect(find.text('复习'), findsOneWidget);
-    expect(find.text('成长'), findsOneWidget);
     expect(find.text('怎么学'), findsOneWidget);
     expect(find.text('设置'), findsOneWidget);
-    expect(find.text('短语'), findsNothing);
   });
 
   testWidgets('sidebar companion shows and cycles daily English', (
