@@ -20,6 +20,7 @@ from app.models import (
     FingerprintIndex,
     SimhashBand,
     UploadTask,
+    User,
     UserCourseAsset,
 )
 from app.services.fingerprint import embedding as emb
@@ -1326,6 +1327,268 @@ async def _process_queue_gpu_task(
             fresh.update_at = _now()
             await db.commit()
         return {"task_id": task.id, "ok": False, "error": str(exc)}
+
+
+UPLOAD_TASK_STATUSES = (
+    "pending",
+    "pending_confirm",
+    "fingerprint_match",
+    "queue_gpu",
+    "processing",
+    "success",
+    "failed",
+)
+UPLOAD_TASK_IN_FLIGHT = frozenset(
+    {"pending", "pending_confirm", "queue_gpu", "processing"}
+)
+UPLOAD_TASK_READY = frozenset({"success", "fingerprint_match"})
+
+
+def _parse_ymd_bound(value: str | None, *, end: bool = False) -> datetime | None:
+    """Parse YYYY-MM-DD as Asia/Shanghai day start (or exclusive end)."""
+    raw = (value or "").strip()
+    if not raw:
+        return None
+    from datetime import timedelta
+    from zoneinfo import ZoneInfo
+
+    try:
+        day = datetime.strptime(raw[:10], "%Y-%m-%d")
+    except ValueError as exc:
+        raise ValueError(f"无效日期: {raw}") from exc
+    shanghai = ZoneInfo("Asia/Shanghai")
+    start = day.replace(tzinfo=shanghai)
+    if end:
+        start = start + timedelta(days=1)
+    return start.astimezone(timezone.utc)
+
+
+def serialize_upload_task(
+    row: UploadTask,
+    *,
+    user: User | None = None,
+    stuck_after_minutes: int = 30,
+    now: datetime | None = None,
+) -> dict[str, Any]:
+    clock = now or _now()
+    updated = row.update_at
+    if updated is not None and updated.tzinfo is None:
+        updated = updated.replace(tzinfo=timezone.utc)
+    age_seconds: int | None = None
+    is_stuck = False
+    if updated is not None:
+        age_seconds = max(0, int((clock - updated).total_seconds()))
+        if (
+            row.status in UPLOAD_TASK_IN_FLIGHT
+            and age_seconds >= max(1, stuck_after_minutes) * 60
+        ):
+            is_stuck = True
+    display = ""
+    if user is not None:
+        display = (user.display_name or "").strip() or (user.email or "").strip()
+    return {
+        "id": row.id,
+        "user_id": row.user_id,
+        "user_display_name": display or None,
+        "user_email": (user.email if user is not None else None),
+        "file_name": row.file_name,
+        "file_type": row.file_type,
+        "raw_file_key": row.raw_file_key,
+        "status": row.status,
+        "ready": row.status in UPLOAD_TASK_READY,
+        "fingerprint_id": row.fingerprint_id,
+        "user_course_asset_id": row.user_course_asset_id,
+        "fail_reason": row.fail_reason,
+        "notify_pending": int(row.notify_pending or 0),
+        "create_at": row.create_at.isoformat() if row.create_at else None,
+        "update_at": row.update_at.isoformat() if row.update_at else None,
+        "age_seconds": age_seconds,
+        "is_stuck": is_stuck,
+    }
+
+
+async def admin_list_upload_tasks(
+    db: AsyncSession,
+    *,
+    status: str | None = None,
+    file_type: str | None = None,
+    user_id: int | None = None,
+    q: str | None = None,
+    created_from: str | None = None,
+    created_to: str | None = None,
+    stuck_only: bool = False,
+    stuck_after_minutes: int = 30,
+    limit: int = 50,
+    offset: int = 0,
+) -> dict[str, Any]:
+    """Admin monitor: list upload_task rows with filters + status counts."""
+    status_f = (status or "").strip().lower() or None
+    if status_f == "ready":
+        status_values: tuple[str, ...] | None = tuple(sorted(UPLOAD_TASK_READY))
+    elif status_f == "in_flight":
+        status_values = tuple(sorted(UPLOAD_TASK_IN_FLIGHT))
+    elif status_f:
+        if status_f not in UPLOAD_TASK_STATUSES:
+            raise ValueError(f"未知状态: {status_f}")
+        status_values = (status_f,)
+    else:
+        status_values = None
+
+    from datetime import timedelta
+
+    type_f = (file_type or "").strip().lower() or None
+    q_f = (q or "").strip() or None
+    from_dt = _parse_ymd_bound(created_from, end=False)
+    to_dt = _parse_ymd_bound(created_to, end=True)
+    stuck_cut = _now() - timedelta(minutes=max(1, stuck_after_minutes))
+
+    filters: list[Any] = []
+    if status_values is not None:
+        filters.append(UploadTask.status.in_(status_values))
+    if type_f:
+        filters.append(UploadTask.file_type == type_f)
+    if user_id is not None:
+        filters.append(UploadTask.user_id == int(user_id))
+    if from_dt is not None:
+        filters.append(UploadTask.create_at >= from_dt)
+    if to_dt is not None:
+        filters.append(UploadTask.create_at < to_dt)
+    if stuck_only:
+        filters.append(UploadTask.status.in_(tuple(UPLOAD_TASK_IN_FLIGHT)))
+        filters.append(UploadTask.update_at <= stuck_cut)
+    if q_f:
+        like = f"%{q_f}%"
+        user_ids_q = (
+            await db.execute(
+                select(User.id).where(
+                    or_(
+                        User.email.ilike(like),
+                        User.display_name.ilike(like),
+                        User.phone.ilike(like),
+                    )
+                )
+            )
+        ).scalars().all()
+        q_clauses = [
+            UploadTask.file_name.ilike(like),
+            UploadTask.id.ilike(like),
+            UploadTask.fail_reason.ilike(like),
+        ]
+        if user_ids_q:
+            q_clauses.append(UploadTask.user_id.in_(list(user_ids_q)))
+        if q_f.isdigit():
+            q_clauses.append(UploadTask.user_id == int(q_f))
+        filters.append(or_(*q_clauses))
+
+    count_stmt = select(func.count()).select_from(UploadTask)
+    list_stmt = select(UploadTask)
+    for clause in filters:
+        count_stmt = count_stmt.where(clause)
+        list_stmt = list_stmt.where(clause)
+
+    total = int((await db.execute(count_stmt)).scalar() or 0)
+    rows = (
+        await db.execute(
+            list_stmt.order_by(UploadTask.create_at.desc())
+            .offset(max(0, offset))
+            .limit(max(1, min(limit, 200)))
+        )
+    ).scalars().all()
+
+    uploaders: dict[int, User] = {}
+    if rows:
+        ids = {r.user_id for r in rows}
+        for u in (
+            await db.execute(select(User).where(User.id.in_(ids)))
+        ).scalars().all():
+            uploaders[u.id] = u
+
+    status_rows = (
+        await db.execute(
+            select(UploadTask.status, func.count())
+            .select_from(UploadTask)
+            .group_by(UploadTask.status)
+        )
+    ).all()
+    status_counts = {s: 0 for s in UPLOAD_TASK_STATUSES}
+    for st, n in status_rows:
+        key = str(st or "")
+        status_counts[key] = int(n or 0)
+    stuck_n = int(
+        (
+            await db.execute(
+                select(func.count())
+                .select_from(UploadTask)
+                .where(
+                    UploadTask.status.in_(tuple(UPLOAD_TASK_IN_FLIGHT)),
+                    UploadTask.update_at <= stuck_cut,
+                )
+            )
+        ).scalar()
+        or 0
+    )
+
+    clock = _now()
+    items = [
+        serialize_upload_task(
+            r,
+            user=uploaders.get(r.user_id),
+            stuck_after_minutes=stuck_after_minutes,
+            now=clock,
+        )
+        for r in rows
+    ]
+    return {
+        "total": total,
+        "limit": max(1, min(limit, 200)),
+        "offset": max(0, offset),
+        "stuck_after_minutes": max(1, stuck_after_minutes),
+        "stuck_count": stuck_n,
+        "status_counts": status_counts,
+        "ready_count": sum(status_counts.get(s, 0) for s in UPLOAD_TASK_READY),
+        "in_flight_count": sum(
+            status_counts.get(s, 0) for s in UPLOAD_TASK_IN_FLIGHT
+        ),
+        "failed_count": status_counts.get("failed", 0),
+        "items": items,
+    }
+
+
+async def admin_get_upload_task(
+    db: AsyncSession,
+    *,
+    task_id: str,
+    stuck_after_minutes: int = 30,
+) -> dict[str, Any] | None:
+    row = (
+        await db.execute(select(UploadTask).where(UploadTask.id == task_id))
+    ).scalar_one_or_none()
+    if row is None:
+        return None
+    user = (
+        await db.execute(select(User).where(User.id == row.user_id))
+    ).scalar_one_or_none()
+    out = serialize_upload_task(
+        row, user=user, stuck_after_minutes=stuck_after_minutes
+    )
+    course = None
+    if row.user_course_asset_id:
+        course = (
+            await db.execute(
+                select(UserCourseAsset).where(
+                    UserCourseAsset.id == row.user_course_asset_id
+                )
+            )
+        ).scalar_one_or_none()
+    if course is not None:
+        out["user_course"] = {
+            "id": course.id,
+            "asset_title": course.asset_title,
+            "asset_cache_id": course.asset_cache_id,
+            "is_from_cache": bool(course.is_from_cache),
+            "share_audit_status": course.share_audit_status,
+        }
+    return out
 
 
 async def admin_stats(db: AsyncSession, *, days: int = 30) -> dict[str, Any]:

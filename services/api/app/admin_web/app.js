@@ -49,6 +49,7 @@
   const titles = {
     dashboard: "可视化看板",
     feedback: "软件优化建议",
+    uploads: "上传资料监控",
     "exam-assets": "考试资料审核",
     commerce: "订单 / 会员",
     infra: "ECS / 云盘监控",
@@ -67,6 +68,20 @@
     q: "",
   };
   const examAssetsState = { status: "pending" };
+  const uploadsState = {
+    offset: 0,
+    limit: 40,
+    total: 0,
+    status: "",
+    file_type: "",
+    q: "",
+    created_from: "",
+    created_to: "",
+    stuck_only: false,
+    auto_refresh: false,
+    selectedId: null,
+  };
+  let uploadsRefreshTimer = null;
   const commerceState = { status: "", kind: "", offset: 0, limit: 40 };
   const communityState = { offset: 0, limit: 40, total: 0, q: "", status: "" };
   const usageState = { days: 30, day: "" };
@@ -369,6 +384,7 @@
     [
       "dashboard",
       "feedback",
+      "uploads",
       "exam-assets",
       "commerce",
       "infra",
@@ -380,6 +396,234 @@
     ].forEach((id) => {
       const panel = $(`panel-${id}`);
       if (panel) panel.classList.toggle("hidden", id !== tab);
+    });
+    if (tab !== "uploads") stopUploadsAutoRefresh();
+  }
+
+  const UPLOAD_STATUS_LABEL = {
+    pending: "待处理",
+    pending_confirm: "待确认",
+    fingerprint_match: "指纹命中",
+    queue_gpu: "排队解构",
+    processing: "处理中",
+    success: "已完成",
+    failed: "失败",
+  };
+
+  function uploadStatusChip(status, isStuck) {
+    const label = UPLOAD_STATUS_LABEL[status] || status || "—";
+    let cls = "chip muted-chip";
+    if (status === "failed") cls = "chip bad";
+    else if (status === "success" || status === "fingerprint_match") cls = "chip ok";
+    else if (status === "processing" || status === "queue_gpu") cls = "chip warn";
+    const stuck = isStuck ? " · 卡住" : "";
+    return `<span class="${cls}">${escapeHtml(label)}${stuck}</span>`;
+  }
+
+  function formatAge(seconds) {
+    const s = Number(seconds || 0);
+    if (!Number.isFinite(s) || s < 0) return "—";
+    if (s < 60) return `${s}s`;
+    if (s < 3600) return `${Math.floor(s / 60)}m`;
+    if (s < 86400) return `${Math.floor(s / 3600)}h`;
+    return `${Math.floor(s / 86400)}d`;
+  }
+
+  function stopUploadsAutoRefresh() {
+    if (uploadsRefreshTimer) {
+      clearInterval(uploadsRefreshTimer);
+      uploadsRefreshTimer = null;
+    }
+  }
+
+  function syncUploadsAutoRefresh() {
+    stopUploadsAutoRefresh();
+    if (!uploadsState.auto_refresh || state.tab !== "uploads") return;
+    uploadsRefreshTimer = setInterval(() => {
+      loadUploads().catch((e) => console.warn(e));
+    }, 30000);
+  }
+
+  async function loadUploads() {
+    const params = new URLSearchParams({
+      limit: String(uploadsState.limit),
+      offset: String(uploadsState.offset),
+    });
+    if (uploadsState.status) params.set("status", uploadsState.status);
+    if (uploadsState.file_type) params.set("file_type", uploadsState.file_type);
+    if (uploadsState.q) params.set("q", uploadsState.q);
+    if (uploadsState.created_from) params.set("created_from", uploadsState.created_from);
+    if (uploadsState.created_to) params.set("created_to", uploadsState.created_to);
+    if (uploadsState.stuck_only) params.set("stuck_only", "true");
+
+    const data = await api(`/fingerprint-cache/upload-tasks?${params.toString()}`);
+    uploadsState.total = Number(data.total || 0);
+    const counts = data.status_counts || {};
+    const badge = $("uploadsBadge");
+    if (badge) {
+      badge.textContent = `· ${uploadsState.total} 条 · 卡住 ${num(data.stuck_count)}`;
+    }
+    const kpis = $("uploadsKpis");
+    if (kpis) {
+      kpis.innerHTML = `
+        <div class="stat"><span class="muted">进行中</span><strong>${num(
+          data.in_flight_count
+        )}</strong></div>
+        <div class="stat"><span class="muted">已完成/命中</span><strong>${num(
+          data.ready_count
+        )}</strong></div>
+        <div class="stat"><span class="muted">失败</span><strong>${num(
+          data.failed_count
+        )}</strong></div>
+        <div class="stat"><span class="muted">卡住(≥${escapeHtml(
+          String(data.stuck_after_minutes || 30)
+        )}m)</span><strong>${num(data.stuck_count)}</strong></div>
+        <div class="stat"><span class="muted">queue_gpu</span><strong>${num(
+          counts.queue_gpu
+        )}</strong></div>
+        <div class="stat"><span class="muted">processing</span><strong>${num(
+          counts.processing
+        )}</strong></div>`;
+    }
+
+    const items = Array.isArray(data.items) ? data.items : [];
+    const table = $("uploadsTable");
+    if (!items.length) {
+      table.innerHTML = `<p class="empty">当前筛选下没有上传任务</p>`;
+    } else {
+      table.innerHTML = `<table>
+        <thead><tr>
+          <th>状态</th><th>文件</th><th>类型</th><th>用户</th>
+          <th>创建</th><th>更新</th><th>闲置</th><th>失败原因</th>
+        </tr></thead>
+        <tbody>${items
+          .map((item) => {
+            const who =
+              item.user_display_name ||
+              item.user_email ||
+              (item.user_id != null ? `用户#${item.user_id}` : "—");
+            const created = item.create_at
+              ? new Date(item.create_at).toLocaleString("zh-CN")
+              : "—";
+            const updated = item.update_at
+              ? new Date(item.update_at).toLocaleString("zh-CN")
+              : "—";
+            const reason = item.fail_reason
+              ? escapeHtml(String(item.fail_reason).slice(0, 80))
+              : "—";
+            return `<tr class="uploads-row${item.is_stuck ? " is-stuck" : ""}" data-id="${escapeAttr(
+              item.id
+            )}">
+              <td>${uploadStatusChip(item.status, item.is_stuck)}</td>
+              <td><strong>${escapeHtml(item.file_name || item.id)}</strong>
+                <div class="muted">${escapeHtml(String(item.id).slice(0, 8))}…</div></td>
+              <td>${escapeHtml(item.file_type || "—")}</td>
+              <td>${escapeHtml(who)}
+                <div class="muted">#${escapeHtml(String(item.user_id ?? ""))}</div></td>
+              <td>${escapeHtml(created)}</td>
+              <td>${escapeHtml(updated)}</td>
+              <td>${escapeHtml(formatAge(item.age_seconds))}</td>
+              <td>${reason}</td>
+            </tr>`;
+          })
+          .join("")}</tbody></table>`;
+      table.querySelectorAll(".uploads-row").forEach((row) => {
+        row.addEventListener("click", () => {
+          uploadsState.selectedId = row.dataset.id;
+          loadUploadDetail(row.dataset.id).catch((e) => alert(e.message));
+        });
+      });
+    }
+
+    const pageInfo = $("uploadsPageInfo");
+    if (pageInfo) {
+      const start = uploadsState.total ? uploadsState.offset + 1 : 0;
+      const end = Math.min(uploadsState.offset + uploadsState.limit, uploadsState.total);
+      pageInfo.textContent = `${start}-${end} / ${uploadsState.total}`;
+    }
+    if (uploadsState.selectedId) {
+      loadUploadDetail(uploadsState.selectedId).catch(() => {});
+    } else {
+      const detail = $("uploadsDetail");
+      if (detail) {
+        detail.classList.add("hidden");
+        detail.innerHTML = "";
+      }
+    }
+    syncUploadsAutoRefresh();
+  }
+
+  async function loadUploadDetail(taskId) {
+    const detail = $("uploadsDetail");
+    if (!detail) return;
+    detail.classList.remove("hidden");
+    detail.innerHTML = `<p class="muted">加载任务详情…</p>`;
+    const item = await api(`/fingerprint-cache/upload-tasks/${encodeURIComponent(taskId)}`);
+    const course = item.user_course || null;
+    detail.innerHTML = `
+      <h3>任务详情</h3>
+      <div class="uploads-detail-grid">
+        <div><span class="muted">任务 ID</span><strong>${escapeHtml(item.id)}</strong></div>
+        <div><span class="muted">状态</span><strong>${uploadStatusChip(
+          item.status,
+          item.is_stuck
+        )}</strong></div>
+        <div><span class="muted">文件</span><strong>${escapeHtml(
+          item.file_name || "—"
+        )}</strong></div>
+        <div><span class="muted">类型</span><strong>${escapeHtml(
+          item.file_type || "—"
+        )}</strong></div>
+        <div><span class="muted">用户</span><strong>${escapeHtml(
+          item.user_display_name || item.user_email || `用户#${item.user_id}`
+        )}</strong></div>
+        <div><span class="muted">指纹</span><strong>${escapeHtml(
+          item.fingerprint_id || "—"
+        )}</strong></div>
+        <div><span class="muted">课程副本</span><strong>${escapeHtml(
+          item.user_course_asset_id || "—"
+        )}</strong></div>
+        <div><span class="muted">raw_file_key</span><strong>${escapeHtml(
+          item.raw_file_key || "—"
+        )}</strong></div>
+        ${
+          course
+            ? `<div><span class="muted">课程标题</span><strong>${escapeHtml(
+                course.asset_title || "—"
+              )}</strong></div>
+               <div><span class="muted">公共缓存</span><strong>${escapeHtml(
+                 course.asset_cache_id || "私人"
+               )}</strong></div>`
+            : ""
+        }
+      </div>
+      ${
+        item.fail_reason
+          ? `<p class="fail-reason">${escapeHtml(item.fail_reason)}</p>`
+          : ""
+      }
+      <div class="login-actions" style="margin-top:12px">
+        <button type="button" class="btn ghost" id="uploadsOpenUserBtn" data-uid="${escapeAttr(
+          String(item.user_id || "")
+        )}">打开用户资产</button>
+        <button type="button" class="btn ghost" id="uploadsCloseDetailBtn">关闭详情</button>
+      </div>`;
+    $("uploadsCloseDetailBtn")?.addEventListener("click", () => {
+      uploadsState.selectedId = null;
+      detail.classList.add("hidden");
+      detail.innerHTML = "";
+    });
+    $("uploadsOpenUserBtn")?.addEventListener("click", () => {
+      const uid = Number($("uploadsOpenUserBtn").dataset.uid || 0);
+      if (!uid) return;
+      setTab("users");
+      state.selectedId = uid;
+      state.q = String(uid);
+      if ($("searchInput")) $("searchInput").value = String(uid);
+      state.offset = 0;
+      loadUsers()
+        .then(() => loadDetail(uid))
+        .catch((e) => alert(e.message));
     });
   }
 
@@ -961,6 +1205,7 @@
   }
   function logout() {
     stopUserRegistrationWatch();
+    stopUploadsAutoRefresh();
     hideNewUserModal();
     state.token = "";
     localStorage.removeItem(TOKEN_KEY);
@@ -1010,6 +1255,9 @@
     }
     if (state.tab === "community") {
       loadCommunityPosts().catch((e) => console.warn(e));
+    }
+    if (state.tab === "uploads") {
+      loadUploads().catch((e) => console.warn(e));
     }
     if (state.selectedId) await loadDetail(state.selectedId);
     startUserRegistrationWatch();
@@ -1208,7 +1456,7 @@
   }
 
   async function loadDashboard() {
-    const [users, learning, pnl, infra, feedbackPeek, pendingAssets, commerce, dailyUsage] =
+    const [users, learning, pnl, infra, feedbackPeek, pendingAssets, commerce, dailyUsage, uploadsPeek] =
       await Promise.all([
         api("/analytics/users?days=90"),
         api("/analytics/learning"),
@@ -1218,6 +1466,7 @@
         api("/exam-assets?status=pending&limit=200").catch(() => []),
         api("/commerce/overview").catch(() => null),
         api("/usage/daily").catch(() => null),
+        api("/fingerprint-cache/upload-tasks?limit=1&stuck_only=true").catch(() => null),
       ]);
     const host = (infra && infra.host) || {};
     const mem = host.memory || {};
@@ -1230,6 +1479,8 @@
     const cloudTok = (dailyUsage && dailyUsage.cloud_tokens) || 0;
     const cloudCny = (dailyUsage && dailyUsage.cloud_cost_cny) || 0;
     const cloudAlert = !!(dailyUsage && dailyUsage.alert);
+    const stuckUploads = (uploadsPeek && uploadsPeek.stuck_count) || 0;
+    const inFlightUploads = (uploadsPeek && uploadsPeek.in_flight_count) || 0;
     const el = $("panel-dashboard");
     el.innerHTML = `
       <div class="kpi-row">
@@ -1252,6 +1503,10 @@
           <button type="button" class="btn ghost dash-jump" data-tab="feedback">去处理</button></div>
         <div class="stat"><span class="muted">待审考试资料</span><strong>${num(pendingList.length)}</strong>
           <button type="button" class="btn ghost dash-jump" data-tab="exam-assets">去审核</button></div>
+        <div class="stat"><span class="muted">上传卡住 / 进行中</span><strong>${num(
+          stuckUploads
+        )} / ${num(inFlightUploads)}</strong>
+          <button type="button" class="btn ghost dash-jump" data-tab="uploads">去监控</button></div>
         <div class="stat"><span class="muted">试用延展已兑</span><strong>${num(
           trial.extend_redeemed
         )} / ${num(trial.extend_coupons)}</strong>
@@ -2504,7 +2759,13 @@
   });
   on("saveTokenBtn", "click", saveTokenToLocal);
   on("logoutBtn", "click", logout);
-  on("refreshBtn", "click", () => bootstrap().catch((e) => alert(e.message)));
+  on("refreshBtn", "click", () => {
+    if (state.tab === "uploads") {
+      loadUploads().catch((e) => alert(e.message));
+      return;
+    }
+    bootstrap().catch((e) => alert(e.message));
+  });
   on("searchForm", "submit", (e) => {
     e.preventDefault();
     state.q = $("searchInput").value.trim();
@@ -2524,6 +2785,7 @@
       setTab(btn.dataset.tab);
       if (btn.dataset.tab === "dashboard") loadDashboard().catch((e) => alert(e.message));
       if (btn.dataset.tab === "feedback") loadFeedback().catch((e) => alert(e.message));
+      if (btn.dataset.tab === "uploads") loadUploads().catch((e) => alert(e.message));
       if (btn.dataset.tab === "exam-assets") loadExamAssets().catch((e) => alert(e.message));
       if (btn.dataset.tab === "commerce") loadCommerce().catch((e) => alert(e.message));
       if (btn.dataset.tab === "infra") loadInfra().catch((e) => alert(e.message));
@@ -2532,6 +2794,46 @@
       if (btn.dataset.tab === "fingerprint") loadFingerprint().catch((e) => alert(e.message));
       if (btn.dataset.tab === "community") loadCommunityPosts().catch((e) => alert(e.message));
     });
+  });
+  on("uploadsFilterForm", "submit", (e) => {
+    e.preventDefault();
+    uploadsState.status = $("uploadsStatusFilter")?.value || "";
+    uploadsState.file_type = $("uploadsTypeFilter")?.value || "";
+    uploadsState.created_from = $("uploadsFromInput")?.value || "";
+    uploadsState.created_to = $("uploadsToInput")?.value || "";
+    uploadsState.q = ($("uploadsSearchInput")?.value || "").trim();
+    uploadsState.stuck_only = Boolean($("uploadsStuckOnly")?.checked);
+    uploadsState.auto_refresh = Boolean($("uploadsAutoRefresh")?.checked);
+    uploadsState.offset = 0;
+    loadUploads().catch((err) => alert(err.message));
+  });
+  on("uploadsAutoRefresh", "change", () => {
+    uploadsState.auto_refresh = Boolean($("uploadsAutoRefresh")?.checked);
+    syncUploadsAutoRefresh();
+  });
+  on("uploadsStuckOnly", "change", () => {
+    uploadsState.stuck_only = Boolean($("uploadsStuckOnly")?.checked);
+    uploadsState.offset = 0;
+    loadUploads().catch((err) => alert(err.message));
+  });
+  on("uploadsPrev", "click", () => {
+    uploadsState.offset = Math.max(0, uploadsState.offset - uploadsState.limit);
+    loadUploads().catch((err) => alert(err.message));
+  });
+  on("uploadsNext", "click", () => {
+    if (uploadsState.offset + uploadsState.limit >= uploadsState.total) return;
+    uploadsState.offset += uploadsState.limit;
+    loadUploads().catch((err) => alert(err.message));
+  });
+  on("uploadsDrainBtn", "click", async () => {
+    if (!confirm("排空最多 5 条 queue_gpu 上传任务？")) return;
+    try {
+      const r = await api("/fingerprint-cache/drain-queue?limit=5", { method: "POST" });
+      alert(`已处理 ${r.processed || 0} 条`);
+      await loadUploads();
+    } catch (e) {
+      alert(e.message);
+    }
   });
   on("communitySearchForm", "submit", (e) => {
     e.preventDefault();
