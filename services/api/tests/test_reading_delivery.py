@@ -58,7 +58,7 @@ def test_reading_source_limits_hosts_and_starters_have_text():
     assert not allowed('https://raw.githubusercontent.com/nishkalavallabhi/OneStopEnglishCorpus/%2e%2e/secret')
     assert not allowed('http://127.0.0.1/secret')
     data = asyncio.run(starter())
-    assert len(data['documents']) == 3
+    assert len(data['documents']) == 5
     assert all(d['plainText'] for d in data['documents'])
 
 
@@ -68,3 +68,15 @@ def test_standard_ebooks_proxy_allows_only_book_archives():
     assert allowed('https://codeload.github.com/standardebooks/jane-austen_pride-and-prejudice/zip/refs/heads/master')
     assert not allowed('https://github.com/other/private/archive/refs/heads/master.zip')
     assert not allowed('https://codeload.github.com/standardebooks/repo/anything')
+    assert allowed('https://standardebooks.org/ebooks?per-page=48&view=list&page=2')
+    assert not allowed('https://standardebooks.org/ebooks?page=1&next=https://evil.example')
+    assert allowed('https://api.github.com/repos/bookdash/bookdash-books/git/trees/gh-pages?recursive=1')
+    assert not allowed('https://api.github.com/repos/bookdash/bookdash-books/zipball/gh-pages')
+    assert allowed('https://raw.githubusercontent.com/bookdash/bookdash-books/gh-pages/sleepy-mr-sloth/en/index.md')
+    assert not allowed('https://raw.githubusercontent.com/bookdash/bookdash-books/gh-pages/sleepy-mr-sloth/en/images/01.jpg')
+    assert allowed('https://bookdash.org/books/sleepy-mr-sloth/')
+    assert not allowed('https://bookdash.org/wp-admin/')
+    assert allowed('https://learningenglish.voanews.com/api/zmypyl-vomx-tpeyry_')
+    assert allowed('https://learningenglish.voanews.com/a/watching-the-grass-grow-is-not-fun/8003108.html')
+    assert not allowed('https://learningenglish.voanews.com/p/5374.html')
+    assert not allowed('https://www.voanews.com/a/watching-the-grass-grow-is-not-fun/8003108.html')
