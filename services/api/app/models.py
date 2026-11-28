@@ -329,6 +329,11 @@ class SharedMediaSubtitle(Base):
     )
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    media_identity_id: Mapped[int | None] = mapped_column(
+        ForeignKey("media_identities.id", ondelete="SET NULL"),
+        nullable=True,
+        index=True,
+    )
     file_hash: Mapped[str] = mapped_column(String(160), index=True)
     file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True, index=True)
     duration_sec: Mapped[int | None] = mapped_column(Integer, nullable=True)
@@ -348,6 +353,82 @@ class SharedMediaSubtitle(Base):
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now()
     )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class MediaIdentity(Base):
+    """Stable learning identity shared by local, netdisk, Bilibili and ECS media."""
+
+    __tablename__ = "media_identities"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    canonical_key: Mapped[str] = mapped_column(String(192), unique=True, index=True)
+    content_fingerprint: Mapped[str | None] = mapped_column(
+        String(192), nullable=True, index=True
+    )
+    title: Mapped[str] = mapped_column(String(512), default="")
+    series_title: Mapped[str] = mapped_column(String(512), default="")
+    season: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    episode: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    primary_language: Mapped[str] = mapped_column(String(16), default="en")
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
+    )
+
+
+class MediaVariant(Base):
+    """A concrete file/source variant belonging to one stable media identity."""
+
+    __tablename__ = "media_variants"
+    __table_args__ = (
+        UniqueConstraint("file_fingerprint", name="uq_media_variant_file_fingerprint"),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    media_identity_id: Mapped[int] = mapped_column(
+        ForeignKey("media_identities.id", ondelete="CASCADE"), index=True
+    )
+    file_fingerprint: Mapped[str] = mapped_column(String(192), index=True)
+    source_type: Mapped[str] = mapped_column(String(32), default="local")
+    source_locator_hash: Mapped[str] = mapped_column(String(64), default="")
+    file_size: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    duration_ms: Mapped[int | None] = mapped_column(BigInteger, nullable=True)
+    timeline_offset_ms: Mapped[int] = mapped_column(Integer, default=0)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), server_default=func.now()
+    )
+
+
+class UserMediaLearningState(Base):
+    """Cross-source and cross-device progress keyed by stable media identity."""
+
+    __tablename__ = "user_media_learning_states"
+    __table_args__ = (
+        UniqueConstraint(
+            "user_id", "media_identity_id", name="uq_user_media_learning_state"
+        ),
+    )
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    user_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
+    media_identity_id: Mapped[int] = mapped_column(
+        ForeignKey("media_identities.id", ondelete="CASCADE"), index=True
+    )
+    media_variant_id: Mapped[int | None] = mapped_column(
+        ForeignKey("media_variants.id", ondelete="SET NULL"), nullable=True
+    )
+    last_position_ms: Mapped[int] = mapped_column(BigInteger, default=0)
+    last_cue_index: Mapped[int] = mapped_column(Integer, default=0)
+    completed: Mapped[int] = mapped_column(Integer, default=0)
+    state_json: Mapped[str] = mapped_column(Text, default="{}")
     updated_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), onupdate=func.now()
     )
