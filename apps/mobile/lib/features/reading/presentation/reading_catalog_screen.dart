@@ -173,7 +173,8 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
       );
       return;
     }
-    final bool freeEntry = isFreeReadingPreviewDocId(entry.stableDocId) ||
+    final bool freeEntry =
+        isFreeReadingPreviewDocId(entry.stableDocId) ||
         isFreeReadingPreviewDocId(entry.id);
     if (!freeEntry) {
       final bool unlocked = await resolveModuleUnlocked(ref, 'reading');
@@ -193,8 +194,8 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
           .read(readingLibraryProvider.notifier)
           .addDoc(doc, checkQuota: false);
       if (!mounted) return;
-      final bool needsPrep = doc.wordCount >= 12000 &&
-          doc.plainText.trim().length >= 20000;
+      final bool needsPrep =
+          doc.wordCount >= 12000 && doc.plainText.trim().length >= 20000;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(
@@ -210,9 +211,7 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
               : SnackBarAction(
                   label: '阅读',
                   onPressed: () {
-                    context.push(
-                      '/reading/${Uri.encodeComponent(doc.id)}',
-                    );
+                    context.push('/reading/${Uri.encodeComponent(doc.id)}');
                   },
                 ),
         ),
@@ -239,7 +238,7 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
             ? '在线书库'
             : (_stack.isEmpty ? _source!.title : _stack.last.title),
         description: atRoot
-            ? 'OneStop · CEFR · Magic · Standard Ebooks；Readseasy/ClickBook 外链'
+            ? 'Standard Ebooks 名著 · Book Dash 绘本 · VOA Learning English'
             : _source!.licenseNote,
         leading: PadBackButton(onPressed: _pop),
         actions: <Widget>[
@@ -268,9 +267,12 @@ class _ReadingCatalogScreenState extends ConsumerState<ReadingCatalogScreen> {
               separatorBuilder: (_, __) => const SizedBox(height: 8),
               itemBuilder: (BuildContext context, int index) {
                 if (index == 0) {
-                  return const Text(
-                    '按需下载到本机书架。第三方内容版权/许可以各源说明为准；Magic 为非商用许可。',
-                    style: TextStyle(height: 1.45, color: Color(0xFF626262)),
+                  return Text(
+                    '按需下载到本机书架。名著、绘本和 VOA 短文可直接加入阅读。',
+                    style: TextStyle(
+                      height: 1.45,
+                      color: AppDesignTokens.textSecondary,
+                    ),
                   );
                 }
                 final ReadingCatalogSource source =
