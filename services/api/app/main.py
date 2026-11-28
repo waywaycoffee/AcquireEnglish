@@ -29,6 +29,7 @@ from app.routers import (
     exam_generate,
     learning_cards,
     learning_module_progress,
+    media_identity,
     public_challenges,
     cosmetics,
     courses,
@@ -132,6 +133,7 @@ app.include_router(tts_progress.admin_router, prefix="/api")
 app.include_router(usage.router, prefix="/api")
 app.include_router(courses.router, prefix="/api")
 app.include_router(progress.router, prefix="/api")
+app.include_router(media_identity.router, prefix="/api")
 app.include_router(vocab.router, prefix="/api")
 app.include_router(curriculum_vocab.router, prefix="/api")
 app.include_router(phrases.router, prefix="/api")

@@ -7,6 +7,7 @@ import 'bilingual_subtitle_helpers.dart';
 import 'player_media_source.dart';
 import 'player_mock_state.dart';
 import 'subtitle_language_sanitize.dart';
+import 'subtitle_timeline_cache.dart';
 
 export 'subtitle_language_sanitize.dart' show sanitizeSubtitleLanguageFields;
 
@@ -28,10 +29,15 @@ Future<List<PlayerSubtitleLine>> loadSubtitleLines(String source) async {
 Future<List<PlayerSubtitleLine>> _parseSubtitleLinesMaybeIsolate(
   String raw,
 ) async {
-  if (raw.length < _kParseOnIsolateMinChars) {
-    return parseSubtitleLines(raw);
-  }
-  return compute(parseSubtitleLines, raw);
+  return SubtitleTimelineCache.loadOrParse(
+    rawSubtitle: raw,
+    parse: () async {
+      if (raw.length < _kParseOnIsolateMinChars) {
+        return parseSubtitleLines(raw);
+      }
+      return compute(parseSubtitleLines, raw);
+    },
+  );
 }
 
 /// Official Chinese-only CC/AI tracks parse into [PlayerSubtitleLine.english]
@@ -76,13 +82,15 @@ List<PlayerSubtitleLine> mergePartialEnglishOntoChineseBase({
   if (chineseLines.isEmpty) {
     return sanitizeSubtitleLanguageFields(englishLines);
   }
-  final List<PlayerSubtitleLine> base =
-      normalizeChineseOnlySubtitleLines(chineseLines);
+  final List<PlayerSubtitleLine> base = normalizeChineseOnlySubtitleLines(
+    chineseLines,
+  );
   if (englishLines.isEmpty) {
     return base;
   }
-  final List<PlayerSubtitleLine> enSanitized =
-      sanitizeSubtitleLanguageFields(englishLines);
+  final List<PlayerSubtitleLine> enSanitized = sanitizeSubtitleLanguageFields(
+    englishLines,
+  );
   return sanitizeSubtitleLanguageFields(
     List<PlayerSubtitleLine>.generate(base.length, (int index) {
       final PlayerSubtitleLine zh = base[index];
@@ -177,10 +185,12 @@ List<PlayerSubtitleLine> mergeSubtitleLines({
   required List<PlayerSubtitleLine> englishLines,
   required List<PlayerSubtitleLine> chineseLines,
 }) {
-  final List<PlayerSubtitleLine> enSanitized =
-      sanitizeSubtitleLanguageFields(englishLines);
-  final List<PlayerSubtitleLine> zhSanitized =
-      sanitizeSubtitleLanguageFields(chineseLines);
+  final List<PlayerSubtitleLine> enSanitized = sanitizeSubtitleLanguageFields(
+    englishLines,
+  );
+  final List<PlayerSubtitleLine> zhSanitized = sanitizeSubtitleLanguageFields(
+    chineseLines,
+  );
 
   final bool hasRealEnglish = enSanitized.any(
     (PlayerSubtitleLine line) => subtitleLooksEnglish(line.english),
@@ -506,10 +516,7 @@ _DualLanguageLinePair _splitDualLanguageLine(List<String> lines) {
   }
   // ZH-only multi-line cue (or EN mislabeled as first line of CJK).
   if (_containsChinese(firstLine) && !_looksLikeEnglishLine(firstLine)) {
-    return _DualLanguageLinePair(
-      english: '',
-      chinese: lines.join(' '),
-    );
+    return _DualLanguageLinePair(english: '', chinese: lines.join(' '));
   }
 
   return _DualLanguageLinePair(

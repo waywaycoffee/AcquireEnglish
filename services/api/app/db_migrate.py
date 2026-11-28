@@ -20,6 +20,7 @@ async def ensure_schema_columns(conn: AsyncConnection) -> None:
     await _ensure_oral_peer_room_columns(conn)
     await _ensure_shared_bilibili_cid_bigint(conn)
     await _ensure_shared_bilibili_identity_columns(conn)
+    await _ensure_shared_media_identity_column(conn)
     await _ensure_api_usage_module_column(conn)
     await _ensure_rank_state_columns(conn)
     await _ensure_upload_task_notify_column(conn)
@@ -314,6 +315,29 @@ async def _ensure_shared_bilibili_identity_columns(conn: AsyncConnection) -> Non
                 "ADD COLUMN preview_zh VARCHAR(512) DEFAULT ''"
             )
         )
+
+
+async def _ensure_shared_media_identity_column(conn: AsyncConnection) -> None:
+    """Link legacy public subtitle rows to the unified media identity."""
+    existing = await _existing_columns(conn, "shared_media_subtitles")
+    if existing is None:
+        return
+    if "media_identity_id" not in existing:
+        await conn.execute(
+            text(
+                "ALTER TABLE shared_media_subtitles "
+                "ADD COLUMN media_identity_id INTEGER"
+            )
+        )
+    try:
+        await conn.execute(
+            text(
+                "CREATE INDEX IF NOT EXISTS ix_shared_media_subtitles_media_identity_id "
+                "ON shared_media_subtitles (media_identity_id)"
+            )
+        )
+    except Exception:  # noqa: BLE001
+        pass
 
 
 async def _ensure_api_usage_module_column(conn: AsyncConnection) -> None:
