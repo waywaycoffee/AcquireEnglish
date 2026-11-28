@@ -4,27 +4,27 @@ import 'package:lucide_flutter/lucide_flutter.dart';
 enum AppNavDestination {
   home(
     route: '/home',
-    label: '学习',
+    label: '首页',
     title: '学习主页',
     subtitle: '继续你的逐句精听练习，回到最近的课程和学习节奏。',
     icon: Icons.home_outlined,
     activeIcon: Icons.home_rounded,
   ),
+  words(
+    route: '/words/syllabus',
+    label: '课程',
+    title: '词书 / 课包',
+    subtitle: '导入与管理词书，按考试或日常目标选书背词。',
+    icon: Icons.menu_book_outlined,
+    activeIcon: Icons.menu_book_rounded,
+  ),
   library(
     route: '/library',
     label: '视频',
     title: '视频学习',
-    subtitle: '浏览课程、查看集数进度，并回到上次学习的位置。',
+    subtitle: '精选 · B站 / YouTube；浏览课程、集数进度与本地文件。',
     icon: LucideIcons.clapperboard,
     activeIcon: LucideIcons.clapperboard,
-  ),
-  reading(
-    route: '/reading',
-    label: '阅读',
-    title: '爱快阅读',
-    subtitle: '泛读短文，点词进词书；可导入或从视频字幕生成。',
-    icon: Icons.chrome_reader_mode_outlined,
-    activeIcon: Icons.chrome_reader_mode_rounded,
   ),
   oralCoach(
     route: '/digital-human',
@@ -34,13 +34,30 @@ enum AppNavDestination {
     icon: Icons.record_voice_over_outlined,
     activeIcon: Icons.record_voice_over_rounded,
   ),
+  reading(
+    route: '/reading',
+    label: '阅读',
+    title: '我的书架',
+    subtitle: '木纹书架：导入、续读；发现栏目与日更切片为二级。',
+    icon: Icons.chrome_reader_mode_outlined,
+    activeIcon: Icons.chrome_reader_mode_rounded,
+  ),
+  phrases(
+    route: '/phrases',
+    label: '收藏',
+    title: '收藏',
+    subtitle: '回顾收藏过的句子、表达与视频摘录。',
+    icon: Icons.bookmark_border_rounded,
+    activeIcon: Icons.bookmark_rounded,
+    showInBottomNav: false,
+  ),
   growth(
     route: '/growth',
-    label: '成长',
-    title: '英语成长之旅',
-    subtitle: '记录你的每一次进步，查看学习轨迹与掌握度。',
-    icon: LucideIcons.sprout,
-    activeIcon: LucideIcons.trophy,
+    label: '历史',
+    title: '学习记录',
+    subtitle: '成长轨迹、连续打卡与掌握度（含最近学习）。',
+    icon: Icons.history_rounded,
+    activeIcon: Icons.history_rounded,
     showInBottomNav: false,
   ),
   discover(
@@ -50,14 +67,7 @@ enum AppNavDestination {
     subtitle: '真题资料共享、素材协作、同桌与输出互评。',
     icon: Icons.groups_outlined,
     activeIcon: Icons.groups_rounded,
-  ),
-  review(
-    route: '/review',
-    label: '复习',
-    title: '复习',
-    subtitle: '把学过的真正记住：今日计划、主动回忆与 FSRS 评分（已并入学习首页）。',
-    icon: Icons.style_outlined,
-    activeIcon: Icons.style_rounded,
+    showInNav: false,
     showInBottomNav: false,
   ),
   battle(
@@ -68,34 +78,27 @@ enum AppNavDestination {
     icon: Icons.sports_esports_outlined,
     activeIcon: Icons.sports_esports_rounded,
     showInNav: false,
+    showInBottomNav: false,
   ),
   exam(
     route: '/exam',
-    label: '备考',
+    label: '应试',
     title: '考试备考',
-    subtitle: '专项、模考、错题本与社区真题（统一在日常习得内）。',
+    subtitle: '专项、模考、错题本与社区真题；可链 K12 教材书架。',
     icon: Icons.school_outlined,
     activeIcon: Icons.school_rounded,
     showInNav: false,
-  ),
-  phrases(
-    route: '/phrases',
-    label: '短语',
-    title: '短语库',
-    subtitle: '回顾收藏过的句子和表达，集中复习高价值内容。',
-    icon: Icons.auto_stories_outlined,
-    activeIcon: Icons.auto_stories_rounded,
-    showInNav: false,
     showInBottomNav: false,
   ),
-  words(
-    route: '/words/syllabus',
-    label: '词书',
-    title: '词书',
-    subtitle: '导入与管理词书，按考试或日常目标选书背词。',
-    icon: Icons.menu_book_outlined,
-    activeIcon: Icons.menu_book_rounded,
+  review(
+    route: '/review',
+    label: '复习',
+    title: '复习',
+    subtitle: '把学过的真正记住：今日计划、主动回忆与 FSRS 评分（已并入学习首页）。',
+    icon: Icons.style_outlined,
+    activeIcon: Icons.style_rounded,
     showInNav: false,
+    showInBottomNav: false,
   ),
   guide(
     route: '/guide',
@@ -108,11 +111,11 @@ enum AppNavDestination {
   ),
   settings(
     route: '/settings',
-    label: '设置',
+    label: '我的',
     title: '我的',
     subtitle: '管理播放偏好、界面设置和本地学习体验。',
-    icon: Icons.tune_outlined,
-    activeIcon: Icons.tune_rounded,
+    icon: Icons.person_outline_rounded,
+    activeIcon: Icons.person_rounded,
     showInBottomNav: false,
   ),
   importCourse(
@@ -146,32 +149,34 @@ enum AppNavDestination {
   final bool showInNav;
   final bool showInBottomNav;
 
-  /// Ordered bottom-bar tabs (excluding the trailing 「更多」 action).
-  ///
-  /// Default viewport shows the first [bottomBarVisibleCount]; swipe to
-  /// reveal the rest. Append new slots here without rewriting layout.
-  static const List<AppNavDestination> bottomBarDestinations =
+  /// Primary left-rail order (design mock): 首页·课程·视频·口语·阅读·收藏·历史.
+  /// 社区 / 对战 / 应试 stay secondary under 我的 — not on the primary rail.
+  /// Settings (我的) sits under the rail footer.
+  static const List<AppNavDestination> sidebarRailDestinations =
       <AppNavDestination>[
         home,
-        library,
-        reading,
-        oralCoach,
-        discover,
-        battle,
-        exam,
         words,
+        library,
+        oralCoach,
+        reading,
+        phrases,
+        growth,
       ];
 
-  /// How many tabs fit in the fixed visible area before scrolling.
+  /// Legacy name kept for tests / tour helpers — same as sidebar rail.
+  static const List<AppNavDestination> bottomBarDestinations =
+      sidebarRailDestinations;
+
   static const int bottomBarVisibleCount = 5;
 
-  /// Destinations offered from the trailing 「更多」 sheet.
+  /// Destinations offered from overflow / more menus.
   static List<AppNavDestination> get moreMenuDestinations =>
       values
           .where(
             (AppNavDestination destination) =>
                 destination.showInNav &&
-                !bottomBarDestinations.contains(destination),
+                !sidebarRailDestinations.contains(destination) &&
+                destination != settings,
           )
           .toList(growable: false);
 }

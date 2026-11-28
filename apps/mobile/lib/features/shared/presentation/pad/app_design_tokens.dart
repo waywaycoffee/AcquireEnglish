@@ -28,9 +28,9 @@ class AppDesignTokens {
   static Color get appWhite =>
       isDark ? const Color(0xFF22252E) : const Color(0xFFFFFFFF);
 
-  /// App canvas / scaffold background.
+  /// App canvas / scaffold background (Pencil charcoal · soft gray).
   static Color get softWhite =>
-      isDark ? const Color(0xFF12141A) : const Color(0xFFF3F4F7);
+      isDark ? const Color(0xFF1A1C20) : const Color(0xFFF5F7F9);
 
   static Color get softGray =>
       isDark ? const Color(0xFF2A2E38) : const Color(0xFFE8EAED);
@@ -62,6 +62,17 @@ class AppDesignTokens {
 
   static Color get dangerText =>
       isDark ? const Color(0xFFFF8A80) : const Color(0xFFBA1A1A);
+
+  /// Sidebar / primary CTA accent (Pencil coral · light teal).
+  static Color get navAccent =>
+      isDark ? const Color(0xFFF26D5B) : const Color(0xFF0D9488);
+
+  static Color get navAccentSoft =>
+      isDark ? const Color(0xFF3D2A28) : const Color(0xFFCCFBF1);
+
+  /// Logo / secondary brand chip (teal).
+  static Color get brandTeal =>
+      isDark ? const Color(0xFF40C4AA) : const Color(0xFF0F766E);
 
   static List<BoxShadow> get toyCardShadow => <BoxShadow>[
         BoxShadow(

@@ -34,6 +34,8 @@ FoundationMediaItem? readingMediaForDoc(
     'magic',
     'cefr',
     'standard_ebooks',
+    'bookdash',
+    'voa',
   ]) {
     final FoundationMediaItem? hit = manifest.lookup(pack, key);
     if (hit != null) return hit;

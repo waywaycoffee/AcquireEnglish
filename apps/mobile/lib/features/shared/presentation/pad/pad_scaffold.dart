@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
-import '../../../navigation/presentation/floating_bottom_nav.dart';
+import '../../../navigation/presentation/app_nav_rail.dart';
 import '../../../navigation/presentation/navigation_destination.dart';
-import '../../../onboarding/data/feature_tour_prefs.dart';
 import '../../../onboarding/presentation/feature_tour_keys.dart';
 import '../../../onboarding/presentation/feature_tour_overlay.dart';
 import '../../../onboarding/presentation/feature_tour_provider.dart';
@@ -26,6 +25,8 @@ class PadScaffold extends ConsumerWidget {
   final AppNavDestination currentDestination;
   final Widget body;
   final Widget? topBar;
+
+  /// Kept for call-site compatibility; bottom tabs are retired (left rail only).
   final bool useBottomTabWhenPortrait;
   final bool showNavigation;
   final bool showContinueLearning;
@@ -36,12 +37,9 @@ class PadScaffold extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final Size size = MediaQuery.sizeOf(context);
-    final bool isPortrait = size.height > size.width;
-    final bool useBottomNavigation = size.width < 840 || isPortrait;
+    final bool useIconRail = size.width < 840;
     final Color scaffoldColor = backgroundColor ?? AppDesignTokens.softWhite;
     final FeatureTourState tour = ref.watch(featureTourProvider);
-    final bool suppressScrollHint =
-        tour.active || !readHomeFeatureTourSeen();
     final Widget content = _PadBackdrop(
       flatColor: backgroundColor,
       child: Column(
@@ -52,43 +50,29 @@ class PadScaffold extends ConsumerWidget {
       ),
     );
 
-    final Widget scaffold;
-    if (showNavigation && useBottomNavigation && useBottomTabWhenPortrait) {
-      scaffold = Scaffold(
-        backgroundColor: scaffoldColor,
-        floatingActionButton: showContinueLearning
-            ? const ContinueLearningButton()
-            : null,
-        body: SafeArea(top: false, bottom: false, child: content),
-        bottomNavigationBar: SafeArea(
-          top: false,
-          child: FloatingBottomNav(
-            // GlobalKeys must not span go_router page swaps — they reparent
-            // the bar off the new route and it can vanish (e.g. 社区).
-            key: tour.active ? FeatureTourKeys.bottomNav : null,
-            current: currentDestination,
-            attachTourKeys: tour.active,
-            forceShowScrollHint: suppressScrollHint ? false : null,
-          ),
+    final Widget scaffold = Scaffold(
+      backgroundColor: scaffoldColor,
+      floatingActionButton: showContinueLearning
+          ? const ContinueLearningButton()
+          : null,
+      body: SafeArea(
+        top: false,
+        bottom: false,
+        child: Row(
+          children: <Widget>[
+            if (showNavigation)
+              useIconRail
+                  ? AppNavRail(
+                      key: tour.active ? FeatureTourKeys.bottomNav : null,
+                      current: currentDestination,
+                      attachTourKeys: tour.active,
+                    )
+                  : PadSidebar(current: currentDestination),
+            Expanded(child: content),
+          ],
         ),
-      );
-    } else {
-      scaffold = Scaffold(
-        backgroundColor: scaffoldColor,
-        floatingActionButton: showContinueLearning
-            ? const ContinueLearningButton()
-            : null,
-        body: SafeArea(
-          top: false,
-          child: Row(
-            children: <Widget>[
-              if (showNavigation) PadSidebar(current: currentDestination),
-              Expanded(child: content),
-            ],
-          ),
-        ),
-      );
-    }
+      ),
+    );
 
     if (!tour.active) {
       return scaffold;

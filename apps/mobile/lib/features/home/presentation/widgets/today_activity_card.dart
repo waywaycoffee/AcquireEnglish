@@ -1,4 +1,4 @@
-import 'dart:async';
+﻿import 'dart:async';
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
@@ -834,7 +834,7 @@ class _TodayActivityCardState extends ConsumerState<TodayActivityCard> {
                           ? '接着昨天的内容继续'
                           : '按计划接着学'),
                   style: TextStyle(
-                    color: AppDesignTokens.brandGreen,
+                    color: AppDesignTokens.navAccent,
                     fontWeight: FontWeight.w700,
                     fontSize: 13,
                   ),
@@ -1091,8 +1091,8 @@ class _QuotaProgressRow extends StatelessWidget {
               value: skipped ? 0 : progress.clamp(0.0, 1.0),
               minHeight: 8,
               color: done
-                  ? AppDesignTokens.brandGreen
-                  : AppDesignTokens.brandGreen.withValues(alpha: 0.7),
+                  ? AppDesignTokens.navAccent
+                  : AppDesignTokens.navAccent.withValues(alpha: 0.7),
               backgroundColor: AppDesignTokens.borderGray.withValues(alpha: 0.4),
             ),
           ),
@@ -1105,7 +1105,7 @@ class _QuotaProgressRow extends StatelessWidget {
             textAlign: TextAlign.right,
             style: TextStyle(
               color: done
-                  ? AppDesignTokens.brandGreen
+                  ? AppDesignTokens.navAccent
                   : AppDesignTokens.textSecondary,
               fontSize: 12,
               fontWeight: FontWeight.w600,
@@ -1246,7 +1246,7 @@ class _TodayQuotaSheetState extends State<_TodayQuotaSheet> {
                           readingWords: _reading,
                         )),
                 style: FilledButton.styleFrom(
-                  backgroundColor: AppDesignTokens.brandGreen,
+                  backgroundColor: AppDesignTokens.navAccent,
                   foregroundColor: AppDesignTokens.onAccent,
                   padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
@@ -1385,3 +1385,4 @@ class _RefreshBatchSheet extends StatelessWidget {
     );
   }
 }
+

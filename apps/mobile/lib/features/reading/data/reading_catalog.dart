@@ -10,12 +10,15 @@ import '../domain/reading_doc.dart';
 import '../domain/reading_title_zh.dart';
 import 'reading_cover_cache.dart';
 import 'reading_ingest.dart';
+import 'reading_open_sources.dart';
 
 enum ReadingCatalogKind {
   onestop,
   cefr,
   magic,
   standardebooks,
+  bookdash,
+  voa,
   readseasy,
   clickbook,
 }
@@ -65,9 +68,23 @@ kReadingCatalogSources = <ReadingCatalogSource>[
   ReadingCatalogSource(
     kind: ReadingCatalogKind.standardebooks,
     title: 'Standard Ebooks',
-    subtitle: '公版精排 EPUB · 新书 + 经典精选',
+    subtitle: '公版名著 · 精选、新书与全部书目',
     licenseNote: '文本公版；排版 CC0 · standardebooks.org',
     externalUrl: 'https://standardebooks.org/ebooks',
+  ),
+  ReadingCatalogSource(
+    kind: ReadingCatalogKind.bookdash,
+    title: 'Book Dash',
+    subtitle: '低幼英文绘本文本 · 约 50 本已整理正文',
+    licenseNote: 'CC BY 4.0 · 署名作者、绘者、设计、编辑与 bookdash.org · 插图不入库',
+    externalUrl: 'https://bookdash.org/books/',
+  ),
+  ReadingCatalogSource(
+    kind: ReadingCatalogKind.voa,
+    title: 'VOA Learning English',
+    subtitle: '慢速分级短文 · 词汇、健康、科普、故事',
+    licenseNote: 'VOA 自有稿 · 署名 learningenglish.voanews.com',
+    externalUrl: 'https://learningenglish.voanews.com/',
   ),
   ReadingCatalogSource(
     kind: ReadingCatalogKind.readseasy,
@@ -114,8 +131,7 @@ class ReadingCatalogEntry {
   final String? externalUrl;
   final int sizeBytes;
 
-  String get displayTitle =>
-      readingDisplayTitle(title, titleZh: titleZh);
+  String get displayTitle => readingDisplayTitle(title, titleZh: titleZh);
 
   String get stableDocId {
     final Digest digest = sha1.convert(utf8.encode(id));
@@ -127,73 +143,73 @@ class ReadingCatalogEntry {
 const List<({String path, String title, String titleZh, String author})>
 kStandardEbooksFeatured =
     <({String path, String title, String titleZh, String author})>[
-  (
-    path: 'l-frank-baum/the-wonderful-wizard-of-oz',
-    title: 'The Wonderful Wizard of Oz',
-    titleZh: '绿野仙踪',
-    author: 'L. Frank Baum',
-  ),
-  (
-    path: 'jane-austen/pride-and-prejudice',
-    title: 'Pride and Prejudice',
-    titleZh: '傲慢与偏见',
-    author: 'Jane Austen',
-  ),
-  (
-    path: 'mary-shelley/frankenstein',
-    title: 'Frankenstein',
-    titleZh: '弗兰肯斯坦',
-    author: 'Mary Shelley',
-  ),
-  (
-    path: 'bram-stoker/dracula',
-    title: 'Dracula',
-    titleZh: '德古拉',
-    author: 'Bram Stoker',
-  ),
-  (
-    path: 'lewis-carroll/alices-adventures-in-wonderland',
-    title: 'Alice’s Adventures in Wonderland',
-    titleZh: '爱丽丝漫游奇境',
-    author: 'Lewis Carroll',
-  ),
-  (
-    path: 'arthur-conan-doyle/the-adventures-of-sherlock-holmes',
-    title: 'The Adventures of Sherlock Holmes',
-    titleZh: '福尔摩斯探案集',
-    author: 'Arthur Conan Doyle',
-  ),
-  (
-    path: 'charles-dickens/a-christmas-carol',
-    title: 'A Christmas Carol',
-    titleZh: '圣诞颂歌',
-    author: 'Charles Dickens',
-  ),
-  (
-    path: 'robert-louis-stevenson/treasure-island',
-    title: 'Treasure Island',
-    titleZh: '金银岛',
-    author: 'Robert Louis Stevenson',
-  ),
-  (
-    path: 'jonathan-swift/gullivers-travels',
-    title: 'Gulliver’s Travels',
-    titleZh: '格列佛游记',
-    author: 'Jonathan Swift',
-  ),
-  (
-    path: 'mark-twain/the-adventures-of-huckleberry-finn',
-    title: 'Adventures of Huckleberry Finn',
-    titleZh: '哈克贝利·费恩历险记',
-    author: 'Mark Twain',
-  ),
-  (
-    path: 'herman-melville/moby-dick',
-    title: 'Moby Dick',
-    titleZh: '白鲸',
-    author: 'Herman Melville',
-  ),
-];
+      (
+        path: 'l-frank-baum/the-wonderful-wizard-of-oz',
+        title: 'The Wonderful Wizard of Oz',
+        titleZh: '绿野仙踪',
+        author: 'L. Frank Baum',
+      ),
+      (
+        path: 'jane-austen/pride-and-prejudice',
+        title: 'Pride and Prejudice',
+        titleZh: '傲慢与偏见',
+        author: 'Jane Austen',
+      ),
+      (
+        path: 'mary-shelley/frankenstein',
+        title: 'Frankenstein',
+        titleZh: '弗兰肯斯坦',
+        author: 'Mary Shelley',
+      ),
+      (
+        path: 'bram-stoker/dracula',
+        title: 'Dracula',
+        titleZh: '德古拉',
+        author: 'Bram Stoker',
+      ),
+      (
+        path: 'lewis-carroll/alices-adventures-in-wonderland',
+        title: 'Alice’s Adventures in Wonderland',
+        titleZh: '爱丽丝漫游奇境',
+        author: 'Lewis Carroll',
+      ),
+      (
+        path: 'arthur-conan-doyle/the-adventures-of-sherlock-holmes',
+        title: 'The Adventures of Sherlock Holmes',
+        titleZh: '福尔摩斯探案集',
+        author: 'Arthur Conan Doyle',
+      ),
+      (
+        path: 'charles-dickens/a-christmas-carol',
+        title: 'A Christmas Carol',
+        titleZh: '圣诞颂歌',
+        author: 'Charles Dickens',
+      ),
+      (
+        path: 'robert-louis-stevenson/treasure-island',
+        title: 'Treasure Island',
+        titleZh: '金银岛',
+        author: 'Robert Louis Stevenson',
+      ),
+      (
+        path: 'jonathan-swift/gullivers-travels',
+        title: 'Gulliver’s Travels',
+        titleZh: '格列佛游记',
+        author: 'Jonathan Swift',
+      ),
+      (
+        path: 'mark-twain/the-adventures-of-huckleberry-finn',
+        title: 'Adventures of Huckleberry Finn',
+        titleZh: '哈克贝利·费恩历险记',
+        author: 'Mark Twain',
+      ),
+      (
+        path: 'herman-melville/moby-dick',
+        title: 'Moby Dick',
+        titleZh: '白鲸',
+        author: 'Herman Melville',
+      ),
+    ];
 
 const ReadingCatalogEntry kDefaultWizardOfOzEntry = ReadingCatalogEntry(
   id: 'se:l-frank-baum/the-wonderful-wizard-of-oz',
@@ -229,7 +245,10 @@ class ReadingCatalogClient {
             if (source.host == 'api.github.com' ||
                 source.host == 'raw.githubusercontent.com' ||
                 source.host == 'standardebooks.org' ||
-                source.host == 'github.com') {
+                source.host == 'github.com' ||
+                source.host == 'bookdash.org' ||
+                source.host == 'www.bookdash.org' ||
+                source.host == 'learningenglish.voanews.com') {
               options.path = Uri.parse(Endpoints.normalizeBaseUrl(apiBaseUrl))
                   .resolve('api/reading/source')
                   .replace(queryParameters: {'url': source.toString()})
@@ -265,6 +284,10 @@ class ReadingCatalogClient {
         return _listMagicLevels();
       case ReadingCatalogKind.standardebooks:
         return _listStandardEbooksRoot();
+      case ReadingCatalogKind.bookdash:
+        return _listBookDash();
+      case ReadingCatalogKind.voa:
+        return _listVoaSections();
       case ReadingCatalogKind.readseasy:
       case ReadingCatalogKind.clickbook:
         return const <ReadingCatalogEntry>[];
@@ -297,9 +320,15 @@ class ReadingCatalogClient {
           entries = await _listStandardEbooksNew();
         } else if (path == 'featured') {
           entries = _listStandardEbooksFeatured();
+        } else if (path.startsWith('browse:')) {
+          entries = await _listStandardEbooksBrowse(path);
         } else {
           entries = const <ReadingCatalogEntry>[];
         }
+      case ReadingCatalogKind.bookdash:
+        entries = await _listBookDash();
+      case ReadingCatalogKind.voa:
+        entries = await _listVoaFeed(path);
       case ReadingCatalogKind.readseasy:
       case ReadingCatalogKind.clickbook:
         entries = const <ReadingCatalogEntry>[];
@@ -325,6 +354,10 @@ class ReadingCatalogClient {
         return _downloadCefrCached(entry);
       case ReadingCatalogKind.standardebooks:
         return _downloadStandardEbook(entry);
+      case ReadingCatalogKind.bookdash:
+        return _downloadBookDash(entry);
+      case ReadingCatalogKind.voa:
+        return _downloadVoa(entry);
       case ReadingCatalogKind.readseasy:
       case ReadingCatalogKind.clickbook:
         throw StateError('请在浏览器打开站点后，用「导入」加入 EPUB/TXT');
@@ -448,6 +481,13 @@ class ReadingCatalogClient {
         path: 'new',
         subtitle: '来自 Atom new-releases',
       ),
+      ReadingCatalogEntry(
+        id: 'se:browse',
+        title: '全部书目',
+        kind: ReadingCatalogEntryKind.folder,
+        path: 'browse:1',
+        subtitle: '公开目录，每页 48 本',
+      ),
     ];
   }
 
@@ -563,7 +603,8 @@ class ReadingCatalogClient {
 
   List<ReadingCatalogEntry> _listStandardEbooksFeatured() {
     return <ReadingCatalogEntry>[
-      for (final ({String path, String title, String titleZh, String author}) book
+      for (final ({String path, String title, String titleZh, String author})
+          book
           in kStandardEbooksFeatured)
         ReadingCatalogEntry(
           id: 'se:${book.path}',
@@ -611,6 +652,172 @@ class ReadingCatalogClient {
     return out;
   }
 
+  Future<List<ReadingCatalogEntry>> _listStandardEbooksBrowse(
+    String path,
+  ) async {
+    final int page = int.tryParse(path.split(':').last) ?? 1;
+    final String html = await _getString(standardEbooksBrowseUrl(page));
+    final StandardEbooksBrowse parsed = parseStandardEbooksBrowsePage(html);
+    final List<ReadingCatalogEntry> out = <ReadingCatalogEntry>[];
+    if (page > 1) {
+      out.add(
+        ReadingCatalogEntry(
+          id: 'se:browse:${page - 1}',
+          title: '上一页',
+          kind: ReadingCatalogEntryKind.folder,
+          path: 'browse:${page - 1}',
+          subtitle: '第 ${page - 1} / ${parsed.lastPage} 页',
+        ),
+      );
+    }
+    for (final StandardEbookRef book in parsed.books) {
+      out.add(
+        ReadingCatalogEntry(
+          id: 'se:${book.path}',
+          title: book.title,
+          titleZh: readingTitleZhFor(book.title) ?? '',
+          kind: ReadingCatalogEntryKind.ebook,
+          subtitle: book.author,
+          path: book.path,
+          downloadUrl: _standardEbooksEpubUrl(book.path),
+          externalUrl: 'https://standardebooks.org/ebooks/${book.path}',
+        ),
+      );
+    }
+    if (page < parsed.lastPage) {
+      out.add(
+        ReadingCatalogEntry(
+          id: 'se:browse:${page + 1}',
+          title: '下一页',
+          kind: ReadingCatalogEntryKind.folder,
+          path: 'browse:${page + 1}',
+          subtitle: '第 ${page + 1} / ${parsed.lastPage} 页',
+        ),
+      );
+    }
+    return out;
+  }
+
+  Future<List<ReadingCatalogEntry>> _listBookDash() async {
+    final String raw = await _getString(kBookDashTreeUrl);
+    return <ReadingCatalogEntry>[
+      for (final BookDashRef book in parseBookDashTree(raw))
+        ReadingCatalogEntry(
+          id: 'bd:${book.slug}',
+          title: book.title,
+          kind: ReadingCatalogEntryKind.article,
+          level: 'A1',
+          path: book.slug,
+          subtitle: 'Book Dash · CC BY 4.0',
+          externalUrl: bookDashPageUrl(book.slug),
+          downloadUrl: bookDashRawUrl(book.slug),
+        ),
+    ];
+  }
+
+  List<ReadingCatalogEntry> _listVoaSections() {
+    return <ReadingCatalogEntry>[
+      for (final VoaSection section in kVoaLearningSections)
+        ReadingCatalogEntry(
+          id: 'voa:${section.id}',
+          title: section.title,
+          kind: ReadingCatalogEntryKind.folder,
+          level: section.level,
+          path: section.feedPath,
+          subtitle: section.level,
+        ),
+    ];
+  }
+
+  Future<List<ReadingCatalogEntry>> _listVoaFeed(String feedPath) async {
+    final int index = kVoaLearningSections.indexWhere(
+      (VoaSection section) => section.feedPath == feedPath,
+    );
+    if (index < 0) throw StateError('未知的 VOA 栏目');
+    final VoaSection section = kVoaLearningSections[index];
+    final String xml = await _getString(
+      'https://learningenglish.voanews.com$feedPath',
+    );
+    return <ReadingCatalogEntry>[
+      for (final VoaFeedItem item in parseVoaRss(xml))
+        ReadingCatalogEntry(
+          id: 'voa:${section.id}:${item.id}',
+          title: item.title,
+          kind: ReadingCatalogEntryKind.article,
+          level: section.level,
+          path: Uri.parse(item.url).path,
+          subtitle: item.summary.isEmpty ? section.title : item.summary,
+          downloadUrl: item.url,
+          externalUrl: item.url,
+        ),
+    ];
+  }
+
+  Future<ReadingDoc> _downloadBookDash(ReadingCatalogEntry entry) async {
+    final String slug = entry.path.trim();
+    if (!RegExp(r'^[a-z0-9-]+$').hasMatch(slug)) {
+      throw StateError('无效的 Book Dash 书目');
+    }
+    final BookDashText story = parseBookDashMarkdown(
+      await _getString(bookDashRawUrl(slug)),
+    );
+    if (story.body.trim().length < 40) {
+      throw StateError('这本还没有可阅读的英文正文');
+    }
+    Map<String, String> credits = const <String, String>{};
+    try {
+      credits = parseBookDashCredits(await _getString(bookDashPageUrl(slug)));
+    } catch (_) {
+      credits = const <String, String>{};
+    }
+    final String credit = bookDashAttribution(slug: slug, credits: credits);
+    final String title = story.title.isEmpty ? entry.title : story.title;
+    final String zh = readingTitleZhFor(title, titleZh: entry.titleZh) ?? '';
+    return ReadingDoc(
+      id: entry.stableDocId,
+      title: readingDisplayTitle(title, titleZh: zh),
+      titleZh: zh,
+      sourceType: ReadingSourceType.catalog,
+      level: 'A1',
+      plainText: '${story.body.trim()}\n\n$credit',
+      sourceLabel: 'Book Dash',
+      courseTitle: 'Book Dash · CC BY 4.0',
+      episodeTitle: credits.values.join(' · '),
+      createdAt: DateTime.now(),
+    );
+  }
+
+  Future<ReadingDoc> _downloadVoa(ReadingCatalogEntry entry) async {
+    final String url = (entry.downloadUrl ?? '').trim();
+    final Uri? uri = Uri.tryParse(url);
+    if (uri == null ||
+        uri.host != 'learningenglish.voanews.com' ||
+        !RegExp(r'^/a/(?:[a-z0-9-]+/)?\d+\.html$').hasMatch(uri.path)) {
+      throw StateError('无效的 VOA 文章地址');
+    }
+    final VoaArticle article = parseVoaArticle(await _getString(url));
+    if (article.wireService) {
+      throw StateError('这篇不是 VOA 自有稿');
+    }
+    if (article.text.trim().length < 80) {
+      throw StateError('没能从页面提取正文');
+    }
+    final String title = article.title.isEmpty ? entry.title : article.title;
+    final String zh = readingTitleZhFor(title, titleZh: entry.titleZh) ?? '';
+    return ReadingDoc(
+      id: entry.stableDocId,
+      title: readingDisplayTitle(title, titleZh: zh),
+      titleZh: zh,
+      sourceType: ReadingSourceType.catalog,
+      level: entry.level,
+      plainText: '${article.text.trim()}\n\n$kVoaCredit',
+      sourceLabel: 'VOA Learning English',
+      courseTitle: 'VOA Learning English · learningenglish.voanews.com',
+      episodeTitle: entry.subtitle,
+      createdAt: DateTime.now(),
+    );
+  }
+
   Future<ReadingDoc> _downloadPlainText({
     required ReadingCatalogEntry entry,
     required String sourceLabel,
@@ -621,7 +828,8 @@ class ReadingCatalogClient {
         'https://raw.githubusercontent.com/nishkalavallabhi/OneStopEnglishCorpus/master/${entry.path.split('/').map(Uri.encodeComponent).join('/')}';
     final String text = (await _getString(url)).trim();
     if (text.isEmpty) throw StateError('正文为空');
-    final String zh = readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
+    final String zh =
+        readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
     return ReadingDoc(
       id: entry.stableDocId,
       title: readingDisplayTitle(entry.title, titleZh: zh),
@@ -654,7 +862,8 @@ class ReadingCatalogClient {
           .trim();
     }
     if (text.isEmpty) throw StateError('故事正文为空');
-    final String zh = readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
+    final String zh =
+        readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
     return ReadingDoc(
       id: entry.stableDocId,
       title: readingDisplayTitle(entry.title, titleZh: zh),
@@ -709,7 +918,8 @@ class ReadingCatalogClient {
     if (data == null || data.isEmpty) throw StateError('EPUB 下载失败');
     final String text = parseEpubImport(Uint8List.fromList(data));
     if (text.trim().isEmpty) throw StateError('未能从 EPUB 提取正文');
-    final String zh = readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
+    final String zh =
+        readingTitleZhFor(entry.title, titleZh: entry.titleZh) ?? '';
     return ReadingDoc(
       id: entry.stableDocId,
       title: readingDisplayTitle(entry.title, titleZh: zh),

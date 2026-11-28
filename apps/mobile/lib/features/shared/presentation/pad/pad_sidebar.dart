@@ -118,13 +118,9 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
     final bool compact = width < 1180;
     final double windowControlsInset =
         defaultTargetPlatform == TargetPlatform.macOS ? 28 : 0;
-    final List<AppNavDestination> items = AppNavDestination.values
-        .where(
-          (AppNavDestination destination) =>
-              destination.showInNav &&
-              destination != AppNavDestination.settings,
-        )
-        .toList(growable: false);
+    // Same primary IA as phone AppNavRail (design mock 7).
+    final List<AppNavDestination> items =
+        AppNavDestination.sidebarRailDestinations;
 
     return Container(
       width: compact ? 196 : 220,
@@ -217,11 +213,17 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
                       child: DecoratedBox(
                         decoration: BoxDecoration(
                           color: selected
-                              ? AppDesignTokens.brandGreen
+                              ? AppDesignTokens.navAccent
                               : Colors.transparent,
                           borderRadius: BorderRadius.circular(24),
                           boxShadow: selected
-                              ? AppDesignTokens.toyButtonShadow
+                              ? <BoxShadow>[
+                                  BoxShadow(
+                                    color: AppDesignTokens.navAccent
+                                        .withValues(alpha: 0.45),
+                                    offset: const Offset(0, 5),
+                                  ),
+                                ]
                               : const <BoxShadow>[],
                         ),
                         child: Padding(
@@ -246,7 +248,7 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
                                         ? destination.activeIcon
                                         : destination.icon,
                                     color: selected
-                                        ? AppDesignTokens.brandGreenDark
+                                        ? AppDesignTokens.navAccent
                                         : AppDesignTokens.textSecondary,
                                     size: compact ? 21 : 23,
                                   ),

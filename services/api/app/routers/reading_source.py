@@ -2,7 +2,7 @@
 import hashlib
 import re
 from pathlib import Path
-from urllib.parse import urlparse,unquote
+from urllib.parse import parse_qs,urlparse,unquote
 import httpx
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import Response
@@ -37,9 +37,24 @@ def allowed(url):
         'xckevin/magic-english-buddy',
         'lilinji/English',
     )
-    if u.hostname=='raw.githubusercontent.com':return any(u.path.startswith('/'+r+'/') for r in _gh_repos)
-    if u.hostname=='api.github.com':return any(u.path.startswith('/repos/'+r+'/contents') for r in _gh_repos)
-    return u.hostname=='standardebooks.org' and u.path.startswith(('/ebooks/','/feeds/'))
+    if u.hostname=='raw.githubusercontent.com':
+        if re.fullmatch(r'/bookdash/bookdash-books/gh-pages/[a-z0-9-]+/en/index\.md', u.path):
+            return True
+        return any(u.path.startswith('/'+r+'/') for r in _gh_repos)
+    if u.hostname=='api.github.com':
+        if u.path=='/repos/bookdash/bookdash-books/git/trees/gh-pages':
+            return set(parse_qs(u.query))<= {'recursive'}
+        return any(u.path.startswith('/repos/'+r+'/contents') for r in _gh_repos)
+    if u.hostname in ('bookdash.org','www.bookdash.org'):
+        return re.fullmatch(r'/books/[a-z0-9-]+/?', u.path) is not None
+    if u.hostname=='learningenglish.voanews.com':
+        if re.fullmatch(r'/api/[a-z0-9_-]+', u.path): return True
+        return re.fullmatch(r'/a/(?:[a-z0-9-]+/)?\d+\.html', u.path) is not None
+    if u.hostname=='standardebooks.org':
+        if u.path=='/ebooks':
+            return set(parse_qs(u.query))<= {'page','per-page','view','query','sort'}
+        return u.path.startswith(('/ebooks/','/feeds/'))
+    return False
 
 @router.get('/source')
 async def source(url:str=Query(max_length=2048)):

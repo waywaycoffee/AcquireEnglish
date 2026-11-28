@@ -1,11 +1,11 @@
 {
-  "version": "0.2.275",
-  "version_code": 298,
-  "apk_name": "AcquireEnglish-android-0.2.275+298.apk",
+  "version": "0.2.279",
+  "version_code": 302,
+  "apk_name": "AcquireEnglish-android-0.2.279+302.apk",
   "apk_url": "https://acquireenglish.curlhairai.com/downloads/AcquireEnglish-android-latest.apk",
-  "sha256": "9093fb9975129e3d574c07980c2ec535f9b0f2e727cb7d58e5e74977d08e5a5b",
-  "force": true,
+  "sha256": "a18fe549144299f7b4f0b7d3d70abd41660e4f6110d1a559c46a2689537a8ed7",
+  "force": false,
   "min_version_code": 293,
-  "notes": "首页改为「今日学习」配额；词书架扁平化与开源分类直达；K12 教材封面与 PDF 翻页同步朗读；影集字幕匹配与复习打分按钮可见性修复。",
-  "published_at": "2026-11-27T06:06:12+08:00"
+  "notes": "手机侧栏锁定为 7 项（首页·课程·视频·口语·阅读·收藏·历史）；听力改名视频；视频首页分类栏；社区/对战/应试收入「我的」。",
+  "published_at": "2026-11-28T12:30:00+08:00"
 }
