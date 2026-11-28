@@ -104,6 +104,7 @@ services/api/data/exam_bank_vendor/**
 *.jks
 *.keystore
 **/android/key.properties
+**/android/key-legacy.properties
 **/android/keystore/**
 !**/android/keystore/README.md
 
