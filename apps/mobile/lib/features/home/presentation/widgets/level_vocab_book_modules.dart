@@ -48,9 +48,12 @@ class LevelVocabBookModules extends ConsumerWidget {
             icon: const Icon(Icons.school_outlined),
             label: const Text('开始背单词'),
             style: FilledButton.styleFrom(
-              backgroundColor: AppDesignTokens.brandGreen,
+              backgroundColor: AppDesignTokens.navAccent,
               foregroundColor: AppDesignTokens.onAccent,
               minimumSize: const Size.fromHeight(52),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
               textStyle: const TextStyle(
                 fontSize: 17,
                 fontWeight: FontWeight.w800,
@@ -58,16 +61,16 @@ class LevelVocabBookModules extends ConsumerWidget {
             ),
           ),
         ),
-        const SizedBox(height: 12),
+        const SizedBox(height: 16),
         Text(
           '我的词书',
           style: TextStyle(
-            color: AppDesignTokens.textSecondary,
-            fontWeight: FontWeight.w700,
-            fontSize: 12,
+            color: AppDesignTokens.textPrimary,
+            fontWeight: FontWeight.w800,
+            fontSize: 18,
           ),
         ),
-        const SizedBox(height: 10),
+        const SizedBox(height: 12),
         Row(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: <Widget>[
@@ -147,14 +150,14 @@ class _BookModule extends StatelessWidget {
                 aspectRatio: 3 / 4,
                 child: DecoratedBox(
                   decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(16),
                     boxShadow: AppDesignTokens.toyCardShadow,
                     border: Border.all(
-                      color: AppDesignTokens.borderGray.withValues(alpha: 0.5),
+                      color: AppDesignTokens.borderGray.withValues(alpha: 0.45),
                     ),
                   ),
                   child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
+                    borderRadius: BorderRadius.circular(16),
                     child: Image.asset(
                       coverAsset,
                       fit: BoxFit.cover,
@@ -180,6 +183,18 @@ class _BookModule extends StatelessWidget {
                 ),
               ),
               const SizedBox(height: 8),
+              Text(
+                title,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+                textAlign: TextAlign.center,
+                style: TextStyle(
+                  color: AppDesignTokens.textPrimary,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+              const SizedBox(height: 2),
               Text(
                 subtitle,
                 maxLines: 2,

@@ -20,9 +20,9 @@ enum AppNavDestination {
   ),
   library(
     route: '/library',
-    label: '听力',
+    label: '视频',
     title: '视频学习',
-    subtitle: '浏览课程、查看集数进度，并回到上次学习的位置。',
+    subtitle: '精选 · B站 / YouTube；浏览课程、集数进度与本地文件。',
     icon: LucideIcons.clapperboard,
     activeIcon: LucideIcons.clapperboard,
   ),
@@ -67,6 +67,8 @@ enum AppNavDestination {
     subtitle: '真题资料共享、素材协作、同桌与输出互评。',
     icon: Icons.groups_outlined,
     activeIcon: Icons.groups_rounded,
+    showInNav: false,
+    showInBottomNav: false,
   ),
   battle(
     route: '/battle',
@@ -75,6 +77,8 @@ enum AppNavDestination {
     subtitle: '打卡比武与近期单词 PK，和同桌比一比。',
     icon: Icons.sports_esports_outlined,
     activeIcon: Icons.sports_esports_rounded,
+    showInNav: false,
+    showInBottomNav: false,
   ),
   exam(
     route: '/exam',
@@ -83,6 +87,8 @@ enum AppNavDestination {
     subtitle: '专项、模考、错题本与社区真题；可链 K12 教材书架。',
     icon: Icons.school_outlined,
     activeIcon: Icons.school_rounded,
+    showInNav: false,
+    showInBottomNav: false,
   ),
   review(
     route: '/review',
@@ -143,7 +149,9 @@ enum AppNavDestination {
   final bool showInNav;
   final bool showInBottomNav;
 
-  /// Primary left-rail order (feature-entry-map). Settings sits under the rail.
+  /// Primary left-rail order (design mock): 首页·课程·视频·口语·阅读·收藏·历史.
+  /// 社区 / 对战 / 应试 stay secondary under 我的 — not on the primary rail.
+  /// Settings (我的) sits under the rail footer.
   static const List<AppNavDestination> sidebarRailDestinations =
       <AppNavDestination>[
         home,
@@ -153,9 +161,6 @@ enum AppNavDestination {
         reading,
         phrases,
         growth,
-        discover,
-        battle,
-        exam,
       ];
 
   /// Legacy name kept for tests / tour helpers — same as sidebar rail.

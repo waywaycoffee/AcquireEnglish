@@ -71,6 +71,7 @@ import 'widgets/course_resource_directory_dialog.dart';
 import 'widgets/library_course_card.dart';
 import 'widgets/library_course_list_item.dart';
 import 'widgets/library_feed_card.dart';
+import 'widgets/video_home_categories_view.dart';
 
 export 'library_browse.dart'
     show LibraryCourseSort, LibraryCourseViewMode;
@@ -128,6 +129,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
   String? cefrFilter;
   String query = '';
   bool editMode = false;
+  /// When true, show classic B站 shelf/list instead of Pencil video-home rows.
+  bool preferClassicLibrary = false;
   bool showScrollToTop = false;
   Timer? _biliSearchDebounce;
   bool _biliSearching = false;
@@ -524,6 +527,13 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
 
     final bool canContinueLearning =
         ref.watch(continueLearningTargetProvider) != null;
+    final bool showVideoHome = !showImport &&
+        !showDetail &&
+        !editMode &&
+        !widget.selectForStudy &&
+        !preferClassicLibrary &&
+        shelfTab == LibraryShelfTab.bilibili &&
+        query.trim().isEmpty;
     return PadScaffold(
       // Always show: morphs to「补字幕」while fill jobs run (detail + list).
       showContinueLearning: !widget.selectForStudy,
@@ -534,6 +544,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ? '导入影视'
             : showDetail
             ? selectedCourse.title
+            : showVideoHome
+            ? '视频'
             : switch (shelfTab) {
                 LibraryShelfTab.bilibili => 'B站',
                 LibraryShelfTab.englishBrowse => '全英可逛',
@@ -547,6 +559,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ? activeEpisode == null
                   ? '暂无剧集'
                   : '第 ${activeEpisode.numberStr} 集'
+            : showVideoHome
+            ? '精选 · B站 / YouTube'
             : '影视库',
         description: widget.selectForStudy
             ? '点视频加入今日计划（可多选）'
@@ -554,6 +568,8 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
             ? '把本地视频和字幕整理成新的学习片库。'
             : showDetail
             ? null
+            : showVideoHome
+            ? '每日精选、TED、口语实战等栏目；顶栏可搜或导入本地文件。'
             : switch (shelfTab) {
                 LibraryShelfTab.bilibili => 'B 站 / 本地短片 · 搜索或导入练耳朵',
                 LibraryShelfTab.englishBrowse =>
@@ -1444,6 +1460,14 @@ class _LibraryScreenState extends ConsumerState<LibraryScreen> {
                 ),
 
               ],
+            )
+          : showVideoHome
+          ? VideoHomeCategoriesView(
+              courses: shelfCourses,
+              onOpenCourse: _handleCourseTap,
+              onMore: (_) {
+                setState(() => preferClassicLibrary = true);
+              },
             )
           : Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,

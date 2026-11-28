@@ -118,13 +118,9 @@ class _PadSidebarState extends ConsumerState<PadSidebar> {
     final bool compact = width < 1180;
     final double windowControlsInset =
         defaultTargetPlatform == TargetPlatform.macOS ? 28 : 0;
-    final List<AppNavDestination> items = AppNavDestination.values
-        .where(
-          (AppNavDestination destination) =>
-              destination.showInNav &&
-              destination != AppNavDestination.settings,
-        )
-        .toList(growable: false);
+    // Same primary IA as phone AppNavRail (design mock 7).
+    final List<AppNavDestination> items =
+        AppNavDestination.sidebarRailDestinations;
 
     return Container(
       width: compact ? 196 : 220,

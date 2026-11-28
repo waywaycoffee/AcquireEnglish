@@ -285,6 +285,31 @@ class SettingsScreen extends ConsumerWidget {
           ],
           SizedBox(height: context.padSectionGap),
           SettingsGroupCard(
+            title: '更多入口',
+            icon: Icons.apps_rounded,
+            children: <Widget>[
+              _ActionRow(
+                title: '学习社区',
+                description: '素材协作、热门榜、同桌与输出互评',
+                icon: Icons.groups_outlined,
+                onTap: () => context.go(AppNavDestination.discover.route),
+              ),
+              _ActionRow(
+                title: '学习对战',
+                description: '打卡比武与单词 PK',
+                icon: Icons.sports_esports_outlined,
+                onTap: () => context.go(AppNavDestination.battle.route),
+              ),
+              _ActionRow(
+                title: '考试备考',
+                description: '专项、模考、错题本与社区真题',
+                icon: Icons.school_outlined,
+                onTap: () => context.go(AppNavDestination.exam.route),
+              ),
+            ],
+          ),
+          SizedBox(height: context.padSectionGap),
+          SettingsGroupCard(
             title: '课程与偏好',
             icon: Icons.tune_rounded,
             children: <Widget>[

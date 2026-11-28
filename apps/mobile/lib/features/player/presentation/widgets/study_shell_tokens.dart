@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 /// Pencil「Study Player · 深色 / 浅色」palette.
 class StudyShellColors {
@@ -53,9 +53,9 @@ class StudyShellColors {
     card: Color(0xFF22252E),
     cardActive: Color(0xFF2A2E38),
     border: Color(0xFF343845),
-    borderActive: Color(0xFF4B8EFF),
-    accent: Color(0xFF4B8EFF),
-    accentSoft: Color(0xFF2A4A7A),
+    borderActive: Color(0xFFF26D5B),
+    accent: Color(0xFFF26D5B),
+    accentSoft: Color(0xFF3D2A28),
     accentOn: Color(0xFFFFFFFF),
     textPrimary: Color(0xFFFFFFFF),
     textSecondary: Color(0xFF9AA0AE),
@@ -127,3 +127,4 @@ class StudyShellTokens {
   static const Color lightTextPrimary = Color(0xFF111827);
   static const Color lightTextSecondary = Color(0xFF6B7280);
 }
+

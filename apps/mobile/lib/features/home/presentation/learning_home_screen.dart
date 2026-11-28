@@ -27,6 +27,7 @@ import '../../reading/presentation/reading_iplus1_provider.dart';
 import '../../reading/presentation/reading_library_provider.dart';
 import '../../shared/presentation/pad/app_design_tokens.dart';
 import '../../shared/presentation/pad/pad_scaffold.dart';
+import '../../shared/presentation/shell_top_chrome.dart';
 import '../../../router/app_router.dart';
 import '../../sync/data/acquire_api_client.dart';
 import '../../sync/presentation/cloud_catalog_sync.dart';
@@ -234,12 +235,11 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
       // Fallback while lexicon loads: keep a short builtin slice.
       return readingLibrary.builtin.take(3).toList(growable: false);
     }();
-    final bool dark = Theme.of(context).brightness == Brightness.dark;
-    final Color bg = dark ? const Color(0xFF141414) : const Color(0xFFF5F5F5);
-    final Color surface = dark ? const Color(0xFF242424) : Colors.white;
-    final Color ink = dark ? const Color(0xFFEEEEEE) : const Color(0xFF292929);
-    final Color muted = dark ? const Color(0xFFAAAAAA) : const Color(0xFF737373);
-    final Color accent = dark ? const Color(0xFFB7D894) : const Color(0xFF284F39);
+    final Color bg = AppDesignTokens.softWhite;
+    final Color surface = AppDesignTokens.appWhite;
+    final Color ink = AppDesignTokens.textPrimary;
+    final Color muted = AppDesignTokens.textSecondary;
+    final Color accent = AppDesignTokens.navAccent;
 
     Widget section(Widget child, {Color? color}) => Container(
       padding: const EdgeInsets.all(16),
@@ -287,8 +287,9 @@ class _LearningHomeScreenState extends ConsumerState<LearningHomeScreen> {
                 constraints: const BoxConstraints(maxWidth: 760),
                 child: ListView(
                   controller: _scrollController,
-                  padding: const EdgeInsets.fromLTRB(24, 24, 24, 96),
+                  padding: const EdgeInsets.fromLTRB(16, 12, 16, 96),
                   children: <Widget>[
+                    const ShellTopChrome(searchHint: '搜索视频'),
                     Row(
                       children: <Widget>[
                         Expanded(

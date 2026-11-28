@@ -12,18 +12,19 @@ void main() {
       <String>[
         '首页',
         '课程',
-        '听力',
+        '视频',
         '口语',
         '阅读',
         '收藏',
         '历史',
-        '社区',
-        '对战',
-        '应试',
       ],
     );
     expect(AppNavDestination.settings.label, '我的');
     expect(AppNavDestination.reading.title, '我的书架');
+    expect(AppNavDestination.library.label, '视频');
+    expect(AppNavDestination.discover.showInNav, isFalse);
+    expect(AppNavDestination.battle.showInNav, isFalse);
+    expect(AppNavDestination.exam.showInNav, isFalse);
   });
 
   testWidgets('phone icon rail shows primary entries without bottom bar', (
