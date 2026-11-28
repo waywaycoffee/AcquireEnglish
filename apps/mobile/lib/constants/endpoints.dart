@@ -161,6 +161,10 @@ class Endpoints {
       'api/netdisk/import-jobs/${Uri.encodeComponent(jobId)}';
   static String netdiskFetchOnlineSubtitles(int importId) =>
       'api/netdisk/imports/$importId/fetch-online-subtitles';
+  static String mediaIdentityResolveNetdisk(int importId) =>
+      'api/media-identity/resolve/netdisk/$importId';
+  static String mediaIdentityState(int mediaIdentityId) =>
+      'api/media-identity/$mediaIdentityId/state';
   static const String rewardsShare = 'api/rewards/share';
   static const String rewardsPoints = 'api/rewards/points';
   static const String rewardsInviteCode = 'api/rewards/invite-code';

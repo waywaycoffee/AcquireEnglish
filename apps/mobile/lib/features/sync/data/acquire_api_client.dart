@@ -57,6 +57,58 @@ class AcquireUser {
   final String? memberNo;
 }
 
+class MediaIdentityResolution {
+  const MediaIdentityResolution({
+    required this.mediaIdentityId,
+    required this.mediaVariantId,
+    required this.canonicalKey,
+    required this.reused,
+  });
+
+  factory MediaIdentityResolution.fromJson(Map<String, dynamic> json) =>
+      MediaIdentityResolution(
+        mediaIdentityId: (json['media_identity_id'] as num).toInt(),
+        mediaVariantId: (json['media_variant_id'] as num).toInt(),
+        canonicalKey: '${json['canonical_key'] ?? ''}',
+        reused: json['reused'] == true,
+      );
+
+  final int mediaIdentityId;
+  final int mediaVariantId;
+  final String canonicalKey;
+  final bool reused;
+}
+
+class MediaLearningState {
+  const MediaLearningState({
+    required this.mediaIdentityId,
+    this.mediaVariantId,
+    this.lastPositionMs = 0,
+    this.lastCueIndex = 0,
+    this.completed = false,
+    this.state = const <String, dynamic>{},
+  });
+
+  factory MediaLearningState.fromJson(Map<String, dynamic> json) =>
+      MediaLearningState(
+        mediaIdentityId: (json['media_identity_id'] as num).toInt(),
+        mediaVariantId: (json['media_variant_id'] as num?)?.toInt(),
+        lastPositionMs: (json['last_position_ms'] as num?)?.toInt() ?? 0,
+        lastCueIndex: (json['last_cue_index'] as num?)?.toInt() ?? 0,
+        completed: json['completed'] == true,
+        state: json['state'] is Map
+            ? Map<String, dynamic>.from(json['state'] as Map)
+            : const <String, dynamic>{},
+      );
+
+  final int mediaIdentityId;
+  final int? mediaVariantId;
+  final int lastPositionMs;
+  final int lastCueIndex;
+  final bool completed;
+  final Map<String, dynamic> state;
+}
+
 class AcquireShareRewardResult {
   const AcquireShareRewardResult({
     required this.awarded,
@@ -2473,9 +2525,9 @@ class AcquireApiClient {
     return rows
         .whereType<Map<dynamic, dynamic>>()
         .map(
-          (Map<dynamic, dynamic> row) => SceneWordLabel.fromJson(
-            Map<String, dynamic>.from(row),
-          ).copyWith(source: 'cloud'),
+          (Map<dynamic, dynamic> row) =>
+              SceneWordLabel.fromJson(Map<String, dynamic>.from(row))
+                  .copyWith(source: 'cloud'),
         )
         .toList(growable: false);
   }
@@ -3415,9 +3467,7 @@ class AcquireApiClient {
     try {
       final Response<dynamic> response = await _dio.post(
         Endpoints.netdiskFetchOnlineSubtitles(importId),
-        queryParameters: <String, dynamic>{
-          if (force) 'force': true,
-        },
+        queryParameters: <String, dynamic>{if (force) 'force': true},
         options: Options(
           sendTimeout: const Duration(seconds: 90),
           receiveTimeout: const Duration(seconds: 90),
@@ -3431,6 +3481,85 @@ class AcquireApiClient {
     } on DioException {
       return false;
     }
+  }
+
+  Future<MediaIdentityResolution> resolveNetdiskMediaIdentity(
+    int importId,
+  ) async {
+    final Response<dynamic> response = await _dio.post(
+      Endpoints.mediaIdentityResolveNetdisk(importId),
+    );
+    return MediaIdentityResolution.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<MediaIdentityResolution> resolveMediaIdentity({
+    required String fileFingerprint,
+    String? contentFingerprint,
+    required String sourceType,
+    String sourceLocatorHash = '',
+    int? fileSize,
+    int? durationMs,
+    String title = '',
+    String seriesTitle = '',
+    int? season,
+    int? episode,
+  }) async {
+    final Response<dynamic> response = await _dio.post(
+      'api/media-identity/resolve',
+      data: <String, dynamic>{
+        'file_fingerprint': fileFingerprint,
+        if ((contentFingerprint ?? '').isNotEmpty)
+          'content_fingerprint': contentFingerprint,
+        'source_type': sourceType,
+        if (sourceLocatorHash.isNotEmpty)
+          'source_locator_hash': sourceLocatorHash,
+        if (fileSize != null) 'file_size': fileSize,
+        if (durationMs != null) 'duration_ms': durationMs,
+        if (title.isNotEmpty) 'title': title,
+        if (seriesTitle.isNotEmpty) 'series_title': seriesTitle,
+        if (season != null) 'season': season,
+        if (episode != null) 'episode': episode,
+        'primary_language': 'en',
+      },
+    );
+    return MediaIdentityResolution.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<MediaLearningState?> mediaLearningState(int mediaIdentityId) async {
+    final Response<dynamic> response = await _dio.get(
+      Endpoints.mediaIdentityState(mediaIdentityId),
+    );
+    if (response.data == null) return null;
+    return MediaLearningState.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
+  }
+
+  Future<MediaLearningState> putMediaLearningState({
+    required int mediaIdentityId,
+    required int mediaVariantId,
+    required int lastPositionMs,
+    required int lastCueIndex,
+    required bool completed,
+    Map<String, dynamic> state = const <String, dynamic>{},
+  }) async {
+    final Response<dynamic> response = await _dio.put(
+      Endpoints.mediaIdentityState(mediaIdentityId),
+      data: <String, dynamic>{
+        'media_variant_id': mediaVariantId,
+        'last_position_ms': lastPositionMs,
+        'last_cue_index': lastCueIndex,
+        'completed': completed,
+        'state': state,
+      },
+    );
+    return MediaLearningState.fromJson(
+      Map<String, dynamic>.from(response.data as Map),
+    );
   }
 
   Future<SharedBilibiliSubtitleUpsertResult> putSharedBilibiliSubtitle({
@@ -3659,9 +3788,9 @@ class AcquireApiClient {
     if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
       return trimmed;
     }
-    return Uri.parse(
-      Endpoints.normalizeBaseUrl(_dio.options.baseUrl),
-    ).resolve(trimmed).toString();
+    return Uri.parse(Endpoints.normalizeBaseUrl(_dio.options.baseUrl))
+        .resolve(trimmed)
+        .toString();
   }
 
   void _rememberReadingSpeechUrl(String key, String url) {
@@ -4480,9 +4609,9 @@ class AcquireApiClient {
     );
     final Map<String, dynamic> result = response.data as Map<String, dynamic>;
     if (result['public_path'] is String)
-      result['share_url'] = Uri.parse(
-        _dio.options.baseUrl,
-      ).resolve(result['public_path'] as String).toString();
+      result['share_url'] = Uri.parse(_dio.options.baseUrl)
+          .resolve(result['public_path'] as String)
+          .toString();
     return result;
   }
 

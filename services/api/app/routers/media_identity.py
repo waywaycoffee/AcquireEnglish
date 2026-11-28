@@ -172,6 +172,54 @@ async def resolve_media(
     )
 
 
+@router.post("/resolve/netdisk/{import_id}", response_model=MediaResolveOut)
+async def resolve_netdisk_media(
+    import_id: int,
+    user: User = Depends(get_current_user),
+    db: AsyncSession = Depends(get_db),
+) -> MediaResolveOut:
+    """Resolve an existing private netdisk import without exposing its path."""
+    from app.models import UserLinkCourse
+
+    link = await db.scalar(
+        select(UserLinkCourse).where(
+            UserLinkCourse.id == import_id,
+            UserLinkCourse.user_id == user.id,
+        )
+    )
+    if link is None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Import not found")
+    source_identity = f"{link.source}:{link.external_id}"
+    payload = MediaResolveIn(
+        file_fingerprint=hashlib.sha256(source_identity.encode()).hexdigest(),
+        source_type="netdisk",
+        source_locator_hash=hashlib.sha256((link.watch_url or "").encode()).hexdigest(),
+        duration_ms=max(0, int(link.duration_sec or 0) * 1000),
+        title=link.title or "",
+        series_title=link.series_title or "",
+        episode=link.episode_index,
+        primary_language="en",
+    )
+    identity, variant, reused = await resolve_media_identity(payload, db)
+    await db.commit()
+    languages = list(
+        (
+            await db.execute(
+                select(SharedMediaSubtitle.language)
+                .where(SharedMediaSubtitle.media_identity_id == identity.id)
+                .distinct()
+            )
+        ).scalars()
+    )
+    return MediaResolveOut(
+        media_identity_id=identity.id,
+        media_variant_id=variant.id,
+        canonical_key=identity.canonical_key,
+        reused=reused,
+        subtitle_languages=sorted(languages),
+    )
+
+
 @router.get("/{media_identity_id}/state", response_model=MediaLearningStateOut | None)
 async def get_learning_state(
     media_identity_id: int,
