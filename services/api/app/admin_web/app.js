@@ -49,6 +49,7 @@
   const titles = {
     dashboard: "可视化看板",
     feedback: "软件优化建议",
+    tts: "TTS 进度监控",
     "exam-assets": "考试资料审核",
     commerce: "订单 / 会员",
     infra: "ECS / 云盘监控",
@@ -67,6 +68,8 @@
     q: "",
   };
   const examAssetsState = { status: "pending" };
+  const ttsState = { auto_refresh: false, selectedId: null };
+  let ttsRefreshTimer = null;
   const commerceState = { status: "", kind: "", offset: 0, limit: 40 };
   const communityState = { offset: 0, limit: 40, total: 0, q: "", status: "" };
   const usageState = { days: 30, day: "" };
@@ -369,6 +372,7 @@
     [
       "dashboard",
       "feedback",
+      "tts",
       "exam-assets",
       "commerce",
       "infra",
@@ -380,6 +384,226 @@
     ].forEach((id) => {
       const panel = $(`panel-${id}`);
       if (panel) panel.classList.toggle("hidden", id !== tab);
+    });
+    if (tab !== "tts") stopTtsAutoRefresh();
+  }
+
+  function stopTtsAutoRefresh() {
+    if (ttsRefreshTimer) {
+      clearInterval(ttsRefreshTimer);
+      ttsRefreshTimer = null;
+    }
+  }
+
+  function syncTtsAutoRefresh() {
+    stopTtsAutoRefresh();
+    if (!ttsState.auto_refresh || state.tab !== "tts") return;
+    ttsRefreshTimer = setInterval(() => {
+      loadTts().catch((e) => console.warn(e));
+    }, 30000);
+  }
+
+  function ttsStatusChip(status) {
+    const s = String(status || "unknown");
+    let cls = "chip muted-chip";
+    if (s === "done" || s === "ready") cls = "chip ok";
+    else if (s === "failed") cls = "chip bad";
+    else if (s === "running" || s === "working") cls = "chip warn";
+    return `<span class="${cls}">${escapeHtml(s)}</span>`;
+  }
+
+  function progressBar(pct) {
+    const n = Number(pct);
+    if (!Number.isFinite(n)) return `<span class="muted">—</span>`;
+    const w = Math.max(0, Math.min(100, n));
+    return `<div>${w.toFixed(1)}%<div class="progress-bar"><span style="width:${w}%"></span></div></div>`;
+  }
+
+  function voicesSummary(voices) {
+    if (!voices || typeof voices !== "object") return "—";
+    return Object.entries(voices)
+      .map(([name, meta]) => {
+        const done = meta?.done_chapters ?? "—";
+        const total = meta?.total ?? "—";
+        return `${name} ${done}/${total}`;
+      })
+      .join(" · ");
+  }
+
+  async function loadTts() {
+    const data = await api("/tts-progress");
+    const summary = data.summary || {};
+    const localJobs = Array.isArray(data.local_jobs) ? data.local_jobs : [];
+    const reading = Array.isArray(data.reading_book_jobs) ? data.reading_book_jobs : [];
+    const badge = $("ttsBadge");
+    if (badge) {
+      badge.textContent = `· 本机 ${num(summary.local_total)} · 运行中 ${num(
+        summary.local_running
+      )} · 书本队列 ${num(summary.reading_book_total)}`;
+    }
+    const kpis = $("ttsKpis");
+    if (kpis) {
+      kpis.innerHTML = `
+        <div class="stat"><span class="muted">本机任务</span><strong>${num(
+          summary.local_total
+        )}</strong></div>
+        <div class="stat"><span class="muted">运行中</span><strong>${num(
+          summary.local_running
+        )}</strong></div>
+        <div class="stat"><span class="muted">已完成</span><strong>${num(
+          summary.local_done
+        )}</strong></div>
+        <div class="stat"><span class="muted">失败</span><strong>${num(
+          summary.local_failed
+        )}</strong></div>
+        <div class="stat"><span class="muted">阅读书本队列</span><strong>${num(
+          summary.reading_book_total
+        )}</strong></div>`;
+    }
+
+    const localEl = $("ttsLocalList");
+    if (!localJobs.length) {
+      localEl.innerHTML = `<p class="empty">尚无 CosyVoice 上报。在 5060 Ti 运行 tools/cosyvoice/report_tts_progress.py</p>`;
+    } else {
+      localEl.innerHTML = `<table>
+        <thead><tr>
+          <th>任务</th><th>状态</th><th>进度</th><th>当前</th><th>音色章节</th><th>PID</th><th>上报时间</th><th>错误</th>
+        </tr></thead>
+        <tbody>${localJobs
+          .map((job) => {
+            const when = job.reported_at
+              ? new Date(job.reported_at).toLocaleString("zh-CN")
+              : "—";
+            const cur = [
+              job.current_voice || "",
+              job.current_chapter != null ? `ch.${job.current_chapter}` : "",
+            ]
+              .filter(Boolean)
+              .join(" ");
+            const err = job.last_error
+              ? escapeHtml(String(job.last_error).slice(0, 60))
+              : "—";
+            const pidLabel =
+              job.pid_alive === true
+                ? `活 ${job.pid ?? ""}`
+                : job.pid_alive === false
+                  ? `停 ${job.pid ?? ""}`
+                  : "—";
+            return `<tr class="tts-row" data-id="${escapeAttr(job.job_id)}">
+              <td><strong>${escapeHtml(job.title || job.job_id)}</strong>
+                <div class="muted">${escapeHtml(job.engine || "")}</div></td>
+              <td>${ttsStatusChip(job.status)}</td>
+              <td>${progressBar(job.percent)}</td>
+              <td>${escapeHtml(cur || "—")}</td>
+              <td><div class="tts-voices">${escapeHtml(
+                voicesSummary(job.voices)
+              )}</div></td>
+              <td>${escapeHtml(pidLabel)}</td>
+              <td>${escapeHtml(when)}</td>
+              <td>${err}</td>
+            </tr>`;
+          })
+          .join("")}</tbody></table>`;
+      localEl.querySelectorAll(".tts-row").forEach((row) => {
+        row.addEventListener("click", () => {
+          ttsState.selectedId = row.dataset.id;
+          showTtsDetail(localJobs.find((j) => j.job_id === row.dataset.id));
+        });
+      });
+    }
+
+    const readingEl = $("ttsReadingList");
+    const readingOk = reading.filter((r) => r && r.doc_id);
+    if (!readingOk.length) {
+      readingEl.innerHTML = `<p class="empty">暂无阅读书本预生成任务</p>`;
+    } else {
+      readingEl.innerHTML = `<table>
+        <thead><tr>
+          <th>doc_id</th><th>音色</th><th>状态</th><th>页进度</th><th>%</th><th>错误</th>
+        </tr></thead>
+        <tbody>${readingOk
+          .map((r) => {
+            return `<tr>
+              <td>${escapeHtml(r.doc_id)}</td>
+              <td>${escapeHtml(r.voice || "")}</td>
+              <td>${ttsStatusChip(r.state)}</td>
+              <td>${num(r.pages_ready)} / ${num(r.pages_total)}</td>
+              <td>${progressBar(r.percent)}</td>
+              <td>${escapeHtml(r.error || "—")}</td>
+            </tr>`;
+          })
+          .join("")}</tbody></table>`;
+    }
+
+    if (ttsState.selectedId) {
+      const selected = localJobs.find((j) => j.job_id === ttsState.selectedId);
+      if (selected) showTtsDetail(selected);
+    }
+    syncTtsAutoRefresh();
+  }
+
+  function showTtsDetail(job) {
+    const detail = $("ttsDetail");
+    if (!detail || !job) return;
+    detail.classList.remove("hidden");
+    const paths = job.paths || {};
+    const voiceRows = Object.entries(job.voices || {})
+      .map(
+        ([name, meta]) =>
+          `<div><span class="muted">${escapeHtml(name)}</span><strong>${num(
+            meta.done_chapters
+          )} / ${num(meta.total)}</strong></div>`
+      )
+      .join("");
+    detail.innerHTML = `
+      <h3>任务详情 · ${escapeHtml(job.title || job.job_id)}</h3>
+      <div class="tts-detail-grid">
+        <div><span class="muted">job_id</span><strong>${escapeHtml(
+          job.job_id
+        )}</strong></div>
+        <div><span class="muted">状态</span><strong>${ttsStatusChip(
+          job.status
+        )}</strong></div>
+        <div><span class="muted">进度</span><strong>${
+          job.percent == null ? "—" : Number(job.percent).toFixed(1) + "%"
+        }</strong></div>
+        <div><span class="muted">当前章节</span><strong>${escapeHtml(
+          String(job.current_chapter ?? "—")
+        )}</strong></div>
+        <div><span class="muted">当前音色</span><strong>${escapeHtml(
+          job.current_voice || "—"
+        )}</strong></div>
+        <div><span class="muted">PID</span><strong>${escapeHtml(
+          String(job.pid ?? "—")
+        )} (${
+          job.pid_alive === true ? "运行中" : job.pid_alive === false ? "已停止" : "未知"
+        })</strong></div>
+        <div><span class="muted">output_dir</span><strong>${escapeHtml(
+          paths.output_dir || "—"
+        )}</strong></div>
+        <div><span class="muted">progress.json</span><strong>${escapeHtml(
+          paths.progress_json || "—"
+        )}</strong></div>
+        <div><span class="muted">female_aria</span><strong>${escapeHtml(
+          paths.female_dir || "—"
+        )}</strong></div>
+        <div><span class="muted">male_guy</span><strong>${escapeHtml(
+          paths.male_dir || "—"
+        )}</strong></div>
+        ${voiceRows}
+      </div>
+      ${
+        job.last_error
+          ? `<p class="fail-reason">${escapeHtml(job.last_error)}</p>`
+          : ""
+      }
+      <div class="login-actions" style="margin-top:12px">
+        <button type="button" class="btn ghost" id="ttsCloseDetailBtn">关闭详情</button>
+      </div>`;
+    $("ttsCloseDetailBtn")?.addEventListener("click", () => {
+      ttsState.selectedId = null;
+      detail.classList.add("hidden");
+      detail.innerHTML = "";
     });
   }
 
@@ -961,6 +1185,7 @@
   }
   function logout() {
     stopUserRegistrationWatch();
+    stopTtsAutoRefresh();
     hideNewUserModal();
     state.token = "";
     localStorage.removeItem(TOKEN_KEY);
@@ -1010,6 +1235,9 @@
     }
     if (state.tab === "community") {
       loadCommunityPosts().catch((e) => console.warn(e));
+    }
+    if (state.tab === "tts") {
+      loadTts().catch((e) => console.warn(e));
     }
     if (state.selectedId) await loadDetail(state.selectedId);
     startUserRegistrationWatch();
@@ -1208,7 +1436,7 @@
   }
 
   async function loadDashboard() {
-    const [users, learning, pnl, infra, feedbackPeek, pendingAssets, commerce, dailyUsage] =
+    const [users, learning, pnl, infra, feedbackPeek, pendingAssets, commerce, dailyUsage, ttsPeek] =
       await Promise.all([
         api("/analytics/users?days=90"),
         api("/analytics/learning"),
@@ -1218,6 +1446,7 @@
         api("/exam-assets?status=pending&limit=200").catch(() => []),
         api("/commerce/overview").catch(() => null),
         api("/usage/daily").catch(() => null),
+        api("/tts-progress?limit=5").catch(() => null),
       ]);
     const host = (infra && infra.host) || {};
     const mem = host.memory || {};
@@ -1230,6 +1459,7 @@
     const cloudTok = (dailyUsage && dailyUsage.cloud_tokens) || 0;
     const cloudCny = (dailyUsage && dailyUsage.cloud_cost_cny) || 0;
     const cloudAlert = !!(dailyUsage && dailyUsage.alert);
+    const ttsSum = (ttsPeek && ttsPeek.summary) || {};
     const el = $("panel-dashboard");
     el.innerHTML = `
       <div class="kpi-row">
@@ -1252,6 +1482,10 @@
           <button type="button" class="btn ghost dash-jump" data-tab="feedback">去处理</button></div>
         <div class="stat"><span class="muted">待审考试资料</span><strong>${num(pendingList.length)}</strong>
           <button type="button" class="btn ghost dash-jump" data-tab="exam-assets">去审核</button></div>
+        <div class="stat"><span class="muted">TTS 运行中 / 本机</span><strong>${num(
+          ttsSum.local_running
+        )} / ${num(ttsSum.local_total)}</strong>
+          <button type="button" class="btn ghost dash-jump" data-tab="tts">看进度</button></div>
         <div class="stat"><span class="muted">试用延展已兑</span><strong>${num(
           trial.extend_redeemed
         )} / ${num(trial.extend_coupons)}</strong>
@@ -2504,7 +2738,13 @@
   });
   on("saveTokenBtn", "click", saveTokenToLocal);
   on("logoutBtn", "click", logout);
-  on("refreshBtn", "click", () => bootstrap().catch((e) => alert(e.message)));
+  on("refreshBtn", "click", () => {
+    if (state.tab === "tts") {
+      loadTts().catch((e) => alert(e.message));
+      return;
+    }
+    bootstrap().catch((e) => alert(e.message));
+  });
   on("searchForm", "submit", (e) => {
     e.preventDefault();
     state.q = $("searchInput").value.trim();
@@ -2524,6 +2764,7 @@
       setTab(btn.dataset.tab);
       if (btn.dataset.tab === "dashboard") loadDashboard().catch((e) => alert(e.message));
       if (btn.dataset.tab === "feedback") loadFeedback().catch((e) => alert(e.message));
+      if (btn.dataset.tab === "tts") loadTts().catch((e) => alert(e.message));
       if (btn.dataset.tab === "exam-assets") loadExamAssets().catch((e) => alert(e.message));
       if (btn.dataset.tab === "commerce") loadCommerce().catch((e) => alert(e.message));
       if (btn.dataset.tab === "infra") loadInfra().catch((e) => alert(e.message));
@@ -2532,6 +2773,15 @@
       if (btn.dataset.tab === "fingerprint") loadFingerprint().catch((e) => alert(e.message));
       if (btn.dataset.tab === "community") loadCommunityPosts().catch((e) => alert(e.message));
     });
+  });
+  on("ttsFilterForm", "submit", (e) => {
+    e.preventDefault();
+    ttsState.auto_refresh = Boolean($("ttsAutoRefresh")?.checked);
+    loadTts().catch((err) => alert(err.message));
+  });
+  on("ttsAutoRefresh", "change", () => {
+    ttsState.auto_refresh = Boolean($("ttsAutoRefresh")?.checked);
+    syncTtsAutoRefresh();
   });
   on("communitySearchForm", "submit", (e) => {
     e.preventDefault();

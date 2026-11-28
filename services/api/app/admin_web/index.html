@@ -5,7 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>AcquireEnglish 运营后台</title>
   <meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate" />
-  <link rel="stylesheet" href="./styles.css?v=20261126a" />
+  <link rel="stylesheet" href="./styles.css?v=20261128b" />
 </head>
 <body>
   <div id="loginView" class="shell login-shell hidden">
@@ -51,6 +51,7 @@
     <nav class="tabs" id="tabs">
       <button type="button" data-tab="dashboard" class="tab active">看板</button>
       <button type="button" data-tab="feedback" class="tab">优化建议</button>
+      <button type="button" data-tab="tts" class="tab">TTS 进度</button>
       <button type="button" data-tab="exam-assets" class="tab">考试资料审核</button>
       <button type="button" data-tab="commerce" class="tab">订单 / 会员</button>
       <button type="button" data-tab="infra" class="tab">ECS / 云盘监控</button>
@@ -95,6 +96,32 @@
           <button id="feedbackNext" class="btn ghost" type="button">下一页</button>
         </div>
         <p class="muted">App「设置 → 软件优化建议」与首页「优化建议」提交；仅后台可见，不进社区。</p>
+      </div>
+    </section>
+    <section id="panel-tts" class="tab-panel hidden">
+      <div class="panel">
+        <div class="panel-head">
+          <h2>TTS 进度监控 <span id="ttsBadge" class="muted"></span></h2>
+          <form id="ttsFilterForm" class="search">
+            <label class="check-inline">
+              <input id="ttsAutoRefresh" type="checkbox" />
+              30s 自动刷新
+            </label>
+            <button class="btn primary" type="submit">刷新</button>
+          </form>
+        </div>
+        <div id="ttsKpis" class="kpi-row"></div>
+        <h3>CosyVoice 本机任务（5060 Ti 上报）</h3>
+        <div id="ttsLocalList" class="table-wrap"></div>
+        <div id="ttsDetail" class="section hidden"></div>
+        <h3 style="margin-top:18px">阅读书本预生成队列（ECS reading-tts-jobs）</h3>
+        <div id="ttsReadingList" class="table-wrap"></div>
+        <p class="muted">
+          Harry Potter CosyVoice：GPU 箱运行
+          <code>python tools/cosyvoice/report_tts_progress.py --loop 60</code>
+          将 <code>progress.json</code> / <code>narrate.pid</code> 推到本页。详见
+          <code>tools/cosyvoice/README.md</code>。
+        </p>
       </div>
     </section>
     <section id="panel-exam-assets" class="tab-panel hidden">
@@ -199,6 +226,6 @@
     </div>
   </div>
 
-  <script src="./app.js?v=20261126a"></script>
+  <script src="./app.js?v=20261128b"></script>
 </body>
 </html>
