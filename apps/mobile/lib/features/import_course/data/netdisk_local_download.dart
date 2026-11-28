@@ -80,10 +80,7 @@ Future<void> _writeAccessMap(Map<String, int> map) async {
   if (!Hive.isBoxOpen('prefs')) {
     return;
   }
-  await Hive.box<String>('prefs').put(
-    _netdiskMediaAccessKey,
-    jsonEncode(map),
-  );
+  await Hive.box<String>('prefs').put(_netdiskMediaAccessKey, jsonEncode(map));
 }
 
 /// Mark a local netdisk video as recently used (playback / download / hit).
@@ -143,11 +140,13 @@ Future<NetdiskMediaPurgeResult> purgeStaleNetdiskMedia({
 }) async {
   final Directory dir = await netdiskMediaDirectory();
   if (!dir.existsSync()) {
-    return const NetdiskMediaPurgeResult(deletedFiles: <String>[], freedBytes: 0);
+    return const NetdiskMediaPurgeResult(
+      deletedFiles: <String>[],
+      freedBytes: 0,
+    );
   }
   final Map<String, int> access = _readAccessMap();
-  final int cutoff =
-      DateTime.now().subtract(maxAge).millisecondsSinceEpoch;
+  final int cutoff = DateTime.now().subtract(maxAge).millisecondsSinceEpoch;
   final List<String> deleted = <String>[];
   int freed = 0;
   final Set<String> keepKeys = <String>{};
@@ -206,8 +205,9 @@ String absoluteNetdiskPlayUrl(String playUrl) {
   if (trimmed.startsWith('http://') || trimmed.startsWith('https://')) {
     return trimmed;
   }
-  final String base = Endpoints.normalizeBaseUrl(Endpoints.baseUrl)
-      .replaceAll(RegExp(r'/$'), '');
+  final String base = Endpoints.normalizeBaseUrl(
+    Endpoints.baseUrl,
+  ).replaceAll(RegExp(r'/$'), '');
   if (trimmed.startsWith('/')) {
     return '$base$trimmed';
   }
@@ -218,9 +218,8 @@ String absoluteNetdiskPlayUrl(String playUrl) {
 ///
 /// Opening the bare `/api/netdisk/play/...` 302 in media_kit without Baidu UA
 /// commonly yields audio-only / long black video on phone.
-Future<({String uri, Map<String, String>? headers})> resolveNetdiskPlayableMedia(
-  String playUrl,
-) async {
+Future<({String uri, Map<String, String>? headers})>
+resolveNetdiskPlayableMedia(String playUrl) async {
   final int? importId = parseNetdiskImportIdFromUrl(playUrl);
   if (importId != null) {
     final File? cached = await findCachedNetdiskMedia(importId);
@@ -262,10 +261,15 @@ Future<({String uri, Map<String, String>? headers})> resolveNetdiskPlayableMedia
   return (uri: startUrl, headers: kNetdiskStreamHeaders);
 }
 
-/// Drama MKV over Baidu progressive HTTP stutters and often blacks out video.
-/// Prefer a full local file before playback; fall back to CDN stream on failure.
+/// Resolve a netdisk episode for **online playback**.
+///
+/// Opening a player must never silently start a full-file download.  Download
+/// after learning is an explicit user action through
+/// [enqueueNetdiskEpisodeDownload].  Keeping these paths mutually exclusive
+/// prevents the player, the current-episode downloader and next-episode
+/// prefetch from competing for the same mobile connection.
 Future<({String uri, Map<String, String>? headers})>
-    prepareNetdiskEpisodeForSmoothPlayback({
+prepareNetdiskEpisodeForSmoothPlayback({
   required String playUrl,
   String? preferredLocalPath,
   void Function(double? progress, String message)? onProgress,
@@ -285,56 +289,14 @@ Future<({String uri, Map<String, String>? headers})>
       return (uri: cached.path, headers: null);
     }
   }
-  final String? idKey =
-      importId?.toString() ?? playUrl.hashCode.toRadixString(16);
-  final NetdiskEpisodeCacheInfo? live = netdiskEpisodeCacheInfoForKey(idKey);
-  if (live != null &&
-      (live.isDownloading || live.isScheduled || live.phase == NetdiskEpisodeCachePhase.partial) &&
-      live.progress != null) {
-    onProgress?.call(
-      live.progress,
-      '继续下载本集 ${(live.progress! * 100).round()}%…',
-    );
-  } else {
-    onProgress?.call(0, '正在准备本集…');
-  }
-  // Kick / join the download, but never block open on a multi‑GB film
-  // (哈利波特 ANR: UI froze while awaiting full download before player.open).
-  final Future<File> downloadFuture = cacheNetdiskEpisodeLocally(
-    playUrl: playUrl,
-    onProgress: (double? p) {
-      if (p == null) {
-        onProgress?.call(null, '后台下载本集…');
-      } else {
-        onProgress?.call(p, '后台下载本集 ${(p * 100).round()}%…');
-      }
-    },
-  );
-  try {
-    final File local = await downloadFuture.timeout(const Duration(seconds: 5));
-    onProgress?.call(1, '本集已就绪');
-    return (uri: local.path, headers: null);
-  } on TimeoutException {
-    onProgress?.call(null, '边下边播（后台继续下载）…');
-    // Keep downloadFuture running via _netdiskDownloadsInFlight.
-    return resolveNetdiskPlayableMedia(playUrl);
-  } catch (e) {
-    // Incomplete download kept as .part — try stream so user can still watch;
-    // next open resumes the .part.
-    final String msg = '$e';
-    onProgress?.call(
-      null,
-      msg.contains('下载未完成') ? '下载未完成，下次续传；先在线缓冲…' : '下载未完成，改用在线缓冲…',
-    );
-    return resolveNetdiskPlayableMedia(playUrl);
-  }
+  onProgress?.call(null, '在线播放（未下载视频）');
+  return resolveNetdiskPlayableMedia(playUrl);
 }
 
-final Set<String> _prefetchInFlightPlayUrls = <String>{};
 final Map<String, Future<File>> _netdiskDownloadsInFlight =
     <String, Future<File>>{};
-final Map<String, Set<void Function(double? progress)>> _netdiskProgressListeners =
-    <String, Set<void Function(double? progress)>>{};
+final Map<String, Set<void Function(double? progress)>>
+_netdiskProgressListeners = <String, Set<void Function(double? progress)>>{};
 final Map<String, NetdiskEpisodeCacheInfo> _episodeCacheSeed =
     <String, NetdiskEpisodeCacheInfo>{};
 NetdiskEpisodeCacheNotifier? _episodeCacheNotifier;
@@ -351,13 +313,7 @@ bool isNetdiskEpisodeDownloadInFlight(String? key) {
   return _netdiskDownloadsInFlight.containsKey(id);
 }
 
-enum NetdiskEpisodeCachePhase {
-  remote,
-  scheduled,
-  partial,
-  downloading,
-  ready,
-}
+enum NetdiskEpisodeCachePhase { remote, scheduled, partial, downloading, ready }
 
 class NetdiskEpisodeCacheInfo {
   const NetdiskEpisodeCacheInfo({
@@ -367,6 +323,7 @@ class NetdiskEpisodeCacheInfo {
   });
 
   final NetdiskEpisodeCachePhase phase;
+
   /// 0–1 when known; null = indeterminate.
   final double? progress;
   final String? localPath;
@@ -414,10 +371,15 @@ class NetdiskEpisodeCacheNotifier
   }
 }
 
-final NotifierProvider<NetdiskEpisodeCacheNotifier,
-        Map<String, NetdiskEpisodeCacheInfo>> netdiskEpisodeCacheProvider =
-    NotifierProvider<NetdiskEpisodeCacheNotifier,
-        Map<String, NetdiskEpisodeCacheInfo>>(NetdiskEpisodeCacheNotifier.new);
+final NotifierProvider<
+  NetdiskEpisodeCacheNotifier,
+  Map<String, NetdiskEpisodeCacheInfo>
+>
+netdiskEpisodeCacheProvider =
+    NotifierProvider<
+      NetdiskEpisodeCacheNotifier,
+      Map<String, NetdiskEpisodeCacheInfo>
+    >(NetdiskEpisodeCacheNotifier.new);
 
 void publishNetdiskEpisodeCache(String key, NetdiskEpisodeCacheInfo info) {
   if (key.trim().isEmpty) return;
@@ -432,10 +394,7 @@ String? netdiskEpisodeCacheKey(LibraryEpisodeItem episode) {
 }
 
 String? netdiskPlayUrlForEpisode(LibraryEpisodeItem episode) {
-  for (final String? raw in <String?>[
-    episode.sourceUrl,
-    episode.videoAsset,
-  ]) {
+  for (final String? raw in <String?>[episode.sourceUrl, episode.videoAsset]) {
     final String value = (raw ?? '').trim();
     if (isNetdiskPlayUrl(value)) {
       return value;
@@ -463,7 +422,8 @@ Future<NetdiskEpisodeCacheInfo> probeNetdiskEpisodeCache(
       localPath: episode.videoAsset!.trim(),
     );
   }
-  final int? importId = parseNetdiskImportIdFromUrl(episode.videoAsset) ??
+  final int? importId =
+      parseNetdiskImportIdFromUrl(episode.videoAsset) ??
       parseNetdiskImportIdFromUrl(episode.sourceUrl);
   if (importId == null) {
     return const NetdiskEpisodeCacheInfo(
@@ -495,9 +455,7 @@ Future<NetdiskEpisodeCacheInfo> probeNetdiskEpisodeCache(
   }
   // Reservation bookkeeping lives in netdisk_drama_reservation.dart; avoid
   // importing it here (cycle). Callers pass [treatAsScheduled] when known.
-  return const NetdiskEpisodeCacheInfo(
-    phase: NetdiskEpisodeCachePhase.remote,
-  );
+  return const NetdiskEpisodeCacheInfo(phase: NetdiskEpisodeCachePhase.remote);
 }
 
 Future<void> refreshNetdiskEpisodeCacheStates(
@@ -551,23 +509,13 @@ Future<File?> enqueueNetdiskEpisodeDownload({
   return file;
 }
 
-/// Warm the next episode while the current one plays from local cache.
+/// Legacy compatibility hook.
+///
+/// Automatic whole-episode prefetch is intentionally disabled.  A caller
+/// must use [enqueueNetdiskEpisodeDownload] after an explicit user action.
 void prefetchNetdiskPlayUrl(String? playUrl) {
-  final String trimmed = (playUrl ?? '').trim();
-  if (!isNetdiskPlayUrl(trimmed)) {
-    return;
-  }
-  if (!_prefetchInFlightPlayUrls.add(trimmed)) {
-    return;
-  }
-  unawaited(() async {
-    try {
-      await cacheNetdiskEpisodeLocally(playUrl: trimmed);
-    } catch (_) {
-    } finally {
-      _prefetchInFlightPlayUrls.remove(trimmed);
-    }
-  }());
+  // No-op by design. Kept while older player screens migrate away from the
+  // hook so a mixed-version build cannot accidentally resume auto-downloads.
 }
 
 /// Download one episode into netdisk_media/{importId}.mkv for smooth local play.
@@ -579,8 +527,8 @@ Future<File> cacheNetdiskEpisodeLocally({
   void Function(double? progress)? onProgress,
 }) async {
   final int? importId = parseNetdiskImportIdFromUrl(playUrl);
-  final String idKey = importId?.toString() ??
-      playUrl.hashCode.toRadixString(16);
+  final String idKey =
+      importId?.toString() ?? playUrl.hashCode.toRadixString(16);
 
   void emit(double? p) {
     if (onProgress != null) {
@@ -590,9 +538,9 @@ Future<File> cacheNetdiskEpisodeLocally({
 
   final Set<void Function(double? progress)> listeners =
       _netdiskProgressListeners.putIfAbsent(
-    idKey,
-    () => <void Function(double? progress)>{},
-  );
+        idKey,
+        () => <void Function(double? progress)>{},
+      );
   listeners.add(emit);
 
   try {
@@ -687,9 +635,7 @@ Future<File> cacheNetdiskEpisodeLocally({
       } else {
         publishNetdiskEpisodeCache(
           idKey,
-          const NetdiskEpisodeCacheInfo(
-            phase: NetdiskEpisodeCachePhase.remote,
-          ),
+          const NetdiskEpisodeCacheInfo(phase: NetdiskEpisodeCachePhase.remote),
         );
       }
       rethrow;
@@ -712,8 +658,9 @@ Future<File> _cacheNetdiskEpisodeLocallyImpl({
   required String idKey,
   void Function(double? progress)? onProgress,
 }) async {
-  final File? existing =
-      importId == null ? null : await findCachedNetdiskMedia(importId);
+  final File? existing = importId == null
+      ? null
+      : await findCachedNetdiskMedia(importId);
   if (existing != null) {
     await touchNetdiskMediaAccess(existing);
     onProgress?.call(1);
@@ -788,11 +735,11 @@ Future<File> _cacheNetdiskEpisodeLocallyImpl({
           },
         ),
         deleteOnError: false,
-        fileAccessMode:
-            resume ? FileAccessMode.append : FileAccessMode.write,
+        fileAccessMode: resume ? FileAccessMode.append : FileAccessMode.write,
         onReceiveProgress: (int received, int total) {
           final int got = offset + received;
-          final int? full = expectedTotal ??
+          final int? full =
+              expectedTotal ??
               (total > 0 ? (resume ? offset + total : total) : null);
           if (full == null || full <= 0) {
             onProgress?.call(null);
@@ -866,7 +813,8 @@ class NetdiskDownloadProgress {
   final int total;
 }
 
-class NetdiskDownloadProgressNotifier extends Notifier<NetdiskDownloadProgress?> {
+class NetdiskDownloadProgressNotifier
+    extends Notifier<NetdiskDownloadProgress?> {
   @override
   NetdiskDownloadProgress? build() => null;
 
@@ -875,7 +823,10 @@ class NetdiskDownloadProgressNotifier extends Notifier<NetdiskDownloadProgress?>
   }
 }
 
-final NotifierProvider<NetdiskDownloadProgressNotifier, NetdiskDownloadProgress?>
+final NotifierProvider<
+  NetdiskDownloadProgressNotifier,
+  NetdiskDownloadProgress?
+>
 netdiskDownloadProgressProvider =
     NotifierProvider<NetdiskDownloadProgressNotifier, NetdiskDownloadProgress?>(
       NetdiskDownloadProgressNotifier.new,
@@ -972,7 +923,8 @@ Future<void> materializeNetdiskSoftsubs({
   // Open path must pass false; only import/download flows opt into Subliminal.
   bool allowOnlineFetch = false,
 }) async {
-  final int? resolvedId = importId ??
+  final int? resolvedId =
+      importId ??
       parseLinkImportId(courseId) ??
       parseNetdiskImportIdFromUrl(episode?.enSubtitleAsset) ??
       parseNetdiskImportIdFromUrl(episode?.cnSubtitleAsset) ??
@@ -1163,8 +1115,8 @@ Future<void> downloadNetdiskCourseToLocal({
         catalog: catalog,
         courseId: courseId,
         importId: importId,
-        episode: ep ??
-            (target.episodes.isNotEmpty ? target.episodes.first : null),
+        episode:
+            ep ?? (target.episodes.isNotEmpty ? target.episodes.first : null),
         allowOnlineFetch: true,
       );
 
@@ -1210,8 +1162,5 @@ Future<File> _downloadPlayUrlToCache({
   // Same resume / in-flight path as playback prepare (netdisk_media/{importId}.mkv).
   // idKey retained for call-site compatibility; cache key is import id from URL.
   assert(idKey.isNotEmpty);
-  return cacheNetdiskEpisodeLocally(
-    playUrl: playUrl,
-    onProgress: onProgress,
-  );
+  return cacheNetdiskEpisodeLocally(playUrl: playUrl, onProgress: onProgress);
 }
